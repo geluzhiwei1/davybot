@@ -1,4 +1,10 @@
 
+# Web UI
+
+![主界面](asserts/web-ui/main.png)
+
+[Web UI 详情](asserts/web-ui/README.md)
+
 # 发布计划
 
 - 开发者预览版本（多平台）： 给有开发经验的专业技术人员试用，需要clone 代码，自行安装运行
