@@ -1,0 +1,573 @@
+/* ============================================================
+   紧凑专业设计系统 - 全局样式覆盖
+   Compact & Professional Design System
+   ============================================================ */
+
+/* ==================== 适度紧凑间距规则 ==================== */
+
+/* 消息容器 - 小间距 */
+.message-area {
+  padding: var(--spacing-sm) !important;
+}
+
+.message-list {
+  gap: var(--spacing-sm) !important;
+  padding: 0 !important;
+}
+
+/* 消息包装器 */
+.message-wrapper {
+  padding: 0 !important;
+  margin-bottom: var(--spacing-sm) !important;
+}
+
+.message-content-wrapper {
+  gap: var(--spacing-xs) !important;
+  padding: 0 !important;
+}
+
+/* 消息卡片 - 适度padding */
+.message-card {
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+  margin: 0 !important;
+}
+
+.user-card,
+.assistant-card {
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+  margin: 0 !important;
+}
+
+/* 独立气泡 */
+.independent-bubble {
+  margin-bottom: var(--spacing-xs) !important;
+  padding: 0 !important;
+}
+
+.reasoning-content,
+.tool-call-content {
+  margin-bottom: var(--spacing-xs) !important;
+  padding: 0 !important;
+}
+
+/* 折叠面板 - 保持可读性 */
+.el-collapse-item__header {
+  padding: var(--spacing-xs) var(--spacing-sm) !important;
+  margin: 0 !important;
+}
+
+.el-collapse-item__content {
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+  margin: 0 !important;
+}
+
+/* 内容块 */
+.content-block {
+  margin-bottom: var(--spacing-xs) !important;
+  padding: 0 !important;
+}
+
+/* 消息时间戳 */
+.message-timestamp {
+  margin-top: var(--spacing-xs) !important;
+  padding: 0 !important;
+}
+
+/* 消息发送者 */
+.message-sender {
+  margin-bottom: var(--spacing-xs) !important;
+  padding: 0 !important;
+}
+
+/* 操作按钮 */
+.message-actions {
+  gap: var(--spacing-xs) !important;
+  margin-top: var(--spacing-xs) !important;
+  padding: 0 !important;
+}
+
+/* 内容区域 */
+.user-message-content,
+.assistant-message-content {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* ==================== 全局变量覆盖 ==================== */
+:root {
+  /* 间距系统 - 紧凑化 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 24px;
+
+  /* 字体大小 - 紧凑化 */
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 14px;
+  --font-size-xl: 16px;
+
+  /* 圆角 - 更小更专业 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+
+  /* 阴影 - 更轻盈 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ==================== 基础组件覆盖 ==================== */
+
+/* 卡片样式 */
+.el-card {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--el-border-color-lighter) !important;
+}
+
+.el-card__header {
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+  border-bottom: 1px solid var(--el-border-color-lighter) !important;
+  font-size: var(--font-size-base) !important;
+  font-weight: 500 !important;
+}
+
+.el-card__body {
+  padding: var(--spacing-md) !important;
+}
+
+/* 按钮样式 */
+.el-button--small {
+  font-size: var(--font-size-xs) !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+}
+
+.el-button--default {
+  border-radius: var(--radius-sm) !important;
+}
+
+/* 输入框样式 */
+.el-input__inner {
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--font-size-base) !important;
+}
+
+.el-textarea__inner {
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--font-size-base) !important;
+}
+
+/* 标签样式 */
+.el-tag {
+  border-radius: var(--radius-xs) !important;
+  font-size: var(--font-size-xs) !important;
+  padding: 2px 8px !important;
+  height: 20px !important;
+}
+
+/* 头像样式 */
+.el-avatar {
+  border-radius: var(--radius-md) !important;
+}
+
+/* ==================== 消息区域样式 ==================== */
+
+/* 消息组容器 */
+.message-group {
+  padding: var(--spacing-xs) var(--spacing-sm) !important;
+  gap: var(--spacing-xs) !important;
+}
+
+/* 用户消息容器 */
+.user-message-container {
+  gap: var(--spacing-xs) !important;
+}
+
+/* AI助手消息容器 */
+.assistant-message-container {
+  gap: var(--spacing-xs) !important;
+}
+
+/* AI助手头部行 - 头像和发送者信息同行 */
+.assistant-header-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--spacing-sm) !important;
+  margin-bottom: var(--spacing-xs) !important;
+}
+
+.assistant-header-row .assistant-avatar {
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+.assistant-header-row .message-sender {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--spacing-xs) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.assistant-header-row .message-time {
+  font-size: var(--font-size-xs) !important;
+  color: var(--el-text-color-secondary) !important;
+}
+
+/* 头像样式 - 紧凑 */
+.user-avatar,
+.assistant-avatar,
+.tool-avatar {
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+}
+
+.user-avatar {
+  background: #e0e0e0 !important;
+  color: #4a4a4a !important;
+}
+
+.user-avatar svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.assistant-avatar {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
+  color: #fff !important;
+}
+
+.assistant-avatar svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* 消息卡片样式 */
+.message-card {
+  border-radius: var(--radius-sm) !important;
+}
+
+.user-card {
+  border-radius: 6px 6px 2px 6px !important;
+  background: #f5f5f5 !important;
+  border: 1px solid #e8e8e8 !important;
+  color: #1a1a1a !important;
+}
+
+.assistant-card {
+  border-radius: 6px 6px 6px 2px !important;
+  border: 1px solid #e0e0e0 !important;
+  background-color: #fff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* 消息发送者信息 */
+.message-sender {
+  font-size: var(--font-size-sm) !important;
+}
+
+/* 消息时间戳 */
+.message-timestamp {
+  font-size: var(--font-size-xs) !important;
+  color: var(--el-text-color-placeholder) !important;
+}
+
+/* ==================== 独立气泡样式 ==================== */
+
+/* 独立气泡基础样式 */
+.independent-bubble {
+  width: 100% !important;
+}
+
+/* 推理气泡 */
+.reasoning-content {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid rgba(230, 162, 60, 0.2) !important;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fffbe6 0%, #fff7d6 100%) !important;
+}
+
+.reasoning-content :deep(.el-collapse-item__header) {
+  background: linear-gradient(135deg, #fffbe6 0%, #fff7d6 100%) !important;
+  border-bottom: 1px solid rgba(230, 162, 60, 0.15) !important;
+  font-size: var(--font-size-xs) !important;
+  min-height: 28px !important;
+}
+
+/* 推理内容详情 */
+.reasoning-content :deep(.reasoning-text) {
+  font-size: var(--font-size-xs) !important;
+  line-height: 1.5 !important;
+}
+
+.reasoning-content :deep(.reasoning-steps) {
+  gap: var(--spacing-xs) !important;
+  margin-top: var(--spacing-xs) !important;
+}
+
+.reasoning-content :deep(.reasoning-step) {
+  padding: var(--spacing-xs) !important;
+  margin-bottom: var(--spacing-xs) !important;
+  font-size: var(--font-size-xs) !important;
+}
+
+/* 工具调用气泡 */
+.tool-call-content {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid var(--el-border-color-light) !important;
+  background-color: var(--el-bg-color) !important;
+}
+
+.tool-call-content :deep(.el-collapse-item__header) {
+  background-color: var(--el-fill-color-lighter) !important;
+  font-size: var(--font-size-xs) !important;
+  min-height: 28px !important;
+}
+
+/* 工具调用详情 */
+.tool-call-content :deep(.tool-details) {
+  gap: var(--spacing-xs) !important;
+}
+
+.tool-call-content :deep(.tool-name) {
+  font-size: var(--font-size-sm) !important;
+  margin-bottom: var(--spacing-xs) !important;
+}
+
+.tool-call-content :deep(.tool-args) {
+  font-size: var(--font-size-xs) !important;
+  padding: var(--spacing-xs) !important;
+}
+
+/* ==================== 侧边栏样式 ==================== */
+
+/* 左侧面板 */
+#left-panel,
+#right-panel {
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* 侧边栏菜单项 */
+.menu-item {
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+  margin: var(--spacing-xs) var(--spacing-sm) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--font-size-base) !important;
+  gap: var(--spacing-sm) !important;
+}
+
+.menu-item:hover {
+  background-color: var(--el-fill-color-light) !important;
+}
+
+/* ==================== 输入区域样式 ==================== */
+
+/* 输入框容器 */
+.input-container {
+  padding: var(--spacing-md) var(--spacing-lg) !important;
+  border-top: 1px solid var(--el-border-color-light) !important;
+  gap: var(--spacing-sm) !important;
+}
+
+/* 发送按钮 */
+.send-button {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+/* ==================== 消息内容样式 ==================== */
+
+/* 内容块 */
+.content-block p {
+  line-height: 1.5 !important;
+}
+
+/* 全屏标题 */
+.assistant-message-header {
+  padding: var(--spacing-xs) var(--spacing-sm) !important;
+  font-size: var(--font-size-sm) !important;
+  min-height: 32px !important;
+}
+
+/* 编辑模式 */
+.edit-mode {
+  padding: 0 !important;
+}
+
+.edit-actions {
+  gap: var(--spacing-xs) !important;
+  margin-top: var(--spacing-xs) !important;
+}
+
+/* ==================== 滚动条优化 ==================== */
+
+::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 3px !important;
+  background: var(--el-border-color-darker) !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--el-text-color-secondary) !important;
+}
+
+/* ==================== 动画优化 ==================== */
+
+/* 减少动画时间，提升响应速度 */
+.el-transition {
+  transition-duration: 0.2s !important;
+}
+
+/* 淡入动画 - 更快 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInBubble {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== 字体优化 ==================== */
+
+/* 代码字体 */
+code, pre {
+  font-size: var(--font-size-xs) !important;
+  line-height: 1.5 !important;
+}
+
+pre {
+  padding: var(--spacing-sm) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+/* ==================== 间距工具类 ==================== */
+
+.compact-mt-xs { margin-top: var(--spacing-xs) !important; }
+.compact-mt-sm { margin-top: var(--spacing-sm) !important; }
+.compact-mt-md { margin-top: var(--spacing-md) !important; }
+
+.compact-mb-xs { margin-bottom: var(--spacing-xs) !important; }
+.compact-mb-sm { margin-bottom: var(--spacing-sm) !important; }
+.compact-mb-md { margin-bottom: var(--spacing-md) !important; }
+
+.compact-p-xs { padding: var(--spacing-xs) !important; }
+.compact-p-sm { padding: var(--spacing-sm) !important; }
+.compact-p-md { padding: var(--spacing-md) !important; }
+
+.compact-gap-xs { gap: var(--spacing-xs) !important; }
+.compact-gap-sm { gap: var(--spacing-sm) !important; }
+.compact-gap-md { gap: var(--spacing-md) !important; }
+
+/* ==================== 颜色系统 ==================== */
+
+/* 背景色 */
+.bg-surface-1 {
+  background-color: #fafafa;
+}
+
+.bg-surface-2 {
+  background-color: #f5f5f5;
+}
+
+/* 边框色 */
+.border-light {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.border-subtle {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* 文字颜色 */
+.text-primary {
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.text-secondary {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.text-tertiary {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* ==================== 响应式调整 ==================== */
+
+@media (max-width: 768px) {
+  :root {
+    --spacing-lg: 12px;
+    --spacing-xl: 16px;
+  }
+}
+
+/* ==================== Element Plus 组件覆盖 ==================== */
+
+/* 对话框 */
+.el-dialog {
+  border-radius: var(--radius-md) !important;
+}
+
+.el-dialog__header {
+  padding: var(--spacing-md) var(--spacing-lg) !important;
+}
+
+.el-dialog__body {
+  padding: var(--spacing-md) var(--spacing-lg) !important;
+}
+
+/* 抽屉 */
+.el-drawer {
+  --el-drawer-padding-primary: var(--spacing-lg) !important;
+}
+
+/* 表格 */
+.el-table {
+  font-size: var(--font-size-base) !important;
+}
+
+.el-table th,
+.el-table td {
+  padding: var(--spacing-sm) var(--spacing-md) !important;
+}
+
+/* 分页 */
+.el-pagination {
+  gap: var(--spacing-sm) !important;
+}
+
+.el-pager li {
+  min-width: 28px !important;
+  height: 28px !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--font-size-xs) !important;
+}

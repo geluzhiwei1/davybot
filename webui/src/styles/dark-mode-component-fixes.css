@@ -1,0 +1,264 @@
+/* ========================================
+   COMPONENT-SPECIFIC DARK MODE FIXES
+   Specific component overrides for ChatView
+   ======================================== */
+
+/* These fixes work with the main dark-mode-comprehensive.css */
+
+/* ====================
+   CHATVIEW SPECIFIC FIXES
+   ==================== */
+
+.theme-dark .chat-container .activity-bar,
+[data-theme="dark"] .chat-container .activity-bar {
+  background: rgba(17, 24, 39, 0.98) !important;
+}
+
+/* Fix content panel backgrounds in dark mode */
+.theme-dark .chat-container .content-panel,
+.theme-dark .chat-container .left-panel,
+[data-theme="dark"] .chat-container .content-panel,
+[data-theme="dark"] .chat-container .left-panel {
+  background: rgba(17, 24, 39, 0.98) !important;
+}
+
+/* Fix header backgrounds in dark mode */
+.theme-dark .chat-container .el-header,
+[data-theme="dark"] .chat-container .el-header {
+  background: rgba(17, 24, 39, 0.98) !important;
+}
+
+/* Fix footer backgrounds in dark mode */
+.theme-dark .chat-container .el-footer,
+[data-theme="dark"] .chat-container .el-footer {
+  background: rgba(17, 24, 39, 0.98) !important;
+}
+
+/* Fix right panel backgrounds in dark mode */
+.theme-dark .chat-container .right-panel,
+[data-theme="dark"] .chat-container .right-panel {
+  background: rgba(17, 24, 39, 0.98) !important;
+}
+
+/* ====================
+   STATUS INDICATOR FIXES
+   ==================== */
+
+.theme-dark .status-indicator,
+[data-theme="dark"] .status-indicator {
+  color: var(--color-text-primary);
+}
+
+.theme-dark .status-dot,
+[data-theme="dark"] .status-dot {
+  background: currentColor;
+}
+
+/* ====================
+   SIDEPANEL SPECIFIC FIXES
+   ==================== */
+
+/* Fix sidebar tabs in dark mode */
+.theme-dark .sidebar-tabs .tab-button,
+[data-theme="dark"] .sidebar-tabs .tab-button {
+  background: var(--color-surface-3);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
+}
+
+.theme-dark .sidebar-tabs .tab-button:hover,
+[data-theme="dark"] .sidebar-tabs .tab-button:hover {
+  background: var(--color-surface-4);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-light);
+}
+
+.theme-dark .sidebar-tabs .tab-button.active,
+[data-theme="dark"] .sidebar-tabs .tab-button.active {
+  background: rgba(var(--color-primary-rgb), 0.15);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Fix conversation menu items in dark mode */
+.theme-dark .conversation-menu,
+[data-theme="dark"] .conversation-menu {
+  background: transparent;
+  border: none;
+}
+
+.theme-dark .conversation-menu-item,
+[data-theme="dark"] .conversation-menu-item {
+  color: var(--color-text-secondary);
+}
+
+.theme-dark .conversation-menu-item:hover,
+[data-theme="dark"] .conversation-menu-item:hover {
+  background: var(--color-surface-3);
+}
+
+.theme-dark .conversation-menu-item.is-active,
+[data-theme="dark"] .conversation-menu-item.is-active {
+  background: rgba(var(--color-primary-rgb), 0.12);
+  color: var(--color-primary);
+}
+
+.theme-dark .conv-title,
+[data-theme="dark"] .conv-title {
+  color: var(--color-text-primary);
+}
+
+.theme-dark .conv-date,
+[data-theme="dark"] .conv-date {
+  color: var(--color-text-tertiary);
+}
+
+/* ====================
+   FILE TREE SPECIFIC FIXES
+   ==================== */
+
+.theme-dark .section-header h4,
+[data-theme="dark"] .section-header h4 {
+  color: var(--color-text-primary);
+}
+
+.theme-dark .custom-tree-node,
+[data-theme="dark"] .custom-tree-node {
+  color: var(--color-text-secondary);
+}
+
+.theme-dark .tree-node-label,
+[data-theme="dark"] .tree-node-label {
+  color: var(--color-text-secondary);
+}
+
+/* ====================
+   MONITORING PANELS
+   ==================== */
+
+.theme-dark .minimal-monitoring-panel,
+[data-theme="dark"] .minimal-monitoring-panel {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+}
+
+/* ====================
+   MESSAGE AREA FIXES
+   ==================== */
+
+.theme-dark .message-area,
+[data-theme="dark"] .message-area {
+  background: transparent !important;
+}
+
+/* Force user message card to white background even in dark mode */
+.theme-dark .user-card,
+[data-theme="dark"] .user-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-dark .user-card.collapsed::after,
+[data-theme="dark"] .user-card.collapsed::after {
+  color: #94a3b8 !important;
+}
+
+.theme-dark .user-card-actions,
+[data-theme="dark"] .user-card-actions {
+  background: transparent !important;
+}
+
+.theme-dark .user-card-actions .el-button,
+[data-theme="dark"] .user-card-actions .el-button {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+.theme-dark .user-card-actions .el-button:hover,
+[data-theme="dark"] .user-card-actions .el-button:hover {
+  background: #ffffff !important;
+  border-color: #3b82f6 !important;
+  color: #3b82f6 !important;
+}
+
+.theme-dark .user-message-content,
+[data-theme="dark"] .user-message-content {
+  background: #ffffff !important;
+  color: #1e293b !important;
+}
+
+.theme-dark .user-message-content .user-text-block,
+[data-theme="dark"] .user-message-content .user-text-block {
+  color: #1e293b !important;
+  background: #ffffff !important;
+}
+
+.theme-dark .el-message,
+[data-theme="dark"] .el-message {
+  background: var(--color-surface-3);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+/* ====================
+   USER INPUT AREA FIXES
+   ==================== */
+
+.theme-dark .user-input-area,
+[data-theme="dark"] .user-input-area {
+  background: rgba(17, 24, 39, 0.98);
+  border-top: 1px solid var(--color-border-default);
+}
+
+/* ====================
+   SCROLLBAR FIXES FOR SPECIFIC COMPONENTS
+   ==================== */
+
+.theme-dark .el-scrollbar__wrap,
+[data-theme="dark"] .el-scrollbar__wrap {
+  background: transparent;
+}
+
+.theme-dark .el-scrollbar__view,
+[data-theme="dark"] .el-scrollbar__view {
+  background: transparent;
+}
+
+/* ====================
+   SETTINGS DRAWER
+   ==================== */
+
+.theme-dark .el-drawer__header,
+[data-theme="dark"] .el-drawer__header {
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.theme-dark .el-drawer__body,
+[data-theme="dark"] .el-drawer__body {
+  background: var(--color-surface-2);
+}
+
+/* ====================
+   TOOLTIPS FIXES
+   ==================== */
+
+.theme-dark .el-popper,
+[data-theme="dark"] .el-popper {
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+/* ====================
+   TRANSITIONS
+   ==================== */
+
+.theme-dark .chat-container *,
+[data-theme="dark"] .chat-container * {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 250ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}

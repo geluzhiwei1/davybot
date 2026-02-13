@@ -1,0 +1,233 @@
+/**
+ * 主题CSS变量映射
+ * 将主题系统的变量映射到应用中使用的变量
+ */
+
+/* ==================== 全局变量映射 ==================== */
+
+/* Light主题 (默认) */
+.theme-light {
+  /* 背景色映射 */
+  --color-surface-1: var(--theme-bg-primary, #FFFFFF);
+  --color-surface-2: var(--theme-bg-secondary, #F5F7FA);
+  --color-surface-3: var(--theme-bg-tertiary, #FAFAFA);
+  --color-terminal: var(--theme-bg-terminal, #282C34);
+
+  /* 文字颜色映射 */
+  --color-text-primary: var(--theme-text-primary, #303133);
+  --color-text-secondary: var(--theme-text-secondary, #606266);
+  --color-text-tertiary: var(--theme-text-tertiary, #909399);
+  --color-text-terminal: var(--theme-text-terminal, #ABB2BF);
+
+  /* 强调色映射 */
+  --color-primary: var(--theme-primary, #409EFF);
+  --color-secondary: var(--theme-secondary, #79bbff);
+  --color-accent: var(--theme-accent, #409EFF);
+
+  /* 状态色映射 */
+  --color-success: var(--theme-success, #67C23A);
+  --color-warning: var(--theme-warning, #E6A23C);
+  --color-error: var(--theme-error, #F56C6C);
+  --color-info: var(--theme-info, #909399);
+
+  /* 边框色映射 */
+  --color-border: var(--theme-border, #DCDFE6);
+  --color-border-light: var(--theme-borderLight, #E4E7ED);
+  --color-border-dark: var(--theme-borderDark, #D4D7DE);
+
+  /* 其他 */
+  --color-overlay: var(--theme-overlay, rgba(0, 0, 0, 0.5));
+  --color-divider: var(--theme-divider, #DCDFE6);
+}
+
+/* Dark主题 */
+.theme-dark {
+  /* 背景色映射 */
+  --color-surface-1: var(--theme-bg-primary, #1a1a1a);
+  --color-surface-2: var(--theme-bg-secondary, #2d2d2d);
+  --color-surface-3: var(--theme-bg-tertiary, #3d3d3d);
+  --color-terminal: var(--theme-bg-terminal, #0d0d0d);
+
+  /* 文字颜色映射 */
+  --color-text-primary: var(--theme-text-primary, #e5e5e5);
+  --color-text-secondary: var(--theme-text-secondary, #a3a3a3);
+  --color-text-tertiary: var(--theme-text-tertiary, #737373);
+  --color-text-terminal: var(--theme-text-terminal, #d4d4d4);
+
+  /* 强调色映射 */
+  --color-primary: var(--theme-primary, #409EFF);
+  --color-secondary: var(--theme-secondary, #79bbff);
+  --color-accent: var(--theme-accent, #409EFF);
+
+  /* 状态色映射 */
+  --color-success: var(--theme-success, #67C23A);
+  --color-warning: var(--theme-warning, #E6A23C);
+  --color-error: var(--theme-error, #F56C6C);
+  --color-info: var(--theme-info, #909399);
+
+  /* 边框色映射 */
+  --color-border: var(--theme-border, #404040);
+  --color-border-light: var(--theme-borderLight, #333333);
+  --color-border-dark: var(--theme-borderDark, #525252);
+
+  /* 其他 */
+  --color-overlay: var(--theme-overlay, rgba(0, 0, 0, 0.7));
+  --color-divider: var(--theme-divider, #404040);
+}
+
+/* ==================== Element Plus 暗色模式变量 ==================== */
+
+/* 当html有dark class时，覆盖Element Plus的CSS变量 */
+html.dark {
+  /* Element Plus 背景色 - DARK MODE */
+  --el-bg-color: #1a1a1a;
+  --el-bg-color-page: #0f0f0f;
+  --el-bg-color-overlay: #1a1a1a;
+  --el-fill-color-blank: #1a1a1a;
+  --el-fill-color: #2d2d2d;
+  --el-fill-color-light: #262626;
+  --el-fill-color-lighter: #1f1f1f;
+  --el-fill-color-extra-light: #404040;
+  --el-fill-color-dark: #262626;
+  --el-fill-color-darker: #1f1f1f;
+
+  /* Element Plus 文字颜色 */
+  --el-text-color-primary: #e5e5e5;
+  --el-text-color-regular: #d4d4d4;
+  --el-text-color-secondary: #a3a3a3;
+  --el-text-color-placeholder: #737373;
+  --el-text-color-disabled: #525252;
+
+  /* Element Plus 边框颜色 */
+  --el-border-color: #404040;
+  --el-border-color-light: #262626;
+  --el-border-color-lighter: #404040;
+  --el-border-color-extra-light: #262626;
+  --el-border-color-dark: #525252;
+  --el-border-color-darker: #737373;
+
+  /* Element Plus 主题色（保持不变） */
+  --el-color-primary: #409EFF;
+  --el-color-primary-light-3: #79bbff;
+  --el-color-primary-light-5: #a0cfff;
+  --el-color-primary-light-7: #c6e2ff;
+  --el-color-primary-light-8: #d9e8ff;
+  --el-color-primary-light-9: #ecf5ff;
+  --el-color-primary-dark-2: #337ecc;
+
+  /* Element Plus 状态色 */
+  --el-color-success: #67C23A;
+  --el-color-warning: #E6A23C;
+  --el-color-error: #F56C6C;
+  --el-color-info: #909399;
+
+  /* Element Plus 阴影 */
+  --el-box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  --el-box-shadow-light: 0 2px 4px rgba(0, 0, 0, 0.04);
+  --el-box-shadow-lighter: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --el-box-shadow-dark: 0 8px 16px rgba(0, 0, 0, 0.06);
+
+  /* Element Plus 禁用状态 */
+  --el-disabled-bg-color: #262626;
+  --el-disabled-text-color: #525252;
+  --el-disabled-border-color: #404040;
+
+  /* Element Plus 遮罩层 */
+  --el-overlay-color: rgba(0, 0, 0, 0.7);
+  --el-overlay-color-light: rgba(0, 0, 0, 0.5);
+  --el-overlay-color-lighter: rgba(0, 0, 0, 0.3);
+
+  /* Element Plus 其他 */
+  --el-mask-color: rgba(0, 0, 0, 0.7);
+  --el-border-radius-base: 4px;
+  --el-border-radius-small: 2px;
+  --el-border-radius-round: 20px;
+  --el-border-radius-circle: 100%;
+}
+
+/* ==================== 特定组件样式 ==================== */
+
+/* 消息气泡 */
+.theme-light .message-bubble {
+  background: var(--theme-bg-primary, #FFFFFF);
+  border-color: var(--theme-border, #DCDFE6);
+  color: var(--theme-text-primary, #303133);
+}
+
+.theme-dark .message-bubble {
+  background: var(--theme-bg-secondary, #2d2d2d);
+  border-color: var(--theme-border, #404040);
+  color: var(--theme-text-primary, #e5e5e5);
+}
+
+/* 输入框 */
+.theme-light .el-input__wrapper {
+  background: var(--theme-bg-primary, #FFFFFF);
+  border-color: var(--theme-border, #DCDFE6);
+}
+
+.theme-dark .el-input__wrapper {
+  background: var(--theme-bg-secondary, #2d2d2d);
+  border-color: var(--theme-border, #404040);
+}
+
+/* 按钮 */
+.theme-light .el-button {
+  background: var(--theme-bg-primary, #FFFFFF);
+  border-color: var(--theme-border, #DCDFE6);
+  color: var(--theme-text-primary, #303133);
+}
+
+.theme-dark .el-button {
+  background: var(--theme-bg-secondary, #2d2d2d);
+  border-color: var(--theme-border, #404040);
+  color: var(--theme-text-primary, #e5e5e5);
+}
+
+/* 卡片 */
+.theme-light .el-card {
+  background: var(--theme-bg-primary, #FFFFFF);
+  border-color: var(--theme-border, #DCDFE6);
+}
+
+.theme-dark .el-card {
+  background: var(--theme-bg-secondary, #2d2d2d);
+  border-color: var(--theme-border, #404040);
+}
+
+/* 文字颜色 */
+.theme-light {
+  color: var(--theme-text-primary, #303133);
+}
+
+.theme-dark {
+  color: var(--theme-text-primary, #e5e5e5);
+}
+
+/* 背景色 */
+.theme-light body,
+.theme-light .app-wrapper {
+  background: var(--theme-bg-primary, #FFFFFF);
+}
+
+.theme-dark body,
+.theme-dark .app-wrapper {
+  background: var(--theme-bg-primary, #1a1a1a);
+}
+
+/* 滚动条 */
+.theme-light ::-webkit-scrollbar-track {
+  background: var(--theme-bg-secondary, #F5F7FA);
+}
+
+.theme-dark ::-webkit-scrollbar-track {
+  background: var(--theme-bg-secondary, #2d2d2d);
+}
+
+.theme-light ::-webkit-scrollbar-thumb {
+  background: var(--theme-border, #DCDFE6);
+}
+
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: var(--theme-border, #404040);
+}

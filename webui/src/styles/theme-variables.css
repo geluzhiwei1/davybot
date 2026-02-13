@@ -1,0 +1,114 @@
+/**
+ * 主题CSS变量系统
+ * 这些变量会被JavaScript动态更新
+ */
+
+/* ========== 默认变量（GUI主题） ========== */
+:root {
+  /* 颜色变量 */
+  --theme-primary: #409EFF;
+  --theme-secondary: #79bbff;
+  --theme-accent: #409EFF;
+  --theme-success: #67C23A;
+  --theme-warning: #E6A23C;
+  --theme-error: #F56C6C;
+  --theme-info: #909399;
+
+  /* 背景色 */
+  --theme-bg-primary: #FFFFFF;
+  --theme-bg-secondary: #F5F7FA;
+  --theme-bg-tertiary: #FAFAFA;
+  --theme-bg-terminal: #282C34;
+
+  /* 文本色 */
+  --theme-text-primary: #303133;
+  --theme-text-secondary: #606266;
+  --theme-text-tertiary: #909399;
+  --theme-text-terminal: #ABB2BF;
+
+  /* 边框色 */
+  --theme-border: #DCDFE6;
+  --theme-border-light: #E4E7ED;
+  --theme-border-dark: #D4D7DE;
+
+  /* 其他 */
+  --theme-overlay: rgba(0, 0, 0, 0.5);
+  --theme-divider: #DCDFE6;
+
+  /* 字体变量 */
+  --theme-font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+  --theme-font-family-mono: "Consolas", "Monaco", "Courier New", monospace;
+  --theme-font-size-xs: 12px;
+  --theme-font-size-sm: 13px;
+  --theme-font-size-md: 14px;
+  --theme-font-size-lg: 16px;
+  --theme-font-size-xl: 18px;
+  --theme-font-weight-normal: 400;
+  --theme-font-weight-medium: 500;
+  --theme-font-weight-bold: 700;
+
+  /* 间距变量 */
+  --theme-spacing-xs: 4px;
+  --theme-spacing-sm: 8px;
+  --theme-spacing-md: 12px;
+  --theme-spacing-lg: 16px;
+  --theme-spacing-xl: 24px;
+
+  /* 圆角变量 */
+  --theme-radius-none: 0;
+  --theme-radius-sm: 2px;
+  --theme-radius-md: 4px;
+  --theme-radius-lg: 8px;
+  --theme-radius-full: 9999px;
+
+  /* 阴影变量 */
+  --theme-shadow-none: none;
+  --theme-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.12);
+  --theme-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.12);
+  --theme-shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.12);
+
+  /* 动画变量 */
+  --theme-animation-enabled: 1;
+  --theme-duration-fast: 150ms;
+  --theme-duration-normal: 300ms;
+  --theme-duration-slow: 500ms;
+  --theme-duration-slower: 700ms;
+  --theme-easing-linear: linear;
+  --theme-easing-ease: ease;
+  --theme-easing-ease-in: ease-in;
+  --theme-easing-ease-out: ease-out;
+  --theme-easing-ease-in-out: ease-in-out;
+  --theme-easing-default: ease;
+
+  /* 组件特定变量 */
+  --message-bubble-bg: #FFFFFF;
+  --message-bubble-border: 1px solid #DCDFE6;
+  --message-bubble-radius: 8px;
+  --message-bubble-padding: 12px 16px;
+  --message-bubble-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  --button-radius: 4px;
+  --button-padding: 8px 16px;
+  --button-font-weight: 500;
+
+  --input-radius: 4px;
+  --input-padding: 8px 12px;
+  --input-font-size: 14px;
+}
+
+/* ========== 响应式工具类 ========== */
+@media (max-width: 640px) {
+  :root {
+    --theme-font-size-xs: 11px;
+    --theme-font-size-sm: 12px;
+    --theme-font-size-md: 13px;
+    --theme-font-size-lg: 14px;
+    --theme-font-size-xl: 16px;
+
+    --theme-spacing-xs: 2px;
+    --theme-spacing-sm: 4px;
+    --theme-spacing-md: 8px;
+    --theme-spacing-lg: 12px;
+    --theme-spacing-xl: 16px;
+  }
+}

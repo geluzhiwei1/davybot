@@ -1,0 +1,80 @@
+/* ========================================
+   Element Plus Popper/Teleport 修复
+   ========================================
+
+问题：状态栏的下拉菜单被遮挡
+
+原因：
+1. .app-wrapper 有 overflow: hidden + position: relative
+2. 多个容器使用 backdrop-filter，创建新的 stacking context
+3. Element Plus 的 dropdown popper 可能被错误定位或裁剪
+
+解决方案：确保所有 teleported 的 popper 元素正确显示
+*/
+
+/* 全局：确保 body 不会裁剪 teleported 内容 */
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* 确保 #app 不会裁剪内容 */
+#app {
+  overflow: visible !important;
+}
+
+/* 所有 Element Plus 的 popper 容器 */
+.el-popper,
+.el-dropdown__popper,
+.el-select-dropdown,
+.el-picker__popper,
+.el-cascader__dropdown,
+.el-tooltip__popper {
+  /* 确保 popper 在最顶层 */
+  position: fixed !important;
+
+  /* 设置足够高的 z-index */
+  z-index: 9999 !important;
+
+  /* 确保不被裁剪 */
+  overflow: visible !important;
+
+  /* 确保可以超出父容器 */
+  contain: none !important;
+}
+
+/* 特定修复：TopBar 的 dropdown - 最高优先级 */
+.topbar-dropdown-popper,
+.topbar-dropdown-popper.el-dropdown__popper {
+  position: fixed !important;
+  z-index: 99999 !important;
+  overflow: visible !important;
+  contain: none !important;
+}
+
+/* 确保所有 teleported 到 body 的元素都可见 */
+body > .el-popper,
+body > .el-dropdown__popper,
+body > .el-overlay {
+  position: fixed !important;
+  z-index: 9999 !important;
+  overflow: visible !important;
+}
+
+/* 特别强制的修复 - 所有 dropdown popper */
+body > .el-dropdown__popper {
+  z-index: 99999 !important;
+}
+
+/* Drawer 组件需要更高的 z-index */
+body > .el-drawer {
+  z-index: 100000 !important;
+}
+
+body > .el-drawer .el-drawer__header {
+  z-index: 100001 !important;
+}
+
+body > .el-drawer .el-drawer__body {
+  z-index: 100001 !important;
+}

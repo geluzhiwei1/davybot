@@ -1,0 +1,574 @@
+/* ========================================
+   CONTENT-FIRST MINIMALISM
+   极简内容优先设计 - 为阅读而设计
+   ======================================== */
+
+/* Using system fonts for offline compatibility */
+
+/* 强制消息区域容器占满宽度，但保持滚动功能 */
+.message-area {
+  height: 100% !important;
+  width: 100% !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  background: #fafafa !important;
+  position: relative;
+}
+
+.el-scrollbar.message-area {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.el-scrollbar.message-area .el-scrollbar__wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* 强制 el-scrollbar 占满宽度 */
+.el-scrollbar.message-area,
+.el-scrollbar.message-area .el-scrollbar__wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Subtle noise texture for warmth */
+.message-area::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  opacity: 0.4 !important;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E") !important;
+  pointer-events: none !important;
+}
+
+.message-list {
+  padding: 24px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.message-list > * {
+  box-sizing: border-box !important;
+}
+
+.message-wrapper {
+  display: flex !important;
+  gap: 12px !important;
+  animation: messageFadeIn 0.3s ease-out !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+@keyframes messageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   AVATARS - Minimal Identifiers
+   极简标识符
+   ======================================== */
+.user-avatar,
+.assistant-avatar,
+.tool-avatar {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 6px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  transition: transform 0.2s ease !important;
+}
+
+.user-avatar {
+  background: #2d2d2d !important;
+  color: white !important;
+}
+
+.assistant-avatar {
+  background: #e5e5e5 !important;
+  color: #2d2d2d !important;
+}
+
+.tool-avatar {
+  background: #f5f5f5 !important;
+  color: #666 !important;
+  border-radius: 6px !important;
+}
+
+.user-avatar svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke-width: 2 !important;
+}
+
+/* ========================================
+   MESSAGE CARDS - Content First
+   内容优先的卡片设计
+   ======================================== */
+.message-card {
+  background: white !important;
+  border-radius: 6px !important;
+  transition: box-shadow 0.2s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+  width: 100% !important;
+}
+
+/* 统一的卡片样式 - 用户和AI消息完全一致 */
+.user-card,
+.assistant-card {
+  background: #ffffff !important;
+  color: #1e293b !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+}
+
+.tool-card {
+  background: #f9f9f9 !important;
+  color: #4a4a4a !important;
+}
+
+/* ========================================
+   MESSAGE CONTENT - Reading Optimized
+   阅读优化的内容区域
+   ======================================== */
+.user-message-content,
+.assistant-message-content,
+.tool-message-content {
+  padding: 16px 20px !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.01em !important;
+  overflow-y: auto !important;
+  max-height: none !important;
+}
+
+/* 移除差异 - 统一所有消息内容的样式 */
+.user-message-content,
+.assistant-message-content,
+.tool-message-content {
+  padding: 16px 20px !important;
+  line-height: 1.6 !important;
+  position: relative !important;
+}
+
+/* 统一消息内容的字体和颜色 */
+.user-card .user-message-content,
+.assistant-card .assistant-message-content {
+  font-family: 'Source Sans Pro', sans-serif !important;
+  color: #1e293b !important;
+}
+
+/* 确保折叠按钮可点击 */
+.assistant-message-content .collapse-toggle,
+.tool-message-content .collapse-toggle {
+  position: relative !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+}
+
+/* 修复CollapsibleMessage容器 */
+.assistant-message-content .collapsible-message,
+.tool-message-content .collapsible-message {
+  overflow: visible !important;
+}
+
+.tool-card .tool-message-content {
+  font-family: 'Source Sans Pro', sans-serif !important;
+  font-size: 14px !important;
+  color: #4a4a4a !important;
+}
+
+.user-message-content p,
+.assistant-message-content p {
+  margin: 0 0 1em 0 !important;
+}
+
+.user-message-content p {
+  margin: 0 0 0.3em 0 !important;
+}
+
+.user-message-content p:last-child {
+  margin: 0 !important;
+}
+
+.user-message-content p:last-child,
+.assistant-message-content p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* ========================================
+   HEADERS - Minimal Information
+   极简信息头
+   ======================================== */
+.assistant-header-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.message-sender {
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  color: #2d2d2d !important;
+  letter-spacing: 0.02em !important;
+  text-transform: uppercase !important;
+}
+
+.message-time {
+  font-size: 10px !important;
+  color: #999 !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.05em !important;
+}
+
+/* ========================================
+   INDEPENDENT BUBBLES - Subtle Context
+   微妙的上下文气泡
+   ======================================== */
+.independent-bubble {
+  margin-bottom: 8px !important;
+  padding: 10px 14px !important;
+  border-radius: 4px !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.reasoning-bubble {
+  background: #faf8f5 !important;
+  border-left: 2px solid #d4c4a0 !important;
+  color: #5c5342 !important;
+}
+
+.tool-call-bubble {
+  background: #f5f8fa !important;
+  border-left: 2px solid #a0aec0 !important;
+  color: #4a5568 !important;
+}
+
+/* ========================================
+   MESSAGE ACTIONS - Invisible Until Needed
+   按需显示的操作
+   ======================================== */
+.message-actions {
+  display: flex !important;
+  gap: 2px !important;
+  padding: 4px 6px !important;
+  opacity: 1 !important;
+  background: transparent !important;
+}
+
+.message-actions .el-button {
+  padding: 2px !important;
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 12px !important;
+}
+
+.user-card .message-actions {
+  justify-content: flex-end !important;
+}
+
+.assistant-actions,
+.tool-actions {
+  justify-content: flex-start !important;
+}
+
+/* ========================================
+   SYSTEM MESSAGES - Ultra Minimal
+   极简系统消息
+   ======================================== */
+.system-message-container {
+  text-align: center !important;
+  padding: 8px !important;
+}
+
+.simple-text {
+  font-size: 12px !important;
+  color: #999 !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.05em !important;
+  padding: 6px 12px !important;
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-radius: 4px !important;
+  display: inline-block !important;
+}
+
+/* ========================================
+   TYPING INDICATOR - Subtle
+   微妙的输入指示器
+   ======================================== */
+.typing-indicator {
+  display: inline-block !important;
+  padding: 20px 24px !important;
+  background: white !important;
+  border-radius: 8px !important;
+}
+
+.dots {
+  display: flex !important;
+  gap: 4px !important;
+  align-items: center !important;
+}
+
+.dot {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: #ccc !important;
+  animation: pulse 1.4s infinite !important;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s !important;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s !important;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   FULLSCREEN MODE - Immersive Reading
+   沉浸式阅读模式
+   ======================================== */
+.message-card.is-fullscreen {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 92vw !important;
+  max-width: 1000px !important;
+  height: 90vh !important;
+  z-index: 9999 !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  animation: fullscreenEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes fullscreenEnter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.user-card.is-fullscreen,
+.assistant-card.is-fullscreen,
+.tool-card.is-fullscreen {
+  background: white !important;
+  color: #2d2d2d !important;
+}
+
+.user-card.is-fullscreen .user-message-content,
+.assistant-card.is-fullscreen .assistant-message-content,
+.tool-card.is-fullscreen .tool-message-content {
+  padding: 40px 48px !important;
+  font-size: 18px !important;
+  line-height: 1.9 !important;
+  max-height: calc(90vh - 80px) !important;
+  overflow-y: auto !important;
+}
+
+.assistant-card.is-fullscreen .assistant-message-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 20px 24px !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  flex-shrink: 0 !important;
+}
+
+.assistant-message-title {
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  color: #2d2d2d !important;
+  letter-spacing: 0.02em !important;
+  text-transform: uppercase !important;
+}
+
+/* ========================================
+   EDIT MODE - Clean Editing
+   清爽的编辑模式
+   ======================================== */
+.edit-mode {
+  padding: 24px 28px !important;
+}
+
+.edit-actions {
+  display: flex !important;
+  gap: 8px !important;
+  margin-top: 16px !important;
+  justify-content: flex-end !important;
+}
+
+/* ========================================
+   SCROLLBARS - Invisible by Default
+   默认隐藏的滚动条
+   ======================================== */
+.user-message-content::-webkit-scrollbar,
+.assistant-message-content::-webkit-scrollbar,
+.tool-message-content::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.user-message-content::-webkit-scrollbar-track,
+.assistant-message-content::-webkit-scrollbar-track,
+.tool-message-content::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.user-message-content::-webkit-scrollbar-thumb,
+.assistant-message-content::-webkit-scrollbar-thumb,
+.tool-message-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1) !important;
+  border-radius: 2px !important;
+}
+
+.user-message-content:hover::-webkit-scrollbar-thumb,
+.assistant-message-content:hover::-webkit-scrollbar-thumb,
+.tool-message-content:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ========================================
+   RESPONSIVE - Mobile Optimized
+   移动端优化
+   ======================================== */
+@media (max-width: 768px) {
+  .message-list {
+    padding: 32px 20px !important;
+    gap: 24px !important;
+  }
+
+  .message-wrapper {
+    gap: 12px !important;
+  }
+
+  .user-avatar,
+  .assistant-avatar,
+  .tool-avatar {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 11px !important;
+  }
+
+  .user-message-content,
+  .assistant-message-content,
+  .tool-message-content {
+    padding: 20px 24px !important;
+    font-size: 15px !important;
+  }
+
+  .message-card.is-fullscreen {
+    width: 96vw !important;
+    height: 92vh !important;
+  }
+
+  .message-card.is-fullscreen .user-message-content,
+  .message-card.is-fullscreen .assistant-message-content,
+  .message-card.is-fullscreen .tool-message-content {
+    padding: 32px 36px !important;
+    font-size: 17px !important;
+  }
+}
+
+/* ========================================
+   CONTAINER WIDTHS - Optimal Reading Width
+   最佳阅读宽度
+   ======================================== */
+.message-content-wrapper {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.user-message-container,
+.assistant-message-container,
+.tool-message-container {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.user-message-container {
+  flex-direction: row-reverse !important;
+}
+
+.assistant-message-container,
+.tool-message-container {
+  flex-direction: row !important;
+}
+
+.user-message-container .message-content-wrapper {
+  align-items: flex-end !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.assistant-message-container .message-content-wrapper,
+.tool-message-container .message-content-wrapper {
+  align-items: flex-start !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Remove all decorative elements */
+.user-card::before,
+.assistant-card::before,
+.tool-card::before {
+  display: none !important;
+}
+
+/* Remove shadows for cleaner look */
+.message-card {
+  box-shadow: none !important;
+}
+
+.message-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Simplify borders */
+.user-card,
+.assistant-card,
+.tool-card {
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}

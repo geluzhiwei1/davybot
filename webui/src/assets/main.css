@@ -1,0 +1,162 @@
+/* ========================================
+   PATENT AI AGENT - GLOBAL STYLES
+   ======================================== */
+
+/* Import Design System */
+@import '../styles/design-system.css';
+
+/* 基础重置和全局样式 */
+*,
+*::before,
+*::after {
+  position: relative;
+  font-weight: normal;
+}
+
+/* 全局字体和平滑 */
+body {
+  min-height: 100vh;
+  background-color: var(--color-surface-1);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--duration-slow) var(--ease-default);
+  overflow-x: hidden;
+}
+
+/* 代码字体 */
+code,
+pre {
+  font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--el-bg-color-page);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--el-border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--el-text-color-secondary);
+}
+
+/* 文本选择样式 */
+::selection {
+  background-color: var(--el-color-primary);
+  color: var(--el-color-white);
+}
+
+/* 链接样式 */
+a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--el-color-primary-light-3);
+}
+
+/* SVG 图标默认样式 */
+svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+/* 布局样式 */
+.chat-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#left-panel,
+#right-panel {
+  background-color: var(--el-bg-color);
+  flex-shrink: 0;
+  box-shadow: var(--el-box-shadow-light);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#left-panel {
+  width: 320px;
+  border-right: 1px solid var(--el-border-color);
+}
+
+#right-panel {
+  width: 384px;
+  border-left: 1px solid var(--el-border-color);
+}
+
+#main-content {
+  flex-grow: 1;
+  background-color: var(--el-bg-color-page);
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.3s ease;
+}
+
+/* 文件树节点样式 */
+.file-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--el-border-radius-base);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-tree-node:hover {
+  background-color: var(--el-color-primary-light-9) !important;
+}
+
+.file-tree-node.selected {
+  background-color: var(--el-color-primary-light-8) !important;
+  color: var(--el-color-primary) !important;
+  font-weight: 500 !important;
+}
+
+/* 确保应用在根元素上有一个高度 */
+#app {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ====================
+   ENHANCED LAYOUT STYLES
+   ==================== */
+#app::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(at 40% 20%, rgba(var(--color-primary-rgb), 0.03) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(var(--color-accent-rgb), 0.02) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(var(--color-primary-rgb), 0.02) 0px, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app > * {
+  position: relative;
+  z-index: 1;
+}

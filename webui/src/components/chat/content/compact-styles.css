@@ -1,0 +1,549 @@
+/* ============================================================================
+   现代统一样式系统
+   用于所有消息内容组件，保持一致优雅的视觉效果
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   设计系统变量 - 现代配色和间距
+   ---------------------------------------------------------------------------- */
+:root {
+  /* 间距系统 */
+  --modern-spacing-xs: 4px;
+  --modern-spacing-sm: 8px;
+  --modern-spacing-md: 12px;
+  --modern-spacing-lg: 16px;
+  --modern-spacing-xl: 20px;
+
+  /* 圆角系统 */
+  --modern-radius-sm: 6px;
+  --modern-radius-md: 10px;
+  --modern-radius-lg: 14px;
+
+  /* 字体系统 */
+  --modern-font-xs: 11px;
+  --modern-font-sm: 12px;
+  --modern-font-md: 13px;
+  --modern-font-lg: 14px;
+
+  /* 颜色系统 - 统一色调 */
+  --modern-color-primary: #667eea;
+  --modern-color-primary-light: #e0e3ff;
+  --modern-color-success: #10b981;
+  --modern-color-success-light: #d1fae5;
+  --modern-color-warning: #f59e0b;
+  --modern-color-warning-light: #fef3c7;
+  --modern-color-danger: #ef4444;
+  --modern-color-danger-light: #fee2e2;
+  --modern-color-info: #3b82f6;
+  --modern-color-info-light: #dbeafe;
+
+  /* 边框系统 */
+  --modern-border-light: rgba(0, 0, 0, 0.06);
+  --modern-border-medium: rgba(0, 0, 0, 0.1);
+
+  /* 背景系统 */
+  --modern-bg-subtle: rgba(0, 0, 0, 0.02);
+  --modern-bg-elevated: rgba(255, 255, 255, 0.8);
+  --modern-bg-surface: #ffffff;
+
+  /* 阴影系统 */
+  --modern-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --modern-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --modern-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 兼容旧的变量名 */
+:root {
+  --compact-padding-xs: var(--modern-spacing-xs);
+  --compact-padding-sm: var(--modern-spacing-sm);
+  --compact-padding-md: var(--modern-spacing-md);
+  --compact-padding-lg: var(--modern-spacing-lg);
+  --compact-gap-xs: var(--modern-spacing-xs);
+  --compact-gap-sm: var(--modern-spacing-sm);
+  --compact-gap-md: var(--modern-spacing-md);
+  --compact-font-xs: var(--modern-font-xs);
+  --compact-font-sm: var(--modern-font-sm);
+  --compact-font-md: var(--modern-font-md);
+  --compact-radius-sm: var(--modern-radius-sm);
+  --compact-radius-md: var(--modern-radius-md);
+  --compact-radius-lg: var(--modern-radius-lg);
+}
+
+/* ----------------------------------------------------------------------------
+   通用内容容器 - 现代卡片设计
+   ---------------------------------------------------------------------------- */
+.compact-content {
+  border: 1px solid var(--modern-border-light);
+  border-radius: var(--modern-radius-lg);
+  background: linear-gradient(135deg, var(--modern-bg-surface) 0%, rgba(249, 250, 251, 0.5) 100%);
+  box-shadow: var(--modern-shadow-sm);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.compact-content:hover {
+  box-shadow: var(--modern-shadow-md);
+  border-color: var(--modern-border-medium);
+}
+
+/* ----------------------------------------------------------------------------
+   标题栏 - 渐变背景
+   ---------------------------------------------------------------------------- */
+.compact-header {
+  display: flex;
+  align-items: center;
+  gap: var(--modern-spacing-sm);
+  padding: var(--modern-spacing-sm) var(--modern-spacing-lg);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid var(--modern-border-light);
+  font-size: var(--modern-font-md);
+  line-height: 1.5;
+  position: relative;
+}
+
+.compact-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--modern-color-primary) 0%,
+    rgba(102, 126, 234, 0.3) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.compact-content:hover > .compact-header::after {
+  opacity: 1;
+}
+
+.compact-header .el-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  color: var(--modern-color-primary);
+}
+
+.compact-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: var(--modern-font-md);
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------------------
+   内容区 - 优雅留白
+   ---------------------------------------------------------------------------- */
+.compact-body {
+  padding: var(--modern-spacing-lg);
+  font-size: var(--modern-font-md);
+  line-height: 1.6;
+  color: #374151;
+}
+
+.compact-body p {
+  margin: 0;
+}
+
+.compact-body p + p {
+  margin-top: 0.6em;
+}
+
+/* ----------------------------------------------------------------------------
+   折叠面板 - 现代化样式
+   ---------------------------------------------------------------------------- */
+.compact-collapse {
+  border: none !important;
+}
+
+.compact-collapse :deep(.el-collapse-item__header) {
+  padding: var(--modern-spacing-sm) var(--modern-spacing-lg) !important;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  border-bottom: 1px solid var(--modern-border-light) !important;
+  font-size: var(--modern-font-md) !important;
+  font-weight: 500 !important;
+  height: auto !important;
+  line-height: 1.5 !important;
+  color: #1e293b !important;
+  transition: all 0.2s ease !important;
+}
+
+.compact-collapse :deep(.el-collapse-item__header:hover) {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+}
+
+.compact-collapse :deep(.el-collapse-item__wrap) {
+  border-bottom: none !important;
+}
+
+.compact-collapse :deep(.el-collapse-item__content) {
+  padding: var(--modern-spacing-lg) !important;
+  background: var(--modern-bg-surface) !important;
+}
+
+.compact-collapse :deep(.el-collapse-item__arrow) {
+  margin-left: var(--modern-spacing-sm);
+  color: var(--modern-color-primary);
+  transition: transform 0.3s ease;
+}
+
+/* ----------------------------------------------------------------------------
+   按钮 - 统一样式
+   ---------------------------------------------------------------------------- */
+.compact-btn {
+  font-size: var(--modern-font-sm);
+  padding: 6px 12px;
+  height: auto;
+  border-radius: var(--modern-radius-sm);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.compact-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--modern-shadow-sm);
+}
+
+.compact-btn .el-icon {
+  font-size: 13px;
+}
+
+/* ----------------------------------------------------------------------------
+   标签 - 现代配色
+   ---------------------------------------------------------------------------- */
+.compact-tag {
+  font-size: var(--modern-font-xs);
+  padding: 3px 8px;
+  height: auto;
+  border-radius: var(--modern-radius-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+/* ----------------------------------------------------------------------------
+   代码块 - 优雅显示
+   ---------------------------------------------------------------------------- */
+.compact-code {
+  font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  padding: 3px 6px;
+  border-radius: var(--modern-radius-sm);
+  font-size: var(--modern-font-sm);
+  line-height: 1.5;
+  color: #1e293b;
+  border: 1px solid var(--modern-border-light);
+}
+
+.compact-pre {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #e2e8f0;
+  padding: var(--modern-spacing-md) var(--modern-spacing-lg);
+  border-radius: var(--modern-radius-md);
+  font-size: var(--modern-font-sm);
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--modern-border-medium);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  /* Fix horizontal overflow */
+  max-width: 100%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.compact-pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ----------------------------------------------------------------------------
+   统计信息 - 卡片网格
+   ---------------------------------------------------------------------------- */
+.compact-stats {
+  display: flex;
+  gap: var(--modern-spacing-md);
+  padding: var(--modern-spacing-md);
+  background: var(--modern-bg-subtle);
+  border-radius: var(--modern-radius-md);
+  border: 1px solid var(--modern-border-light);
+}
+
+.compact-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--modern-bg-surface);
+  border-radius: var(--modern-radius-sm);
+  border: 1px solid var(--modern-border-light);
+  transition: all 0.2s ease;
+}
+
+.compact-stat-item:hover {
+  border-color: var(--modern-color-primary-light);
+  background: var(--modern-color-primary-light);
+}
+
+.compact-stat-item .el-icon {
+  font-size: 13px;
+  color: var(--modern-color-primary);
+}
+
+/* ----------------------------------------------------------------------------
+   进度条 - 现代化
+   ---------------------------------------------------------------------------- */
+.compact-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--modern-spacing-md);
+}
+
+.compact-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--modern-bg-subtle);
+  border-radius: var(--modern-radius-sm);
+  overflow: hidden;
+}
+
+.compact-progress-text {
+  font-size: var(--modern-font-md);
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+  color: var(--modern-color-primary);
+}
+
+/* ----------------------------------------------------------------------------
+   详情块 - 统一间距
+   ---------------------------------------------------------------------------- */
+.compact-detail-block {
+  margin-top: var(--modern-spacing-md);
+  padding: var(--modern-spacing-md);
+  background: var(--modern-bg-subtle);
+  border-radius: var(--modern-radius-md);
+  border: 1px solid var(--modern-border-light);
+}
+
+.compact-detail-block:first-child {
+  margin-top: 0;
+}
+
+.compact-detail-title {
+  font-size: var(--modern-font-sm);
+  font-weight: 600;
+  color: #64748b;
+  margin: 0 0 var(--modern-spacing-sm) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ----------------------------------------------------------------------------
+   操作按钮组
+   ---------------------------------------------------------------------------- */
+.compact-actions {
+  display: flex;
+  gap: var(--modern-spacing-sm);
+  justify-content: flex-end;
+  padding: var(--modern-spacing-sm) var(--modern-spacing-lg);
+  border-top: 1px solid var(--modern-border-light);
+  background: var(--modern-bg-subtle);
+}
+
+/* ----------------------------------------------------------------------------
+   Markdown 内容样式
+   ---------------------------------------------------------------------------- */
+.compact-markdown :deep(h1),
+.compact-markdown :deep(h2),
+.compact-markdown :deep(h3),
+.compact-markdown :deep(h4),
+.compact-markdown :deep(h5),
+.compact-markdown :deep(h6) {
+  margin: 1em 0 0.4em 0;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1e293b;
+}
+
+.compact-markdown :deep(h1) {
+  font-size: 1.3em;
+  padding-bottom: var(--modern-spacing-sm);
+  border-bottom: 2px solid var(--modern-border-light);
+}
+
+.compact-markdown :deep(h2) {
+  font-size: 1.15em;
+}
+
+.compact-markdown :deep(h3) {
+  font-size: 1.05em;
+}
+
+.compact-markdown :deep(p) {
+  margin: 0.6em 0;
+  line-height: 1.7;
+}
+
+.compact-markdown :deep(ul),
+.compact-markdown :deep(ol) {
+  margin: 0.6em 0;
+  padding-left: 1.6em;
+}
+
+.compact-markdown :deep(li) {
+  margin: 0.4em 0;
+  line-height: 1.6;
+}
+
+.compact-markdown :deep(li::marker) {
+  color: var(--modern-color-primary);
+}
+
+.compact-markdown :deep(blockquote) {
+  border-left: 4px solid var(--modern-color-primary);
+  padding-left: 1em;
+  margin: 0.8em 0;
+  color: #64748b;
+  background: var(--modern-bg-subtle);
+  padding: var(--modern-spacing-sm) var(--modern-spacing-md);
+  border-radius: 0 var(--modern-radius-sm) var(--modern-radius-sm) 0;
+}
+
+.compact-markdown :deep(code) {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--modern-bg-subtle);
+  padding: 2px 5px;
+  border-radius: var(--modern-radius-sm);
+  font-size: 0.9em;
+  color: #dc2626;
+  border: 1px solid var(--modern-border-light);
+}
+
+.compact-markdown :deep(pre) {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #e2e8f0;
+  padding: var(--modern-spacing-md);
+  border-radius: var(--modern-radius-md);
+  overflow-x: auto;
+  border: 1px solid var(--modern-border-medium);
+  /* Fix horizontal overflow */
+  max-width: 100%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.compact-markdown :deep(pre code) {
+  background: none;
+  padding: 0;
+  border: none;
+  color: inherit;
+}
+
+.compact-markdown :deep(a) {
+  color: var(--modern-color-primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.compact-markdown :deep(a:hover) {
+  border-bottom-color: var(--modern-color-primary);
+}
+
+/* ----------------------------------------------------------------------------
+   工具类 - 现代间距
+   ---------------------------------------------------------------------------- */
+.compact-mt-xs { margin-top: var(--modern-spacing-xs); }
+.compact-mt-sm { margin-top: var(--modern-spacing-sm); }
+.compact-mt-md { margin-top: var(--modern-spacing-md); }
+.compact-mt-lg { margin-top: var(--modern-spacing-lg); }
+.compact-mb-sm { margin-bottom: var(--modern-spacing-sm); }
+.compact-mb-md { margin-bottom: var(--modern-spacing-md); }
+.compact-text-secondary {
+  color: #64748b;
+}
+.compact-text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------------------
+   深色模式支持
+   ---------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --modern-border-light: rgba(255, 255, 255, 0.08);
+    --modern-border-medium: rgba(255, 255, 255, 0.15);
+    --modern-bg-subtle: rgba(255, 255, 255, 0.03);
+    --modern-bg-elevated: rgba(30, 41, 59, 0.8);
+    --modern-bg-surface: #1e293b;
+  }
+
+  .compact-content {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  }
+
+  .compact-header {
+    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+    border-bottom-color: var(--modern-border-light);
+  }
+
+  .compact-title {
+    color: #e2e8f0;
+  }
+
+  .compact-body {
+    color: #cbd5e1;
+  }
+
+  .compact-collapse :deep(.el-collapse-item__header) {
+    background: linear-gradient(135deg, #334155 0%, #1e293b 100%) !important;
+    color: #e2e8f0 !important;
+  }
+
+  .compact-collapse :deep(.el-collapse-item__header:hover) {
+    background: linear-gradient(135deg, #475569 0%, #334155 100%) !important;
+  }
+
+  .compact-collapse :deep(.el-collapse-item__content) {
+    background: #1e293b !important;
+  }
+
+  .compact-code {
+    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+    color: #e2e8f0;
+    border-color: var(--modern-border-light);
+  }
+
+  .compact-markdown :deep(h1),
+  .compact-markdown :deep(h2),
+  .compact-markdown :deep(h3),
+  .compact-markdown :deep(h4),
+  .compact-markdown :deep(h5),
+  .compact-markdown :deep(h6) {
+    color: #e2e8f0;
+  }
+
+  .compact-markdown :deep(p) {
+    color: #cbd5e1;
+  }
+
+  .compact-markdown :deep(blockquote) {
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .compact-text-secondary {
+    color: #94a3b8;
+  }
+}

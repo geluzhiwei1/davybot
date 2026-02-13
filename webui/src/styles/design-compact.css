@@ -1,0 +1,741 @@
+/* ========================================
+   COMPACT PRECISION - DESIGN SYSTEM
+   紧凑精密设计系统 - 专利AI Agent专用
+   ========================================
+
+   设计理念：信息密度高，间距精密，克制优雅
+   让有效信息占据主导地位
+   ======================================== */
+
+/* Using system fonts for offline compatibility */
+/* ====================
+   CSS CUSTOM PROPERTIES
+   ==================== */
+:root {
+  /* 主色板 - 降饱和蓝灰 */
+  --color-primary: #475569;
+  --color-primary-rgb: 71, 85, 105;
+  --color-primary-dark: #334155;
+  --color-primary-light: #64748b;
+  --color-primary-lighter: #f1f5f9;
+
+  /* 点缀色 - 精致蓝 */
+  --color-accent: #3b82f6;
+  --color-accent-rgb: 59, 130, 246;
+  --color-accent-light: #60a5fa;
+  --color-accent-lighter: #dbeafe;
+
+  /* 中性色 - 精确灰度 */
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #F8FAFC;
+  --color-surface-3: #F1F5F9;
+  --color-border-subtle: #E2E8F0;
+  --color-border-default: #CBD5E1;
+  --color-border-strong: #94A3B8;
+
+  /* 文本色 - 精心调配 */
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94A3B8;
+  --color-text-inverse: #FFFFFF;
+
+  /* 状态色 - 更克制的饱和度 */
+  --color-success: #059669;
+  --color-warning: #D97706;
+  --color-error: #DC2626;
+  --color-info: #0284C7;
+
+  /* 阴影系统 - 极简 */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.10);
+
+  /* 字体系统 - 专业中性 */
+  --font-display: 'Inter', ui-sans-serif, system-ui;
+  --font-body: 'Inter', ui-sans-serif, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* 字体大小 - 更精细的梯度 */
+  --text-xs: 0.75rem;
+  /* 12px */
+  --text-sm: 0.8125rem;
+  /* 13px */
+  --text-base: 0.875rem;
+  /* 14px */
+  --text-md: 0.9375rem;
+  /* 15px */
+  --text-lg: 1rem;
+  /* 16px */
+  --text-xl: 1.0625rem;
+  /* 17px */
+  --text-2xl: 1.25rem;
+  /* 20px */
+  --text-3xl: 1.5rem;
+  /* 24px */
+
+  /* 间距 - 紧凑系统 */
+  --space-tight: 0.25rem;
+  /* 4px */
+  --space-xs: 0.375rem;
+  /* 6px */
+  --space-sm: 0.5rem;
+  /* 8px */
+  --space-md: 0.75rem;
+  /* 12px */
+  --space-lg: 1rem;
+  /* 16px */
+  --space-xl: 1.25rem;
+  /* 20px */
+  --space-2xl: 1.5rem;
+  /* 24px */
+  --space-3xl: 2rem;
+  /* 32px */
+
+  /* 组件尺寸 */
+  --header-height: 48px;
+  --footer-height: 32px;
+  --input-height: 36px;
+  --button-sm: 28px;
+  --button-md: 32px;
+
+  /* 圆角 - 更小更精确 */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  /* 动画 - 快速响应 */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+
+  /* 缓动 - 精确控制 */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-index层级 */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
+/* 暗色模式 - 保持克制 */
+[data-theme="dark"] {
+  --color-surface-1: #0F172A;
+  --color-surface-2: #1E293B;
+  --color-surface-3: #334155;
+  --color-border-subtle: #334155;
+  --color-border-default: #475569;
+  --color-border-strong: #64748b;
+
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #CBD5E1;
+  --color-text-tertiary: #94A3B8;
+  --color-text-inverse: #0F172A;
+}
+
+/* ====================
+   GLOBAL RESET
+   ==================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  /* 紧凑行高 */
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-1);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ====================
+   TYPOGRAPHY
+   ==================== */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-md);
+}
+
+h1 {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+h4 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+h5 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+h6 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+p {
+  margin-bottom: var(--space-md);
+  line-height: 1.6;
+  max-width: 65ch;
+  /* 最佳阅读宽度 */
+}
+
+/* 代码 */
+code,
+pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--color-surface-3);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-xs);
+}
+
+pre {
+  padding: var(--space-md);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+/* ====================
+   SCROLLBAR - 极简
+   ==================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-subtle);
+  border-radius: var(--radius-xs);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-default);
+}
+
+/* ====================
+   CHAT LAYOUT - 紧凑版
+   ==================== */
+.chat-container {
+  height: 100vh;
+  display: flex;
+  background: var(--color-surface-1);
+  /* 移除渐变背景，使用纯色 */
+}
+
+/* Activity Bar - 更窄 */
+.activity-bar {
+  width: 48px !important;
+  /* 从 60px 缩小 */
+  background: var(--color-surface-2);
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.activity-bar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-sm);
+  gap: var(--space-sm);
+}
+
+.top-buttons,
+.bottom-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* Side Panel - 更紧凑 */
+.content-panel,
+.side-panel {
+  width: 320px !important;
+  /* 从 400px 缩小 */
+  background: var(--color-surface-2);
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.side-panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Main Content - 最大化信息区域 */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-1);
+  min-width: 0;
+  /* Flexbox fix */
+}
+
+/* Header - 极简 */
+.el-header {
+  padding: 0 !important;
+  height: var(--header-height) !important;
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 确保子元素正确分布，左中右对齐 */
+}
+
+/* Main - 紧凑 */
+.el-main {
+  padding: 0 !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Footer - 压扁 */
+.el-footer {
+  padding: 0 !important;
+  height: auto !important;
+  background: var(--color-surface-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* ====================
+   MESSAGE AREA - 信息密度优先
+   ==================== */
+.message-area {
+  height: 100%;
+  flex: 1;
+  padding: var(--space-md) !important;
+  background: var(--color-surface-1);
+  position: relative;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md) !important;
+  /* 紧凑间距 */
+  max-width: 900px;
+  /* 限制宽度 */
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--space-md) 0;
+}
+
+/* 消息包装器 - 压缩 */
+.message-wrapper {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+/* 用户消息 */
+.user-message-container {
+  justify-content: flex-end;
+}
+
+.user-avatar {
+  width: 28px !important;
+  /* 从 32px 缩小 */
+  height: 28px !important;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.message-card {
+  padding: var(--space-md) !important;
+  /* 从大padding缩小 */
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-xs) !important;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  max-width: 85%;
+  /* 给信息更多空间 */
+}
+
+/* 统一所有卡片样式 - 用户和AI消息完全一致 */
+.user-card,
+.assistant-card {
+  background: var(--color-surface-1) !important;
+  border-color: var(--color-border-subtle) !important;
+}
+
+.user-message-content {
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
+/* AI助手消息 */
+.assistant-message-container {
+  justify-content: flex-start;
+}
+
+.assistant-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.assistant-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.message-sender {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.message-time {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-left: var(--space-xs);
+}
+
+/* 消息气泡 - 统一样式 */
+.assistant-card {
+  background: var(--color-surface-1) !important;
+  border: 1px solid var(--color-border-subtle) !important;
+  padding: var(--space-md) !important;
+}
+
+/* 操作按钮 - 更小更克制 */
+.message-actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+}
+
+.message-wrapper:hover .message-actions {
+  opacity: 1;
+}
+
+.message-actions .el-button {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 12px;
+}
+
+/* ====================
+   SIDE PANEL COMPONENTS
+   ==================== */
+.side-collapse {
+  border: none !important;
+}
+
+.collapse-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.collapse-content {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* 对话列表 - 更紧凑 */
+.conversation-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.conversation-actions .el-button {
+  font-size: var(--text-xs);
+  height: var(--button-sm);
+  padding: 0 var(--space-md);
+}
+
+.conversation-menu {
+  border: none !important;
+}
+
+.conversation-menu-item {
+  height: auto !important;
+  padding: var(--space-sm) var(--space-md) !important;
+  margin: 0 !important;
+  border-radius: var(--radius-sm) !important;
+  transition: background var(--duration-fast);
+}
+
+.conversation-menu-item:hover {
+  background: var(--color-surface-3);
+}
+
+.conversation-menu-item.is-active {
+  background: var(--color-primary-lighter);
+}
+
+.conv-content {
+  display: flex;
+  align-items: left;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex: 1;
+}
+
+.conv-title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-date {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.conv-delete-btn {
+  flex-shrink: 0;
+}
+
+/* ====================
+   INPUT AREA - 精简
+   ==================== */
+.user-input-area {
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-1);
+  padding: var(--space-md);
+}
+
+/* ====================
+   BUTTONS - 克制设计
+   ==================== */
+.el-button {
+  font-weight: 500;
+  transition: all var(--duration-fast);
+}
+
+.el-button--small {
+  height: var(--button-sm);
+  padding: 0 var(--space-md);
+  font-size: var(--text-xs);
+}
+
+.el-button.is-circle {
+  width: var(--button-md);
+  height: var(--button-md);
+}
+
+/* ====================
+   CARDS - 更轻量
+   ==================== */
+.el-card {
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-xs) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* ====================
+   COLLAPSE - 精简
+   ==================== */
+.el-collapse-item__header {
+  height: 36px !important;
+  line-height: 36px !important;
+  padding: 0 var(--space-md) !important;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.el-collapse-item__content {
+  padding: 0 !important;
+}
+
+/* ====================
+   UTILITIES
+   ==================== */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-tertiary {
+  color: var(--color-text-tertiary);
+}
+
+/* ====================
+   RESPONSIVE
+   ==================== */
+@media (max-width: 768px) {
+  :root {
+    --space-md: 0.625rem;
+    /* 10px */
+    --space-lg: 0.75rem;
+    /* 12px */
+  }
+
+  .message-card {
+    max-width: 95%;
+  }
+}
+
+/* ====================
+   ANIMATIONS - 快速微妙
+   ==================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-wrapper {
+  animation: fadeIn var(--duration-base) var(--ease-out);
+}
+
+/* ====================
+   PRINT - 高效输出
+   ==================== */
+@media print {
+
+  .activity-bar,
+  .el-footer,
+  .message-actions {
+    display: none !important;
+  }
+
+  .message-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+}
+
+/* ====================
+   ELEMENT PLUS COMPONENT FIXES
+   ==================== */
+
+/* 修复 el-descriptions 标签竖着显示的问题 */
+.el-descriptions__label {
+  width: auto !important;
+  min-width: 80px;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  word-break: keep-all !important;
+}
+
+.el-descriptions__content {
+  width: auto !important;
+  word-break: break-word !important;
+}
+
+.el-descriptions__cell {
+  padding: 8px 12px !important;
+}
+
+.el-descriptions {
+  font-size: 14px !important;
+}
+
+/* 确保 label 不会在表格中竖排 */
+.el-descriptions__label .el-descriptions__label,
+.el-descriptions-item__label {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
