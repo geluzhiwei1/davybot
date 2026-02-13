@@ -1,5 +1,3 @@
-# 微信交流群
-![alt text](asserts/group.png)
 
 # 发布计划
 
@@ -8,3 +6,13 @@
 - windows app版本： windows 下载安装，直接使用
 - Linux app 版本： Ubuntu 下载安装，直接使用
 - 移动端 App 版本（跨平台）： 手机版本，安装后直接使用 
+
+# 依赖代码库
+
+- https://github.com/geluzhiwei1/davybot-market-cli
+- https://github.com/geluzhiwei1/davybot-skills
+- https://github.com/geluzhiwei1/davybot-agents
+- TODO
+
+# 微信交流群
+![alt text](asserts/group.png)
