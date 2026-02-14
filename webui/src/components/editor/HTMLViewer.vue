@@ -89,13 +89,11 @@ const reloadHTML = () => {
   if (iframeRef.value) {
     iframeRef.value.src = ''
     iframeRef.value.srcdoc = htmlContent.value
-    console.log('[HTMLViewer] iframe reloaded with srcdoc, length:', htmlContent.value.length)
   }
 }
 
 const onFrameLoad = () => {
   loading.value = false
-  console.log('[HTMLViewer] HTML loaded successfully')
 }
 
 const openInNewTab = () => {
@@ -103,7 +101,6 @@ const openInNewTab = () => {
   if (newWindow) {
     newWindow.document.write(htmlContent.value)
     newWindow.document.close()
-    console.log('[HTMLViewer] Opened in new tab')
   } else {
     ElMessage.warning('无法打开新标签页')
   }
@@ -111,7 +108,6 @@ const openInNewTab = () => {
 
 // 生命周期
 onMounted(() => {
-  console.log('[HTMLViewer] Component mounted')
   loading.value = true
   nextTick(() => {
     reloadHTML()
@@ -120,18 +116,12 @@ onMounted(() => {
 
 // 监听内容变化
 watch(() => props.modelValue, (newVal, oldVal) => {
-  console.log('[HTMLViewer] props.modelValue changed:', {
-    oldLength: oldVal?.length,
-    newLength: newVal?.length,
-    isDifferent: oldVal !== newVal
-  })
   if (oldVal !== newVal) {
     reloadHTML()
   }
 })
 
 watch(htmlContent, (newVal) => {
-  console.log('[HTMLViewer] htmlContent changed, length:', newVal?.length)
   if (iframeRef.value) {
     iframeRef.value.src = ''
     iframeRef.value.srcdoc = newVal

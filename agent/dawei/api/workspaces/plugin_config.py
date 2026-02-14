@@ -136,6 +136,9 @@ async def list_all_plugin_configs(
 
                     plugin_meta = yaml.safe_load(plugin_yaml.read_text(encoding="utf-8"))
                 except Exception:
+                    # Skip plugin if config cannot be loaded
+                    # nosec B112 - Intentional skip for corrupted plugin configs
+                    logger.debug(f"Skipping plugin {plugin_id} due to config load error")
                     continue
 
                 # Handle config_schema file reference
@@ -301,19 +304,28 @@ async def update_plugin_config(
         plugin_info = list_response.plugins[actual_plugin_id]
         schema = plugin_info.get("schema")
 
+        # 添加日志
+        logger.info(f"[PLUGIN CONFIG SAVE] plugin_id={actual_plugin_id}")
+        logger.info(f"[PLUGIN CONFIG SAVE] request.config={request.config}")
+        logger.info(f"[PLUGIN CONFIG SAVE] request.config type={type(request.config)}")
+        logger.info(f"[PLUGIN CONFIG SAVE] request.config keys={list(request.config.keys()) if request.config else 'None'}")
+
         # 验证配置
         is_valid = validate_config_against_schema(request.config, schema)
 
         if not is_valid:
+            logger.error(f"[PLUGIN CONFIG SAVE] Validation failed!")
             raise HTTPException(status_code=400, detail="Configuration validation failed. Please check your input values.")
 
         # 保存配置
         manager.save_plugin_config(actual_plugin_id, request.config)
+        logger.info(f"[PLUGIN CONFIG SAVE] Saved successfully")
 
         return PluginConfigResponse(
             success=True,
             schema=schema,
             config=request.config,
+            existing_config=request.config,
             form_config=plugin_info.get("form_config"),
             message="Configuration updated successfully",
         )
@@ -321,6 +333,7 @@ async def update_plugin_config(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception(f"[PLUGIN CONFIG SAVE] Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update plugin config: {str(e)}")
 
 

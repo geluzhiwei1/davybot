@@ -53,20 +53,11 @@ const checkHeight = () => {
     const scrollHeight = contentRef.value.scrollHeight
     const clientHeight = contentRef.value.clientHeight
 
-    console.log('[CollapsibleMessage] Height check:', {
-      scrollHeight,
-      clientHeight,
-      maxHeight: props.maxHeight,
-      shouldShow: scrollHeight > props.maxHeight,
-      userManuallyExpanded: userManuallyExpanded.value
-    })
-
     showToggleButton.value = scrollHeight > props.maxHeight
 
     // 只在用户未手动展开过的情况下才自动折叠
     if (props.autoCollapse && scrollHeight > props.maxHeight && !userManuallyExpanded.value && !props.collapsed) {
       isCollapsed.value = true
-      console.log('[CollapsibleMessage] Auto-collapsing content')
     }
   } catch (error) {
     console.error('[CollapsibleMessage] Error checking height:', error)
@@ -77,7 +68,6 @@ const checkHeight = () => {
 }
 
 const toggleCollapse = () => {
-  console.log('[CollapsibleMessage] Toggle clicked, current state:', isCollapsed.value)
   try {
     const newState = !isCollapsed.value
     isCollapsed.value = newState
@@ -85,10 +75,7 @@ const toggleCollapse = () => {
     // 如果用户手动展开了，设置标记以防止自动折叠
     if (newState === false) {
       userManuallyExpanded.value = true
-      console.log('[CollapsibleMessage] User manually expanded, preventing auto-collapse')
     }
-
-    console.log('[CollapsibleMessage] New state:', isCollapsed.value)
   } catch (error) {
     console.error('Error toggling collapse:', error)
     // 如果出错，确保状态被重置
@@ -97,8 +84,6 @@ const toggleCollapse = () => {
 }
 
 onMounted(() => {
-  console.log('[CollapsibleMessage] Component mounted')
-
   // 初始化状态
   if (props.collapsed) {
     isCollapsed.value = true
@@ -115,7 +100,6 @@ onMounted(() => {
   // 使用 ResizeObserver 监听内容变化
   if (contentRef.value) {
     const resizeObserver = new ResizeObserver(() => {
-      console.log('[CollapsibleMessage] Content resized, rechecking height')
       checkHeight()
     })
     resizeObserver.observe(contentRef.value)

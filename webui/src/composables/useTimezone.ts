@@ -23,7 +23,6 @@ import { TimezoneManager, initDayjsLocale } from '@/utils/dateFormatter'
  * const { userTimezone, setUserTimezone, resetTimezone, getTimezoneInfo, sendTimezoneToBackend } = useTimezone()
  *
  * // 获取当前时区
- * console.log(userTimezone.value) // 'Asia/Shanghai'
  *
  * // 设置时区
  * setUserTimezone('America/New_York')

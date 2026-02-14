@@ -140,21 +140,16 @@ const formProps = computed(() => ({
 // Load plugin config schema
 const loadConfigSchema = async () => {
   if (!props.pluginId || !props.workspaceId) {
-    console.log('[PluginSettingsDialog] loadConfigSchema skipped - pluginId:', props.pluginId, 'workspaceId:', props.workspaceId);
     return;
   }
-
-  console.log('[PluginSettingsDialog] loadConfigSchema called with pluginId:', props.pluginId, 'Type:', typeof props.pluginId);
 
   loadingSchema.value = true;
   validationErrors.value = [];
   try {
     const response = await pluginsApi.getConfigSchema(props.workspaceId, props.pluginId);
-    console.log('[PluginSettingsDialog] Config schema response:', response);
 
     // API returns: {success, schema, config, existing_config, form_config, message}
     configSchema.value = response;
-    console.log('[PluginSettingsDialog] Schema properties:', configSchema.value.schema?.properties);
 
     // Initialize form data with defaults and existing config
     if (configSchema.value?.schema?.properties) {
@@ -169,16 +164,21 @@ const loadConfigSchema = async () => {
       }
 
       // Merge with existing config (existing config takes precedence)
-      // existing_config is the full config object with nested settings field
-      formData.settings = {
+      // existing_config may be full config object or pure config values
+      let existingConfigValues: Record<string, unknown> = {};
+      if (response.existing_config) {
+        const { enabled, activated, version, install_path, ...pureConfig } = response.existing_config as any;
+        existingConfigValues = pureConfig || {};
+      }
+
+      const finalSettings = {
         ...defaultSettings,
-        ...(response.existing_config?.settings || {})
+        ...existingConfigValues
       };
 
-      console.log('[PluginSettingsDialog] Initialized settings:', formData.settings);
+      formData.settings = finalSettings;
     }
   } catch (error: unknown) {
-    console.error('[PluginSettingsDialog] Failed to load config schema:', error);
     ElMessage.warning(t('workspaceSettings.plugins.pluginConfig.loadSchemaError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     loadingSchema.value = false;
@@ -223,7 +223,9 @@ const handleSubmit = async () => {
 
   saving.value = true;
   try {
-    emit('save', props.pluginId, formData.settings);
+    // 🔧 修复：提取纯数据，避免发送 Proxy 对象
+    const plainData = JSON.parse(JSON.stringify(formData.settings));
+    emit('save', props.pluginId, plainData);
   } catch (error: unknown) {
     ElMessage.error(t('workspaceSettings.plugins.pluginConfig.saveError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
@@ -248,13 +250,15 @@ watch(
   () => props.pluginConfig,
   (newConfig) => {
     if (newConfig) {
+      // 提取纯配置值（排除 enabled, activated 等元数据）
+      const { enabled, activated, version, install_path, ...pureConfig } = newConfig as any;
       // 使用 Object.assign 更新 reactive 对象，而不是替换整个对象
       Object.assign(formData, {
-        settings: { ...(newConfig.settings || {}) }
+        settings: { ...(pureConfig || {}) }
       });
     }
   },
-  { immediate: true, deep: true }
+  { immediate: false, deep: true }
 );
 </script>
 

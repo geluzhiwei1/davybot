@@ -133,15 +133,10 @@ const simulateOperationRequest = () => {
 }
 
 const handleCancel = () => {
-  console.log('用户取消操作')
   currentOperation.value = null
 }
 
 const handleConfirm = () => {
-  console.log('用户确认操作')
-  if (currentOperation.value?.type === 'file_edit') {
-    console.log('应用文件更改')
-  }
   currentOperation.value = null
 }
 

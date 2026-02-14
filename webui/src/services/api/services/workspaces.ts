@@ -1237,7 +1237,12 @@ export class WorkspacesApiService {
       // 提取纯配置数据（去除 enabled, activated）
       const { settings, ...configOnly } = data;
 
-      return await httpClient.put<{
+      const payload = {
+        plugin_id: pluginId,
+        config: settings || configOnly || {}
+      };
+
+      const response = await httpClient.put<{
         success: boolean;
         plugin_id: string;
         enabled: boolean;
@@ -1247,11 +1252,10 @@ export class WorkspacesApiService {
         install_path: string | null;
       }>(
         `${this.baseUrl}/${workspaceId}/plugin-config/config`,
-        {
-          plugin_id: pluginId,
-          config: settings || configOnly || {}
-        }
+        payload
       );
+
+      return response;
     } catch (error) {
       throw this.handleError(error);
     }

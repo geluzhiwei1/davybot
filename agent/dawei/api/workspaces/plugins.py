@@ -131,13 +131,7 @@ async def get_plugin_manager(
             if workspace.plugins_config and workspace.plugins_config.plugins:
                 for plugin_name, plugin_config in workspace.plugins_config.plugins.items():
                     # Merge metadata fields into settings
-                    merged_settings = {
-                        "enabled": plugin_config.enabled,
-                        "activated": plugin_config.activated,
-                        "version": plugin_config.version,
-                        "install_path": plugin_config.install_path,
-                        **plugin_config.settings
-                    }
+                    merged_settings = {"enabled": plugin_config.enabled, "activated": plugin_config.activated, "version": plugin_config.version, "install_path": plugin_config.install_path, **plugin_config.settings}
                     settings_for_load[plugin_name] = merged_settings
 
             await manager.discover_and_load_all(settings=settings_for_load)
@@ -188,7 +182,7 @@ async def list_plugins(
                 "activated": plugin.get("activated", False),
             }
             plugin_list.append(plugin_info)
-        
+
         return {"plugins": plugin_list}
 
     except Exception as e:

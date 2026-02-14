@@ -200,9 +200,8 @@ const handleClick = (event: Event) => {
   }
 }
 
-const handleChange = (value: unknown) => {
+const handleChange = (_value: unknown) => {
   // Handle input changes
-  console.log('[A2UI] Change:', props.node.id, value)
 
   // Update data model if component has data binding
   if (props.node.dataContextPath) {
@@ -210,9 +209,8 @@ const handleChange = (value: unknown) => {
   }
 }
 
-const handleInput = (value: unknown) => {
+const handleInput = (_value: unknown) => {
   // Handle input events
-  console.log('[A2UI] Input:', props.node.id, value)
 }
 
 const emitAction = (

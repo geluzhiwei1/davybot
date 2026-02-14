@@ -144,7 +144,6 @@ onMounted(async () => {
         // 同步到chatStore
         if (currentMode.value) {
           chatStore.uiContext.currentMode = currentMode.value.slug;
-          console.log('BottomBar: 初始化currentMode并同步到chatStore:', currentMode.value.slug);
         }
       }
     } catch (error) {
@@ -162,7 +161,6 @@ onMounted(async () => {
         // 同步到chatStore
         if (currentLLM.value) {
           chatStore.uiContext.currentLlmId = currentLLM.value.llm_id;
-          console.log('BottomBar: 初始化currentLLM并同步到chatStore:', currentLLM.value.llm_id);
         }
       }
     } catch (error) {
@@ -192,7 +190,6 @@ const selectMode = async (mode: Mode) => {
       currentMode.value = mode;
       // 更新 chatStore 中的 uiContext
       chatStore.uiContext.currentMode = mode.slug;
-      console.log('Mode updated successfully:', mode.slug);
     } else {
       console.error('Failed to update mode, status:', response.status);
     }
@@ -204,7 +201,6 @@ const selectMode = async (mode: Mode) => {
 const selectLLM = async (llm: LLM) => {
   try {
     const workspaceId = route.params.workspaceId as string;
-    console.log('Updating LLM:', { workspaceId, llmId: llm.llm_id });
 
     if (!workspaceId) {
       ElMessage.error('工作区ID不存在');
@@ -212,8 +208,7 @@ const selectLLM = async (llm: LLM) => {
       return;
     }
 
-    const url = `/api/workspaces/${workspaceId}/ui/context`;  // 修复：使用正确的路径
-    console.log('Request URL:', url);
+    const url = `/api/workspaces/${workspaceId}/ui/context`;
 
     const response = await fetch(url, {
       method: 'PUT',
@@ -225,13 +220,10 @@ const selectLLM = async (llm: LLM) => {
       })
     });
 
-    console.log('Response status:', response.status);
-
     if (response.ok) {
       currentLLM.value = llm;
       // 更新 chatStore 中的 uiContext
       chatStore.uiContext.currentLlmId = llm.llm_id;
-      console.log('LLM updated successfully');
       ElMessage.success('LLM 已更新');
     } else {
       const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));

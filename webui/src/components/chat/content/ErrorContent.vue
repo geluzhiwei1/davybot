@@ -95,10 +95,7 @@ const hasDetails = computed(() => {
 // 添加调试日志（仅在开发模式）
 onMounted(() => {
   if (import.meta.env.DEV) {
-    console.log('ErrorContent component mounted with block:', props.block)
-    console.log('Error message:', props.block.message)
-    console.log('Error details:', props.block.details)
-    console.log('Error code:', errorCode.value)
+    console.debug('ErrorContent component mounted with block:', props.block)
   }
 })
 

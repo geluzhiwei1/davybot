@@ -89,6 +89,5 @@ app.mount('#app')
 
 // ==================== 应用退出前清理 ====================
 window.addEventListener('beforeunload', () => {
-  console.log('[Main] Application shutting down...')
   // 可以在这里执行清理逻辑
 })

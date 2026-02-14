@@ -93,7 +93,6 @@ const handleSendMessage = () => {
 
 const handleFileUpload = () => {
   // TODO: 实现文件上传功能
-  console.log('File upload clicked');
 };
 
 const handleLoadMore = async () => {
@@ -112,7 +111,6 @@ const handleLoadMore = async () => {
     // 将新加载的消息添加到现有消息列表的顶部
     if (newMessages.length > 0) {
       chatStore.messages.unshift(...newMessages);
-      console.log(`[CHAT_AREA] Loaded ${newMessages.length} more historical messages`);
     }
   } catch (error) {
     console.error('[CHAT_AREA] Failed to load more messages:', error);

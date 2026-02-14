@@ -345,12 +345,6 @@ function isPDFFile(file: File): boolean {
 
 function isHTMLFile(file: File): boolean {
   const isHTML = file.name.endsWith('.html') || file.name.endsWith('.htm') || file.type === 'html' || file.type === 'text/html' || file.type === 'application/xhtml+xml'
-  console.log('[FileContentArea] File type check:', {
-    name: file.name,
-    type: file.type,
-    isHTML,
-    isPDF: isPDFFile(file)
-  })
   return isHTML
 }
 
@@ -360,15 +354,7 @@ function isGenericFile(file: File): boolean {
 
 // Event handlers
 const handleTabChange = (fileId: string | number) => {
-  const startTime = performance.now()
-  console.log('[FileContentArea] Tab changed to:', fileId)
   emit('update:activeFileId', fileId as string)
-
-  // 测量切换性能
-  nextTick(() => {
-    const endTime = performance.now()
-    console.log(`[FileContentArea] Tab switch took ${(endTime - startTime).toFixed(2)}ms`)
-  })
 }
 
 const closeFile = (fileId: string | number) => {
@@ -376,7 +362,6 @@ const closeFile = (fileId: string | number) => {
 }
 
 const openImageViewer = () => {
-  console.log('[FileContentArea] Opening image viewer')
   imageViewerVisible.value = true
 }
 
@@ -400,12 +385,10 @@ const handleSave = async () => {
     // 保存后对于 Markdown 文件，等待父组件更新 content
     if (isMarkdownFile(activeFile.value)) {
       await nextTick()
-      console.log('[FileContentArea] File saved')
     } else if (isHTMLFile(activeFile.value)) {
       // HTML文件切换到预览标签页
       await nextTick()
       htmlActiveTab.value = 'preview'
-      console.log('[FileContentArea] HTML file saved, switching to preview tab')
     }
   } finally {
     isSaving.value = false
@@ -420,7 +403,6 @@ const initVditor = () => {
 
   // 如果已经初始化过，只更新值
   if (vditorInitialized.value && vditor.value) {
-    console.log('[FileContentArea] Reusing existing Vditor instance')
     const currentValue = vditor.value.getValue()
     if (currentValue !== editableContent.value) {
       vditor.value.setValue(editableContent.value)
@@ -429,7 +411,6 @@ const initVditor = () => {
   }
 
   // 首次初始化
-  console.log('[FileContentArea] Initializing Vditor for the first time')
   const startTime = performance.now()
 
   vditor.value = new Vditor(vditorRef.value, {
@@ -468,8 +449,6 @@ const initVditor = () => {
     },
     after: () => {
       vditorInitialized.value = true
-      const endTime = performance.now()
-      console.log(`[FileContentArea] Vditor initialized in ${(endTime - startTime).toFixed(2)}ms`)
     },
   })
 }
@@ -483,21 +462,12 @@ watch(() => themeStore.theme, (newTheme) => {
 watch(activeFile, (newFile, oldFile) => {
   if (!newFile) return
 
-  console.log('[FileContentArea] Active file changed:', {
-    name: newFile.name,
-    type: newFile.type,
-    isHTML: isHTMLFile(newFile),
-    isPDF: isPDFFile(newFile)
-  })
-
   // 更新编辑内容
   editableContent.value = newFile.content
-  console.log('[FileContentArea] editableContent initialized:', editableContent.value?.substring(0, 100))
 
   // 如果是HTML文件，重置tab状态
   if (isHTMLFile(newFile)) {
     htmlActiveTab.value = 'preview'
-    console.log('[FileContentArea] HTML file detected, reset to preview tab')
   }
 
   // 只在切换到Markdown文件时初始化/更新Vditor
@@ -519,15 +489,9 @@ watch(activeFile, (newFile, oldFile) => {
 // 监听 activeFile.content 变化，同步到 editableContent
 watch(() => activeFile.value?.content, (newContent) => {
   if (newContent !== undefined && newContent !== editableContent.value) {
-    console.log('[FileContentArea] activeFile.content changed, syncing to editableContent')
     editableContent.value = newContent
   }
 }, { immediate: true })
-
-// 调试：监控文件类型变化
-watch(fileTypeDebug, (debug) => {
-  console.log('[FileContentArea] File type detection:', debug)
-}, { immediate: true, deep: true })
 
 onUnmounted(() => {
   vditor.value?.destroy()

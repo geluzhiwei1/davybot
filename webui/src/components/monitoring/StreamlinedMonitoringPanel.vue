@@ -255,17 +255,11 @@ const selectedAgentId = ref<string | null>(null)
 watch(
   () => parallelTasksStore.allTasks,
   (tasks) => {
-    console.log('[StreamlinedMonitoring] All tasks from parallelTasksStore:', tasks.length)
-    tasks.forEach(task => {
-      console.log('  - Task:', task.taskId, 'state:', task.state, 'nodeType:', task.nodeType)
-    })
-
     // 同步活跃任务到 monitoringStore
     const activeTasks = tasks.filter(
       task => task.state === 'running' || task.state === 'pending'
     )
 
-    console.log('[StreamlinedMonitoring] Filtered active tasks:', activeTasks.length)
     monitoringStore.updateAgents(activeTasks)
 
     // 自动选择逻辑：
@@ -277,7 +271,6 @@ watch(
 
       if (!selectedAgentId.value || isCurrentTaskInactive) {
         selectedAgentId.value = activeTasks[0].taskId
-        console.log('[StreamlinedMonitoring] Auto-selected agent:', selectedAgentId.value)
       }
     }
   },

@@ -578,7 +578,6 @@ class LLMProvider(ILLMService):
         stream_response = llm_instance.astream_chat_completion(messages=messages, **kwargs)
 
         async for message in stream_response:
-
             # stream_response 已经是解析后的 StreamMessages 对象，无需再次解析
             await callback(message)
 

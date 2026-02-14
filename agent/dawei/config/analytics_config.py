@@ -147,7 +147,7 @@ PRIVACY_CONFIG = {
         "email_pattern": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
         "ip_pattern": r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}",
         "path_pattern": r"/[^\s]+",  # 文件路径
-        "token_pattern": r"sk-[a-zA-Z0-9]{32,}",  # API keys
+        "token_pattern": r"sk-[a-zA-Z0-9]{32,}",  # API keys (正则模式，用于脱敏)
         "replacement": "[REDACTED]",
     },
     # Cookie 策略（Web 模式）
@@ -186,19 +186,19 @@ INTEGRATION_CONFIG = {
         # Sentry 集成（错误追踪）
         "sentry": {
             "enabled": False,
-            "dsn": "",  # Sentry DSN
+        "dsn": os.getenv("SENTRY_DSN", ""),  # 从环境变量加载
             "environment": "production",
             "traces_sample_rate": 0.1,
         },
         # Google Analytics 集成（可选）
         "google_analytics": {
             "enabled": False,
-            "tracking_id": "",  # GA4 Measurement ID
+            "tracking_id": os.getenv("GA_TRACKING_ID", ""),  # 从环境变量加载
         },
         # Mixpanel 集成（可选）
         "mixpanel": {
             "enabled": False,
-            "token": "",
+            "token": os.getenv("MIXPANEL_TOKEN", ""),  # 从环境变量加载
         },
     },
     # Webhook 通知

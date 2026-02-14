@@ -305,12 +305,6 @@ export class WebSocketClient {
 
     // ✅ 持久化到 sessionStorage
     this.saveSessionId()
-
-    console.log('[WebSocketClient] ✅ SessionId updated and persisted:', {
-      new_session_id: sessionId,
-      workspace_id: this.workspaceId,
-      storage_key: `ws_session_id_${this.workspaceId}`
-    })
   }
 
   /**
@@ -426,16 +420,6 @@ export class WebSocketClient {
       // 更新性能指标
       this.metrics.messagesReceived++
       this.metrics.bytesReceived += data.length
-
-      // 调试日志：追踪每条消息（忽略心跳消息以减少日志噪音）
-      if (message.type !== 'ws_heartbeat') {
-        console.log(`[WebSocket] Received message #${this.metrics.messagesReceived}:`, {
-          type: message.type,
-          id: message.id,
-          sessionId: message.session_id,
-          timestamp: message.timestamp
-        })
-      }
 
       // 路由消息到本地处理器
       await this.router.dispatch(message)

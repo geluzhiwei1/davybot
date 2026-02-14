@@ -243,10 +243,6 @@ const handleClick = () => {
 }
 
 const checkForMention = (value: string, cursorPosition: number, textarea: HTMLInputElement | HTMLTextAreaElement) => {
-  console.log('[UserInputArea] ===== Checking for mention =====')
-  console.log('[UserInputArea] Value:', value)
-  console.log('[UserInputArea] Cursor position:', cursorPosition)
-
   // 查找光标位置前最近的@符号
   let atPosition = -1
 
@@ -261,13 +257,9 @@ const checkForMention = (value: string, cursorPosition: number, textarea: HTMLIn
     }
   }
 
-  console.log('[UserInputArea] @ found at position:', atPosition)
-
   // 只有刚输入@符号时才弹出文件选择框（@后面还没有内容）
   // 条件：找到了@符号 且 光标就在@符号后面（@后面还没有输入任何字符）
   if (atPosition !== -1 && cursorPosition === atPosition + 1) {
-    console.log('[UserInputArea] ===== Opening mention popup =====')
-
     // 提取查询字符串（此时应该为空）
     mentionQuery.value = value.substring(atPosition + 1, cursorPosition)
     mentionStartIndex.value = atPosition
@@ -286,20 +278,8 @@ const checkForMention = (value: string, cursorPosition: number, textarea: HTMLIn
       y: rect.top + 20 + linesBefore * lineHeight
     }
 
-    console.log('[UserInputArea] Popup position:', resourceMentionPosition.value)
-    console.log('[UserInputArea] Current workspace:', currentWorkspaceId.value)
-
     showResourceMention.value = true
-    console.log('[UserInputArea] showResourceMention set to true')
   } else {
-    console.log('[UserInputArea] Closing mention popup (not triggered)')
-    if (atPosition !== -1) {
-      console.log('[UserInputArea] Reason: cursorPosition !== atPosition + 1', {
-        cursorPosition,
-        atPosition,
-        expected: atPosition + 1
-      })
-    }
     closeResourceMention()
   }
 }
@@ -372,9 +352,7 @@ const loadSlashCommands = async () => {
       ? currentWorkspaceId.value
       : undefined
 
-    console.log('[SlashCommands] Loading commands with workspace:', workspaceParam)
     const response = await listSlashCommands({ workspace: workspaceParam })
-    console.log('[SlashCommands] API response:', response)
 
     const commands = response.success && response.commands
       ? response.commands.map(cmd => ({
@@ -385,8 +363,6 @@ const loadSlashCommands = async () => {
           source: cmd.source
         }))
       : []
-
-    console.log('[SlashCommands] Mapped commands:', commands)
 
     const position = calculatePopupPosition()
 

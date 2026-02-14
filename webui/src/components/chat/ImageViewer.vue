@@ -201,24 +201,18 @@ const resetView = () => {
 }
 
 const zoomIn = () => {
-  console.log('[ImageViewer] Zoom in, current scale:', scale.value)
   scale.value = Math.min(scale.value + zoomStep, maxScale)
   fitMode.value = 'actual'
-  console.log('[ImageViewer] New scale:', scale.value)
 }
 
 const zoomOut = () => {
-  console.log('[ImageViewer] Zoom out, current scale:', scale.value)
   scale.value = Math.max(scale.value - zoomStep, minScale)
-  console.log('[ImageViewer] New scale:', scale.value)
 }
 
 const handleWheel = (event: WheelEvent) => {
-  console.log('[ImageViewer] Wheel event:', event.deltaY, 'Current scale:', scale.value)
   const delta = event.deltaY > 0 ? -zoomStep : zoomStep
   scale.value = Math.max(minScale, Math.min(maxScale, scale.value + delta))
   fitMode.value = 'actual'
-  console.log('[ImageViewer] New scale:', scale.value)
 }
 
 const handleSliderChange = () => {
@@ -396,12 +390,8 @@ const handleKeyboard = (event: KeyboardEvent) => {
 
 // Watch for visibility changes to fit image on open
 watch(() => props.visible, (newVal) => {
-  console.log('[ImageViewer] Visible changed to:', newVal)
-  console.log('[ImageViewer] Images:', props.images)
   if (newVal) {
-    console.log('[ImageViewer] Opening with images:', props.images)
     nextTick(() => {
-      console.log('[ImageViewer] NextTick - calling fitToScreen')
       fitToScreen()
     })
   }
@@ -409,14 +399,12 @@ watch(() => props.visible, (newVal) => {
 
 // Watch for index changes
 watch(currentIndex, () => {
-  console.log('[ImageViewer] Current index changed to:', currentIndex.value)
   imageInfo.value = null
   imageSize.value = 0
 })
 
 // Lifecycle
 onMounted(() => {
-  console.log('[ImageViewer] Component mounted')
   document.addEventListener('keydown', handleKeyboard)
   document.addEventListener('fullscreenchange', () => {
     isFullscreen.value = !!document.fullscreenElement

@@ -409,12 +409,10 @@ async function handleBatchOperation(command: string) {
   }
 }
 
-function handleTodoUpdate(todoId: string, updates: unknown) {
-  console.log('TODO updated:', todoId, updates)
+function handleTodoUpdate(_todoId: string, _updates: unknown) {
 }
 
-function handleTodoDelete(todoId: string, taskNodeId: string) {
-  console.log('TODO deleted:', todoId, taskNodeId)
+function handleTodoDelete(_todoId: string, _taskNodeId: string) {
 }
 
 function handleSizeChange(size: number) {

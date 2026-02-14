@@ -211,7 +211,6 @@ const handleSendReport = async () => {
       ElMessage.success('✅ 崩溃报告已发送，感谢您的反馈！')
     } else {
       // feedback 服务不可用，将数据保存到 localStorage
-      console.log('[CrashRecoveryDialog] Feedback service not available, saving locally')
       const pendingReports = JSON.parse(localStorage.getItem('pending_feedback') || '[]')
       pendingReports.push(reportData)
       localStorage.setItem('pending_feedback', JSON.stringify(pendingReports))

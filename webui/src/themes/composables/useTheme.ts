@@ -83,7 +83,6 @@ export function useTheme() {
     watch(
       () => themeStore.currentTheme,
       (newTheme, oldTheme) => {
-        console.log(`[Theme] Switched from ${oldTheme} to ${newTheme}`)
         applyThemeToDOM()
         updateBodyClass()
         localStorage.setItem(STORAGE_KEY, newTheme)

@@ -198,7 +198,6 @@ const tabs = computed(() => {
     { key: 'skills', label: '技能', icon: '⚡', count: skills.value.length },
     { key: 'recent', label: '最近', icon: '🕐', count: recentItems.value.length }
   ]
-  console.log('[ResourceMention] Tabs computed:', tabsList)
   return tabsList
 })
 
@@ -337,24 +336,14 @@ const loadFiles = async () => {
 
 const loadSkills = async () => {
   try {
-    console.log('[ResourceMention] ===== Loading skills =====')
-    console.log('[ResourceMention] Workspace ID:', props.workspaceId)
-
     // 使用 apiManager 调用正确的 API
     const response = await apiManager.getSkillsApi().listSkills({
       workspace_id: props.workspaceId
     })
 
-    console.log('[ResourceMention] API Response:', response)
     skills.value = response.skills || []
-    console.log('[ResourceMention] Skills loaded successfully:', skills.value.length, 'skills')
-    console.log('[ResourceMention] Skills:', skills.value)
-    console.log('[ResourceMention] ===== Skills loading complete =====')
   } catch (error: unknown) {
-    console.error('[ResourceMention] ===== Failed to load skills =====')
-    console.error('[ResourceMention] Error:', error)
-    console.error('[ResourceMention] Error message:', error?.message)
-    console.error('[ResourceMention] Error response:', error?.response)
+    console.error('[ResourceMention] Failed to load skills:', error)
     skills.value = []
   }
 }
@@ -393,13 +382,11 @@ const saveRecentItem = (item: RecentItem) => {
 }
 
 const switchTab = (tabKey: string) => {
-  console.log('[ResourceMention] Switching to tab:', tabKey)
   activeTab.value = tabKey
   selectedIndex.value = 0
   searchQuery.value = ''
   nextTick(() => {
     searchInput.value?.focus()
-    console.log('[ResourceMention] Tab switched to:', tabKey)
   })
 }
 
@@ -568,10 +555,7 @@ const switchTabBasedOnQuery = (query: string) => {
 
 // 监听器
 watch(() => props.visible, (visible) => {
-  console.log('[ResourceMention] Visible changed:', visible)
-  console.log('[ResourceMention] Workspace ID:', props.workspaceId)
   if (visible) {
-    console.log('[ResourceMention] Loading data...')
     loadFiles()
     loadSkills()
     loadRecentItems()
@@ -579,11 +563,6 @@ watch(() => props.visible, (visible) => {
     selectedIndex.value = 0
     nextTick(() => {
       searchInput.value?.focus()
-      console.log('[ResourceMention] Data loaded:', {
-        files: files.value.length,
-        skills: skills.value.length,
-        recent: recentItems.value.length
-      })
     })
   }
 })

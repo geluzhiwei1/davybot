@@ -127,7 +127,6 @@ const iframeSrc = computed(() => {
 const loadPDF = async () => {
   // 检查是否有内容
   if (!props.modelValue || props.modelValue.trim() === '') {
-    console.log('[PDFViewer] No content to load, skipping')
     error.value = false
     src.value = null
     return
@@ -150,11 +149,6 @@ const loadPDF = async () => {
   }
 
   try {
-    console.log('[PDFViewer] Loading PDF, source type:', props.modelValue?.substring(0, 50) + '...')
-    if (props.filename) {
-      console.log('[PDFViewer] Filename:', props.filename)
-    }
-
     // 安全检查：拒绝加载HTML内容
     if (props.modelValue && (
         props.modelValue.trim().startsWith('<!DOCTYPE html>') ||
@@ -171,7 +165,6 @@ const loadPDF = async () => {
 
     // 直接使用 PDF 源（浏览器原生查看器会处理）
     src.value = props.modelValue
-    console.log('[PDFViewer] PDF source set successfully (using browser native viewer)')
 
   } catch (err: unknown) {
     console.error('[PDFViewer] Load error:', err)

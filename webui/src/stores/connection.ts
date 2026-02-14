@@ -193,11 +193,6 @@ export const useConnectionStore = defineStore('connection', () => {
 
           // ✅ 连接成功后，验证并注册 session_id
           const sessionId = wsClient.getSessionId()
-          console.log('[ConnectionStore] 🔍 Client session_id:', {
-            session_id: sessionId,
-            session_id_length: sessionId?.length,
-            session_id_prefix: sessionId?.substring(0, 20)
-          })
 
           if (sessionId) {
             // ⚠️ 注意：这里注册的是前端的临时 session_id

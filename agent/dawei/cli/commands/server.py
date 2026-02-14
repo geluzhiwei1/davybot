@@ -211,7 +211,7 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill)
 
 
 @server_cmd.command(name="stop", help="Stop the running server")
-@click.option("--host", "-h", default="0.0.0.0", help="Server host")
+@click.option("--host", "-h", default="0.0.0.0", help="Server host (for port checking)")
 @click.option("--port", "-p", type=int, default=8465, help="Server port")
 @click.option("--force", "-f", is_flag=True, help="Force stop without confirmation")
 def server_stop(host, port, force):

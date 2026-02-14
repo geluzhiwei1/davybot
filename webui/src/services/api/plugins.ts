@@ -206,8 +206,6 @@ export const pluginsApi = {
    * Get plugin configuration schema
    */
   async getConfigSchema(workspaceId: string, pluginId: string): Promise<PluginConfigSchema> {
-    console.log('[pluginsApi.getConfigSchema] Input pluginId:', pluginId, 'Type:', typeof pluginId)
-
     const response = await httpClient.get<PluginConfigSchema>(
       `${BASE_URL}/${workspaceId}/plugins/${pluginId}/schema`
     )

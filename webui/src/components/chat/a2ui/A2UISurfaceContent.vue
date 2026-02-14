@@ -93,9 +93,8 @@ const surfaceMetadata = computed(() => props.block.metadata)
 // Data model (reactive)
 const reactiveDataModel = computed({
   get: () => props.block.dataModel as Record<string, unknown>,
-  set: (value) => {
+  set: (_value) => {
     // TODO: Update data model via WebSocket
-    console.log('[A2UI] Data model updated:', value)
   }
 })
 
@@ -172,8 +171,6 @@ function handleUserAction(payload: {
   timestamp: string
   context?: Record<string, unknown>
 }) {
-  console.log('[A2UI] User action:', payload)
-
   // Send action to backend via WebSocket
   if (connectionStore.isConnected) {
     connectionStore.sendMessage({

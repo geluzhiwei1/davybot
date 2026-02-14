@@ -81,14 +81,10 @@ const handleImageError = (event: Event) => {
 }
 
 const openViewer = () => {
-  console.log('[ImageContent] Opening viewer')
-  console.log('[ImageContent] Block image:', props.block.image)
-  console.log('[ImageContent] Viewer images:', viewerImages.value)
   // Find the index of current image in the message images
   const currentIndex = viewerImages.value.findIndex(img => img.src === props.block.image)
   viewerInitialIndex.value = currentIndex >= 0 ? currentIndex : 0
   viewerVisible.value = true
-  console.log('[ImageContent] Viewer visible set to true, initial index:', viewerInitialIndex.value)
 }
 </script>
 

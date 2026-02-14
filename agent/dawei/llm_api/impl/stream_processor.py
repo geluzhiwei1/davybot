@@ -298,9 +298,7 @@ class StreamProcessor:
             async for line in stream:
                 # 检查是否有空闲超时
                 if idle_timeout_event.is_set():
-                    raise asyncio.TimeoutError(
-                        f"No data received for {idle_timeout}s (idle timeout)"
-                    )
+                    raise asyncio.TimeoutError(f"No data received for {idle_timeout}s (idle timeout)")
 
                 # 每次收到数据，重置空闲计时器
                 last_data_time = time.monotonic()

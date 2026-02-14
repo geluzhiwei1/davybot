@@ -232,16 +232,14 @@ function getFileName(path: string): string {
 }
 
 // 移除文件
-function removeFile(filePath: string) {
+function removeFile(_filePath: string) {
   // TODO: 发送移除文件的请求到后端
-  console.log('Remove file:', filePath);
   // 这里需要实现实际的文件移除逻辑
 }
 
 // 清空所有文件
 function clearAllFiles() {
   // TODO: 发送清空文件的请求到后端
-  console.log('Clear all files');
 }
 
 // 获取警告样式类

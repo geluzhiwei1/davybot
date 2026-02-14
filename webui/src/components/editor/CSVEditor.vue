@@ -162,7 +162,6 @@ const parseCSV = (csvText: string) => {
   }
 
   const startTime = performance.now()
-  console.log('[CSVEditor] Starting CSV parse...')
 
   Papa.parse(csvText, {
     header: true,
@@ -172,12 +171,6 @@ const parseCSV = (csvText: string) => {
       // 直接赋值，避免额外的map操作
       tableData.value = results.data as TableRow[]
       columns.value = results.meta.fields || []
-
-      const endTime = performance.now()
-      console.log('[CSVEditor] Parsed CSV in', (endTime - startTime).toFixed(2), 'ms', {
-        rows: results.data.length,
-        fields: results.meta.fields
-      })
 
       // 如果是大文件，自动启用分页
       if (isLargeFile.value) {
@@ -257,12 +250,6 @@ const unparseCSV = (): string => {
     header: true,
     newline: '\n'
   })
-  const endTime = performance.now()
-
-  if (isLargeFile.value) {
-    console.log('[CSVEditor] Unparsed CSV in', (endTime - startTime).toFixed(2), 'ms')
-  }
-
   return csv
 }
 

@@ -172,15 +172,13 @@ const formatTime = (timestamp: string | number | Date): string => {
 
 
 // 重试节点
-const retryNode = (node: TaskGraphNode) => {
+const retryNode = (_node: TaskGraphNode) => {
   // 这里应该调用控制节点的API
-  console.log('重试节点:', node.id)
 }
 
 // 跳过节点
-const skipNode = (node: TaskGraphNode) => {
+const skipNode = (_node: TaskGraphNode) => {
   // 这里应该调用控制节点的API
-  console.log('跳过节点:', node.id)
 }
 </script>
 

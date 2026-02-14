@@ -84,16 +84,6 @@ class ErrorMonitoring {
 
     // 更新时间戳
     this.metrics.lastUpdated = new Date().toISOString()
-
-    // 记录到控制台（开发环境）
-    if (import.meta.env.DEV) {
-      console.log('[ErrorMonitoring] Error handling recorded:', {
-        layer,
-        resolutionTime: `${resolutionTime}ms`,
-        usedFallback,
-        metrics: this.getMetrics()
-      })
-    }
   }
 
   /**
@@ -206,8 +196,6 @@ class ErrorMonitoring {
       lastUpdated: new Date().toISOString()
     }
     this.resolutionTimes = []
-
-    console.log('[ErrorMonitoring] Metrics reset')
   }
 
   /**

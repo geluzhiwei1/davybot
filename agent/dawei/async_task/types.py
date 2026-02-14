@@ -67,11 +67,11 @@ class RetryPolicy:
         # 限制最大延迟
         delay = min(delay, self.max_delay)
 
-        # 添加随机抖动
+        # 添加随机抖动（用于重试退避，非加密用途）
         if self.jitter:
-            import random
+            import secrets
 
-            delay *= 0.5 + random.random() * 0.5
+            delay *= 0.5 + secrets.token_bytes(1)[0] / 255.0
 
         return delay
 

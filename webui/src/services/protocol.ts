@@ -154,17 +154,8 @@ export class MessageBuilder {
     // 添加用户UI上下文（如果提供）
     if (userUIContext) {
       (message as unknown).user_ui_context = userUIContext;
-      console.log('[createUserMessage] ✓ user_ui_context added:', {
-        current_mode: userUIContext.current_mode,
-        current_llm_id: userUIContext.current_llm_id,
-        has_open_files: !!userUIContext.open_files,
-        has_current_file: !!userUIContext.current_file
-      });
-    } else {
-      console.log('[createUserMessage] ✗ No user_ui_context provided');
     }
 
-    console.log('createUserMessage - created message:', message);
     return message;
   }
 

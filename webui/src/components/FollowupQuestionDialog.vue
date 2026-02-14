@@ -110,14 +110,6 @@ const isSubmitting = ref(false);
 
 // 监听 visible prop
 watch(() => props.visible, (newVal) => {
-  console.log('========== FollowupQuestionDialog visible prop 变化 ==========');
-  console.log('新值:', newVal);
-  console.log('问题:', props.question);
-  console.log('建议:', props.suggestions);
-  console.log('建议数量:', props.suggestions?.length || 0);
-  console.log('建议详情:', JSON.stringify(props.suggestions, null, 2));
-  console.log('=============================================================');
-
   dialogVisible.value = newVal;
   if (newVal) {
     // 重置状态
@@ -129,9 +121,6 @@ watch(() => props.visible, (newVal) => {
 
 // 监听 dialogVisible 变化，同步到父组件
 watch(dialogVisible, (newVal) => {
-  console.log('========== dialogVisible 内部状态变化 ==========');
-  console.log('新值:', newVal);
-  console.log('================================================');
   emit('update:visible', newVal);
 });
 

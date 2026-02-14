@@ -68,7 +68,6 @@ watch(currentLanguage, (newLang) => {
   localStorage.setItem('user-language', newLang);
 
   // 触发语言变化事件（可以在这里添加i18n逻辑）
-  console.log('Language changed to:', newLang);
 });
 
 // 选择语言
@@ -77,8 +76,7 @@ const selectLanguage = (langValue: string) => {
 };
 
 // 处理下拉菜单显示/隐藏
-const handleDropdownVisible = (visible: boolean) => {
-  console.log('Dropdown visible:', visible);
+const handleDropdownVisible = (_visible: boolean) => {
 };
 
 // 暴露方法给父组件

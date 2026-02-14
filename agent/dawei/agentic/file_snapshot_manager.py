@@ -428,8 +428,8 @@ class FileSnapshotManager:
     def _save_snapshot(self, snapshot: FileSnapshot):
         """保存快照到磁盘"""
         try:
-            # 获取文件哈希（用于目录组织）
-            file_hash = hashlib.md5(snapshot.file_path.encode()).hexdigest()
+            # 获取文件哈希（用于目录组织，非安全用途）
+            file_hash = hashlib.md5(snapshot.file_path.encode(), usedforsecurity=False).hexdigest()
 
             # 快照目录
             snapshot_dir = self.files_dir / file_hash
@@ -460,7 +460,8 @@ class FileSnapshotManager:
             self.logger.exception("Failed to save snapshot {snapshot.snapshot_id}: ")
             # 清理可能部分创建的文件
             try:
-                file_hash = hashlib.md5(snapshot.file_path.encode()).hexdigest()
+                # 清理时获取文件哈希（非安全用途）
+                file_hash = hashlib.md5(snapshot.file_path.encode(), usedforsecurity=False).hexdigest()
                 snapshot_dir = self.files_dir / file_hash
                 metadata_file = snapshot_dir / f"{snapshot.snapshot_id}.json"
                 content_file = snapshot_dir / f"{snapshot.snapshot_id}.content"
@@ -475,8 +476,8 @@ class FileSnapshotManager:
 
     def _load_snapshot(self, file_path: str, snapshot_id: str) -> FileSnapshot | None:
         """从磁盘加载快照"""
-        # 获取文件哈希
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()
+        # 获取文件哈希（非安全用途，用于目录组织）
+        file_hash = hashlib.md5(file_path.encode(), usedforsecurity=False).hexdigest()
 
         # 快照目录
         snapshot_dir = self.files_dir / file_hash
@@ -511,8 +512,8 @@ class FileSnapshotManager:
         if file_path in self._index_cache:
             return self._index_cache[file_path]
 
-        # 获取文件哈希
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()
+        # 获取文件哈希（非安全用途，用于目录组织）
+        file_hash = hashlib.md5(file_path.encode(), usedforsecurity=False).hexdigest()
 
         # 索引文件
         index_file = self.index_dir / f"{file_hash}.json"
@@ -543,8 +544,8 @@ class FileSnapshotManager:
 
     def _update_index(self, snapshot: FileSnapshot):
         """更新快照索引"""
-        # 获取文件哈希
-        file_hash = hashlib.md5(snapshot.file_path.encode()).hexdigest()
+        # 获取文件哈希（非安全用途，用于目录组织）
+        file_hash = hashlib.md5(snapshot.file_path.encode(), usedforsecurity=False).hexdigest()
 
         # 加载或创建索引
         index = self._load_index(snapshot.file_path)
@@ -588,7 +589,7 @@ class FileSnapshotManager:
         """生成快照 ID"""
         # 【修复】添加微秒级时间戳，避免同一秒内创建多个快照时 ID 碰撞
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")  # 包含微秒
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
+        file_hash = hashlib.md5(file_path.encode(), usedforsecurity=False).hexdigest()[:8]
         return f"snap_{strategy.value}_{file_hash}_{timestamp}"
 
     def _calculate_checksum(self, content: str) -> str:
@@ -673,8 +674,8 @@ class FileSnapshotManager:
         cutoff_time = datetime.now(UTC) - timedelta(days=self.retention_days)
         index.snapshots = [snap for snap in index.snapshots if snap.created_at > cutoff_time or snap.strategy == SnapshotStrategy.MILESTONE]
 
-        # 保存更新后的索引
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()
+        # 保存更新后的索引（非安全用途）
+        file_hash = hashlib.md5(file_path.encode(), usedforsecurity=False).hexdigest()
         index_file = self.index_dir / f"{file_hash}.json"
 
         index_data = {
@@ -689,7 +690,8 @@ class FileSnapshotManager:
 
     def _delete_snapshot(self, snapshot: FileSnapshot):
         """删除快照文件"""
-        file_hash = hashlib.md5(snapshot.file_path.encode()).hexdigest()
+        # 获取文件哈希（非安全用途，用于目录组织）
+        file_hash = hashlib.md5(snapshot.file_path.encode(), usedforsecurity=False).hexdigest()
         snapshot_dir = self.files_dir / file_hash
 
         # 删除元数据文件

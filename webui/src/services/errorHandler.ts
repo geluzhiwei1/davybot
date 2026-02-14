@@ -45,17 +45,13 @@ class ErrorHandler {
    */
   init() {
     if (this.initialized) {
-      console.warn('[ErrorHandler] Already initialized');
       return;
     }
 
-    console.log('[ErrorHandler] Initializing...');
     this.setupGlobalErrorHandler();
     this.setupUnhandledRejectionHandler();
     this.loadCrashReports();
     this.initialized = true;
-
-    console.log('[ErrorHandler] Initialized successfully');
   }
 
   /**
@@ -154,14 +150,12 @@ class ErrorHandler {
       // 动态导入 analyticsService (避免循环依赖)
       const { analyticsService } = await import('./analytics');
       await analyticsService.trackError(crashReport.error, crashReport.context);
-      console.log('[ErrorHandler] Error sent to analytics');
     } catch (e) {
       console.warn('[ErrorHandler] Analytics not available or failed:', e);
     }
 
     // 3. 判断是否为严重错误，如果是则提示用户报告
     if (this.isCriticalError(crashReport.error)) {
-      console.log('[ErrorHandler] Critical error detected, prompting user report');
       await this.promptUserReport(crashReport);
     }
   }
@@ -227,10 +221,8 @@ class ErrorHandler {
         await feedbackService.submitFeedback(reportData);
         crashReport.reported = true;
         this.saveCrashReports();
-        console.log('[ErrorHandler] Crash report automatically submitted');
       } else if (consent === 'minimal') {
         // 只记录，不自动发送
-        console.log('[ErrorHandler] Crash report saved (minimal consent mode)');
       }
       // consent === 'none': 不处理
     } catch (e) {
@@ -297,7 +289,6 @@ class ErrorHandler {
     try {
       const data = JSON.stringify(this.crashReports);
       localStorage.setItem(this.storageKey, data);
-      console.log(`[ErrorHandler] Saved ${this.crashReports.length} crash reports`);
     } catch (e) {
       console.error('[ErrorHandler] Failed to save crash reports:', e);
 
@@ -322,7 +313,6 @@ class ErrorHandler {
       const saved = localStorage.getItem(this.storageKey);
       if (saved) {
         this.crashReports = JSON.parse(saved);
-        console.log(`[ErrorHandler] Loaded ${this.crashReports.length} crash reports`);
       } else {
         this.crashReports = [];
       }
@@ -340,7 +330,6 @@ class ErrorHandler {
   clearCrashReports() {
     this.crashReports = [];
     localStorage.removeItem(this.storageKey);
-    console.log('[ErrorHandler] All crash reports cleared');
   }
 
   /**

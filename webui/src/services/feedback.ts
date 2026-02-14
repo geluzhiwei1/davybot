@@ -43,7 +43,6 @@ class FeedbackServiceImpl implements FeedbackService {
   async submitFeedback(feedback: FeedbackData): Promise<void> {
     try {
       // TODO: 实现实际的API调用
-      console.log('[Feedback] Submitting feedback:', feedback)
 
       // 临时实现：保存到本地存储
       const reports = this.getPendingReports()
@@ -52,8 +51,6 @@ class FeedbackServiceImpl implements FeedbackService {
         timestamp: Date.now()
       } as unknown)
       this.savePendingReports(reports)
-
-      console.log('[Feedback] Feedback saved locally')
     } catch (error) {
       console.error('[Feedback] Failed to submit feedback:', error)
       throw error
@@ -63,14 +60,11 @@ class FeedbackServiceImpl implements FeedbackService {
   async submitCrashReport(report: CrashReport): Promise<void> {
     try {
       // TODO: 实现实际的API调用
-      console.log('[Feedback] Submitting crash report:', report)
 
       // 临时实现：保存到本地存储
       const reports = this.getPendingReports()
       reports.push(report)
       this.savePendingReports(reports)
-
-      console.log('[Feedback] Crash report saved locally')
     } catch (error) {
       console.error('[Feedback] Failed to submit crash report:', error)
       throw error

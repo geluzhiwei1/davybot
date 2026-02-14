@@ -162,6 +162,7 @@ const loadPluginsConfig = async () => {
   try {
     // 加载插件列表
     const plugins = await pluginsApi.listPlugins(props.workspaceId);
+
     // 添加加载状态字段
     pluginsList.value = plugins.map(p => ({
       ...p,
@@ -171,6 +172,7 @@ const loadPluginsConfig = async () => {
 
     // 加载插件配置
     const response = await getPluginsConfig(props.workspaceId);
+
     if (response.success) {
       pluginsConfig.value = response.config as PluginsConfig;
     }
@@ -282,12 +284,10 @@ const editPluginSettings = (pluginId: string) => {
   const plugin = pluginsList.value.find(p => p.id === pluginId);
   if (!plugin) return;
 
-  console.log('[PluginConfigPanel] editPluginSettings called with pluginId:', pluginId);
-  console.log('[PluginConfigPanel] Plugin object:', plugin);
-  console.log('[PluginConfigPanel] Plugin.id:', plugin.id, 'Type:', typeof plugin.id);
-
   editingPluginId.value = pluginId;
-  editingPluginConfig.value = plugin;
+  // 只传递纯配置数据（不包含 enabled, activated 等元数据）
+  const { enabled, activated, version, install_path, ...pureSettings } = plugin as any;
+  editingPluginConfig.value = pureSettings;
   settingsDialogVisible.value = true;
 };
 
@@ -296,14 +296,11 @@ const onPluginSettingsSaved = async (pluginId: string, newSettings: Record<strin
   loading.value = true;
   try {
     const response = await updatePluginConfig(props.workspaceId, pluginId, newSettings);
+
     if (response.success) {
-      // 更新本地配置
-      if (pluginsConfig.value.plugins[pluginId]) {
-        pluginsConfig.value.plugins[pluginId] = {
-          ...pluginsConfig.value.plugins[pluginId],
-          ...newSettings
-        };
-      }
+      // 保存成功后，重新加载配置以确保数据一致性
+      await loadPluginsConfig();
+
       settingsDialogVisible.value = false;
       ElMessage.success(t('workspaceSettings.plugins.pluginConfig.settingsSaveSuccess'));
     }

@@ -331,14 +331,12 @@ export class MonitoringService {
    * 获取实时系统指标
    */
   async getRealTimeMetrics(): Promise<SystemHealthMetrics> {
-    console.log('[DEBUG] getRealTimeMetrics called')
     const httpClient = apiManager.getHttpClient();
-    
+
     try {
       // 首先尝试使用健康检查端点获取系统信息
-      const response = await httpClient.get(`/api/health`);
-      console.log('[DEBUG] getRealTimeMetrics response:', response.data);
-      
+      const response = await httpClient.get(`/api/health`)
+
       // 将健康检查数据转换为 SystemHealthMetrics 格式
       const systemMetrics: SystemHealthMetrics = {
         timestamp: new Date().toISOString(),

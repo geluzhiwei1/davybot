@@ -157,17 +157,10 @@ function handleClearOutputs() {
 watch(
   () => parallelTasksStore.allTasks,
   (tasks) => {
-    console.log('[ThreeLevelMonitoring] All tasks from parallelTasksStore:', tasks.length)
-    tasks.forEach(task => {
-      console.log('  - Task:', task.taskId, 'state:', task.state, 'nodeType:', task.nodeType)
-    })
-
     // 只同步正在运行或等待中的任务，过滤掉已完成和失败的
     const activeTasks = tasks.filter(
       task => task.state === 'running' || task.state === 'pending'
     )
-
-    console.log('[ThreeLevelMonitoring] Filtered active tasks:', activeTasks.length)
 
     monitoringStore.updateAgents(activeTasks)
 
@@ -175,36 +168,28 @@ watch(
     if (!monitoringStore.selectedAgentId && activeTasks.length > 0) {
       const mainAgent = findMainAgent(activeTasks)
       if (mainAgent) {
-        console.log('[ThreeLevelMonitoring] Auto-selecting main agent:', mainAgent.taskId)
         monitoringStore.selectAgent(mainAgent.taskId)
       }
     }
-
-    console.log('[ThreeLevelMonitoring] Selected agent ID:', monitoringStore.selectedAgentId)
   },
   { deep: true, immediate: true }
 )
 
 // 查找主agent（orchestrator或第一个agent）
 function findMainAgent(tasks: unknown[]) {
-  console.log('[ThreeLevelMonitoring] findMainAgent called with tasks:', tasks.length)
-
   // 优先查找orchestrator模式的agent（不区分大小写）
   const orchestratorAgent = tasks.find(
     task => {
       const nodeType = task.nodeType?.toLowerCase()
-      console.log('[ThreeLevelMonitoring] Checking task:', task.taskId, 'nodeType:', nodeType)
       return nodeType === 'orchestrator'
     }
   )
 
   if (orchestratorAgent) {
-    console.log('[ThreeLevelMonitoring] Found orchestrator agent:', orchestratorAgent.taskId)
     return orchestratorAgent
   }
 
   // 如果没有orchestrator，返回第一个agent
-  console.log('[ThreeLevelMonitoring] No orchestrator found, returning first task')
   return tasks[0] || null
 }
 </script>

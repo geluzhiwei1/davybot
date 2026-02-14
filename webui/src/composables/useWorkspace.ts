@@ -79,8 +79,6 @@ export function useWorkspace() {
     state.value.error = null
 
     try {
-      console.log('[useWorkspace] Initializing workspace:', workspaceId)
-
       // 调用API获取工作区信息
       const response = await apiManager.workspaces.getWorkspace(workspaceId)
 
@@ -95,12 +93,6 @@ export function useWorkspace() {
       state.value.workspaceId = workspace.id
       state.value.workspacePath = workspace.path
       state.value.isInitialized = true
-
-      console.log('[useWorkspace] ✓ Workspace initialized:', {
-        id: workspace.id,
-        name: workspace.name,
-        path: workspace.path
-      })
 
       return workspace
     } catch (err) {
@@ -123,8 +115,6 @@ export function useWorkspace() {
     }
 
     try {
-      console.log('[useWorkspace] Updating workspace settings:', settings)
-
       const response = await apiManager.workspaces.updateWorkspaceSettings(
         state.value.workspaceId,
         settings
@@ -136,8 +126,6 @@ export function useWorkspace() {
           ...state.value.currentWorkspace.settings,
           ...settings
         }
-
-        console.log('[useWorkspace] ✓ Settings updated')
       }
     } catch (err) {
       console.error('[useWorkspace] ✗ Failed to update settings:', err)
@@ -155,11 +143,6 @@ export function useWorkspace() {
       ...updates,
       conversation_id: state.value.conversationId
     }
-
-    console.log('[useWorkspace] UI context updated:', {
-      old: oldContext,
-      new: state.value.uiContext
-    })
 
     // 如果工作区已加载，保存到后端
     if (state.value.workspaceId) {
@@ -194,12 +177,6 @@ export function useWorkspace() {
     if (conversationId) {
       await updateUIContext({ conversation_id: conversationId })
     }
-
-    console.log('[useWorkspace] Conversation changed:', {
-      old: oldConversationId,
-      new: conversationId,
-      isTemp
-    })
   }
 
   /**
@@ -211,8 +188,6 @@ export function useWorkspace() {
     }
 
     try {
-      console.log('[useWorkspace] Creating new conversation in workspace:', state.value.workspaceId)
-
       const response = await apiManager.workspaces.createConversation(
         state.value.workspaceId,
         { title }
@@ -222,7 +197,6 @@ export function useWorkspace() {
         const newConversation = response.data
         await setConversation(newConversation.id, false)
 
-        console.log('[useWorkspace] ✓ New conversation created:', newConversation.id)
         return newConversation
       }
 
@@ -242,8 +216,6 @@ export function useWorkspace() {
     }
 
     try {
-      console.log('[useWorkspace] Loading conversation:', conversationId)
-
       const response = await apiManager.workspaces.getConversation(
         state.value.workspaceId,
         conversationId
@@ -252,7 +224,6 @@ export function useWorkspace() {
       if (response.success && response.data) {
         await setConversation(conversationId, false)
 
-        console.log('[useWorkspace] ✓ Conversation loaded')
         return response.data
       }
 
@@ -267,8 +238,6 @@ export function useWorkspace() {
    * 清理工作区状态
    */
   const cleanup = () => {
-    console.log('[useWorkspace] Cleaning up workspace state')
-
     state.value.currentWorkspace = null
     state.value.workspacePath = null
     state.value.workspaceId = null
@@ -294,8 +263,6 @@ export function useWorkspace() {
    * 重置为临时对话
    */
   const resetToTempConversation = () => {
-    console.log('[useWorkspace] Resetting to temporary conversation')
-
     state.value.conversationId = null
     state.value.isTempConversation = true
 
@@ -307,8 +274,6 @@ export function useWorkspace() {
   watch(
     () => state.value.uiContext,
     (newContext) => {
-      console.log('[useWorkspace] UI context changed:', newContext)
-
       // 可以在这里添加自动保存逻辑
       // 但要避免频繁调用，建议使用防抖
     },

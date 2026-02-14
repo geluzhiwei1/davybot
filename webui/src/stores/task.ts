@@ -309,12 +309,6 @@ export const useTaskStore = defineStore('task', () => {
     if (message.type !== MessageType.TASK_NODE_START) return
     const nodeStart = message as TaskNodeStartMessage
 
-    console.log('[TASK_NODE] Task node started:', {
-      nodeId: nodeStart.task_node_id,
-      nodeType: nodeStart.node_type,
-      description: nodeStart.description
-    })
-
     // 添加到活跃节点
     const workspaceId = getCurrentWorkspaceId()
     const currentActive = getActiveNodes()
@@ -343,13 +337,6 @@ export const useTaskStore = defineStore('task', () => {
     if (message.type !== MessageType.TASK_NODE_PROGRESS) return
     const nodeProgress = message as TaskNodeProgressMessage
 
-    console.log('[TASK_NODE] Task node progress:', {
-      nodeId: nodeProgress.task_node_id,
-      progress: nodeProgress.progress,
-      status: nodeProgress.status,
-      message: nodeProgress.message
-    })
-
     // 确保节点在活跃列表中
     const workspaceId = getCurrentWorkspaceId()
     const currentActive = getActiveNodes()
@@ -376,12 +363,6 @@ export const useTaskStore = defineStore('task', () => {
   const handleTaskNodeComplete = (message: WebSocketMessage) => {
     if (message.type !== MessageType.TASK_NODE_COMPLETE) return
     const nodeComplete = message as TaskNodeCompleteMessage
-
-    console.log('[TASK_NODE] Task node completed:', {
-      nodeId: nodeComplete.task_node_id,
-      duration: nodeComplete.duration_ms,
-      result: nodeComplete.result
-    })
 
     // 从活跃节点移除并添加到已完成节点
     const workspaceId = getCurrentWorkspaceId()

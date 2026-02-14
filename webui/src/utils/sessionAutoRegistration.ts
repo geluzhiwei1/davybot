@@ -52,16 +52,10 @@ export class SessionRegistrar {
     workspaceStore: WorkspaceStore
   ): Promise<boolean> {
     if (!this.config.enabled) {
-      console.log('[SessionRegistrar] Auto-registration disabled')
       return false
     }
 
     const workspaceId = workspaceStore.currentWorkspaceId || 'default'
-
-    console.log('[SessionRegistrar] Auto-registering session→workspace mapping:', {
-      session_id: sessionId,
-      workspace_id: workspaceId
-    })
 
     try {
       // 注册映射
@@ -69,11 +63,6 @@ export class SessionRegistrar {
 
       // 清除重试计数
       this.registrationAttempts.delete(sessionId)
-
-      console.log('[SessionRegistrar] ✅ Registration successful:', {
-        session_id: sessionId,
-        workspace_id: workspaceId
-      })
 
       return true
     } catch (error) {
@@ -85,12 +74,6 @@ export class SessionRegistrar {
 
         if (attempts < this.config.maxRetries) {
           this.registrationAttempts.set(sessionId, attempts + 1)
-
-          console.log('[SessionRegistrar] Retrying registration:', {
-            session_id: sessionId,
-            attempt: attempts + 1,
-            max_attempts: this.config.maxRetries
-          })
 
           // 延迟重试
           await this.delay(this.config.retryDelay * (attempts + 1))
@@ -117,8 +100,6 @@ export class SessionRegistrar {
     let success = 0
     let failed = 0
 
-    console.log('[SessionRegistrar] Batch registering mappings:', mappings.length)
-
     for (const { sessionId, workspaceId } of mappings) {
       try {
         connectionStore.updateSessionMapping(sessionId, workspaceId)
@@ -132,12 +113,6 @@ export class SessionRegistrar {
         failed++
       }
     }
-
-    console.log('[SessionRegistrar] Batch registration complete:', {
-      total: mappings.length,
-      success,
-      failed
-    })
 
     return { success, failed }
   }
@@ -155,10 +130,6 @@ export class SessionRegistrar {
       // 这里可以添加session时间戳检查逻辑
       // 暂时跳过，因为Map中没有存储时间戳
       // TODO: 需要在connectionStore中添加sessionTimestamps Map
-    }
-
-    if (cleaned > 0) {
-      console.log('[SessionRegistrar] Cleaned up expired sessions:', cleaned)
     }
 
     return cleaned
@@ -220,8 +191,6 @@ export function initSessionAutoRegistration(
   connectionStore: ConnectionStore,
   workspaceStore: WorkspaceStore
 ): void {
-  console.log('[SessionAutoRegistration] Initializing...')
-
   // 监听连接状态变化
   connectionStore.$onAction(({ name, after }) => {
     if (name === 'connect') {
@@ -245,8 +214,6 @@ export function initSessionAutoRegistration(
       })
     }
   })
-
-  console.log('[SessionAutoRegistration] ✅ Initialized')
 }
 
 /**
@@ -260,12 +227,9 @@ export function startSessionCleanup(
     sessionRegistrar.cleanupExpiredSessions(connectionStore)
   }, intervalMs)
 
-  console.log('[SessionCleanup] Started with interval:', intervalMs, 'ms')
-
   // 返回清理函数
   return () => {
     clearInterval(intervalId)
-    console.log('[SessionCleanup] Stopped')
   }
 }
 

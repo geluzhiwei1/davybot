@@ -136,6 +136,7 @@ def _get_workspace_path(workspace_id: str) -> Path | None:
                     if ws_path.exists():
                         return ws_path
     except Exception:
+        # Workspace file not found or invalid, fallback will handle
         pass
 
     # Fallback: try ./workspaces/{workspace_id}

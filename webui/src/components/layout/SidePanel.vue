@@ -221,8 +221,6 @@ const handleClickOutside = () => {
 
 // 更新临时会话为真实会话
 const updateTempConversation = (tempId: string, realId: string) => {
-  console.log(`[SIDE_PANEL] 更新临时会话: ${tempId} -> ${realId}`);
-
   // 查找临时会话在列表中的索引
   const tempIndex = conversations.value.findIndex((c: any) => c.id === tempId);
 
@@ -235,10 +233,6 @@ const updateTempConversation = (tempId: string, realId: string) => {
     if (activeConversationId.value === tempId) {
       activeConversationId.value = realId;
     }
-
-    console.log(`[SIDE_PANEL] 临时会话已更新为真实会话`);
-  } else {
-    console.warn(`[SIDE_PANEL] 未找到临时会话: ${tempId}`);
   }
 };
 
@@ -358,7 +352,6 @@ const loadFiles = async () => {
     ]);
     fileTree.value = tree || [];
     openFiles.value = open || [];
-    console.log('[FileTree] Initial top-level directories loaded:', fileTree.value.length);
   } catch {
     console.error('加载文件失败');
     filesError.value = '加载失败';
@@ -478,8 +471,6 @@ const handleDeleteAllConversations = async () => {
 
 // 懒加载树节点 - 当用户展开目录时加载子节点
 const loadTreeNode = async (node: unknown, resolve: (data: unknown[]) => void) => {
-  console.log('[FileTree] Loading children for node:', node.data?.path || node.data?.name);
-
   if (!props.workspaceId) {
     resolve([]);
     return;
@@ -500,7 +491,6 @@ const loadTreeNode = async (node: unknown, resolve: (data: unknown[]) => void) =
       recursive: false
     });
 
-    console.log('[FileTree] Loaded children for', directoryPath, ':', children?.length || 0, 'items');
     resolve(children || []);
   } catch (error) {
     console.error('[FileTree] Failed to load children for', directoryPath, ':', error);
@@ -511,12 +501,6 @@ const loadTreeNode = async (node: unknown, resolve: (data: unknown[]) => void) =
 // 处理树节点的点击（用于打开文件，目录展开由懒加载自动处理）
 const handleTreeNodeClick = (data: unknown, _node: unknown) => {
   const isDirectory = data.is_directory || data.type === 'directory';
-
-  console.log('[FileTree] Node clicked:', {
-    name: data.name,
-    path: data.path,
-    isDirectory
-  });
 
   // 懒加载模式下，Element Plus Tree 会自动处理目录的展开/折叠
   // 我们只需要处理文件的点击
@@ -760,8 +744,7 @@ const handleQuickDelete = async (nodeData: unknown) => {
 };
 
 // Handle memory selection
-const handleSelectMemory = (memoryId: string) => {
-  console.log('[SidePanel] Memory selected:', memoryId);
+const handleSelectMemory = (_memoryId: string) => {
   // Future: Could open memory details or use memory in chat
 };
 

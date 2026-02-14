@@ -41,7 +41,6 @@ class AnalyticsServiceImpl implements AnalyticsService {
     })
 
     // TODO: 实现实际的分析服务集成
-    console.log('[Analytics] Event tracked:', event, properties)
   }
 
   async trackError(error: Error, context?: Record<string, unknown>): Promise<void> {
@@ -56,8 +55,6 @@ class AnalyticsServiceImpl implements AnalyticsService {
       },
       timestamp: Date.now()
     })
-
-    console.log('[Analytics] Error tracked:', error.message, context)
   }
 
   async trackPageView(page: string, properties?: Record<string, unknown>): Promise<void> {
@@ -71,8 +68,6 @@ class AnalyticsServiceImpl implements AnalyticsService {
       },
       timestamp: Date.now()
     })
-
-    console.log('[Analytics] Page view tracked:', page, properties)
   }
 
   getQueuedEvents(): AnalyticsEvent[] {

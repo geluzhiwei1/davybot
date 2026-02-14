@@ -263,12 +263,6 @@ export const useChatStore = defineStore('chat', () => {
       userUIContext.user_preferences = uiContext.value.userPreferences
     }
 
-    console.log('[sendMessage] Sending message with userUIContext:', {
-      current_mode: uiContext.value.currentMode,
-      current_llm_id: uiContext.value.currentLlmId,
-      full_context: userUIContext
-    })
-
     // 发送消息（使用当前workspace的客户端）
     const workspaceId = workspaceStore.currentWorkspaceId || 'default'
     connectionStore.getClient(workspaceId).sendUserMessage(text, metadata, userUIContext).catch(err => {
@@ -506,13 +500,6 @@ export const useChatStore = defineStore('chat', () => {
 
     const connectMessage = message as unknown
 
-    console.log('[handleConnect] 📨 Received CONNECT message:', {
-      session_id: connectMessage.session_id,
-      message: connectMessage.message,
-      timestamp: connectMessage.timestamp,
-      full_message: connectMessage
-    })
-
     // ✅ 严格验证：CONNECT 消息必须包含 session_id
     const backendSessionId = connectMessage.session_id
     if (!backendSessionId) {
@@ -529,11 +516,6 @@ export const useChatStore = defineStore('chat', () => {
             throw error  // ← FastFail: 立即失败
     }
 
-    console.log('[handleConnect] ✅ Initial validation passed:', {
-      backend_session_id: backendSessionId,
-      workspace_id: workspaceId
-    })
-
     // ✅ 同步客户端的 session_id（关键步骤）
     try {
       const wsClient = connectionStore.getClient(workspaceId)
@@ -545,13 +527,6 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       const frontendSessionId = wsClient._sessionId?.value
-
-      console.log('[handleConnect] 🔄 Syncing session_id:', {
-        frontend_session_id: frontendSessionId,
-        backend_session_id: backendSessionId,
-        workspace_id: workspaceId,
-        needs_sync: frontendSessionId !== backendSessionId
-      })
 
       // ✅ 更新客户端的 session_id 为后端生成的值
       if (wsClient.setSessionId) {
@@ -586,13 +561,6 @@ export const useChatStore = defineStore('chat', () => {
 
       // ✅ 注册新的映射
       connectionStore.sessionToWorkspaceMap.set(backendSessionId, workspaceId)
-
-      console.log('[handleConnect] ✅ Session sync complete:', {
-        backend_session_id: backendSessionId,
-        workspace_id: workspaceId,
-        map_size: connectionStore.sessionToWorkspaceMap.size,
-        all_mappings: Object.fromEntries(connectionStore.sessionToWorkspaceMap)
-      })
 
     } catch (syncError) {
       const error = new Error(`[handleConnect] ❌ FATAL: Failed to sync session_id: ${syncError.message}`)
@@ -1136,18 +1104,28 @@ export const useChatStore = defineStore('chat', () => {
     // 处理工具调用结果
     if (completeMessage.tool_calls && completeMessage.tool_calls.length > 0) {
       logger.debug('处理 tool_calls:', completeMessage.tool_calls)
+
+      // ✅ 创建新的 content 数组用于存储更新
+      const newContent = [...chatMessage.content]
+
       for (const toolCall of completeMessage.tool_calls) {
-        const toolCallBlock = chatMessage.content.find(
+        const toolCallBlockIndex = newContent.findIndex(
           c => c.type === ContentType.TOOL_CALL && (c as unknown).toolCall.tool_call_id === toolCall.tool_call_id
         )
 
-        if (toolCallBlock) {
-          (toolCallBlock as unknown).toolCall.status = toolCall.status
-          (toolCallBlock as unknown).toolCall.output = toolCall.output
-          (toolCallBlock as unknown).toolCall.error = toolCall.error
+        if (toolCallBlockIndex !== -1) {
+          // ✅ 更新现有的 toolCall block
+          const toolCallBlock = newContent[toolCallBlockIndex] as unknown
+          toolCallBlock.toolCall = {
+            ...toolCallBlock.toolCall,
+            status: toolCall.status,
+            output: toolCall.output,
+            error: toolCall.error
+          }
+          newContent[toolCallBlockIndex] = toolCallBlock
 
           if (toolCall.output) {
-            chatMessage.content.push({
+            newContent.push({
               type: ContentType.TOOL_RESULT,
               toolName: toolCall.tool_name,
               result: toolCall.output,
@@ -1156,7 +1134,7 @@ export const useChatStore = defineStore('chat', () => {
           }
 
           if (toolCall.error) {
-            chatMessage.content.push({
+            newContent.push({
               type: ContentType.ERROR,
               message: `工具调用失败: ${toolCall.error}`,
               details: { toolCall }
@@ -1164,6 +1142,10 @@ export const useChatStore = defineStore('chat', () => {
           }
         }
       }
+
+      // ✅ 更新消息内容以触发响应式更新
+      messageStore.updateMessage(chatMessage.id, { content: newContent })
+      logger.debug('[handleStreamComplete] Updated message with tool call results:', chatMessage.id)
     }
 
     logger.debug('✅ stream_complete 处理完成')
@@ -1184,44 +1166,53 @@ export const useChatStore = defineStore('chat', () => {
       startTime: new Date().toISOString()
     }
 
-    chatMessage.content.push(toolExecutionBlock)
+    // ✅ 创建新的 content 数组以触发响应式更新
+    const newContent = [...chatMessage.content, toolExecutionBlock]
+    messageStore.updateMessage(chatMessage.id, { content: newContent })
+    logger.debug('[handleToolCallStart] Tool call started and added to message:', chatMessage.id)
   }
 
   const handleToolCallProgress = (message: WebSocketMessage) => {
     if (message.type !== MessageType.TOOL_CALL_PROGRESS) return
     const progressMessage = message as unknown
 
-    for (const message of messageStore.messages) {
-      if (message.role === MessageRole.ASSISTANT) {
-        for (const content of message.content) {
+    for (const msg of messageStore.messages) {
+      if (msg.role === MessageRole.ASSISTANT) {
+        for (const content of msg.content) {
           if (content.type === ContentType.TOOL_EXECUTION &&
             (content as unknown).toolCallId === progressMessage.tool_call_id) {
 
             const toolExecution = content as unknown
 
-            toolExecution.status = progressMessage.status || toolExecution.status
-            toolExecution.progressPercentage = progressMessage.progress_percentage
-            toolExecution.currentStep = progressMessage.current_step
-            toolExecution.totalSteps = progressMessage.total_steps
-            toolExecution.currentStepIndex = progressMessage.current_step_index
-            toolExecution.estimatedRemainingTime = progressMessage.estimated_remaining_time
-
-            if (!toolExecution.progressHistory) {
-              toolExecution.progressHistory = []
+            // ✅ 创建新的 toolExecution 对象
+            const updatedToolExecution = {
+              ...toolExecution,
+              status: progressMessage.status || toolExecution.status,
+              progressPercentage: progressMessage.progress_percentage,
+              currentStep: progressMessage.current_step,
+              totalSteps: progressMessage.total_steps,
+              currentStepIndex: progressMessage.current_step_index,
+              estimatedRemainingTime: progressMessage.estimated_remaining_time,
+              progressHistory: [
+                ...(toolExecution.progressHistory || []),
+                {
+                  timestamp: new Date().toISOString(),
+                  message: progressMessage.message,
+                  progress_percentage: progressMessage.progress_percentage,
+                  step: progressMessage.current_step
+                }
+              ],
+              streamOutput: progressMessage.stream_output
+                ? [...(toolExecution.streamOutput || []), progressMessage.stream_output]
+                : toolExecution.streamOutput
             }
-            toolExecution.progressHistory.push({
-              timestamp: new Date().toISOString(),
-              message: progressMessage.message,
-              progress_percentage: progressMessage.progress_percentage,
-              step: progressMessage.current_step
-            })
 
-            if (progressMessage.stream_output) {
-              if (!toolExecution.streamOutput) {
-                toolExecution.streamOutput = []
-              }
-              toolExecution.streamOutput.push(progressMessage.stream_output)
-            }
+            // ✅ 创建新的 content 数组以触发响应式更新
+            const newContent = msg.content.map(block =>
+              block === content ? updatedToolExecution : block
+            )
+            messageStore.updateMessage(msg.id, { content: newContent })
+            logger.debug('[handleToolCallProgress] Tool progress updated:', msg.id)
           }
         }
       }
@@ -1232,25 +1223,33 @@ export const useChatStore = defineStore('chat', () => {
     if (message.type !== MessageType.TOOL_CALL_RESULT) return
     const resultMessage = message as unknown
 
-    for (const message of messageStore.messages) {
-      if (message.role === MessageRole.ASSISTANT) {
-        for (const content of message.content) {
+    for (const msg of messageStore.messages) {
+      if (msg.role === MessageRole.ASSISTANT) {
+        for (const content of msg.content) {
           if (content.type === ContentType.TOOL_EXECUTION &&
             (content as unknown).toolCallId === resultMessage.tool_call_id) {
 
             const toolExecution = content as unknown
 
-            toolExecution.status = resultMessage.is_error ? 'failed' : 'completed'
-            toolExecution.result = resultMessage.result
-            toolExecution.isError = resultMessage.is_error
-            toolExecution.errorCode = resultMessage.error_code
-            toolExecution.errorMessage = resultMessage.error_message
-            toolExecution.endTime = new Date().toISOString()
-            toolExecution.executionTime = resultMessage.execution_time
-
-            if (resultMessage.performance_metrics) {
-              toolExecution.performanceMetrics = resultMessage.performance_metrics
+            // ✅ 创建新的 toolExecution 对象
+            const updatedToolExecution = {
+              ...toolExecution,
+              status: resultMessage.is_error ? 'failed' : 'completed',
+              result: resultMessage.result,
+              isError: resultMessage.is_error,
+              errorCode: resultMessage.error_code,
+              errorMessage: resultMessage.error_message,
+              endTime: new Date().toISOString(),
+              executionTime: resultMessage.execution_time,
+              performanceMetrics: resultMessage.performance_metrics || toolExecution.performanceMetrics
             }
+
+            // ✅ 创建新的 content 数组以触发响应式更新
+            const newContent = msg.content.map(block =>
+              block === content ? updatedToolExecution : block
+            )
+            messageStore.updateMessage(msg.id, { content: newContent })
+            logger.debug('[handleToolCallResult] Tool result updated:', msg.id)
           }
         }
       }
@@ -1267,12 +1266,6 @@ export const useChatStore = defineStore('chat', () => {
   const handleLLMApiRequest = (message: WebSocketMessage) => {
     if (message.type !== MessageType.LLM_API_REQUEST) return
     const apiRequest = message as unknown
-
-    console.log('[LLM API] Request started:', {
-      provider: apiRequest.provider,
-      model: apiRequest.model,
-      requestType: apiRequest.request_type
-    })
 
     const currentStatus = getCurrentLlmApiStatus()
     currentStatus.isActive = true
@@ -1302,14 +1295,6 @@ export const useChatStore = defineStore('chat', () => {
   const handleLLMApiResponse = (message: WebSocketMessage) => {
     if (message.type !== MessageType.LLM_API_RESPONSE) return
     const apiResponse = message as unknown
-
-    console.log('[LLM API] Response received:', {
-      responseType: apiResponse.response_type,
-      task_id: apiResponse.task_id,
-      contentLength: apiResponse.content?.length || 0,
-      contentPreview: apiResponse.content?.substring(0, 50),
-      session_id: apiResponse.session_id?.substring(0, 8)
-    })
 
     if (apiResponse.content) {
       const currentStatus = getCurrentLlmApiStatus()
@@ -1377,15 +1362,6 @@ export const useChatStore = defineStore('chat', () => {
     if (message.type !== MessageType.LLM_API_COMPLETE) return
     const apiComplete = message as unknown
 
-    const duration = apiComplete.duration_ms ? `${apiComplete.duration_ms}ms` : 'unknown'
-    console.log('[LLM API] Request completed:', {
-      provider: apiComplete.provider,
-      model: apiComplete.model,
-      finishReason: apiComplete.finish_reason,
-      duration,
-      usage: apiComplete.usage
-    })
-
     const currentStatus = getCurrentLlmApiStatus()
     currentStatus.isActive = false
     currentStatus.provider = ''
@@ -1452,11 +1428,6 @@ export const useChatStore = defineStore('chat', () => {
     if (message.type !== MessageType.TODO_UPDATE) return
     const todoMessage = message as unknown
 
-    console.log('[TODO] Update received:', {
-      taskNodeId: todoMessage.task_node_id,
-      todosCount: todoMessage.todos?.length || 0
-    })
-
     // 更新todoStore
     if (todoMessage.todos && Array.isArray(todoMessage.todos)) {
       todoStore.updateTodos(todoMessage.task_node_id, todoMessage.todos)
@@ -1476,13 +1447,6 @@ export const useChatStore = defineStore('chat', () => {
     if (message.type !== MessageType.TASK_NODE_PROGRESS) return
     const progressMessage = message as unknown
 
-    console.log('[CHAT] Task node progress received:', {
-      nodeId: progressMessage.task_node_id,
-      progress: progressMessage.progress,
-      status: progressMessage.status,
-      message: progressMessage.message
-    })
-
     // ✅ 任务进度不在对话框中显示，由状态栏通过 parallelTasks store 自动处理
     // 进度信息已通过 globalRouter 的 handleTaskNodeProgress 处理
     // ServerStatusIndicator 组件会监听并显示在状态栏
@@ -1495,15 +1459,6 @@ export const useChatStore = defineStore('chat', () => {
     if (message.type !== MessageType.ERROR) return
     const errorMessage = message as unknown
     agentStore.setThinking(false)
-
-    console.log('[ERROR] Received error message:', {
-      code: errorMessage.code,
-      message: errorMessage.message,
-      details: errorMessage.details,
-      workspace_id: errorMessage.workspace_id,
-      session_id: errorMessage.session_id,
-      task_id: errorMessage.task_id
-    })
 
     // ✅ 恢复错误消息在聊天区域的显示
     const errorContent: unknown = {
@@ -1549,12 +1504,6 @@ export const useChatStore = defineStore('chat', () => {
 
       // ✅ 确保UI更新 - 触发响应式更新
       messageStore.triggerMessagesUpdate()
-
-      console.log('[ERROR] Error message added successfully:', {
-        messageId: errorMsg.id,
-        workspaceId: workspaceId,
-        content: errorMsg.content
-      })
 
       // 记录性能指标（不使用fallback）
       const duration = performance.now() - startTime

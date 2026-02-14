@@ -43,13 +43,6 @@ watch(
     // ✅ 关键改进：只要文本变化就重新解析（不限于流式传输）
     // 这样可以处理任何形式的文本更新
     if (newText !== oldText && newText) {
-      console.log('[TextContent] 🔄 Text changed, re-parsing:', {
-        old_length: oldText?.length || 0,
-        new_length: newText.length,
-        diff: newText.length - (oldText?.length || 0),
-        is_streaming: props.isStreaming,
-        preview: newText.substring(newText.length - 50)
-      })
       reparse()
     }
   },

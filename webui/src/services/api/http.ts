@@ -42,12 +42,6 @@ export class HttpClient {
           config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // 日志记录（只记录URL和方法，避免输出大对象）
-        if (this.config.logRequests) {
-          console.log(`[HTTP Request] ${config.method?.toUpperCase()} ${config.url}`);
-          // 不记录params和data，避免性能问题
-        }
-
         return config;
       },
       (error) => {
@@ -59,19 +53,6 @@ export class HttpClient {
     // 响应拦截器
     this.instance.interceptors.response.use(
       (response: AxiosResponse) => {
-        // 计算请求耗时
-        const endTime = new Date();
-        const duration = endTime.getTime() - (response.config.metadata?.startTime?.getTime() || 0);
-
-        // 日志记录
-        if (this.config.logResponses) {
-          console.log(`[HTTP Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
-            status: response.status,
-            duration: `${duration}ms`,
-            data: response.data
-          });
-        }
-        
         const apiResponse = response.data as ApiResponse;
 
         if (apiResponse && typeof apiResponse.success === 'boolean') {

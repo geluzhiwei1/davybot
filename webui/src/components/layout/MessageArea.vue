@@ -322,24 +322,6 @@ watch(() => messages.value, (newMessages, oldMessages) => {
   const oldLength = oldMessages?.length || 0
   const newLength = newMessages.length
 
-  // 🐛 DEBUG: 打印消息统计
-  const userMsgs = newMessages.filter(m => m.role === 'user')
-  const assistantMsgs = newMessages.filter(m => m.role === 'assistant')
-  const toolMsgs = newMessages.filter(m => m.role === 'tool')
-  const systemMsgs = newMessages.filter(m => m.role === 'system')
-
-  console.log('[MessageArea] 🔍 Messages updated:', {
-    total: newLength,
-    user: userMsgs.length,
-    assistant: assistantMsgs.length,
-    tool: toolMsgs.length,
-    system: systemMsgs.length,
-    systemMessageIds: systemMsgs.map(m => ({ id: m.id, contentTypes: m.content.map(c => c.type) })),
-    // 🔍 添加详细消息信息
-    allMessageIds: newMessages.map(m => ({ id: m.id, role: m.role, contentLength: m.content.reduce((sum, c) => sum + (('text' in c) ? c.text?.length || 0 : 0), 0) })),
-    workspaceId: workspaceStore.currentWorkspaceId
-  })
-
   if (newLength < oldLength) {
     const currentIds = new Set(messages.value.map(m => m.id))
     for (const [id] of messageBlockCache) {

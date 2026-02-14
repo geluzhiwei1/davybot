@@ -255,13 +255,6 @@ export const useAgentStore = defineStore('agent', () => {
     if (message.type !== MessageType.AGENT_START) return
     const agentStart = message as AgentStartMessage
 
-    console.log('[AGENT] Agent started:', {
-      agentMode: agentStart.agent_mode,
-      userMessage: agentStart.user_message,
-      workspaceId: agentStart.workspace_id,
-      taskId: agentStart.task_id
-    })
-
     // 设置当前任务ID
     const workspaceId = getCurrentWorkspaceId()
     workspaceCurrentTaskId.value.set(workspaceId, agentStart.task_id)
@@ -302,11 +295,6 @@ export const useAgentStore = defineStore('agent', () => {
     if (message.type !== MessageType.AGENT_THINKING) return
     const agentThinking = message as AgentThinkingMessage
 
-    console.log('[AGENT] Agent thinking:', {
-      content: agentThinking.thinking_content.substring(0, 100) + '...',
-      isComplete: agentThinking.is_complete
-    })
-
     // 更新思考内容
     const workspaceId = getCurrentWorkspaceId()
     const currentStatus = getCurrentAgentStatus()
@@ -331,14 +319,6 @@ export const useAgentStore = defineStore('agent', () => {
   const handleAgentComplete = (message: WebSocketMessage) => {
     if (message.type !== MessageType.AGENT_COMPLETE) return
     const agentComplete = message as AgentCompleteMessage
-
-    console.log('[AGENT] 🎉 Agent completed:', {
-      resultSummary: agentComplete.result_summary,
-      duration: agentComplete.total_duration_ms,
-      tasksCompleted: agentComplete.tasks_completed,
-      toolsUsed: agentComplete.tools_used,
-      taskId: agentComplete.task_id
-    })
 
     // 在 parallelTasksStore 中标记任务为完成
     if (agentComplete.task_id) {
@@ -394,12 +374,6 @@ export const useAgentStore = defineStore('agent', () => {
     if (message.type !== MessageType.AGENT_MODE_SWITCH) return
     const modeSwitch = message as AgentModeSwitchMessage
 
-    console.log('[AGENT] Agent mode switched:', {
-      oldMode: modeSwitch.old_mode,
-      newMode: modeSwitch.new_mode,
-      reason: modeSwitch.reason
-    })
-
     // 更新 Agent 模式
     const workspaceId = getCurrentWorkspaceId()
     const currentStatus = getCurrentAgentStatus()
@@ -420,13 +394,6 @@ export const useAgentStore = defineStore('agent', () => {
   const handleAgentStopped = (message: WebSocketMessage) => {
     if (message.type !== MessageType.AGENT_STOP) return
     const stoppedMessage = message as AgentStoppedMessage
-
-    console.log('[AGENT] Agent stopped:', {
-      taskId: stoppedMessage.task_id,
-      stoppedAt: stoppedMessage.stopped_at,
-      partial: stoppedMessage.partial,
-      resultSummary: stoppedMessage.result_summary
-    })
 
     // 清除当前任务ID并重置 Agent 状态
     const workspaceId = getCurrentWorkspaceId()

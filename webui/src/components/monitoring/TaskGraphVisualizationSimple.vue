@@ -150,25 +150,19 @@ const selectedExecutionId = ref('')
 
 // 当前执行 - 直接从 store 访问以保持响应性
 const currentExecution = computed(() => {
-  console.log('[DEBUG] currentExecution computed called, selectedExecutionId:', selectedExecutionId.value)
-  console.log('[DEBUG] activeExecutions from store:', monitoringStore.state.activeExecutions)
-  
   if (!selectedExecutionId.value) return null
-  
+
   const executions = monitoringStore.state.activeExecutions
   if (!executions || !Array.isArray(executions)) {
-    console.warn('[DEBUG] activeExecutions is not an array:', executions)
     return null
   }
-  
+
   const execution = executions.find(exec => exec && exec.executionId === selectedExecutionId.value)
-  console.log('[DEBUG] found execution:', execution)
   return execution || null
 })
 
 // 为了在模板中使用，创建计算属性
 const activeExecutions = computed(() => {
-  console.log('[DEBUG] activeExecutions computed called, value:', monitoringStore.state.activeExecutions)
   return monitoringStore.state.activeExecutions || []
 })
 
@@ -202,7 +196,6 @@ const getStatusTagType = (status: NodeStatus): string => {
 
 // 执行变化处理
 const onExecutionChange = () => {
-  console.log('[DEBUG] onExecutionChange called with ID:', selectedExecutionId.value)
   monitoringStore.selectExecution(selectedExecutionId.value)
 }
 
@@ -249,7 +242,6 @@ const skipNode = async (node: TaskGraphNode) => {
 
 // 刷新数据
 const refreshData = async () => {
-  console.log('[DEBUG] refreshData called')
   try {
     await monitoringStore.refreshData()
   } catch (error) {
@@ -258,15 +250,9 @@ const refreshData = async () => {
 }
 
 onMounted(() => {
-  console.log('[DEBUG] TaskGraphVisualizationSimple mounted')
-  console.log('[DEBUG] activeExecutions at mount:', activeExecutions.value)
-  
   // 初始化时选择第一个执行
   if (activeExecutions.value && activeExecutions.value.length > 0 && activeExecutions.value[0]) {
     selectedExecutionId.value = activeExecutions.value[0].executionId
-    console.log('[DEBUG] Set initial selectedExecutionId:', selectedExecutionId.value)
-  } else {
-    console.warn('[DEBUG] No active executions found at mount time')
   }
 })
 </script>
