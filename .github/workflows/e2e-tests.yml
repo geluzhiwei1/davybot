@@ -56,7 +56,7 @@ jobs:
       - name: Install backend dependencies
         working-directory: ./agent
         run: |
-          uv pip install -e ".[dev]"
+          uv pip install --system -e ".[dev]"
 
       - name: Create test workspace
         working-directory: ./agent
@@ -190,7 +190,7 @@ jobs:
       - name: Install backend dependencies
         working-directory: ./agent
         run: |
-          uv pip install -e ".[dev]"
+          uv pip install --system -e ".[dev]"
           mkdir -p ../workspaces/test-e2e-workspace
           uv run uvicorn dawei.server:app --host 0.0.0.0 --port 8465 > /tmp/backend.log 2>&1 &
           sleep 10
