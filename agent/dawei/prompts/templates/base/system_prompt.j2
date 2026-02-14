@@ -1,0 +1,36 @@
+{#
+  重构后的基础系统提示词模板
+  简化结构，提高可维护性
+#}
+
+{% macro render_section(title, content) %}
+{% if content %}
+====
+
+{{ title }}
+
+{{ content }}
+{% endif %}
+{% endmacro %}
+
+{% if role_definition %}
+{{ role_definition }}
+{% endif %}
+
+
+{{ render_section('MARKDOWN RULES', sections.markdown_rules) }}
+{{ render_section('TOOL USE', sections.tool_use) }}
+{{ render_section('SPECIALIZED SKILLS', sections.skills) }}
+{{ render_section('CAPABILITIES', sections.capabilities) }}
+{{ render_section('MODES', sections.modes) }}
+{{ render_section('SYSTEM INFORMATION', sections.system_information) }}
+{{ render_section('OBJECTIVE', sections.objective) }}
+{{ render_section('RULES', sections.rules) }}
+
+{% if custom_instructions %}
+====
+
+USER'S CUSTOM INSTRUCTIONS
+
+{{ custom_instructions }}
+{% endif %}

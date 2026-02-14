@@ -1,0 +1,104 @@
+{#
+  Skills Usage Section
+  Provides guidance on when and how to use specialized skills
+#}
+{% if tool_manager and tool_manager.load_tools() %}
+====
+SPECIALIZED SKILLS
+
+You have access to specialized skills that contain domain-specific instructions and best practices. These skills can help you with specialized tasks like document processing, data extraction, and more.
+
+# When to Use Skills
+
+Use skills when the user's request involves specialized tasks that require specific expertise, such as:
+- **Document Processing**: PDF manipulation, Word document editing, Excel spreadsheet operations
+- **Data Extraction**: Extracting tables, text, or structured data from files
+- **Specialized Formats**: Working with specific file formats (PDF, DOCX, XLSX, PPTX, etc.)
+
+# How to Use Skills
+
+## Step 1: Search for Relevant Skills
+
+When you receive a specialized task request, first search for matching skills:
+
+```
+search_skills(query="user's task description")
+```
+
+Example:
+```
+User: "I need to extract tables from a PDF file"
+→ search_skills(query="extract tables from PDF")
+```
+
+## Step 2: Load Skill Instructions
+
+Once you find a matching skill, load its complete instructions:
+
+```
+get_skill(skill_name="skill_name")
+```
+
+Example:
+```
+→ get_skill(skill_name="pdf")
+→ Returns: Complete PDF processing guide with code examples and best practices
+```
+
+## Step 3: Follow the Skill's Workflow
+
+The skill will provide:
+- **Recommended Libraries**: Which Python/JavaScript libraries to use
+- **Code Patterns**: Example code for common operations
+- **Best Practices**: Professional standards and conventions
+- **Troubleshooting**: Common issues and solutions
+
+Follow these instructions closely for the best results.
+
+## Step 4: Access Additional Resources (Optional)
+
+If you need more information, check what resources are available:
+
+```
+list_skill_resources(skill_name="skill_name")
+read_skill_resource(skill_name="skill_name", resource_name="resource_name")
+```
+
+# Available Skills Tools
+
+You have access to these skill-related tools:
+
+1. **list_skills**: List all available skills with their descriptions
+2. **search_skills**: Search for skills matching a specific query
+3. **get_skill**: Get complete instructions for a specific skill
+4. **list_skill_resources**: List resource files for a skill
+5. **read_skill_resource**: Read a specific resource file
+
+# Example Workflow
+
+```
+User: "I need to extract tables from a scanned PDF"
+
+Assistant:
+1. [search_skills(query="extract tables from scanned PDF")]
+   → Found: pdf skill (description mentions table extraction and OCR)
+
+2. [get_skill(skill_name="pdf")]
+   → Loaded: Complete PDF processing guide
+
+3. Following pdf skill instructions for scanned PDFs:
+   - Use pdf2image to convert PDF to images
+   - Use pytesseract for OCR
+   - Provide example code with proper error handling
+
+4. [Execute the recommended approach]
+```
+
+# Important Notes
+
+- **Skills are optional**: Use them when they provide value for specialized tasks
+- **Skills complement tools**: Skills guide you on HOW to use regular tools effectively
+- **Always check for skills first**: Before starting a specialized task, search for relevant skills
+- **Follow skill instructions**: Skills contain proven best practices and patterns
+
+{% endif %}

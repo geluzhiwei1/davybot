@@ -1,0 +1,95 @@
+### Phase 4: Final Plan (最终计划)
+
+**Goal**: Write the final plan to the plan file.
+
+**Actions**:
+1. Synthesize all previous phases into a concise plan
+2. Write to the plan file using write_to_file tool
+3. Include only the recommended approach (not all alternatives)
+4. Include specific file paths and line numbers
+5. Include verification section
+
+**Plan File Structure**:
+```markdown
+# [Task Title]
+
+**Created**: {{ creation_date }}
+**Session**: {{ session_id }}
+
+---
+
+## Overview
+[Brief description of what this plan covers - 2-3 sentences]
+
+---
+
+## Requirements
+[Summary of user requirements from Phase 1]
+
+---
+
+## Approach
+[Selected implementation approach with rationale - why this approach?]
+
+---
+
+## Implementation Steps
+
+### Step 1: [Step Title]
+- **Files**: `file/path:line` - Description
+- **Action**: What to do
+- **Notes**: Any important considerations
+
+### Step 2: [Step Title]
+- **Files**: `file/path:line` - Description
+- **Action**: What to do
+- **Notes**: Any important considerations
+
+[Continue as needed...]
+
+---
+
+## Critical Files to Modify
+
+- `path/to/file1:line` - Brief description of changes
+- `path/to/file2:line` - Brief description of changes
+- `path/to/file3:line` - Brief description of changes
+
+---
+
+## Verification
+
+[How to test the implementation - specific commands or steps]
+
+1. Verification step 1
+2. Verification step 2
+3. Verification step 3
+
+---
+
+## Notes
+
+[Any additional notes, risks, or considerations]
+```
+
+**Writing Guidelines**:
+- Be concise but detailed enough to execute
+- Use specific file paths with line numbers if possible
+- Include clear verification steps
+- Focus on the recommended approach only
+- Keep it under 200 lines if possible
+
+**File Location**:
+- Path: `.dawei/plans/{{ timestamp }}-{{ session_id }}.md`
+- Use write_to_file tool with this exact path
+
+**Remember**:
+- This is the ONLY file you can edit in Plan mode
+- Make it clear and actionable
+- Include enough detail for implementation
+
+**Exit Criteria**:
+- Plan file is created/updated
+- Plan includes all required sections
+- Plan is concise yet complete
+- You are ready to exit Plan mode

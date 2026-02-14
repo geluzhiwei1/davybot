@@ -1,0 +1,227 @@
+# Dawei TUI Translation Template
+# Copyright (c) 2026 Dawei Project
+# This file is distributed under the same license as the Dawei package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dawei TUI 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-09 01:30+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: dawei/tui/app.py:46
+msgid "Quit"
+msgstr ""
+
+#: dawei/tui/app.py:47
+msgid "Quit"
+msgstr ""
+
+#: dawei/tui/app.py:48
+msgid "Help"
+msgstr ""
+
+#: dawei/tui/app.py:49
+msgid "Help"
+msgstr ""
+
+#: dawei/tui/app.py:50
+msgid "Commands"
+msgstr ""
+
+#: dawei/tui/app.py:51
+msgid "Settings"
+msgstr ""
+
+#: dawei/tui/app.py:52
+msgid "Save Session"
+msgstr ""
+
+#: dawei/tui/app.py:53
+msgid "Clear Chat"
+msgstr ""
+
+#: dawei/tui/app.py:54
+msgid "History"
+msgstr ""
+
+#: dawei/tui/app.py:58
+msgid "Dawei TUI - Agent Terminal Interface"
+msgstr ""
+
+#: dawei/tui/app.py:59
+msgid "Agent"
+msgstr ""
+
+#: dawei/tui/ui/screens/main_screen.py:37
+msgid "Type @skill:name or message... (Tab to autocomplete, Enter to send)"
+msgstr ""
+
+#: dawei/tui/ui/widgets/chat_area.py
+msgid "Chat Output"
+msgstr ""
+
+#: dawei/tui/ui/widgets/chat_area.py
+msgid "Messages"
+msgstr ""
+
+#: dawei/tui/ui/widgets/chat_area.py
+msgid "Loaded skill '{skill_name}' to context ({char_count} chars)"
+msgstr ""
+
+#: dawei/tui/ui/widgets/command_palette.py
+msgid "Type to filter commands... (Esc to close)"
+msgstr ""
+
+#: dawei/tui/ui/widgets/pdca_panel.py
+msgid "PDCA"
+msgstr ""
+
+#: dawei/tui/ui/widgets/pdca_panel.py
+msgid "Understanding requirements, exploring context, and creating a plan."
+msgstr ""
+
+#: dawei/tui/ui/widgets/status_bar.py
+msgid "Status"
+msgstr ""
+
+#: dawei/tui/ui/widgets/thinking_panel.py
+msgid "Thinking"
+msgstr ""
+
+#: dawei/tui/ui/widgets/thinking_panel.py
+msgid "AI Thinking Process"
+msgstr ""
+
+#: dawei/tui/ui/widgets/tool_panel.py
+msgid "Tools"
+msgstr ""
+
+#: dawei/tui/ui/widgets/tool_panel.py
+msgid "Tool Execution"
+msgstr ""
+
+#: dawei/tui/ui/widgets/toast_notifications.py
+msgid "Notification"
+msgstr ""
+
+#: dawei/tui/ui/widgets/toast_notifications.py
+msgid "Info"
+msgstr ""
+
+#: dawei/tui/ui/widgets/toast_notifications.py
+msgid "Success"
+msgstr ""
+
+#: dawei/tui/ui/widgets/toast_notifications.py
+msgid "Warning"
+msgstr ""
+
+#: dawei/tui/ui/widgets/toast_notifications.py
+msgid "Error"
+msgstr ""
+
+#: dawei/tui/ui/screens/settings_screen.py
+msgid "Settings"
+msgstr ""
+
+#: dawei/tui/ui/screens/settings_screen.py
+msgid "Display Settings"
+msgstr ""
+
+#: dawei/tui/ui/screens/settings_screen.py
+msgid "Panel Settings"
+msgstr ""
+
+#: dawei/tui/ui/screens/help_screen.py
+msgid "Help"
+msgstr ""
+
+#: dawei/tui/ui/screens/help_screen.py
+msgid "Keyboard Shortcuts"
+msgstr ""
+
+#: dawei/tui/ui/screens/help_screen.py
+msgid "Commands"
+msgstr ""
+
+#: dawei/tui/ui/screens/history_screen.py
+msgid "Session History"
+msgstr ""
+
+#: dawei/tui/ui/screens/history_screen.py
+msgid "Session:"
+msgstr ""
+
+#: dawei/tui/ui/screens/history_screen.py
+msgid "Created:"
+msgstr ""
+
+#: dawei/tui/ui/screens/history_screen.py
+msgid "Messages:"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Select Language"
+msgstr ""
+
+msgid "English"
+msgstr ""
+
+msgid "Simplified Chinese"
+msgstr ""
+
+msgid "Traditional Chinese"
+msgstr ""
+
+msgid "Mode"
+msgstr ""
+
+msgid "Model"
+msgstr ""
+
+msgid "N/A"
+msgstr ""
+
+msgid "Chat Area initialized!"
+msgstr ""
+
+msgid "Messages will appear here..."
+msgstr ""
+
+msgid "You:"
+msgstr ""
+
+msgid "Assistant:"
+msgstr ""
+
+msgid "System:"
+msgstr ""
+
+msgid "Failed to load skill '{skill_name}'"
+msgstr ""
+
+msgid "Skills Loaded:"
+msgstr ""
+
+msgid "Thinking..."
+msgstr ""
+
+msgid "Tools..."
+msgstr ""
+
+msgid "Params:"
+msgstr ""
+
+msgid "Language Settings"
+msgstr ""

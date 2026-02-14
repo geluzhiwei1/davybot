@@ -1,0 +1,313 @@
+/*
+ * Dawei TUI - Default Theme
+ *
+ * Color scheme and layout styling
+ * Updated for Textual 7.5.0+ with compatible CSS syntax
+ */
+
+/* ========================================
+   CSS Variables - Color Palette
+   ======================================== */
+$primary: #3c3c3c;
+$secondary: #1e90ff;
+$accent: #87ceeb;
+$warning: #ffa500;
+$error: #ff6347;
+$success: #32cd32;
+$surface: #2b2b2b;
+$background: #1a1a1a;
+$text: #ffffff;
+$text-muted: #b0b0b0;
+$border: #4a4a4a;
+
+/* ========================================
+   Global Styles
+   ======================================== */
+Screen {
+    background: $background;
+    color: $text;
+}
+
+/* ========================================
+   Header & Footer
+   ======================================== */
+Header {
+    background: $primary 95%;
+    text-align: center;
+    text-style: bold;
+    border: round $accent;
+    padding: 0 2;
+    height: 3;
+}
+
+Footer {
+    background: $primary 95%;
+    text-align: center;
+    text-style: bold;
+}
+
+/* ========================================
+   Main Layout Containers
+   ======================================== */
+#main_container {
+    height: 1fr;
+}
+
+#left_panel {
+    width: 70%;
+    height: 1fr;
+    padding: 1;
+    /* Ensure vertical layout works correctly */
+    display: block;
+}
+
+#right_panel {
+    width: 30%;
+    height: 1fr;
+    padding: 1;
+}
+
+/* ========================================
+   Chat Area
+   ======================================== */
+ChatArea {
+    height: 1fr;
+    min-height: 10;
+    /* CRITICAL: Don't use all vertical space, leave room for input box */
+    max-height: 1fr;
+    border: thick $accent;
+    background: $surface;
+    padding: 1;
+    scrollbar-size: 1 1;
+    color: $text;
+    scrollbar-background: $surface;
+    scrollbar-color: $accent;
+}
+
+ChatArea:focus {
+    border: heavy $secondary;
+}
+
+/* RichLog specific styling */
+RichLog {
+    background: $surface;
+    color: $text;
+}
+
+RichLog > .richlog--log {
+    background: transparent;
+}
+
+/* Enable text selection in RichLog/ChatArea */
+RichLog > .richlog--log-container {
+    background: transparent;
+}
+
+RichLog > .richlog--log-container > ScrollView {
+    background: transparent;
+}
+
+RichLog > .richlog--log-container > ScrollView > .richlog--content {
+    background: transparent;
+}
+
+/* ChatArea (RichLog) supports text selection by default */
+/* No additional CSS needed - Textual handles this automatically */
+
+/* ========================================
+   Input Box
+   ======================================== */
+InputBox, Input {
+    height: 3;
+    min-height: 3;
+    max-height: 3;
+    margin-top: 1;
+    border: thick $accent;
+    background: $primary;
+    padding: 0 1;
+    color: $text;
+    text-style: none;
+    /* Ensure input box is always visible */
+    display: block;
+    visibility: visible;
+}
+
+InputBox:focus, Input:focus {
+    border: heavy $secondary;
+    background: $primary 105%;
+}
+
+/* Placeholder styling */
+Input.-placeholder {
+    color: $text-muted;
+    text-style: italic;
+}
+
+/* ========================================
+   Status Bar
+   ======================================== */
+StatusBar {
+    height: 4;
+    min-height: 4;
+    background: $primary 90%;
+    padding: 0 1;
+    border: round $border;
+    content-align: center middle;
+    text-style: bold;
+}
+
+/* ========================================
+   Thinking Panel
+   ======================================== */
+ThinkingPanel {
+    height: 1fr;
+    min-height: 10;
+    border: thick $border;
+    background: $surface 95%;
+    padding: 1;
+    margin-top: 1;
+}
+
+ThinkingPanel:focus {
+    border: heavy $warning;
+}
+
+/* ========================================
+   Tool Panel
+   ======================================== */
+ToolPanel {
+    height: 1fr;
+    min-height: 10;
+    border: thick $border;
+    background: $surface 95%;
+    padding: 1;
+    margin-top: 1;
+}
+
+ToolPanel:focus {
+    border: heavy $success;
+}
+
+/* ========================================
+   PDCA Panel
+   ======================================== */
+PDCAPanel {
+    height: 8;
+    min-height: 6;
+    max-height: 12;
+    border: thick $warning;
+    background: $surface 90%;
+    padding: 1;
+    margin-top: 1;
+}
+
+PDCAPanel:focus {
+    border: heavy $warning;
+}
+
+/* ========================================
+   DataTable (used in screens)
+   ======================================== */
+DataTable {
+    border: thick $border;
+    background: $surface;
+}
+
+DataTable > DataTableHeader {
+    background: $primary;
+    text-style: bold;
+    color: $accent;
+}
+
+DataTable > DataTableCursor {
+    background: $secondary;
+    text-style: bold;
+}
+
+/* ========================================
+   Button Styling
+   ======================================== */
+Button {
+    background: $secondary;
+    color: $text;
+    border: round $secondary;
+    padding: 0 2;
+    text-style: bold;
+    min-width: 12;
+}
+
+Button:hover {
+    background: $secondary 90%;
+    border: round $secondary;
+    text-style: bold underline;
+}
+
+Button.-active {
+    background: $accent;
+    color: $background;
+    border: round $accent;
+}
+
+/* ========================================
+   Modal Screens
+   ======================================== */
+Screen.modal {
+    background: $background 95%;
+    border: heavy $accent;
+    padding: 2;
+}
+
+/* ========================================
+   Command Palette
+   ======================================== */
+CommandPalette {
+    background: $surface;
+    border: heavy $accent;
+    padding: 1;
+}
+
+CommandPalette > Input {
+    margin: 0 1 1 1;
+    border: thick $secondary;
+}
+
+CommandPalette > DataTable {
+    height: 1fr;
+    min-height: 10;
+}
+
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+ScrollBar {
+    background: $surface;
+    color: $accent;
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+.success {
+    color: $success;
+    text-style: bold;
+}
+
+.error {
+    color: $error;
+    text-style: bold;
+}
+
+.warning {
+    color: $warning;
+    text-style: bold;
+}
+
+.info {
+    color: $accent;
+    text-style: bold;
+}
+
+.muted {
+    color: $text-muted;
+    text-style: italic;
+}

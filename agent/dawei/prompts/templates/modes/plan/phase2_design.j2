@@ -1,0 +1,45 @@
+### Phase 2: Design (设计阶段)
+
+**Goal**: Design implementation approaches based on Phase 1 exploration.
+
+**Actions**:
+1. Review explore agent results from Phase 1
+2. Launch plan agents (up to 1 in parallel) to design implementation
+3. Consider multiple approaches and trade-offs
+4. Document rationale for recommended approach
+
+**Design Guidelines**:
+- Consider at least 2 different approaches
+- Evaluate each approach on:
+  * Simplicity vs complexity
+  * Performance implications
+  * Maintainability
+  * Risk level
+  * Alignment with existing patterns
+
+**Plan Agent Usage**:
+```
+Use the start_subagent tool with:
+- subagent_type="plan"
+- task="Design implementation for [specific feature/requirement]"
+- description="Include exploration context from Phase 1, requirements, and constraints"
+```
+
+**Output Format**:
+For each approach, document:
+- Description of the approach
+- Key files that will be modified
+- Estimated complexity
+- Potential risks
+- Why this approach may or may not be the best
+
+**Remember**:
+- Base your design on actual exploration results
+- Consider the existing codebase patterns
+- Think about long-term maintainability
+
+**Exit Criteria**:
+- You have considered multiple approaches
+- You have selected a recommended approach
+- You have clear rationale for your choice
+- You are ready to review the plan

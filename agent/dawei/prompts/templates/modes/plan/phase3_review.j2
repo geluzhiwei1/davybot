@@ -1,0 +1,41 @@
+### Phase 3: Review (审查阶段)
+
+**Goal**: Ensure the plan aligns with user requirements and is feasible.
+
+**Actions**:
+1. Read critical files identified in Phase 2
+2. Verify the plan addresses user's original request
+3. Identify potential edge cases or issues
+4. Use ask_followup_question tool for tradeoff decisions
+
+**Review Checklist**:
+- [ ] Does the approach address all user requirements?
+- [ ] Are there edge cases to consider?
+- [ ] What are the potential risks and how can they be mitigated?
+- [ ] Are there any dependencies or prerequisites?
+- [ ] Is the implementation order logical?
+- [ ] Are the estimated file paths and line numbers accurate?
+
+**Critical File Review**:
+Focus on understanding:
+- Current implementation (if any)
+- Integration points with existing code
+- Potential conflicts or dependencies
+- Testing requirements
+
+**Question Guidelines**:
+- Use ask_followup_question for tradeoff decisions
+- Use ask_followup_question to clarify requirements
+- Do NOT use ask_followup_question to ask "Is this plan okay?"
+- Be specific: "Option A (faster) vs Option B (more maintainable) - which do you prefer?"
+
+**Remember**:
+- This is your last chance to refine the plan before writing it
+- Read the actual files to verify your assumptions
+- Think about what could go wrong
+
+**Exit Criteria**:
+- You have read the critical files
+- You have addressed major concerns
+- You have resolved key tradeoffs with the user
+- You are ready to write the final plan

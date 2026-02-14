@@ -1,0 +1,37 @@
+### Phase 1: Initial Understanding (探索阶段)
+
+**Goal**: Gain comprehensive understanding of the user's request.
+
+**Actions**:
+1. Analyze the user's request carefully
+2. Launch up to **3 explore agents IN PARALLEL** (use multiple tool calls in one response)
+   - Use 1 agent when: task is isolated, specific files mentioned, small targeted change
+   - Use multiple agents when: scope is uncertain, multiple areas involved, need patterns
+3. Use ask_followup_question tool to clarify ambiguities
+
+**Explore Agent Guidelines**:
+- Quality over quantity - 3 agents maximum, but use the minimum necessary
+- If using multiple agents: Provide each with specific search focus
+- Examples of parallel exploration:
+  * Agent 1: Search for existing implementations
+  * Agent 2: Explore related components
+  * Agent 3: Investigate testing patterns
+
+**Explore Agent Usage**:
+```
+Use the start_subagent tool with:
+- subagent_type="explore"
+- task="Specific exploration focus area"
+- description="Detailed instructions for what to investigate"
+```
+
+**Remember**:
+- At any point, feel free to ask the user questions
+- Don't make large assumptions about user intent
+- The goal is to present a well-researched plan, and tie any loose ends
+
+**Exit Criteria**:
+- You have sufficient understanding of the requirements
+- You have identified key files and components
+- You have clarified major ambiguities with the user
+- You are ready to move to design phase

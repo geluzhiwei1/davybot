@@ -1,0 +1,246 @@
+# Diff-Based File Editing Guide
+
+## When Editing Large Files, Use Diff-Based Approach
+
+You have access to three file editing tools. Choose the right one based on file size:
+
+### Tool Selection Guide
+
+**1. `smart_file_edit` - Best for large files (>200 lines)**
+```json
+{
+  "edits": [
+    {
+      "search": "exact text to find (include 3-5 unique lines)",
+      "replace": "replacement text"
+    }
+  ]
+}
+```
+**Use when:**
+- HTML files >500 lines
+- Code files >200 lines
+- Making multiple changes to the same file
+- Previous write_to_file calls failed due to truncation
+
+**Benefits:**
+- Processes edits sequentially
+- Verifies each edit
+- Prevents response truncation
+- Provides detailed progress feedback
+
+---
+
+**2. `apply_diff` - For focused edits (10-50 lines)**
+
+**Format Options (auto-detected):**
+
+**Option A: Git Unified Diff Format (Recommended)**
+```diff
+--- a/file.txt
++++ b/file.txt
+@@ -line,count +line,count @@
+ context line
+-old content
++new content
+ another context
+```
+
+**Option B: SEARCH/REPLACE Format (Simpler)**
+```
+<<<<<<< SEARCH
+[exact content to find]
+=======
+[replacement content]
+>>>>>>> REPLACE
+```
+
+**Use when:**
+- Making a single targeted change
+- Editing 10-50 lines at once
+- File is 100-500 lines
+
+---
+
+**3. `write_to_file` - Only for small files (<100 lines)**
+**Use when:**
+- Creating entirely new files
+- File is <100 lines
+- No risk of truncation
+
+⚠️ **WARNING:** Do NOT use write_to_file for large HTML/CSS/JS files!
+
+---
+
+## Best Practices for Diff Editing
+
+### For HTML Files:
+1. Read the file first to understand structure
+2. Identify unique sections (3-5 lines) as search anchors
+3. Split large changes into multiple diffs:
+   - Edit header section first
+   - Then body content
+   - Then footer/scripts
+4. Use smart_file_edit for multiple changes
+
+### Example: Editing a Large HTML File
+
+**❌ WRONG (will truncate):**
+```python
+write_to_file(
+    path="large_page.html",
+    content=""""<!DOCTYPE html>
+<html>
+<!-- 1000+ lines of HTML -->
+</html>"""
+)
+```
+
+**✅ CORRECT:**
+```python
+# Method 1: Use smart_file_edit for multiple changes
+smart_file_edit(
+    file_path="large_page.html",
+    edits=[
+        {
+            "search": '<header>\n    <h1>Old Title</h1>\n</header>',
+            "replace": '<header>\n    <h1>New Title</h1>\n</header>'
+        },
+        {
+            "search": '<section id="content">\n    <p>Old content</p>',
+            "replace": '<section id="content">\n    <p>New content</p>'
+        }
+    ]
+)
+
+# Method 2: Use apply_diff for single change
+apply_diff(
+    file_path="large_page.html",
+    diff="""--- a/large_page.html
++++ b/large_page.html
+@@ -1,3 +1,3 @@
+ <header>
+-    <h1>Old Title</h1>
++    <h1>New Title</h1>
+ </header>"""
+)
+
+# Or use SEARCH/REPLACE format:
+# apply_diff(
+#     file_path="large_page.html",
+#     diff="""<<<<<<< SEARCH
+# <header>
+#     <h1>Old Title</h1>
+# </header>
+# =======
+# <header>
+#     <h1>New Title</h1>
+# </header>
+# >>>>>>> REPLACE"""
+# )
+```
+
+### For Code Files (Python/JS/etc):
+1. Include unique identifiers in search (function names, variable names)
+2. Match indentation exactly
+3. Include context lines (lines before and after)
+4. Verify syntax after edit
+
+**Example:**
+
+**Git Unified Diff Format:**
+```python
+apply_diff(
+    file_path="app.py",
+    diff="""--- a/app.py
++++ b/app.py
+@@ -1,3 +1,6 @@
+ def process_data(data):
+     result = data.copy()
++    # Add validation
++    if not result:
++        raise ValueError("Empty data")
+     return result"""
+)
+```
+
+**Or SEARCH/REPLACE Format:**
+```python
+apply_diff(
+    file_path="app.py",
+    diff="""<<<<<<< SEARCH
+def process_data(data):
+    result = data.copy()
+    return result
+=======
+def process_data(data):
+    result = data.copy()
+    # Add validation
+    if not result:
+        raise ValueError("Empty data")
+    return result
+>>>>>>> REPLACE"""
+)
+```
+
+---
+
+## Handling Truncation Errors
+
+If you see errors like:
+- "Response was truncated"
+- "Incomplete tool call"
+- "Missing arguments"
+
+**Solution:** Switch to diff-based editing immediately:
+
+1. **Abort the current write_to_file call**
+2. **Read the file to see current state**
+3. **Use smart_file_edit with multiple small edits**
+4. **Wait for confirmation between edits**
+
+---
+
+## Search Text Tips
+
+✅ **Good search text (3-10 lines, unique):**
+```python
+search = """<div class="header-container">
+    <h1>Welcome</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+"""
+```
+
+❌ **Bad diff context (too short, not unique):**
+
+**Git Unified Diff:**
+```diff
+@@ -1,1 +1,1 @@
+-<div>
++<span>
+```
+❌ Too generic - no context, will match wrong location
+
+**SEARCH/REPLACE:**
+```python
+search = "<div>"  # Too generic, will match wrong location
+```
+
+---
+
+## Summary
+
+| File Size | Lines | Tool to Use |
+|-----------|-------|-------------|
+| < 10 KB | < 100 | write_to_file ✅ |
+| 10-50 KB | 100-500 | apply_diff ✅ |
+| > 50 KB | > 500 | smart_file_edit ✅ |
+| Multiple edits | Any | smart_file_edit ✅ |
+
+**Key Principle:** When in doubt, use diff-based editing (apply_diff or smart_file_edit). It's safer and more reliable for large files!
+
+---
+
+Remember: The goal is to avoid response truncation. Diff-based editing ensures LLM responses stay within limits while still making precise changes to files.

@@ -1,0 +1,11 @@
+{#
+  This template renders the USER'S CUSTOM INSTRUCTIONS section.
+  It expects a `custom_instructions` variable in the context, which is a string.
+#}
+====
+
+USER'S CUSTOM INSTRUCTIONS
+
+{% if custom_instructions is defined %}
+{{ custom_instructions }}
+{% endif %}

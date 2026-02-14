@@ -1,0 +1,173 @@
+# Traditional Chinese translations for Dawei TUI
+# Copyright (c) 2026 Dawei Project
+# This file is distributed under the same license as the Dawei package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Dawei TUI 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-09 01:30+0800\n"
+"PO-Revision-Date: 2026-02-09 01:30+0800\n"
+"Last-Translator: Dawei Team\n"
+"Language-Team: Traditional Chinese <zh_TW@li.org>\n"
+"Language: zh_TW\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Quit"
+msgstr "退出"
+
+msgid "Help"
+msgstr "說明"
+
+msgid "Commands"
+msgstr "指令"
+
+msgid "Settings"
+msgstr "設定"
+
+msgid "Save Session"
+msgstr "儲存會話"
+
+msgid "Clear Chat"
+msgstr "清除聊天"
+
+msgid "History"
+msgstr "歷史"
+
+msgid "Dawei TUI - Agent Terminal Interface"
+msgstr "大微 TUI - AI助手終端介面"
+
+msgid "Agent"
+msgstr "助手"
+
+msgid "Type @skill:name or message... (Tab to autocomplete, Enter to send)"
+msgstr "輸入 @技能:名稱 或訊息... (Tab 自動補全，Enter 傳送)"
+
+msgid "Chat Output"
+msgstr "聊天輸出"
+
+msgid "Messages"
+msgstr "訊息"
+
+msgid "Loaded skill '{skill_name}' to context ({char_count} chars)"
+msgstr "已載入技能 '{skill_name}' 到上下文 ({char_count} 字元)"
+
+msgid "Type to filter commands... (Esc to close)"
+msgstr "輸入以篩選指令... (Esc 關閉)"
+
+msgid "PDCA"
+msgstr "PDCA"
+
+msgid "Understanding requirements, exploring context, and creating a plan."
+msgstr "理解需求，探索上下文，並建立計畫。"
+
+msgid "Status"
+msgstr "狀態"
+
+msgid "Thinking"
+msgstr "思考中"
+
+msgid "AI Thinking Process"
+msgstr "AI 思考過程"
+
+msgid "Tools"
+msgstr "工具"
+
+msgid "Tool Execution"
+msgstr "工具執行"
+
+msgid "Notification"
+msgstr "通知"
+
+msgid "Info"
+msgstr "資訊"
+
+msgid "Success"
+msgstr "成功"
+
+msgid "Warning"
+msgstr "警告"
+
+msgid "Error"
+msgstr "錯誤"
+
+msgid "Display Settings"
+msgstr "顯示設定"
+
+msgid "Panel Settings"
+msgstr "面板設定"
+
+msgid "Keyboard Shortcuts"
+msgstr "鍵盤快捷鍵"
+
+msgid "Session History"
+msgstr "會話歷史"
+
+msgid "Session:"
+msgstr "會話："
+
+msgid "Created:"
+msgstr "建立時間："
+
+msgid "Messages:"
+msgstr "訊息："
+
+msgid "Language"
+msgstr "語言"
+
+msgid "Select Language"
+msgstr "選擇語言"
+
+msgid "English"
+msgstr "English"
+
+msgid "Simplified Chinese"
+msgstr "簡體中文"
+
+msgid "Traditional Chinese"
+msgstr "繁體中文"
+
+msgid "Mode"
+msgstr "模式"
+
+msgid "Model"
+msgstr "模型"
+
+msgid "N/A"
+msgstr "不可用"
+
+msgid "Chat Area initialized!"
+msgstr "聊天區域已初始化！"
+
+msgid "Messages will appear here..."
+msgstr "訊息將顯示在這裡..."
+
+msgid "You:"
+msgstr "您："
+
+msgid "Assistant:"
+msgstr "助手："
+
+msgid "System:"
+msgstr "系統："
+
+msgid "Failed to load skill '{skill_name}'"
+msgstr "載入技能 '{skill_name}' 失敗"
+
+msgid "Skills Loaded:"
+msgstr "已載入技能："
+
+msgid "Thinking..."
+msgstr "思考中..."
+
+msgid "Tools..."
+msgstr "工具..."
+
+msgid "Params:"
+msgstr "參數："
+
+msgid "Language Settings"
+msgstr "語言設定"

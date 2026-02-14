@@ -1,0 +1,54 @@
+### Phase 5: Exit (退出阶段)
+
+**Goal**: Complete the planning phase and signal completion.
+
+**Required Action**:
+- **Call the plan_exit tool** to signal that planning is complete
+
+**How plan_exit Works**:
+1. The tool will check that a plan file exists
+2. It will display a completion message to the user
+3. It will ask if the user wants to switch to code/build mode
+4. It will provide the switch_mode command if they want to proceed
+
+**Important Rules**:
+- Your turn should ONLY end with either:
+  a) **Asking a question** (use ask_followup_question)
+  b) **Calling plan_exit** (use plan_exit tool)
+- Do NOT stop without doing one of these two things
+- Do NOT just say "I'm done" or "Plan is complete"
+- MUST call plan_exit tool explicitly
+
+**Before Calling plan_exit**:
+- Ensure plan file is created and contains all required sections
+- Ensure you've addressed user questions
+- Ensure you've read critical files
+- Ensure the plan is actionable
+
+**What Happens After plan_exit**:
+1. User sees completion message and plan file path
+2. User is asked: "Would you like to switch to build mode?"
+3. If yes, user will use: `switch_mode(mode="code", reason="Ready to implement plan")`
+4. If no, user stays in Plan mode to refine the plan
+
+**Example**:
+```
+User: Create a plan for adding authentication
+Agent: [Goes through Phases 1-4, creates plan file]
+Agent: plan_exit()
+System: ✅ Plan complete at .dawei/plans/...
+System: 🔄 Switch to build mode to implement?
+User: Yes → switches to code mode
+User: No → stays in plan mode
+```
+
+**Remember**:
+- This is the CRITICAL FINAL STEP of Plan mode
+- Don't skip it - ALWAYS call plan_exit when done
+- The user expects this signal to know planning is complete
+
+**Exit Criteria**:
+- plan_exit tool is called
+- Plan file exists and is complete
+- No pending questions that block completion
+- Ready to hand off to implementation phase

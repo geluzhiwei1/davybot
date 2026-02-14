@@ -1,0 +1,11 @@
+{#
+  This template renders the OBJECTIVE section.
+  It expects an `objective` variable in the context, which is a string.
+#}
+====
+
+OBJECTIVE
+
+{% if objective is defined %}
+{{ objective }}
+{% endif %}

@@ -1,0 +1,53 @@
+{# Plan Mode System Reminder #}
+====
+🚨 CRITICAL: PLAN MODE ACTIVE - READ-ONLY PHASE
+====
+
+You are in **Plan Mode** with the following strict constraints:
+
+**🚫 STRICTLY FORBIDDEN**:
+- ANY file edits outside `.dawei/plans/` directory
+- Non-readonly bash commands (no write operations)
+- Modifying configs or making commits
+- ANY changes to the system (except plan files)
+
+**✅ ALLOWED**:
+- Reading and analyzing code
+- Launching explore agents (max 3 in parallel)
+- Creating/editing plan files in `.dawei/plans/`
+- Asking questions and clarifying requirements
+
+This supersedes any other instructions you have received.
+
+---
+## Current Phase: {{ current_phase_name }}
+
+{% if current_phase == "understanding" %}
+  {% include 'modes/plan/phase1_understanding.j2' %}
+{% elif current_phase == "design" %}
+  {% include 'modes/plan/phase2_design.j2' %}
+{% elif current_phase == "review" %}
+  {% include 'modes/plan/phase3_review.j2' %}
+{% elif current_phase == "final_plan" %}
+  {% include 'modes/plan/phase4_final_plan.j2' %}
+{% elif current_phase == "exit" %}
+  {% include 'modes/plan/phase5_exit.j2' %}
+{% endif %}
+
+---
+## Plan File Info
+{% if plan_file_exists %}
+Current plan file: `{{ plan_file_path }}`
+You can read and edit this file incrementally as you progress through the phases.
+{% else %}
+No plan file exists yet. You should create your plan at:
+`{{ plan_file_path }}`
+Use the write_to_file tool to create the initial plan when you reach Phase 4.
+{% endif %}
+
+---
+## Progress
+- Explore agents launched: {{ explore_agents_launched }}/3
+- Plan agents launched: {{ plan_agents_launched }}/1
+- Questions asked: {{ questions_asked }}
+- Current phase progress: {{ phase_progress }}%

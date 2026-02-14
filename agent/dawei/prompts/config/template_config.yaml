@@ -1,0 +1,18 @@
+cache:
+  enabled: true
+  max_size: 100
+  ttl: 3600
+features:
+  debug_mode: false
+  hot_reload: false
+rendering:
+  auto_escape: true
+  keep_trailing_newline: false
+  lstrip_blocks: true
+  strict_undefined: false
+  trim_blocks: true
+templates:
+  base_path: templates/base/
+  languages_path: templates/languages/
+  modes_path: templates/modes/
+  sections_path: templates/sections/
