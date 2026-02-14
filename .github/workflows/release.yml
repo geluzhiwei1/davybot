@@ -47,7 +47,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Build Backend Package
+  # Build Backend Package (with Frontend)
   build-backend:
     name: Build Backend Package
     runs-on: ubuntu-latest
@@ -56,6 +56,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ========== Frontend Build ==========
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Install frontend dependencies
+        working-directory: ./webui
+        run: |
+          pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: ./webui
+        run: |
+          pnpm build
+
+      - name: Copy frontend to agent
+        run: |
+          mkdir -p agent/frontend
+          cp -r webui/dist/* agent/frontend/
+
+      # ========== Backend Build ==========
       - name: Install UV
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh

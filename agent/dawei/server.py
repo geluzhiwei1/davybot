@@ -471,10 +471,21 @@ def _mount_frontend_static(app: FastAPI) -> None:
         app: FastAPI application instance
 
     """
-    # Try package frontend first, fallback to local development
-    frontend_path = Path(__file__).parent / "dawei" / "frontend"
+    import dawei
+
+    # Get the package directory where dawei is installed
+    package_dir = Path(dawei.__file__).parent  # site-packages/dawei/
+    frontend_path = package_dir / "frontend"
+
+    # Fallback: try agent/frontend for local development
     if not frontend_path.exists():
-        frontend_path = Path(__file__).parent.parent.parent / "apps" / "web" / "dist"
+        agent_dir = Path(__file__).parent.parent  # agent/
+        frontend_path = agent_dir / "frontend"
+
+    # Fallback: try webui/dist for local development
+    if not frontend_path.exists():
+        repo_root = Path(__file__).parent.parent.parent  # root of dawei-agent repo
+        frontend_path = repo_root / "webui" / "dist"
 
     if frontend_path.exists():
         app.mount(
@@ -482,9 +493,9 @@ def _mount_frontend_static(app: FastAPI) -> None:
             StaticFiles(directory=str(frontend_path), html=True),
             name="frontend",
         )
-        print(f"[Dawei Server] Serving frontend from: {frontend_path}")
+        print(f"[Dawei Server] ✓ Frontend mounted from: {frontend_path}")
     else:
-        print("[Dawei Server] Warning: Frontend not found. API-only mode.")
+        print("[Dawei Server] ⚠ Frontend not found. API-only mode.")
 
 
 def parse_arguments() -> argparse.Namespace:
