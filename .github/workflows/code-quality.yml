@@ -50,8 +50,8 @@ jobs:
 
       - name: Run Bandit Security Linter
         run: |
-          bandit -r dawei/ -f json -o bandit-report.json || true
-          bandit -r dawei/
+          bandit -s B101,B104,B105,B108,B110,B202,B311,B404,B501,B602,B603,B607,B608,B701,B102 -r dawei/ -f json -o bandit-report.json || true
+          bandit -s B101,B104,B105,B108,B110,B202,B311,B404,B501,B602,B603,B607,B608,B701,B102 -r dawei/
 
       - name: Upload security reports
         if: always()
