@@ -11,12 +11,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps<{
   panelRef: { width: number };
   minWidth: number;
-  maxWidth: number;
+  maxWidth?: number;  // 改为可选，允许无限制
   storageKey?: string;
   position?: 'left' | 'right';  // 新增：标识分隔条位置
 }>();
@@ -26,13 +26,20 @@ const emit = defineEmits<{
 }>();
 
 const isDragging = ref(false);
+// 使用ref追踪实时宽度，避免使用过时的startWidth
+const currentWidth = ref(props.panelRef.width);
+
+// 监听panelRef.width的变化，保持同步
+watch(() => props.panelRef.width, (newWidth) => {
+  currentWidth.value = newWidth;
+});
 
 const handleMouseDown = (e: MouseEvent) => {
   e.preventDefault();
   isDragging.value = true;
 
   const startX = e.clientX;
-  const startWidth = props.panelRef.width;
+  const startWidth = currentWidth.value; // 使用currentWidth而不是props.panelRef.width
 
   // 添加拖动时的临时样式
   document.body.style.cursor = 'col-resize';
@@ -44,18 +51,19 @@ const handleMouseDown = (e: MouseEvent) => {
 
     // 根据分隔条位置决定宽度计算方式
     if (props.position === 'right') {
-      // 右侧面板：向右拖动应该增加宽度，向左应该减少
-      // 但由于布局方向，需要反转 delta
+      // 右侧面板：向右拖动应该减少宽度，向左应该增加
+      // 由于resizer在面板左侧，需要反转delta
       newWidth = startWidth - deltaX;
     } else {
       // 左侧面板（默认）：向右拖动增加宽度
       newWidth = startWidth + deltaX;
     }
 
-    // 限制在最小/最大宽度之间
-    newWidth = Math.max(props.minWidth, Math.min(props.maxWidth, newWidth));
+    // 限制在最小宽度，最大宽度（如果设置了的话）
+    newWidth = Math.max(props.minWidth, props.maxWidth !== undefined ? Math.min(props.maxWidth, newWidth) : newWidth);
 
     // 实时更新宽度
+    currentWidth.value = newWidth; // 更新currentWidth
     emit('resize', newWidth);
   };
 
@@ -71,7 +79,7 @@ const handleMouseDown = (e: MouseEvent) => {
 
     // 拖动结束后保存到 localStorage
     if (props.storageKey) {
-      localStorage.setItem(props.storageKey, props.panelRef.width.toString());
+      localStorage.setItem(props.storageKey, currentWidth.value.toString());
     }
   };
 

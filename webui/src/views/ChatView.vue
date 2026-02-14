@@ -50,8 +50,7 @@
     <ResizerBar
       v-if="!isSidePanelCollapsed"
       :panel-ref="{ width: sidePanelWidth }"
-      :min-width="250"
-      :max-width="600"
+      :min-width="100"
       storage-key="dawei-sidepanel-width"
       @resize="sidePanelWidth = $event"
     />
@@ -81,8 +80,7 @@
     <ResizerBar
       v-if="isRightPanelVisible && !isChatPanelCollapsed"
       :panel-ref="{ width: rightPanelWidth }"
-      :min-width="300"
-      :max-width="800"
+      :min-width="100"
       storage-key="dawei-rightpanel-width"
       position="right"
       @resize="rightPanelWidth = $event"
@@ -288,7 +286,7 @@ onMounted(async () => {
     const savedSideWidth = localStorage.getItem('dawei-sidepanel-width');
     if (savedSideWidth) {
       const width = parseInt(savedSideWidth, 10);
-      if (!isNaN(width) && width >= 250 && width <= 600) {
+      if (!isNaN(width) && width >= 100) {
         sidePanelWidth.value = width;
       }
     }
@@ -296,7 +294,7 @@ onMounted(async () => {
     const savedRightWidth = localStorage.getItem('dawei-rightpanel-width');
     if (savedRightWidth) {
       const width = parseInt(savedRightWidth, 10);
-      if (!isNaN(width) && width >= 300 && width <= 800) {
+      if (!isNaN(width) && width >= 100) {
         rightPanelWidth.value = width;
       }
     }
@@ -686,7 +684,7 @@ async function handleFollowupResponse(toolCallId: string, response: string) {
   flex-direction: column;
   background: transparent;
   flex: 1;
-  min-width: 0;
+  min-width: 100px;
 }
 
 .el-header,
@@ -756,8 +754,7 @@ async function handleFollowupResponse(toolCallId: string, response: string) {
   backdrop-filter: blur(10px);
   transition: all var(--duration-base) var(--ease-default);
   flex-shrink: 0;
-  min-width: 300px;
-  max-width: 800px;
+  min-width: 100px;
   overflow: hidden;
   box-shadow: -2px 0 12px rgba(0, 0, 0, 0.03);
 }

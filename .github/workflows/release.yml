@@ -81,8 +81,8 @@ jobs:
 
       - name: Copy frontend to agent
         run: |
-          mkdir -p agent/frontend
-          cp -r webui/dist/* agent/frontend/
+          mkdir -p agent/dawei/frontend
+          cp -r webui/dist/* agent/dawei/frontend/
 
       # ========== Backend Build ==========
       - name: Install UV
@@ -97,6 +97,8 @@ jobs:
 
       - name: Build package
         working-directory: ./agent
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
           uv pip install --system build
           uv build --out dist/
