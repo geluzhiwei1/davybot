@@ -29,25 +29,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 
       <!-- 插件配置内容 -->
       <div v-else class="plugins-content">
-        <!-- 全局设置 -->
-        <div class="global-settings">
-          <h4>{{ $t('workspaceSettings.plugins.pluginConfig.globalSettings') }}</h4>
-          <el-form :model="pluginsConfig" label-width="200px" size="small">
-            <el-form-item :label="$t('workspaceSettings.plugins.pluginConfig.maxPlugins')">
-              <el-input-number v-model="pluginsConfig.max_plugins" :min="1" :max="200" :disabled="!canEdit"
-                @change="onGlobalSettingChange" />
-            </el-form-item>
-
-            <el-form-item :label="$t('workspaceSettings.plugins.pluginConfig.autoDiscovery')">
-              <el-switch v-model="pluginsConfig.auto_discovery" :disabled="!canEdit" @change="onGlobalSettingChange" />
-            </el-form-item>
-
-            <el-form-item :label="$t('workspaceSettings.plugins.pluginConfig.enablePlugins')">
-              <el-switch v-model="pluginsConfig.enabled" :disabled="!canEdit" @change="onGlobalSettingChange" />
-            </el-form-item>
-          </el-form>
-        </div>
-
         <el-divider />
 
         <!-- 插件列表 -->
@@ -168,10 +149,7 @@ const emit = defineEmits<{
 const loading = ref(false);
 const saving = ref(false);
 const pluginsConfig = ref<PluginsConfig>({
-  plugins: {},
-  max_plugins: 50,
-  auto_discovery: true,
-  enabled: true
+  plugins: {}
 });
 const pluginsList = ref<unknown[]>([]);
 const settingsDialogVisible = ref(false);
@@ -208,10 +186,7 @@ const savePluginsConfig = async () => {
   saving.value = true;
   try {
     const response = await updatePluginsConfig(props.workspaceId, {
-      plugins: pluginsConfig.value.plugins,
-      max_plugins: pluginsConfig.value.max_plugins,
-      auto_discovery: pluginsConfig.value.auto_discovery,
-      enabled: pluginsConfig.value.enabled
+      plugins: pluginsConfig.value.plugins
     });
     if (response.success) {
       pluginsConfig.value = response.config as PluginsConfig;
@@ -339,10 +314,6 @@ const onPluginSettingsSaved = async (pluginId: string, newSettings: Record<strin
   }
 };
 
-// 全局设置变更
-const onGlobalSettingChange = () => {
-  // 全局设置变更时可以自动保存，或者等待用户点击保存
-};
 
 // 卸载插件
 const uninstallPlugin = async (pluginId: string) => {

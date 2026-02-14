@@ -144,6 +144,9 @@ class TaskNodeExecutionEngine:
     async def execute_task(self) -> Any | None:
         """执行当前任务节点
 
+        注意: 任务本身没有时间限制,只有LLM请求有超时(通过 process_message 中的 llm_timeout 控制)。
+        LLM 超时结合 stream_processor 中的 idle timeout 实现快速失败。
+
         Returns:
             执行结果
 
@@ -155,15 +158,8 @@ class TaskNodeExecutionEngine:
         self.execution_task = asyncio.create_task(self._run_task_loop())
 
         try:
-            # 添加全局超时控制 (默认30分钟)
-            timeout = getattr(self._config, "task_execution_timeout", 1800.0)
-            async with asyncio.timeout(timeout):
-                result = await self.execution_task
-        except TimeoutError:
-            # Task timeout - log but don't include stack trace (expected flow)
-            self.logger.exception(f"Task execution timeout after {timeout}s")
-            if not self.execution_task.done():
-                self.execution_task.cancel()
+            # 任务本身没有超时限制,只通过 LLM 请求超时控制
+            result = await self.execution_task
         except asyncio.CancelledError:
             # Task cancelled - log info but don't include stack trace (expected flow)
             self.logger.info(f"Task {self.task_node.task_node_id} was cancelled")

@@ -37,9 +37,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
           uv pip install --system -e ".[dev]"
-          uv pip install safety bandit
+          uv pip install --system safety bandit
 
       - name: Run Safety Check
         run: |

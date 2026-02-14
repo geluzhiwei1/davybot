@@ -929,48 +929,35 @@ class ChatHandler(AsyncMessageHandler):
     ) -> UserInputMessage:
         """处理消息中的文件引用
 
+        ⚠️ **重要变更**：不再自动读取文件内容
+        - @file/path 引用保留在消息中
+        - Agent内部的FileReferenceParser会解析@指令
+        - Agent自行决定是否使用file read工具读取文件
+
         Args:
             user_message: 用户消息
             workspace_path: 工作区路径
 
         Returns:
-            UserInputMessage: 处理后的用户消息
-
-        Raises:
-            ValueError: 文件引用处理失败
+            UserInputMessage: 原始用户消息（保留@引用）
 
         """
-        from dawei.websocket.handlers.at_message_processor import AtMessageProcessor
-
         original_message = user_message.content
-        try:
-            # 处理并增强消息内容
-            enhanced_message, file_refs = AtMessageProcessor.process_and_enhance(
-                original_message,
-                workspace_path,
-            )
+
+        # 检查消息中是否包含@文件引用
+        if "@" in original_message:
+            from dawei.websocket.handlers.at_message_processor import AtMessageProcessor
+
+            # 仅提取文件引用（不读取内容）
+            file_refs = AtMessageProcessor.extract_file_references(original_message)
 
             if file_refs:
-                logger.info(f"[CHAT_HANDLER] Processed {len(file_refs)} file references in message")
-                for ref in file_refs:
-                    logger.debug(
-                        f"[CHAT_HANDLER] File ref: {ref.file_path} (content_length: {len(ref.content) if ref.content else 0}, metadata: {ref.metadata})",
-                    )
+                logger.info(f"[CHAT_HANDLER] Detected {len(file_refs)} @ file references (will be processed by Agent)")
+                for ref_path in file_refs:
+                    logger.debug(f"[CHAT_HANDLER] File ref: @{ref_path} (Agent will read if needed)")
 
-            # 使用增强后的消息
-            return UserInputMessage(text=enhanced_message)
-
-        except ValueError as e:
-            logger.error(f"[CHAT_HANDLER] Error processing @ file references: {e}", exc_info=True)
-            # 如果处理失败，使用原始消息
-            return UserInputMessage(text=original_message)
-        except Exception as e:
-            logger.warning(
-                f"[CHAT_HANDLER] Unexpected error processing file references: {e}",
-                exc_info=True,
-            )
-            # 如果处理失败，使用原始消息
-            return UserInputMessage(text=original_message)
+        # 返回原始消息，保留@指令供Agent处理
+        return UserInputMessage(text=original_message)
 
     async def _handle_system_command_if_needed(
         self,

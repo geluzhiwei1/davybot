@@ -32,6 +32,7 @@ import { useMonitoringStore } from './monitoringStore'
 import { useParallelTasksStore } from './parallelTasks'
 import { useWorkspaceStore as _useWorkspaceStore } from './workspace'
 import { useMessageStore } from './messages'
+import { ParallelTaskState } from '@/types/parallelTasks'
 
 export const useAgentStore = defineStore('agent', () => {
   // --- Helper function to get current workspaceId ---
@@ -272,7 +273,7 @@ export const useAgentStore = defineStore('agent', () => {
       agentStart.agent_mode,
       agentStart.user_message
     )
-    parallelTasksStore.updateTaskState(agentStart.task_id, 'running')
+    parallelTasksStore.updateTaskState(agentStart.task_id, ParallelTaskState.RUNNING)
     logger.debug('[AGENT] Created task in parallelTasksStore:', agentStart.task_id)
     // 自动选择当前Agent，以便Agents显示
     const monitoringStore = useMonitoringStore()
@@ -322,6 +323,10 @@ export const useAgentStore = defineStore('agent', () => {
 
   /**
    * 处理Agent完成消息
+   * 
+   * 注意：此方法不再直接修改 isActive 状态
+   * 因为 AGENT_COMPLETE 可能是针对子任务的
+   * 控制面板的显示/隐藏由 parallelTasksStore.hasActiveTasks 决定
    */
   const handleAgentComplete = (message: WebSocketMessage) => {
     if (message.type !== MessageType.AGENT_COMPLETE) return
@@ -338,23 +343,34 @@ export const useAgentStore = defineStore('agent', () => {
     // 在 parallelTasksStore 中标记任务为完成
     if (agentComplete.task_id) {
       const parallelTasksStore = useParallelTasksStore()
-      parallelTasksStore.updateTaskState(agentComplete.task_id, 'completed')
+      parallelTasksStore.updateTaskState(agentComplete.task_id, ParallelTaskState.COMPLETED)
       logger.debug('[AGENT] Marked task as completed in parallelTasksStore:', agentComplete.task_id)
     }
 
-    // 清除当前任务ID并重置 Agent 状态
-    const workspaceId = getCurrentWorkspaceId()
-    workspaceCurrentTaskId.value.set(workspaceId, null)
-    workspaceAgentStatus.value.set(workspaceId, {
-      isActive: false,
-      isPaused: false,
-      agentMode: 'ask',
-      startTime: null,
-      thinking: '',
-      currentTask: ''
-    })
+    // 注意：不再直接设置 isActive = false
+    // 因为控制面板的显示由 parallelTasksStore.hasActiveTasks 决定
+    // 只有当 parallelTasksStore 中没有任何活跃任务时，控制面板才会隐藏
 
-    logger.debug('[AGENT] ✅ Agent状态已重置, isActive =:', getCurrentAgentStatus().isActive)
+    // 清除当前任务ID和Agent状态
+    const workspaceId = getCurrentWorkspaceId()
+    const currentTaskId = workspaceCurrentTaskId.value.get(workspaceId)
+
+    // 只有当当前任务ID与完成的任务ID相同时，才清除任务ID和状态
+    if (currentTaskId === agentComplete.task_id) {
+      workspaceCurrentTaskId.value.set(workspaceId, null)
+
+      // 同时重置 workspaceAgentStatus，避免状态残留
+      workspaceAgentStatus.value.set(workspaceId, {
+        isActive: false,
+        isPaused: false,
+        agentMode: 'ask',
+        startTime: null,
+        thinking: '',
+        currentTask: ''
+      })
+    }
+
+    logger.debug('[AGENT] ✅ Agent任务完成消息已处理，isActive状态由parallelTasksStore控制')
 
     // 🔥 重要：触发消息列表更新，确保assistant消息显示在UI上
     try {

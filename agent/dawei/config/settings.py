@@ -388,7 +388,6 @@ class AgentTimeoutConfig(BaseSettings):
     )
 
     tool_execution_timeout: int = Field(default=60)
-    task_execution_timeout: int = Field(default=3600)
     request_timeout: int = Field(default=180)
 
 

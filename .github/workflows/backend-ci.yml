@@ -55,6 +55,7 @@ jobs:
           UV_SYSTEM_PYTHON: 1
         run: |
           uv pip install --system -e ".[dev]"
+          uv pip install --system safety bandit
 
       - name: Run Black check
         run: |
@@ -114,6 +115,7 @@ jobs:
           UV_SYSTEM_PYTHON: 1
         run: |
           uv pip install --system -e ".[dev]"
+          uv pip install --system safety bandit
 
       - name: Run unit tests
         run: |
@@ -171,6 +173,7 @@ jobs:
           UV_SYSTEM_PYTHON: 1
         run: |
           uv pip install --system -e ".[dev,tui]"
+          uv pip install --system safety bandit
 
       - name: Test dawei server command
         run: |

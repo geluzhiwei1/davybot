@@ -1,7 +1,7 @@
 # Copyright (c) 2025 格律至微
 # SPDX-License-Identifier: AGPL-3.0-only
 
-"""Plugin manager for coordinating plugin system with 4-tier discovery"""
+"""Plugin manager for coordinating plugin system with 3-tier discovery"""
 
 import logging
 from pathlib import Path
@@ -14,20 +14,19 @@ logger = logging.getLogger(__name__)
 
 
 class PluginManager:
-    """Central plugin manager with 4-tier discovery system.
+    """Central plugin manager with 3-tier discovery system.
 
     Discovery tiers (highest to lowest priority):
     1. workspace - Workspace-specific plugins ({workspace}/.dawei/plugins/)
     2. user - User-specific plugins (~/.dawei/plugins/)
-    3. system - System-wide plugins (/etc/dawei/plugins/)
-    4. builtin - Built-in plugins (rarely used)
+    3. builtin - Built-in plugins (rarely used)
     """
 
     def __init__(self, workspace_path: Path | None = None):
         """Initialize plugin manager.
 
         Args:
-            workspace_path: Optional workspace path for tier 4 discovery
+            workspace_path: Optional workspace path for tier 3 discovery
 
         """
         self.workspace_path = workspace_path
@@ -60,13 +59,7 @@ class PluginManager:
             paths.append(user_plugin_dir)
             logger.debug(f"User plugin path: {user_plugin_dir}")
 
-        # Tier 3: System plugins
-        system_plugin_dir = Path("/etc/dawei/plugins")
-        if system_plugin_dir.exists():
-            paths.append(system_plugin_dir)
-            logger.debug(f"System plugin path: {system_plugin_dir}")
-
-        # Tier 4: Builtin plugins (lowest priority, rarely used)
+        # Tier 3: Builtin plugins (lowest priority, rarely used)
         builtin_plugin_dir = Path(__file__).parent / "builtin"
         if builtin_plugin_dir.exists():
             paths.append(builtin_plugin_dir)

@@ -211,12 +211,18 @@ class ContextManager:
                 f"Invalid tool definitions format: {e}",
             ) from e  # Fast fail with specific error
 
-    def add_file(self, file_path: str, content: str | None = None):
+    def add_file(self, file_path: str, content: str | None = None, auto_read: bool = False):
         """添加文件到上下文
+
+        ⚠️ **重要变更**：默认不自动读取文件内容
+        - @file/path 引用只记录路径，不读取内容
+        - Agent通过file_read工具按需读取文件
+        - 设置 auto_read=True 可恢复自动读取行为
 
         Args:
             file_path: 文件路径
-            content: 文件内容（可选，如果不提供则从文件读取）
+            content: 文件内容（可选，提供则直接使用）
+            auto_read: 是否自动读取文件内容（默认False）
 
         """
         # 如果文件已存在，先移除
@@ -225,6 +231,19 @@ class ContextManager:
 
         # 获取内容
         if content is None:
+            # ⚠️ 默认不自动读取文件，只记录路径
+            if not auto_read:
+                # 只记录文件路径，不读取内容（0 tokens）
+                self.files[file_path] = FileTokenUsage(
+                    path=file_path,
+                    tokens=0,  # 不消耗token
+                    last_updated=time.time(),
+                    char_count=0,
+                )
+                self.logger.debug(f"Added file reference (not loaded): {file_path}")
+                return
+
+            # auto_read=True 时才读取文件内容
             path = Path(file_path)
             if not path.exists():
                 self.logger.warning(f"File not found: {file_path}")

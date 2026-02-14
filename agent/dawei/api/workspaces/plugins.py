@@ -55,71 +55,6 @@ def get_cached_plugin_manager(workspace_id: str, workspace_path: Path) -> "Plugi
     return manager
 
 
-def load_plugin_settings_file(workspace_path: Path) -> dict[str, Any]:
-    """Load plugin settings from .dawei/plugins/{plugin_id}.json
-
-    Args:
-        workspace_path: Path to workspace directory
-
-    Returns:
-        Dictionary of plugin settings {plugin_id: settings_dict}
-
-    """
-    plugins_dir = workspace_path / ".dawei" / "plugins"
-
-    if not plugins_dir.exists() or not plugins_dir.is_dir():
-        logger.debug(f"No plugin settings dir: {plugins_dir}")
-        return {}
-
-    plugin_settings = {}
-    for config_file in plugins_dir.glob("*.json"):
-        # Skip non-plugin config files
-        if config_file.name == "config_schema.json":
-            continue
-        try:
-            plugin_id = config_file.stem
-            with config_file.open(encoding="utf-8") as f:
-                config_data = json.load(f)
-                plugin_settings[plugin_id] = config_data
-            logger.debug(f"Loaded plugin config: {plugin_id}")
-        except Exception as e:
-            logger.warning(f"Failed to load plugin config {config_file}: {e}")
-
-    if plugin_settings:
-        logger.info(f"Loaded {len(plugin_settings)} plugin configs from {plugins_dir}")
-
-    return plugin_settings
-
-
-def save_plugin_settings_file(workspace_path: Path, plugin_settings: dict[str, Any]) -> bool:
-    """Save plugin settings to individual plugin config files.
-
-    Saves each plugin's configuration to .dawei/plugins/{plugin_id}.json
-
-    Args:
-        workspace_path: Path to workspace directory
-        plugin_settings: Dictionary of plugin settings {plugin_id: config_dict}
-
-    Returns:
-        True if successful, False otherwise
-    """
-    plugins_dir = workspace_path / ".dawei" / "plugins"
-    plugins_dir.mkdir(parents=True, exist_ok=True)
-
-    try:
-        for plugin_id, config in plugin_settings.items():
-            config_file = plugins_dir / f"{plugin_id}.json"
-            with config_file.open("w", encoding="utf-8") as f:
-                json.dump(config, f, indent=2, ensure_ascii=False)
-            logger.debug(f"Saved plugin config: {plugin_id}")
-
-        logger.info(f"Saved {len(plugin_settings)} plugin configs to {plugins_dir}")
-        return True
-    except Exception as e:
-        logger.exception(f"Failed to save plugin settings: {e}")
-        return False
-
-
 router = APIRouter(prefix="/{workspace_id}/plugins", tags=["plugins"])
 
 
@@ -187,16 +122,23 @@ async def get_plugin_manager(
     # Load plugins if not already loaded
     if not manager.loader.list_loaded_plugins():
         try:
-            # Load plugin settings from .dawei/plugins/{plugin_id}.json
-            plugin_settings = load_plugin_settings_file(workspace_path)
+            # Load plugin settings from workspace
+            if workspace.plugins_config is None:
+                await workspace._load_plugins_config()
 
-            # Extract 'settings' key from each plugin config for discover_and_load_all
+            # Convert plugins_config to settings dict for discover_and_load_all
             settings_for_load = {}
-            for plugin_name, plugin_config in plugin_settings.items():
-                if isinstance(plugin_config, dict) and "settings" in plugin_config:
-                    settings_for_load[plugin_name] = plugin_config["settings"]
-                else:
-                    settings_for_load[plugin_name] = plugin_config
+            if workspace.plugins_config and workspace.plugins_config.plugins:
+                for plugin_name, plugin_config in workspace.plugins_config.plugins.items():
+                    # Merge metadata fields into settings
+                    merged_settings = {
+                        "enabled": plugin_config.enabled,
+                        "activated": plugin_config.activated,
+                        "version": plugin_config.version,
+                        "install_path": plugin_config.install_path,
+                        **plugin_config.settings
+                    }
+                    settings_for_load[plugin_name] = merged_settings
 
             await manager.discover_and_load_all(settings=settings_for_load)
         except Exception as e:
@@ -231,7 +173,23 @@ async def list_plugins(
         plugins = manager.list_plugins(plugin_type=ptype, activated_only=activated_only)
 
         # Return in format expected by frontend
-        return {"plugins": [PluginInfo(**plugin) for plugin in plugins]}
+        # Build plugin info with manifest data and registration state
+        plugin_list = []
+        for plugin in plugins:
+            # plugin is now a dict, not an object
+            plugin_info = {
+                "id": plugin.get("id"),
+                "name": plugin.get("name"),
+                "version": plugin.get("version"),
+                "type": plugin.get("type"),
+                "description": plugin.get("description"),
+                "author": plugin.get("author"),
+                "enabled": plugin.get("enabled", True),
+                "activated": plugin.get("activated", False),
+            }
+            plugin_list.append(plugin_info)
+        
+        return {"plugins": plugin_list}
 
     except Exception as e:
         logger.exception("Error listing plugins: ")
@@ -327,9 +285,7 @@ async def update_plugins_config(
                 "enabled": true,
                 "settings": {"api_key": "new-key"}
             }
-        },
-        "max_plugins": 100,
-        "auto_discovery": false
+        }
     }
     """
     try:
@@ -363,14 +319,6 @@ async def update_plugins_config(
                         plugin_config.version = plugin_data["version"]
                     if "install_path" in plugin_data:
                         plugin_config.install_path = plugin_data["install_path"]
-
-        # 更新全局设置
-        if "max_plugins" in config_update:
-            workspace.plugins_config.max_plugins = config_update["max_plugins"]
-        if "auto_discovery" in config_update:
-            workspace.plugins_config.auto_discovery = config_update["auto_discovery"]
-        if "enabled" in config_update:
-            workspace.plugins_config.enabled = config_update["enabled"]
 
         # 保存配置
         await workspace._save_plugins_config()
@@ -590,16 +538,41 @@ async def plugin_action(
                 result = True
 
         elif action == "activate":
+            # 先执行实际的插件激活，成功后再更新配置
+            # 避免配置与运行时状态不一致
             result = await manager.activate_plugin(plugin_id)
-            if not result:
+
+            if result:
+                # 激活成功，更新配置并保存
+                if workspace.plugins_config is None:
+                    await workspace._load_plugins_config()
+
+                workspace.plugins_config.enable_plugin(plugin_id)
+                if plugin_id in workspace.plugins_config.plugins:
+                    workspace.plugins_config.plugins[plugin_id].activated = True
+
+                await workspace._save_plugins_config()
+            else:
                 logger.warning(f"Failed to activate plugin {plugin_id}")
 
         elif action == "deactivate":
+            # 先执行实际的插件停用，成功后再更新配置
+            # 避免配置与运行时状态不一致
             result = await manager.deactivate_plugin(plugin_id)
+
             if not result:
                 # Already deactivated is not an error
                 logger.info(f"Plugin {plugin_id} is already deactivated")
                 result = True  # Consider it success
+            else:
+                # 停用成功，更新配置并保存
+                if workspace.plugins_config is None:
+                    await workspace._load_plugins_config()
+
+                if plugin_id in workspace.plugins_config.plugins:
+                    workspace.plugins_config.plugins[plugin_id].activated = False
+
+                await workspace._save_plugins_config()
 
         elif action == "reload":
             result = await manager.reload_plugin(plugin_id)
@@ -745,173 +718,6 @@ async def save_plugin_config(
     except Exception as e:
         logger.exception("Error saving plugin config: ")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/{plugin_id}/config/new")
-async def get_plugin_config_v2(
-    plugin_id: str,
-    workspace: UserWorkspace = Depends(get_user_workspace),
-) -> dict[str, Any]:
-    """获取单个插件配置（两层配置系统）
-
-    返回指定插件的配置，如果不存在则返回默认配置
-    """
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
-
-        # 加载插件配置
-        if workspace.plugins_config is None:
-            await workspace._load_plugins_config()
-
-        # 获取插件配置
-        plugin_config = workspace.plugins_config.get_plugin_config(plugin_id)
-
-        if plugin_config is None:
-            # 返回默认配置
-            return {
-                "plugin_id": plugin_id,
-                "enabled": True,
-                "activated": False,
-                "settings": {},
-                "version": None,
-                "install_path": None,
-                "exists": False,
-            }
-
-        return {
-            "plugin_id": plugin_id,
-            "exists": True,
-            **plugin_config.model_dump(),
-        }
-
-    except Exception as e:
-        logger.exception(f"Failed to get plugin config for {plugin_id}: ")
-        raise HTTPException(status_code=500, detail=f"Failed to get plugin config: {e!s}")
-
-
-@router.put("/{plugin_id}/config/new")
-async def update_plugin_config_v2(
-    plugin_id: str,
-    request: UpdatePluginSettingsRequest,
-    workspace: UserWorkspace = Depends(get_user_workspace),
-) -> dict[str, Any]:
-    """更新单个插件配置（两层配置系统）
-
-    请求体示例：
-    {
-        "enabled": true,
-        "settings": {"api_key": "new-key"}
-    }
-    """
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
-
-        # 加载插件配置
-        if workspace.plugins_config is None:
-            await workspace._load_plugins_config()
-
-        # 获取或创建插件配置
-        plugin_config = workspace.plugins_config.get_plugin_config(plugin_id)
-        if plugin_config is None:
-            plugin_config = PluginInstanceConfig()
-            workspace.plugins_config.set_plugin_config(plugin_id, plugin_config)
-
-        # 更新字段
-        if request.enabled is not None:
-            plugin_config.enabled = request.enabled
-        if request.settings is not None:
-            plugin_config.settings.update(request.settings)
-
-        # 保存配置
-        await workspace._save_plugins_config()
-
-        logger.info(f"Plugin config updated for {plugin_id}")
-
-        return {
-            "success": True,
-            "plugin_id": plugin_id,
-            **plugin_config.model_dump(),
-        }
-
-    except Exception as e:
-        logger.exception(f"Failed to update plugin config for {plugin_id}: ")
-        raise HTTPException(status_code=500, detail=f"Failed to update plugin config: {e!s}")
-
-
-@router.post("/{plugin_id}/enable")
-async def enable_plugin_v2(
-    plugin_id: str,
-    workspace: UserWorkspace = Depends(get_user_workspace),
-    manager: PluginManager = Depends(get_plugin_manager),
-) -> dict[str, Any]:
-    """启用插件（两层配置系统）"""
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
-
-        # 加载插件配置
-        if workspace.plugins_config is None:
-            await workspace._load_plugins_config()
-
-        # 启用插件
-        workspace.plugins_config.enable_plugin(plugin_id)
-
-        # 同步更新 PluginManager.registry 中的 settings
-        plugin_config = workspace.plugins_config.plugins.get(plugin_id)
-        if plugin_config:
-            await manager.update_plugin_settings(plugin_id, {"enabled": plugin_config.enabled, "activated": plugin_config.activated, **plugin_config.settings})
-
-        # 保存配置
-        await workspace._save_plugins_config()
-
-        logger.info(f"Plugin {plugin_id} enabled")
-
-        return {"success": True, "plugin_id": plugin_id, "enabled": True}
-
-    except Exception as e:
-        logger.exception(f"Failed to enable plugin {plugin_id}: ")
-        raise HTTPException(status_code=500, detail=f"Failed to enable plugin: {e!s}")
-
-
-@router.post("/{plugin_id}/disable")
-async def disable_plugin_v2(
-    plugin_id: str,
-    workspace: UserWorkspace = Depends(get_user_workspace),
-    manager: PluginManager = Depends(get_plugin_manager),
-) -> dict[str, Any]:
-    """禁用插件（两层配置系统）"""
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
-
-        # 加载插件配置
-        if workspace.plugins_config is None:
-            await workspace._load_plugins_config()
-
-        # 禁用插件
-        workspace.plugins_config.disable_plugin(plugin_id)
-
-        # 同步更新 PluginManager.registry 中的 settings
-        plugin_config = workspace.plugins_config.plugins.get(plugin_id)
-        if plugin_config:
-            await manager.update_plugin_settings(plugin_id, {"enabled": plugin_config.enabled, "activated": plugin_config.activated, **plugin_config.settings})
-
-        # 保存配置
-        await workspace._save_plugins_config()
-
-        logger.info(f"Plugin {plugin_id} disabled")
-
-        return {"success": True, "plugin_id": plugin_id, "enabled": False}
-
-    except Exception as e:
-        logger.exception(f"Failed to disable plugin {plugin_id}: ")
-        raise HTTPException(status_code=500, detail=f"Failed to disable plugin: {e!s}")
 
 
 @router.delete("/{plugin_id}")

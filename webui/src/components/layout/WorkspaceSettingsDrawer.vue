@@ -19,7 +19,8 @@
         <!-- Workspace Tab (simplified, only basic info) -->
         <el-tab-pane :label="t('workspaceSettings.tabs.workspace')" name="workspace">
           <div class="workspace-config">
-            <el-alert :title="t('workspaceSettings.workspace.description')" type="info" :closable="false" show-icon style="margin-bottom: 20px">
+            <el-alert :title="t('workspaceSettings.workspace.description')" type="info" :closable="false" show-icon
+              style="margin-bottom: 20px">
               <template #default>
                 <p style="margin: 0; font-size: 13px;">
                   {{ t('workspaceSettings.workspace.description') }}
@@ -101,9 +102,13 @@
               <el-table-column label="高级设置" width="180">
                 <template #default="scope">
                   <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                    <el-tag v-if="scope.row.config.config?.diffEnabled || scope.row.config.diffEnabled" size="small" type="info">Diff</el-tag>
-                    <el-tag v-if="scope.row.config.config?.todoListEnabled || scope.row.config.todoListEnabled" size="small" type="info">TODO</el-tag>
-                    <el-tag v-if="scope.row.config.config?.enableReasoningEffort || scope.row.config.enableReasoningEffort" size="small" type="warning">推理</el-tag>
+                    <el-tag v-if="scope.row.config.config?.diffEnabled || scope.row.config.diffEnabled" size="small"
+                      type="info">Diff</el-tag>
+                    <el-tag v-if="scope.row.config.config?.todoListEnabled || scope.row.config.todoListEnabled"
+                      size="small" type="info">TODO</el-tag>
+                    <el-tag
+                      v-if="scope.row.config.config?.enableReasoningEffort || scope.row.config.enableReasoningEffort"
+                      size="small" type="warning">推理</el-tag>
                   </div>
                 </template>
               </el-table-column>
@@ -122,7 +127,8 @@
         <!-- Skills Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.skills')" name="skills">
           <div class="skills-settings">
-            <el-alert :title="t('workspaceSettings.skills.title')" type="info" :closable="false" show-icon style="margin-bottom: 16px;">
+            <el-alert :title="t('workspaceSettings.skills.title')" type="info" :closable="false" show-icon
+              style="margin-bottom: 16px;">
               <template #default>
                 <p style="margin: 0; font-size: 13px;">`
                   {{ t('workspaceSettings.skills.description') }}
@@ -143,7 +149,8 @@
                   </el-icon>
                   {{ t('workspaceSettings.skills.marketInstall') }}
                 </el-button>
-                <el-button type="primary" size="small" @click="loadSkills" :loading="loadingSkills" style="margin-left: 8px;">
+                <el-button type="primary" size="small" @click="loadSkills" :loading="loadingSkills"
+                  style="margin-left: 8px;">
                   <el-icon>
                     <Refresh />
                   </el-icon>
@@ -154,7 +161,8 @@
 
             <!-- 过滤器 -->
             <div style="margin-bottom: 16px; display: flex; gap: 12px;">
-              <el-select v-model="skillsFilter.mode" :placeholder="t('workspaceSettings.skills.filter.mode')" clearable style="width: 150px;" @change="filterSkills">
+              <el-select v-model="skillsFilter.mode" :placeholder="t('workspaceSettings.skills.filter.mode')" clearable
+                style="width: 150px;" @change="filterSkills">
                 <el-option :label="t('workspaceSettings.skills.filter.allModes')" value="" />
                 <el-option label="Code" value="code" />
                 <el-option label="Ask" value="ask" />
@@ -162,19 +170,15 @@
                 <el-option label="Debug" value="debug" />
               </el-select>
 
-              <el-select v-model="skillsFilter.scope" :placeholder="t('workspaceSettings.skills.filter.scope')" clearable style="width: 150px;" @change="filterSkills">
+              <el-select v-model="skillsFilter.scope" :placeholder="t('workspaceSettings.skills.filter.scope')"
+                clearable style="width: 150px;" @change="filterSkills">
                 <el-option :label="t('workspaceSettings.skills.filter.allScopes')" value="" />
                 <el-option :label="t('workspaceSettings.skills.filter.project')" value="project" />
                 <el-option :label="t('workspaceSettings.skills.filter.global')" value="global" />
               </el-select>
 
-              <el-input
-                v-model="skillsFilter.search"
-                :placeholder="t('workspaceSettings.skills.filter.search')"
-                style="width: 250px;"
-                clearable
-                @input="filterSkills"
-              >
+              <el-input v-model="skillsFilter.search" :placeholder="t('workspaceSettings.skills.filter.search')"
+                style="width: 250px;" clearable @input="filterSkills">
                 <template #prefix>
                   <el-icon>
                     <Search />
@@ -191,9 +195,11 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="name" :label="t('workspaceSettings.skills.table.name')" width="200" show-overflow-tooltip />
+              <el-table-column prop="name" :label="t('workspaceSettings.skills.table.name')" width="200"
+                show-overflow-tooltip />
 
-              <el-table-column prop="description" :label="t('workspaceSettings.skills.table.description')" show-overflow-tooltip />
+              <el-table-column prop="description" :label="t('workspaceSettings.skills.table.description')"
+                show-overflow-tooltip />
 
               <el-table-column prop="category" :label="t('workspaceSettings.skills.table.category')" width="120">
                 <template #default="scope">
@@ -216,20 +222,23 @@
               <el-table-column prop="scope" :label="t('workspaceSettings.skills.table.scope')" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.scope === 'project' ? 'warning' : 'success'" size="small">
-                    {{ scope.row.scope === 'project' ? t('workspaceSettings.skills.filter.project') : t('workspaceSettings.skills.filter.global') }}
+                    {{ scope.row.scope === 'project' ? t('workspaceSettings.skills.filter.project') :
+                      t('workspaceSettings.skills.filter.global') }}
                   </el-tag>
                 </template>
               </el-table-column>
             </el-table>
 
-            <el-empty v-if="!loadingSkills && filteredSkills.length === 0" :description="t('workspaceSettings.skills.noSkills')" />
+            <el-empty v-if="!loadingSkills && filteredSkills.length === 0"
+              :description="t('workspaceSettings.skills.noSkills')" />
           </div>
         </el-tab-pane>
 
         <!-- Agents 管理 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.agents')" name="mode-settings">
           <div class="mode-settings">
-            <el-alert :title="t('workspaceSettings.agents.title')" type="info" :closable="false" show-icon style="margin-bottom: 16px;">
+            <el-alert :title="t('workspaceSettings.agents.title')" type="info" :closable="false" show-icon
+              style="margin-bottom: 16px;">
               <template #default>
                 <p style="margin: 0; font-size: 13px;">
                   {{ t('workspaceSettings.agents.description') }}
@@ -260,7 +269,8 @@
                 <template #default="scope">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <span>{{ scope.row.name }}</span>
-                    <el-tag v-if="scope.row.is_default" type="success" size="small">{{ t('workspaceSettings.agents.table.default') }}</el-tag>
+                    <el-tag v-if="scope.row.is_default" type="success" size="small">{{
+                      t('workspaceSettings.agents.table.default') }}</el-tag>
                   </div>
                 </template>
               </el-table-column>
@@ -271,26 +281,32 @@
                 <template #default="scope">
                   <el-tag
                     :type="scope.row.source === 'system' ? 'info' : scope.row.source === 'user' ? 'warning' : 'success'"
-                    size="small"
-                  >
-                    {{ scope.row.source === 'system' ? t('workspaceSettings.agents.sourceTypes.system') : scope.row.source === 'user' ? t('workspaceSettings.agents.sourceTypes.user') : t('workspaceSettings.agents.sourceTypes.workspace') }}
+                    size="small">
+                    {{ scope.row.source === 'system' ? t('workspaceSettings.agents.sourceTypes.system') :
+                      scope.row.source === 'user' ? t('workspaceSettings.agents.sourceTypes.user') :
+                        t('workspaceSettings.agents.sourceTypes.workspace') }}
                   </el-tag>
                 </template>
               </el-table-column>
 
-              <el-table-column prop="description" :label="t('workspaceSettings.agents.table.description')" show-overflow-tooltip />
+              <el-table-column prop="description" :label="t('workspaceSettings.agents.table.description')"
+                show-overflow-tooltip />
 
               <el-table-column :label="t('workspaceSettings.agents.table.actions')" width="280" fixed="right">
                 <template #default="scope">
-                  <el-button size="small" @click="viewModel(scope.row)">{{ t('workspaceSettings.agents.table.view') }}</el-button>
-                  <el-button size="small" type="primary" @click="editMode(scope.row)" :disabled="scope.row.source === 'system'">{{ t('workspaceSettings.agents.table.edit') }}</el-button>
+                  <el-button size="small" @click="viewModel(scope.row)">{{ t('workspaceSettings.agents.table.view')
+                  }}</el-button>
+                  <el-button size="small" type="primary" @click="editMode(scope.row)"
+                    :disabled="scope.row.source === 'system'">{{ t('workspaceSettings.agents.table.edit') }}</el-button>
                   <el-button size="small" type="warning" @click="editModeRules(scope.row)">
                     <el-icon>
                       <Document />
                     </el-icon>
                     Rules
                   </el-button>
-                  <el-button size="small" type="danger" @click="deleteMode(scope.row.slug)" :disabled="scope.row.source === 'system'">{{ t('workspaceSettings.agents.table.delete') }}</el-button>
+                  <el-button size="small" type="danger" @click="deleteMode(scope.row.slug)"
+                    :disabled="scope.row.source === 'system'">{{ t('workspaceSettings.agents.table.delete')
+                    }}</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -299,17 +315,15 @@
 
         <!-- Plugins 管理 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.plugins')" name="plugins">
-          <PluginConfigPanel
-            :workspace-id="props.workspaceId"
-            :can-edit="true"
-            @open-market="openMarketDialog('plugin')"
-          />
+          <PluginConfigPanel :workspace-id="props.workspaceId" :can-edit="true"
+            @open-market="openMarketDialog('plugin')" />
         </el-tab-pane>
 
         <!-- MCP Servers 管理 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.mcpServers')" name="mcp-servers">
           <div class="mcp-settings">
-            <el-alert :title="t('workspaceSettings.mcpServers.title')" type="info" :closable="false" show-icon style="margin-bottom: 16px;">
+            <el-alert :title="t('workspaceSettings.mcpServers.title')" type="info" :closable="false" show-icon
+              style="margin-bottom: 16px;">
               <template #default>
                 <p style="margin: 0; font-size: 13px;">
                   {{ t('workspaceSettings.mcpServers.description') }}
@@ -329,13 +343,16 @@
 
             <el-table :data="mcpServerList" stripe>
               <el-table-column prop="name" :label="t('workspaceSettings.mcpServers.table.name')" width="200" />
-              <el-table-column prop="command" :label="t('workspaceSettings.mcpServers.table.command')" show-overflow-tooltip />
+              <el-table-column prop="command" :label="t('workspaceSettings.mcpServers.table.command')"
+                show-overflow-tooltip />
               <el-table-column prop="cwd" :label="t('workspaceSettings.mcpServers.table.cwd')" width="150" />
               <el-table-column prop="timeout" :label="t('workspaceSettings.mcpServers.table.timeout')" width="100" />
               <el-table-column :label="t('workspaceSettings.mcpServers.table.actions')" width="150" fixed="right">
                 <template #default="scope">
-                  <el-button size="small" @click="editMcpServer(scope.row)">{{ t('workspaceSettings.mcpServers.table.edit') }}</el-button>
-                  <el-button size="small" type="danger" @click="deleteMcpServer(scope.row.name)">{{ t('workspaceSettings.mcpServers.table.delete') }}</el-button>
+                  <el-button size="small" @click="editMcpServer(scope.row)">{{
+                    t('workspaceSettings.mcpServers.table.edit') }}</el-button>
+                  <el-button size="small" type="danger" @click="deleteMcpServer(scope.row.name)">{{
+                    t('workspaceSettings.mcpServers.table.delete') }}</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -370,10 +387,12 @@
                 <el-switch v-model="workspaceConfig.tools.workspace_tools_enabled" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.defaultTimeout')">
-                <el-input-number v-model="workspaceConfig.tools.default_timeout" :min="10" :max="300" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.tools.default_timeout" :min="10" :max="300"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxConcurrentExecutions')">
-                <el-input-number v-model="workspaceConfig.tools.max_concurrent_executions" :min="1" :max="10" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.tools.max_concurrent_executions" :min="1" :max="10"
+                  style="width: 100%" />
               </el-form-item>
 
               <!-- 操作按钮 -->
@@ -413,16 +432,19 @@
                 <el-switch v-model="workspaceConfig.agent.auto_approve_tools" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxConcurrentSubtasks')">
-                <el-input-number v-model="workspaceConfig.agent.max_concurrent_subtasks" :min="1" :max="10" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.agent.max_concurrent_subtasks" :min="1" :max="10"
+                  style="width: 100%" />
               </el-form-item>
 
               <!-- 检查点配置 -->
               <el-divider content-position="left">{{ t('workspaceSettings.workspace.checkpoint') }}</el-divider>
               <el-form-item :label="t('workspaceSettings.workspace.checkpointInterval')">
-                <el-input-number v-model="workspaceConfig.checkpoint.checkpoint_interval" :min="60" :max="3600" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.checkpoint.checkpoint_interval" :min="60" :max="3600"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxCheckpoints')">
-                <el-input-number v-model="workspaceConfig.checkpoint.max_checkpoints" :min="1" :max="50" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.checkpoint.max_checkpoints" :min="1" :max="50"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.enableCompression')">
                 <el-switch v-model="workspaceConfig.checkpoint.enable_compression" />
@@ -431,10 +453,12 @@
                 <el-switch v-model="workspaceConfig.checkpoint.auto_create_enabled" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.minIntervalMinutes')">
-                <el-input-number v-model="workspaceConfig.checkpoint.min_interval_minutes" :min="1" :max="60" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.checkpoint.min_interval_minutes" :min="1" :max="60"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxCheckpointsPerTask')">
-                <el-input-number v-model="workspaceConfig.checkpoint.max_checkpoints_per_task" :min="1" :max="100" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.checkpoint.max_checkpoints_per_task" :min="1" :max="100"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.validationEnabled')">
                 <el-switch v-model="workspaceConfig.checkpoint.validation_enabled" />
@@ -463,22 +487,28 @@
                 <el-switch v-model="workspaceConfig.compression.enabled" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.preserveRecent')">
-                <el-input-number v-model="workspaceConfig.compression.preserve_recent" :min="1" :max="100" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.compression.preserve_recent" :min="1" :max="100"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxTokens')">
-                <el-input-number v-model="workspaceConfig.compression.max_tokens" :min="1000" :max="200000" :step="1000" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.compression.max_tokens" :min="1000" :max="200000" :step="1000"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.compressionThreshold')">
-                <el-slider v-model="workspaceConfig.compression.compression_threshold" :min="0" :max="1" :step="0.1" style="width: 100%" />
+                <el-slider v-model="workspaceConfig.compression.compression_threshold" :min="0" :max="1" :step="0.1"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.aggressiveThreshold')">
-                <el-slider v-model="workspaceConfig.compression.aggressive_threshold" :min="0" :max="1" :step="0.1" style="width: 100%" />
+                <el-slider v-model="workspaceConfig.compression.aggressive_threshold" :min="0" :max="1" :step="0.1"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.pageSize')">
-                <el-input-number v-model="workspaceConfig.compression.page_size" :min="5" :max="50" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.compression.page_size" :min="5" :max="50"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxActivePages')">
-                <el-input-number v-model="workspaceConfig.compression.max_active_pages" :min="1" :max="20" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.compression.max_active_pages" :min="1" :max="20"
+                  style="width: 100%" />
               </el-form-item>
 
               <!-- 记忆集成 -->
@@ -499,19 +529,24 @@
                 <el-switch v-model="workspaceConfig.memory.enabled" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.virtualPageSize')">
-                <el-input-number v-model="workspaceConfig.memory.virtual_page_size" :min="500" :max="5000" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.memory.virtual_page_size" :min="500" :max="5000"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxActivePages')">
-                <el-input-number v-model="workspaceConfig.memory.max_active_pages" :min="1" :max="20" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.memory.max_active_pages" :min="1" :max="20"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.defaultEnergy')">
-                <el-slider v-model="workspaceConfig.memory.default_energy" :min="0" :max="1" :step="0.1" style="width: 100%" />
+                <el-slider v-model="workspaceConfig.memory.default_energy" :min="0" :max="1" :step="0.1"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.energyDecayRate')">
-                <el-slider v-model="workspaceConfig.memory.energy_decay_rate" :min="0" :max="1" :step="0.05" style="width: 100%" />
+                <el-slider v-model="workspaceConfig.memory.energy_decay_rate" :min="0" :max="1" :step="0.05"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.minEnergyThreshold')">
-                <el-slider v-model="workspaceConfig.memory.min_energy_threshold" :min="0" :max="1" :step="0.1" style="width: 100%" />
+                <el-slider v-model="workspaceConfig.memory.min_energy_threshold" :min="0" :max="1" :step="0.1"
+                  style="width: 100%" />
               </el-form-item>
 
               <!-- 操作按钮 -->
@@ -545,10 +580,12 @@
                 <el-input v-model="workspaceConfig.logging.dir" placeholder="~/.dawei/logs" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.maxFileSize')">
-                <el-input-number v-model="workspaceConfig.logging.max_file_size" :min="1" :max="100" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.logging.max_file_size" :min="1" :max="100"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.backupCount')">
-                <el-input-number v-model="workspaceConfig.logging.backup_count" :min="1" :max="20" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.logging.backup_count" :min="1" :max="20"
+                  style="width: 100%" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.consoleOutput')">
                 <el-switch v-model="workspaceConfig.logging.console_output" />
@@ -566,7 +603,8 @@
                 <el-switch v-model="workspaceConfig.monitoring.prometheus_enabled" />
               </el-form-item>
               <el-form-item :label="t('workspaceSettings.workspace.prometheusPort')">
-                <el-input-number v-model="workspaceConfig.monitoring.prometheus_port" :min="1024" :max="65535" style="width: 100%" />
+                <el-input-number v-model="workspaceConfig.monitoring.prometheus_port" :min="1024" :max="65535"
+                  style="width: 100%" />
               </el-form-item>
 
               <!-- 操作按钮 -->
@@ -631,7 +669,8 @@
                 </el-row>
 
                 <el-form-item>
-                  <el-button @click="loadUIEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh') }}</el-button>
+                  <el-button @click="loadUIEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
+                  }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -668,12 +707,14 @@
                 <el-row :gutter="20">
                   <el-col :span="12">
                     <el-form-item :label="t('workspaceSettings.executionEnvironment.system.memoryTotal')">
-                      <el-input-number v-model="systemEnvironments.memory_total" :min="0" disabled style="width: 100%" />
+                      <el-input-number v-model="systemEnvironments.memory_total" :min="0" disabled
+                        style="width: 100%" />
                     </el-form-item>
                   </el-col>
                   <el-col :span="12">
                     <el-form-item :label="t('workspaceSettings.executionEnvironment.system.memoryAvailable')">
-                      <el-input-number v-model="systemEnvironments.memory_available" :min="0" disabled style="width: 100%" />
+                      <el-input-number v-model="systemEnvironments.memory_available" :min="0" disabled
+                        style="width: 100%" />
                     </el-form-item>
                   </el-col>
                 </el-row>
@@ -686,13 +727,15 @@
                   </el-col>
                   <el-col :span="12">
                     <el-form-item :label="t('workspaceSettings.executionEnvironment.system.diskAvailable')">
-                      <el-input-number v-model="systemEnvironments.disk_available" :min="0" disabled style="width: 100%" />
+                      <el-input-number v-model="systemEnvironments.disk_available" :min="0" disabled
+                        style="width: 100%" />
                     </el-form-item>
                   </el-col>
                 </el-row>
 
                 <el-form-item>
-                  <el-button @click="loadSystemEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh') }}</el-button>
+                  <el-button @click="loadSystemEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
+                  }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -702,30 +745,18 @@
         <el-tab-pane :label="t('workspaceSettings.tabs.privacy')" name="privacy">
           <el-scrollbar max-height="calc(100vh - 200px)">
             <!-- 使用 PrivacyConfigSimplified 简化版组件 -->
-            <PrivacyConfigSimplified
-              :workspace-id="workspaceId"
-              :initial-config="workspaceConfig.analytics"
-              @config-changed="handlePrivacyConfigChanged"
-            />
+            <PrivacyConfigSimplified :workspace-id="workspaceId" :initial-config="workspaceConfig.analytics"
+              @config-changed="handlePrivacyConfigChanged" />
           </el-scrollbar>
         </el-tab-pane>
       </el-tabs>
     </div>
 
     <!-- Plugin Configuration Dialog -->
-    <el-dialog
-      v-model="pluginConfigDialogVisible"
-      :title="`配置插件: ${selectedPlugin?.name || ''}`"
-      width="700px"
-      :close-on-click-modal="false"
-    >
-      <PluginConfigForm
-        v-if="pluginConfigDialogVisible && selectedPlugin"
-        :workspace-id="props.workspaceId"
-        :plugin-id="selectedPlugin.id"
-        @saved="handlePluginConfigSaved"
-        @cancel="pluginConfigDialogVisible = false"
-      />
+    <el-dialog v-model="pluginConfigDialogVisible" :title="`配置插件: ${selectedPlugin?.name || ''}`" width="700px"
+      :close-on-click-modal="false">
+      <PluginConfigForm v-if="pluginConfigDialogVisible && selectedPlugin" :workspace-id="props.workspaceId"
+        :plugin-id="selectedPlugin.id" @saved="handlePluginConfigSaved" @cancel="pluginConfigDialogVisible = false" />
     </el-dialog>
 
     <!-- Provider 编辑/创建对话框 -->
@@ -777,7 +808,8 @@
           </el-form-item>
 
           <el-form-item label="模型 ID" required>
-            <el-input v-model="providerForm.openAiModelId" placeholder="gpt-4o, deepseek-chat, claude-3-5-sonnet-20241022" />
+            <el-input v-model="providerForm.openAiModelId"
+              placeholder="gpt-4o, deepseek-chat, claude-3-5-sonnet-20241022" />
           </el-form-item>
 
           <el-form-item label="自定义 Headers">
@@ -1042,19 +1074,15 @@
     </el-dialog>
 
     <!-- Market Dialog -->
-    <MarketDialog
-      v-model="marketDialogVisible"
-      :workspace-id="workspaceId || ''"
-      :initial-type="marketResourceType"
-      @closed="loadSettings"
-    />
+    <MarketDialog v-model="marketDialogVisible" :workspace-id="workspaceId || ''" :initial-type="marketResourceType"
+      @closed="loadSettings" />
   </el-drawer>
 </template>
 
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
@@ -2223,6 +2251,12 @@ const openMarketDialog = (type: ResourceType) => {
 };
 
 // ==================== Plugins 管理方法 ====================
+
+const handlePrivacyConfigChanged = (config: unknown) => {
+  if (workspaceConfig.value.analytics) {
+    workspaceConfig.value.analytics = config as typeof workspaceConfig.value.analytics;
+  }
+};
 
 const loadPlugins = async () => {
   if (!props.workspaceId) {

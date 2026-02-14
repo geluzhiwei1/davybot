@@ -208,14 +208,8 @@ export const pluginsApi = {
   async getConfigSchema(workspaceId: string, pluginId: string): Promise<PluginConfigSchema> {
     console.log('[pluginsApi.getConfigSchema] Input pluginId:', pluginId, 'Type:', typeof pluginId)
 
-    const params = new URLSearchParams()
-    params.append('plugin_id', pluginId)
-
-    console.log('[pluginsApi.getConfigSchema] URLSearchParams toString:', params.toString())
-
     const response = await httpClient.get<PluginConfigSchema>(
-      `${BASE_URL}/${workspaceId}/plugin-config/schema`,
-      params
+      `${BASE_URL}/${workspaceId}/plugins/${pluginId}/schema`
     )
 
     return response
@@ -229,9 +223,9 @@ export const pluginsApi = {
     pluginId: string,
     config: Record<string, unknown>
   ): Promise<SaveConfigResponse> {
-    const response = await httpClient.put<SaveConfigResponse>(
-      `${BASE_URL}/${workspaceId}/plugin-config/config`,
-      { plugin_id: pluginId, config }
+    const response = await httpClient.post<SaveConfigResponse>(
+      `${BASE_URL}/${workspaceId}/plugins/${pluginId}/config`,
+      { config }
     )
 
     return response

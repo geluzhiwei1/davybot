@@ -284,9 +284,6 @@ class PluginsConfig(BaseModel):
     """
 
     plugins: dict[str, PluginInstanceConfig] = Field(default_factory=dict)
-    max_plugins: int = 50
-    auto_discovery: bool = True
-    enabled: bool = True
 
     def get_plugin_config(self, plugin_id: str) -> PluginInstanceConfig | None:
         """获取指定插件的配置

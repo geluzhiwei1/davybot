@@ -169,17 +169,17 @@ const loadConfigSchema = async () => {
       }
 
       // Merge with existing config (existing config takes precedence)
-      // existing_config is the full config object, not nested
+      // existing_config is the full config object with nested settings field
       formData.settings = {
         ...defaultSettings,
-        ...(response.existing_config || {})
+        ...(response.existing_config?.settings || {})
       };
 
       console.log('[PluginSettingsDialog] Initialized settings:', formData.settings);
     }
   } catch (error: unknown) {
     console.error('[PluginSettingsDialog] Failed to load config schema:', error);
-    ElMessage.warning(t('workspaceSettings.plugins.pluginConfig.loadSchemaError') + ': ' + (error.message || 'Unknown error'));
+    ElMessage.warning(t('workspaceSettings.plugins.pluginConfig.loadSchemaError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     loadingSchema.value = false;
   }
@@ -225,7 +225,7 @@ const handleSubmit = async () => {
   try {
     emit('save', props.pluginId, formData.settings);
   } catch (error: unknown) {
-    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.saveError') + ': ' + (error.message || 'Unknown error'));
+    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.saveError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     saving.value = false;
   }

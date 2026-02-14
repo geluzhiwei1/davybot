@@ -399,9 +399,6 @@ export interface PluginInstanceConfig {
 
 export interface PluginsConfig {
   plugins: Record<string, PluginInstanceConfig>;
-  max_plugins: number;
-  auto_discovery: boolean;
-  enabled: boolean;
 }
 
 export interface PluginsConfigResponse {

@@ -3,9 +3,11 @@
 
 """流式消息处理器"""
 
+import asyncio
 import contextlib
 import json
 import logging
+import time
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -258,11 +260,13 @@ class StreamProcessor:
     async def process_stream(
         self,
         stream: AsyncGenerator[str, None],
+        idle_timeout: float = 60.0,
     ) -> AsyncGenerator[StreamMessages, None]:
         """处理流式数据
 
         Args:
             stream: 原始流式数据生成器
+            idle_timeout: 空闲超时时间（秒），默认60秒。如果超过此时间没有收到任何数据，抛出超时错误。
 
         Yields:
             解析后的流式消息
@@ -271,12 +275,38 @@ class StreamProcessor:
             ValueError: 如果数据格式无效
             RuntimeError: 如果流式处理失败
             UnicodeDecodeError: 如果字节解码失败
+            asyncio.TimeoutError: 如果空闲超时
 
         """
         last_chunk = None
+        last_data_time = time.monotonic()
+        idle_timeout_event = asyncio.Event()
+
+        async def check_idle_timeout_task():
+            """后台任务：定期检查空闲超时"""
+            while not idle_timeout_event.is_set():
+                await asyncio.sleep(1)
+                if time.monotonic() - last_data_time > idle_timeout:
+                    idle_timeout_event.set()
+
+        idle_task: asyncio.Task | None = None
 
         try:
+            # 启动 idle 超时检测后台任务
+            idle_task = asyncio.create_task(check_idle_timeout_task())
+
             async for line in stream:
+                # 检查是否有空闲超时
+                if idle_timeout_event.is_set():
+                    raise asyncio.TimeoutError(
+                        f"No data received for {idle_timeout}s (idle timeout)"
+                    )
+
+                # 每次收到数据，重置空闲计时器
+                last_data_time = time.monotonic()
+                # 重置超时事件（如果之前设置过）
+                idle_timeout_event.clear()
+
                 # 解码字节行
                 try:
                     line = line.decode("utf-8").strip() if isinstance(line, bytes) else line.strip()
@@ -315,6 +345,16 @@ class StreamProcessor:
             except Exception as e:
                 raise RuntimeError(f"Failed to generate complete message: {e}")
 
+        except asyncio.TimeoutError:
+            # 空闲超时 - 重新抛出
+            logger.warning(f"Idle timeout: no data received for {idle_timeout}s")
+            raise
         except Exception:
             # 重新抛出已处理的异常
             raise
+        finally:
+            # 确保 idle 超时检测任务被取消
+            if idle_task is not None:
+                idle_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await idle_task

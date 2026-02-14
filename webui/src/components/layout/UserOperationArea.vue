@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <!-- Agent 控制面板 -->
@@ -19,12 +19,7 @@
 
     <div class="agent-control-buttons">
       <!-- 始终显示停止按钮 -->
-      <el-button
-        type="danger"
-        :icon="Close"
-        @click="handleStopAgent"
-        size="small"
-      >
+      <el-button type="danger" :icon="Close" @click="handleStopAgent" size="small">
         停止
       </el-button>
     </div>
@@ -32,13 +27,7 @@
 
   <!-- 其他操作确认区域 -->
   <div v-if="showOperations" class="user-operation-area">
-    <el-alert
-      :title="operationMessage"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="operation-alert"
-    >
+    <el-alert :title="operationMessage" type="warning" :closable="false" show-icon class="operation-alert">
       <template #default>
         <div class="operation-content">
           <div v-if="operationDetails" class="operation-details">
@@ -59,6 +48,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useAgentStore } from '@/stores/agent'
+import { useParallelTasksStore } from '@/stores/parallelTasks'
 import { storeToRefs } from 'pinia'
 import { Loading, CircleCheck, Close } from '@element-plus/icons-vue'
 
@@ -70,12 +61,18 @@ interface Operation {
 }
 
 const chatStore = useChatStore()
+const agentStore = useAgentStore()
+const parallelTasksStore = useParallelTasksStore()
 const { agentStatus, currentTaskId } = storeToRefs(chatStore)
 
 const currentOperation = ref<Operation | null>(null)
 
 // Agent 控制相关
-const showAgentControls = computed(() => agentStatus.value.isActive)
+// 使用 parallelTasksStore.hasActiveTasks 判断是否有活跃任务，避免子任务场景下提前隐藏
+const showAgentControls = computed(() =>
+  parallelTasksStore.hasActiveTasks ||
+  agentStatus.value.isActive
+)
 
 const agentStatusText = computed(() => {
   if (agentStatus.value.isActive) return 'Agent 执行中'
@@ -104,12 +101,22 @@ const confirmButtonText = computed(() => {
 
 // Agent 控制方法
 const handleStopAgent = async () => {
-  if (!currentTaskId.value) {
-    console.error('No active task to stop')
+  const activeTasks = parallelTasksStore.activeTasks
+
+  if (activeTasks.length === 0) {
+    if (agentStatus.value.isActive) {
+      agentStore.stopAgent()
+      parallelTasksStore.clearAllTasks()
+    } else {
+      console.warn('没有活跃任务可停止')
+    }
     return
   }
-  console.log('停止 Agent:', currentTaskId.value)
-  await chatStore.stopAgent(currentTaskId.value)
+
+  // 停止所有活跃任务
+  for (const task of activeTasks) {
+    await chatStore.stopAgent(task.taskId)
+  }
 }
 
 // 操作确认方法
@@ -205,6 +212,7 @@ defineExpose({
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -258,6 +266,7 @@ defineExpose({
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

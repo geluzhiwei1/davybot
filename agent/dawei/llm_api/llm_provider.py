@@ -578,10 +578,6 @@ class LLMProvider(ILLMService):
         stream_response = llm_instance.astream_chat_completion(messages=messages, **kwargs)
 
         async for message in stream_response:
-            # 【DEBUG】记录收到的stream消息类型
-            logger.info(
-                f"[STREAM_CALLBACK] Received message type: {type(message).__name__}, ContentMessage: {isinstance(message, ContentMessage)}",
-            )
 
             # stream_response 已经是解析后的 StreamMessages 对象，无需再次解析
             await callback(message)
@@ -589,9 +585,6 @@ class LLMProvider(ILLMService):
             if isinstance(message, ContentMessage):
                 full_content += message.content
                 self._stream_state.current_content = full_content
-                logger.info(
-                    f"[STREAM_CALLBACK] ContentMessage: content='{message.content[:50]}...', full_length={len(full_content)}",
-                )
 
                 # 注意：不需要在这里发射事件，因为task_node_executor已经发射了CONTENT_STREAM事件
                 # 避免重复发射导致TUI显示重复内容
@@ -599,14 +592,9 @@ class LLMProvider(ILLMService):
                 all_tool_calls = message.all_tool_calls
                 for tool_call_obj in all_tool_calls:
                     self._stream_state.current_tool_calls[tool_call_obj.tool_call_id] = tool_call_obj
-                logger.info(f"[STREAM_CALLBACK] ToolCallMessage: {len(all_tool_calls)} tools")
             elif isinstance(message, UsageMessage):
                 self._stream_state.token_usage = message.data
-                logger.info(f"[STREAM_CALLBACK] UsageMessage: {message.data}")
             elif isinstance(message, CompleteMessage):
-                logger.info(
-                    f"[STREAM_CALLBACK] CompleteMessage: finish_reason={message.finish_reason}",
-                )
                 break
 
         result = {

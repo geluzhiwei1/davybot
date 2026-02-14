@@ -79,7 +79,6 @@ class Config:
 
         # 超时配置
         self.tool_execution_timeout = 60
-        self.task_execution_timeout = 3600  # 1小时
 
         # 日志配置
         self.log_level = "INFO"
@@ -144,7 +143,6 @@ class Config:
             "default_ttl",
             "enable_auto_compression",
             "tool_execution_timeout",
-            "task_execution_timeout",
             "log_level",
             "enable_performance_logging",
             "enable_telemetry",
@@ -200,7 +198,6 @@ class Config:
             "max_messages",
             "default_ttl",
             "tool_execution_timeout",
-            "task_execution_timeout",
             "max_concurrent_subtasks",
         }
 
@@ -239,7 +236,6 @@ class Config:
             f"{prefix}DEFAULT_TTL": "default_ttl",
             f"{prefix}ENABLE_AUTO_COMPRESSION": "enable_auto_compression",
             f"{prefix}TOOL_EXECUTION_TIMEOUT": "tool_execution_timeout",
-            f"{prefix}TASK_EXECUTION_TIMEOUT": "task_execution_timeout",
             f"{prefix}LOG_LEVEL": "log_level",
             f"{prefix}ENABLE_PERFORMANCE_LOGGING": "enable_performance_logging",
             f"{prefix}ENABLE_TELEMETRY": "enable_telemetry",
@@ -411,8 +407,6 @@ class Config:
         errors = []
         if self.tool_execution_timeout < 1:
             errors.append("tool_execution_timeout must be >= 1 second")
-        if self.task_execution_timeout < 1:
-            errors.append("task_execution_timeout must be >= 1 second")
         return {"timeout": errors} if errors else {}
 
     def _validate_logging_config(self) -> dict[str, list[str]]:
@@ -473,7 +467,6 @@ class Config:
             "default_ttl",
             "enable_auto_compression",
             "tool_execution_timeout",
-            "task_execution_timeout",
             "log_level",
             "enable_performance_logging",
             "enable_telemetry",
