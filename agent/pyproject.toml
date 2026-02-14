@@ -1,0 +1,207 @@
+[project]
+name = "dawei-agent"
+version = "0.1.0"
+description = "Dawei AI Assistant - Server Package (Backend + Frontend)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Proprietary"}
+authors = [
+    {name = "Dawei Team", email = "contact@dawei.com"}
+]
+keywords = ["patent", "ai", "agent", "llm", "fastapi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: FastAPI",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "aiofiles",
+    "aiohttp",
+    "PyYAML",
+    "requests>=2.31.0",
+    "python-multipart>=0.0.21",
+    "jinja2>=3.1.0",
+    "textual>=7.5.0",
+    "jsonschema>=4.20.0",
+    "click>=8.1.0",
+    "davybot-market-cli>=0.1.0",
+    "python-dotenv",
+    "python-docx",
+    "PyMuPDF",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "flake8>=7.3.0",
+    "debugpy>=1.8.19",
+    # Code formatting and linting
+    "ruff>=0.8.0",
+    # Type checking
+    "mypy>=1.10.0",
+    "types-requests",
+    "types-PyYAML",
+    "types-aiofiles",
+    "pre-commit>=3.6.0",
+]
+
+docs = [
+    "python-docx",
+    "PyMuPDF",
+]
+all = [
+    "docker",
+    "prometheus_client"
+]
+
+[project.urls]
+Homepage = "https://github.com/geluzhiwei1/davybot.git"
+Documentation = "https://github.com/geluzhiwei1/davybot.git"
+Repository = "https://github.com/geluzhiwei1/davybot.git"
+
+[project.scripts]
+# Main CLI entry point (unified command)
+dawei = "dawei.cli.dawei:main"
+
+# Legacy command (deprecated, use 'dawei server' instead)
+dawei-server = "dawei.server:main"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-data = {dawei = ["*.yaml", "*.yml", "json/**/*.json", "frontend/**/*"]}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dawei*"]
+
+# ========== Ruff Configuration ==========
+[tool.ruff]
+target-version = "py312"
+indent-width = 4
+line-length = 320
+
+[tool.ruff.lint]
+# Enable pycodestyle (E, W), Pyflakes (F), isort (I), and more
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "DTZ",    # flake8-datetimez
+    "T10",    # flake8-debugger
+    "EXE",    # flake8-executable
+    "ISC",    # flake8-implicit-str-concat
+    "ICN",    # flake8-import-conventions
+    "PIE",    # flake8-pie
+    "PYI",    # flake8-pyi
+    "PT",     # flake8-pytest-style
+    "Q",      # flake8-quotes
+    "RSE",    # flake8-raise
+    "RET",    # flake8-return
+    "SIM",    # flake8-simplify
+    "TID",    # flake8-tidy-imports
+    "TCH",    # flake8-type-checking
+    "ARG",    # flake8-unused-arguments
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate
+    "PL",     # Pylint
+    "TRY",    # tryceratops
+]
+
+ignore = [
+    "B015",     # pointless-comparison (assertion logic)
+    "DTZ003",   # call-datetime-utcnow (legacy code)
+    "DTZ005",   # call-datetime-now-without-tzinfo (legacy code)
+    "DTZ901",   # datetime-min-without-timezone (default values)
+    "E501",     # line-too-long (already set to 320)
+    "E721",     # type-comparison (valid checks)
+    "E402",     # module-import-not-at-top-of-file (lazy loading, circular imports)
+    "PLC0415",  # import-outside-top-level (lazy loading, conditional imports)
+    "PLR0911", # too-many-return-statements (complex logic)
+    "PLR0912", # too-many-branches (complex business logic)
+    "PLR0913", # too many arguments
+    "PLR0915", # too-many-statements (complex functions)
+    "PLR2004",  # magic-value-comparison (values documented in error messages)
+    "PLW0603",  # global-statement (singleton pattern)
+    "PLW1510",  # subprocess-run-without-check (intentional)
+    "PLW2901",  # redefined-loop-name (loop variable shadowing)
+    "PLW0602",  # global-variable-not-assigned (type hints)
+    "PLW0711",  # binary-op-exception (exception handling)
+    "PLW0127",  # self-assigning-variable (assertions)
+    "PLE0704",  # misplaced-bare-raise (re-raising)
+    "PLE1205",  # logging-too-many-args (version compatibility)
+    "N802",     # invalid-function-name (naming conventions)
+    "N806",     # non-lowercase-variable-in-function (framework requirements)
+    "N815",     # mixed-case-variable-in-class-scope (Pydantic API contract)
+    "ARG001",   # unused-function-argument (interface compatibility)
+    "ARG002",   # unused-method-argument (interface compatibility)
+    "ARG003",   # unused-class-method-argument (interface compatibility)
+    "ARG004",   # unused-static-method-argument (interface compatibility)
+    "B008",     # function-call-in-default-argument (FastAPI Depends)
+    "B007",     # unused-loop-control-variable (intentional)
+    "B025",     # duplicate-try-block-exception (try-except-try pattern)
+    "B027",     # empty-method-without-abstract-decorator (overriding)
+    "B030",     # except-with-non-exception-classes (exception hierarchy)
+    "DTZ006",   # call-datetime-fromtimestamp (intentional)
+    "F401",     # unused-import (re-exports, lazy loading)
+    "F821",     # undefined-name (Windows API, dynamic imports)
+    "F822",     # undefined-export (re-exports)
+    "F402",     # import-shadowed-by-loop-var (intentional)
+    "F403",     # undefined-local-with-import-star (re-exports)
+    "F811",     # redefined-while-unused (conditional imports)
+    "TRY002",   # raise-vanilla-class (custom exceptions)
+    "W293",     # blank-line-with-whitespace (editors)
+    "PTH109",  # os-getcwd (pathlib not needed)
+    "SIM102",   # collapsible-if (readability)
+    "SIM103",   # needless-bool (readability)
+    "SIM105",  # suppressible-exception (pass)
+    "SIM108",  # if-else-block-instead-of-if-exp (readability)
+    "TRY003",  # long exception messages
+    "TRY004",   # type-check-without-type-error (valid checks)
+    "TRY300",   # try-consider-else (requires manual refactoring)
+    "TRY301",   # raise-within-try (requires manual refactoring)
+    "TRY401",   # verbose-log-message (variable needed for raise-from)
+    "TRY203",  # useless-try-except (readability)
+    "UP007",    # non-pep604-annotation-union (compatibility)
+    "ERA001",   # commented-out-code (may contain useful comments)
+    "PIE796",   # non-unique-enums (Python enum behavior)
+    "B904",     # raise-without-from (needs manual review)
+    "ISC001",  # conflict with formatter
+    "ANN",     # Missing type annotations (gradual migration)
+    "D100",    # Missing docstring in public module
+    "D101",    # Missing docstring in public class
+    "D102",    # Missing docstring in public method
+    "D103",    # Missing docstring in public function
+    "D104",    # Missing docstring in public package
+    "D105",    # Missing docstring in magic method
+    "D106",    # Missing docstring in public nested class
+    "D107",    # Missing docstring in __init__
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports
+"tests/**/*.py" = ["ARG001", "PLR2004"]  # unused args in tests
