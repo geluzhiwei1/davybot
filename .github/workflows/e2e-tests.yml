@@ -1,0 +1,221 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [master, main, develop]
+    paths:
+      - 'agent/**'
+      - 'webui/**'
+      - 'shared/**'
+      - '.github/workflows/e2e-tests.yml'
+  pull_request:
+    branches: [master, main, develop]
+    paths:
+      - 'agent/**'
+      - 'webui/**'
+      - 'shared/**'
+      - '.github/workflows/e2e-tests.yml'
+  schedule:
+    # Run E2E tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-tests:
+    name: E2E Tests (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ========== Backend Setup ==========
+      - name: Install UV
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache UV packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            agent/.venv
+            ~/.uv/cache
+          key: ${{ runner.os }}-uv-backend-${{ hashFiles('agent/pyproject.toml') }}
+
+      - name: Install backend dependencies
+        working-directory: ./agent
+        run: |
+          uv pip install -e ".[dev]"
+
+      - name: Create test workspace
+        working-directory: ./agent
+        run: |
+          mkdir -p ../workspaces/test-e2e-workspace
+
+      - name: Start backend server
+        working-directory: ./agent
+        run: |
+          uv run uvicorn dawei.server:app --host 0.0.0.0 --port 8465 > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+          # Wait for backend to start
+          for i in {1..30}; do
+            if curl -s http://localhost:8465/docs > /dev/null; then
+              echo "Backend started successfully"
+              break
+            fi
+            echo "Waiting for backend... ($i/30)"
+            sleep 2
+          done
+
+      # ========== Frontend Setup ==========
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Install frontend dependencies
+        working-directory: ./webui
+        run: |
+          pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: ./webui
+        run: |
+          pnpm test:e2e:install
+
+      - name: Start frontend dev server
+        working-directory: ./webui
+        run: |
+          pnpm dev > /tmp/frontend.log 2>&1 &
+          echo $! > /tmp/frontend.pid
+          # Wait for frontend to start
+          for i in {1..30}; do
+            if curl -s http://localhost:8460 > /dev/null; then
+              echo "Frontend started successfully"
+              break
+            fi
+            echo "Waiting for frontend... ($i/30)"
+            sleep 2
+          done
+
+      # ========== Run E2E Tests ==========
+      - name: Run E2E tests
+        working-directory: ./webui
+        run: |
+          pnpm test:e2e --project=chromium --reporter=list
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            webui/test-results/
+            webui/playwright-report/
+          retention-days: 7
+
+      - name: Upload E2E screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: webui/test-results/**/*.png
+          retention-days: 7
+
+      - name: Upload backend logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-logs
+          path: /tmp/backend.log
+          retention-days: 3
+
+      - name: Upload frontend logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-logs
+          path: /tmp/frontend.log
+          retention-days: 3
+
+      - name: Cleanup processes
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill $(cat /tmp/backend.pid) || true
+          fi
+          if [ -f /tmp/frontend.pid ]; then
+            kill $(cat /tmp/frontend.pid) || true
+          fi
+
+  e2e-smoke-tests:
+    name: E2E Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only run smoke tests on push to main branches
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install UV
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend dependencies
+        working-directory: ./agent
+        run: |
+          uv pip install -e ".[dev]"
+          mkdir -p ../workspaces/test-e2e-workspace
+          uv run uvicorn dawei.server:app --host 0.0.0.0 --port 8465 > /tmp/backend.log 2>&1 &
+          sleep 10
+
+      - name: Setup pnpm and Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Install frontend dependencies and Playwright
+        working-directory: ./webui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test:e2e:install
+
+      - name: Start frontend
+        working-directory: ./webui
+        run: |
+          pnpm dev > /tmp/frontend.log 2>&1 &
+          sleep 10
+
+      - name: Run smoke tests
+        working-directory: ./webui
+        run: |
+          pnpm test:e2e e2e/debug-page-load.spec.ts --project=chromium
+          pnpm test:e2e e2e/at-command-skills.spec.ts --project=chromium

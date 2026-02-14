@@ -1,0 +1,143 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [master, main, develop]
+    paths:
+      - 'webui/**'
+      - 'shared/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [master, main, develop]
+    paths:
+      - 'webui/**'
+      - 'shared/**'
+      - '.github/workflows/frontend-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint Frontend Code
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./webui
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: |
+          pnpm lint
+
+      - name: Run type check
+        run: |
+          pnpm type-check
+
+  test:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: ./webui
+
+    strategy:
+      matrix:
+        node-version: ['20', '22']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+
+      - name: Run unit tests
+        run: |
+          pnpm test --run
+
+      - name: Run tests with coverage
+        if: matrix.node-version == '22'
+        run: |
+          pnpm test:coverage
+
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '22'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./webui/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+
+  build:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    defaults:
+      run:
+        working-directory: ./webui
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: |
+          pnpm build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: webui/dist/
+          retention-days: 7
