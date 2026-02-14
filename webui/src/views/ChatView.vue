@@ -198,13 +198,39 @@ const handleSwitchWorkspace = () => {
   router.push('/workspaces');
 };
 
-// 删除未使用的函数
-// const _handleCloseFile = (fileId: string) => { ... }
+const handleCloseFile = (fileId: string) => {
+  const fileToClose = openFiles.value.find(f => f.id === fileId);
+  if (!fileToClose) {
+    console.warn('[ChatView] File not found in openFiles:', fileId);
+    return;
+  }
+
+  // 如果是媒体文件（blob URL），需要释放资源
+  if (['image', 'video', 'audio'].includes(fileToClose.type)) {
+    try {
+      URL.revokeObjectURL(fileToClose.content);
+    } catch (error) {
+      console.warn('[ChatView] Failed to revoke blob URL:', error);
+    }
+  }
+
+  // 从 openFiles 数组中移除文件
+  openFiles.value = openFiles.value.filter(f => f.id !== fileId);
+
+  // 如果关闭的是当前激活的文件，需要切换到其他文件
+  if (currentActiveFileId.value === fileId) {
+    // 优先选择最后一个打开的文件
+    if (openFiles.value.length > 0) {
+      currentActiveFileId.value = openFiles.value[openFiles.value.length - 1].id;
+    } else {
+      currentActiveFileId.value = null;
+    }
+  }
+};
 
 // 添加全局测试函数（仅用于开发调试）
 if (import.meta.env.DEV) {
   (window as unknown).testFollowupDialog = () => {
-    console.log('========== 手动触发测试对话框 ==========');
     followupData.value = {
       question: '这是一个测试问题：你的名字是什么？',
       suggestions: ['张三', '李四', '王五'],
@@ -212,9 +238,6 @@ if (import.meta.env.DEV) {
       taskId: 'test-task-id'
     };
     showFollowupDialog.value = true;
-    console.log('showFollowupDialog 设置为:', showFollowupDialog.value);
-    console.log('followupData:', followupData.value);
-    console.log('=========================================');
   };
 }
 
@@ -223,20 +246,14 @@ const isRightPanelVisible = computed(() => openFiles.value.length > 0);
 // 检查 LLM 配置，如果为空则自动打开设置
 const checkLLMConfiguration = async () => {
   if (!chatStore.workspaceId) {
-    console.log('[ChatView] No workspace ID, skipping LLM configuration check');
     return;
   }
 
   try {
-    console.log('[ChatView] Checking LLM configuration...');
-
     // 使用新的 API 获取所有级别的 LLM 配置（用户级和工作区级）
     const response = await apiManager.getWorkspacesApi().getLLMSettingsAllLevels(chatStore.workspaceId);
     const userConfigs = response.settings.user || [];
     const workspaceConfigs = response.settings.workspace || [];
-
-    console.log('[ChatView] User LLM configs:', userConfigs.length);
-    console.log('[ChatView] Workspace LLM configs:', workspaceConfigs.length);
 
     // 检查是否有任何 LLM provider 配置（用户级或工作区级）
     const hasConfigs = userConfigs.length > 0 || workspaceConfigs.length > 0;
@@ -257,8 +274,6 @@ const checkLLMConfiguration = async () => {
           showClose: true
         });
       }, 500);
-    } else {
-      console.log('[ChatView] LLM configuration check passed');
     }
   } catch (error) {
     console.error('[ChatView] Failed to check LLM configuration:', error);
@@ -268,16 +283,6 @@ const checkLLMConfiguration = async () => {
 
 // 在组件挂载时立即打印API配置
 onMounted(async () => {
-  const apiBaseUrl = getApiBaseUrl();
-  console.log('='.repeat(60));
-  console.log('[ChatView] ========== Component Mounted ==========');
-  console.log('[ChatView] Workspace ID:', chatStore.workspaceId);
-  console.log('[ChatView] API Base URL:', apiBaseUrl);
-  console.log('[ChatView] Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-  console.log('[ChatView] Is Tauri:', import.meta.env.CLIENT_TAWSI ?? 'false');
-  console.log('[ChatView] Expected API URL:', apiBaseUrl === '/api' ? '✅ /api (correct for Web dev mode)' : `❌ ${apiBaseUrl} (should be /api)`);
-  console.log('='.repeat(60));
-
   // 恢复面板宽度
   try {
     const savedSideWidth = localStorage.getItem('dawei-sidepanel-width');
@@ -285,7 +290,6 @@ onMounted(async () => {
       const width = parseInt(savedSideWidth, 10);
       if (!isNaN(width) && width >= 250 && width <= 600) {
         sidePanelWidth.value = width;
-        console.log('[ChatView] Restored side panel width:', width);
       }
     }
 
@@ -294,7 +298,6 @@ onMounted(async () => {
       const width = parseInt(savedRightWidth, 10);
       if (!isNaN(width) && width >= 300 && width <= 800) {
         rightPanelWidth.value = width;
-        console.log('[ChatView] Restored right panel width:', width);
       }
     }
   } catch (error) {
@@ -347,8 +350,6 @@ const fetchFileContent = async (node: { path: string; name: string; is_directory
         // 使用fetch获取二进制数据
         const apiBaseUrl = getApiBaseUrl();
         const mediaUrl = `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodeURIComponent(node.path)}`;
-        console.log('[ChatView] API Base URL:', apiBaseUrl);
-        console.log('[ChatView] Fetching media file from:', mediaUrl);
 
         const response = await fetch(mediaUrl);
 
@@ -359,7 +360,6 @@ const fetchFileContent = async (node: { path: string; name: string; is_directory
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
-        console.log('[ChatView] Created blob URL for', fileType, ':', blobUrl);
         return { content: blobUrl, type: fileType };
       } catch (error) {
         console.error(`[ChatView] Failed to fetch ${fileType} file:`, error);
@@ -377,26 +377,21 @@ const fetchFileContent = async (node: { path: string; name: string; is_directory
 };
 
 const handleOpenFile = async (fileInfo: { path: string; name: string; is_directory?: boolean }) => {
-  console.log('[ChatView] handleOpenFile called with:', fileInfo);
-
   // 检查文件是否已经打开
   const existingFile = openFiles.value.find(f => f.id === fileInfo.path);
 
   if (existingFile) {
     // 文件已打开，直接切换到该 tab
-    console.log('[ChatView] File already open, switching to tab:', existingFile.id);
     currentActiveFileId.value = existingFile.id;
     return;
   }
 
   // 文件未打开，获取内容并打开新 tab
   try {
-    console.log('[ChatView] Fetching file content...');
     const { content, type } = await fetchFileContent(fileInfo);
 
     // 如果是目录，不打开
     if (type === 'directory') {
-      console.log('[ChatView] Skipping directory:', fileInfo.path);
       return;
     }
 
@@ -409,17 +404,10 @@ const handleOpenFile = async (fileInfo: { path: string; name: string; is_directo
       isDirty: false
     };
 
-    console.log('[ChatView] Opening new file tab:', newFile);
-    console.log('[ChatView] Current openFiles count:', openFiles.value.length);
-
     openFiles.value.push(newFile);
     currentActiveFileId.value = newFile.id;
-
-    console.log('[ChatView] After adding, openFiles count:', openFiles.value.length);
-    console.log('[ChatView] isRightPanelVisible:', isRightPanelVisible.value);
   } catch (error) {
     console.error('[ChatView] Failed to open file:', error);
-    console.error('[ChatView] Error details:', error);
   }
 };
 
@@ -463,21 +451,18 @@ const handleOpenSettings = () => {
 
 // 用户设置
 const handleUserSettings = () => {
-  console.log('用户设置');
+  // TODO: 实现用户设置功能
 };
 
 const getValidWorkspaceId = async (): Promise<string | null> => {
   const routeWorkspaceId = route.params.workspaceId as string;
-  console.log('[ChatView] getValidWorkspaceId - route.params.workspaceId:', routeWorkspaceId);
   if (routeWorkspaceId) {
-    console.log('[ChatView] getValidWorkspaceId - 使用 URL 中的 workspaceId:', routeWorkspaceId);
     return routeWorkspaceId;
   }
 
   try {
     const workspaces = await apiManager.getWorkspacesApi().getWorkspaces();
     if (workspaces && workspaces.length > 0 && workspaces[0]) {
-      console.log('[ChatView] getValidWorkspaceId - 从 API 获取的 workspace:', workspaces[0].id);
       return workspaces[0].id;
     }
     return null;
@@ -528,7 +513,6 @@ onMounted(async () => {
 // 监听并行任务，有活跃任务时自动显示监控面板
 watch(() => parallelTasksStore.activeTasks.length, (count) => {
   if (count > 0 && !isMonitoringPanelVisible.value) {
-    console.log('[ChatView] 检测到活跃任务，自动显示监控面板');
     isMonitoringPanelVisible.value = true;
   }
 });
@@ -545,7 +529,6 @@ watch(() => route.params.workspaceId, async (newWorkspaceId) => {
     // 检查是否需要更新（避免重复设置）
     const currentWsId = chatStore.workspaceId;
     if (currentWsId === finalWorkspaceId) {
-      console.log('[ChatView] 工作区未变化，跳过重复加载');
       return;
     }
 
@@ -565,14 +548,6 @@ watch(() => route.params.workspaceId, async (newWorkspaceId) => {
 
 // 处理追问问题
 function handleFollowupQuestion(message: FollowupQuestionMessage) {
-  console.log('========== 🎯 收到追问问题 ==========');
-  console.log('完整消息:', message);
-  console.log('问题:', message.question);
-  console.log('建议:', message.suggestions);
-  console.log('tool_call_id:', message.tool_call_id);
-  console.log('task_id:', message.task_id);
-  console.log('=====================================');
-
   // 更新追问数据
   followupData.value = {
     question: message.question,
@@ -581,24 +556,12 @@ function handleFollowupQuestion(message: FollowupQuestionMessage) {
     taskId: message.task_id
   };
 
-  console.log('✅ followupData 已更新:', followupData.value);
-
   // 显示对话框
-  console.log('⏳ 准备显示对话框，设置 showFollowupDialog = true');
   showFollowupDialog.value = true;
-
-  console.log('✅ showFollowupDialog 当前值:', showFollowupDialog.value);
-  console.log('✅ 对话框应该已经显示');
-  console.log('=====================================');
 }
 
 // 处理追问回复
 async function handleFollowupResponse(toolCallId: string, response: string) {
-  console.log('========== 提交追问回复 ==========');
-  console.log('toolCallId:', toolCallId);
-  console.log('response:', response);
-  console.log('taskId:', followupData.value.taskId);
-
   try {
     // 使用 chatStore 的 WebSocket 连接发送消息
     const { MessageBuilder } = await import('@/services/protocol');
@@ -615,13 +578,8 @@ async function handleFollowupResponse(toolCallId: string, response: string) {
       response: response
     });
 
-    console.log('准备发送消息:', responseMessage);
-
     // 通过 chatStore 发送消息
     await chatStore.sendWebSocketMessage(responseMessage);
-
-    console.log('✅ 追问回复已发送');
-    console.log('==================================');
   } catch (error) {
     console.error('❌ 发送追问回复失败:', error);
   }
