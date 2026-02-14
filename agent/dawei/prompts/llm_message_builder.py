@@ -8,7 +8,7 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from dawei.entity.lm_messages import AssistantMessage, ContentBlock, LLMMessage
@@ -218,7 +218,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         # 添加时间戳
         from datetime import datetime
 
-        dynamic_content["generation_timestamp"] = datetime.now(timezone.utc).isoformat()
+        dynamic_content["generation_timestamp"] = datetime.now(UTC).isoformat()
 
         return dynamic_content
 

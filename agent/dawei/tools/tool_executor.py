@@ -1102,13 +1102,11 @@ class ToolExecutor(IToolCallService):
                 return True
 
             return False
-        except (OSError, IOError, PermissionError) as e:
+        except (OSError, PermissionError) as e:
             # Fast Fail: 预期的存储/IO错误不应阻止工具执行
             self.logger.warning(f"Failed to create snapshot before {tool_name}: {e}", exc_info=True)
             return False
         except Exception as e:
             # Fast Fail: 关键错误应该快速失败并抛出
             self.logger.error(f"Unexpected error creating snapshot before {tool_name}: {e}", exc_info=True)
-            raise type(e)(
-                f"Critical snapshot creation failure for tool {tool_name}: {e}"
-            ) from e
+            raise type(e)(f"Critical snapshot creation failure for tool {tool_name}: {e}") from e

@@ -6,8 +6,15 @@ from typing import Any
 
 # 敏感环境变量键名模式
 SENSITIVE_ENV_PATTERNS = [
-    'key', 'secret', 'token', 'password', 'pwd',
-    'api', 'auth', 'credential', 'private',
+    "key",
+    "secret",
+    "token",
+    "password",
+    "pwd",
+    "api",
+    "auth",
+    "credential",
+    "private",
 ]
 
 
@@ -89,10 +96,7 @@ class SystemEnvironments:
             key_lower = key.lower()
 
             # 检查是否包含敏感关键词
-            is_sensitive = any(
-                pattern in key_lower
-                for pattern in SENSITIVE_ENV_PATTERNS
-            )
+            is_sensitive = any(pattern in key_lower for pattern in SENSITIVE_ENV_PATTERNS)
 
             if is_sensitive:
                 # 敏感变量，完全跳过或使用占位符
@@ -248,18 +252,19 @@ class UserUIContext:
             return None
 
         # 提取文件名 (保留扩展名)
-        import os
-        filename = os.path.basename(file_path)
+        from pathlib import Path
+
+        filename = Path(file_path).name
 
         # 如果文件名过长，进一步简化
         if len(filename) > 50:
             # 保留扩展名
-            ext = os.path.splitext(filename)[1]
+            ext = Path(filename).suffix
             return f"[FILE]{ext}" if ext else "[FILE]"
 
         # 如果看起来像哈希（包含多个点和数字/字母混合），进一步简化
-        if '.' in filename[:10] and any(c.isdigit() for c in filename[:10]):
-            ext = os.path.splitext(filename)[1]
+        if "." in filename[:10] and any(c.isdigit() for c in filename[:10]):
+            ext = Path(filename).suffix
             return f"[FILE]{ext}" if ext else "[FILE]"
 
         return filename

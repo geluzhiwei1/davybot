@@ -7,7 +7,7 @@
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from pydantic import BaseModel, Field
 
@@ -203,7 +203,7 @@ class TimerTool(CustomBaseTool):
                     },
                     indent=2,
                 )
-            trigger_time = datetime.now(timezone.utc) + timedelta(seconds=delay)
+            trigger_time = datetime.now(UTC) + timedelta(seconds=delay)
             schedule_type = ScheduleType.DELAY
         else:
             return json.dumps(

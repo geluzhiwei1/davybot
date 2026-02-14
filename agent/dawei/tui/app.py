@@ -115,13 +115,12 @@ if sys.platform == "win32":
 # END OF PATCH
 # ============================================================================
 
-from dawei.core.local_context import set_message_id
-
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer
 
 from dawei.core.events import TaskEventType
+from dawei.core.local_context import set_message_id
 from dawei.tui.agent_bridge import AgentBridge
 from dawei.tui.config import TUIConfig
 from dawei.tui.i18n import _, get_current_language, get_system_language, set_language

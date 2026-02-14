@@ -13,7 +13,7 @@
 
 import asyncio
 import contextlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -207,7 +207,7 @@ class TaskGraphPersistenceManager:
 
                     # 更新统计
                     self._save_count += 1
-                    self._last_save_time = datetime.now(timezone.utc)
+                    self._last_save_time = datetime.now(UTC)
 
                     self.logger.debug(
                         f"Save completed: {key} (total: {self._save_count}, errors: {self._error_count})",
@@ -251,7 +251,7 @@ class TaskGraphPersistenceManager:
                 TaskEventType.PERSIST_TASK_GRAPH,
                 {
                     "task_graph_id": task_graph_id,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 },
                 task_id=task_graph_id,
             )
@@ -274,9 +274,9 @@ class TaskGraphPersistenceManager:
         try:
             # 1. 先等待队列中的保存完成（在取消任务之前）
             timeout = 5.0  # 5秒超时
-            start_time = datetime.now(timezone.utc)
+            start_time = datetime.now(UTC)
 
-            while self._pending_saves and (datetime.now(timezone.utc) - start_time).total_seconds() < timeout:
+            while self._pending_saves and (datetime.now(UTC) - start_time).total_seconds() < timeout:
                 self.logger.info(
                     f"Waiting for {len(self._pending_saves)} pending saves to complete...",
                 )
@@ -307,9 +307,9 @@ class TaskGraphPersistenceManager:
         # 等待保存完成
         key = f"task_graph:{task_graph_id}"
         timeout = 10.0  # 10秒超时
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
-        while key in self._pending_saves and (datetime.now(timezone.utc) - start_time).total_seconds() < timeout:
+        while key in self._pending_saves and (datetime.now(UTC) - start_time).total_seconds() < timeout:
             await asyncio.sleep(0.1)
 
         if key in self._pending_saves:

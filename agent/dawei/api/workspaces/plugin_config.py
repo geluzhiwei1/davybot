@@ -12,20 +12,20 @@
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from dawei.api.workspaces.core import get_user_workspace
 
 logger = logging.getLogger(__name__)
-from dawei.workspace.user_workspace import UserWorkspace
+from dawei.core.exceptions import ConfigurationError
 from dawei.plugins.config import (
     PluginConfigManager,
     validate_config_against_schema,
 )
-from dawei.core.exceptions import ConfigurationError
-
+from dawei.workspace.user_workspace import UserWorkspace
 
 # Routes will be under /api/workspaces/{workspace_id}/plugin-config/ when included by workspaces router
 router = APIRouter(prefix="/{workspace_id}/plugin-config", tags=["Plugin Configuration"])
@@ -35,53 +35,56 @@ router = APIRouter(prefix="/{workspace_id}/plugin-config", tags=["Plugin Configu
 # 请求/响应模型
 # ============================================================================
 
+
 class GetPluginSchemaRequest(BaseModel):
     """获取插件 Schema 请求"""
+
     plugin_id: str = Field(..., description="插件 ID")
 
 
 class GetPluginConfigRequest(BaseModel):
     """获取插件配置请求"""
+
     plugin_id: str = Field(..., description="插件 ID")
 
 
 class UpdatePluginConfigRequest(BaseModel):
     """更新插件配置请求"""
+
     plugin_id: str = Field(..., description="插件 ID")
-    config: Dict[str, Any] = Field(..., description="配置值（键值对）")
+    config: dict[str, Any] = Field(..., description="配置值（键值对）")
 
 
 class ResetPluginConfigRequest(BaseModel):
     """重置插件配置请求"""
+
     plugin_id: str = Field(..., description="插件 ID")
 
 
 class PluginConfigResponse(BaseModel):
     """插件配置响应"""
+
     success: bool = Field(..., description="是否成功")
-    schema: Dict[str, Any] | None = Field(None, description="配置 Schema")
-    config: Dict[str, Any] = Field(..., description="当前配置值")
-    existing_config: Dict[str, Any] | None = Field(None, description="已存在的配置值（与config相同）")
-    form_config: Dict[str, Any] | None = Field(None, description="前端表单配置")
+    schema: dict[str, Any] | None = Field(None, description="配置 Schema")
+    config: dict[str, Any] = Field(..., description="当前配置值")
+    existing_config: dict[str, Any] | None = Field(None, description="已存在的配置值（与config相同）")
+    form_config: dict[str, Any] | None = Field(None, description="前端表单配置")
     message: str | None = Field(None, description="提示消息")
 
 
 class PluginListResponse(BaseModel):
     """插件列表响应"""
+
     success: bool
-    plugins: Dict[str, Dict[str, Any]] = Field(
-        default_factory=dict,
-        description="所有插件的配置信息 {plugin_id: {schema, config}}"
-    )
+    plugins: dict[str, dict[str, Any]] = Field(default_factory=dict, description="所有插件的配置信息 {plugin_id: {schema, config}}")
 
 
 # ============================================================================
 # 依赖项
 # ============================================================================
 
-def get_plugin_manager(
-    workspace: UserWorkspace = Depends(get_user_workspace)
-) -> PluginConfigManager:
+
+def get_plugin_manager(workspace: UserWorkspace = Depends(get_user_workspace)) -> PluginConfigManager:
     """获取插件配置管理器
 
     根据 workspace 初始化，返回对应级别的插件配置管理器：
@@ -94,6 +97,7 @@ def get_plugin_manager(
 # ============================================================================
 # API 端点
 # ============================================================================
+
 
 @router.get("/plugins")
 async def list_all_plugin_configs(
@@ -111,7 +115,7 @@ async def list_all_plugin_configs(
         # 扫描插件目录
         plugins_dir = workspace.workspace_path / ".dawei" / "plugins"
 
-        plugins: Dict[str, Dict[str, Any]] = {}
+        plugins: dict[str, dict[str, Any]] = {}
 
         if plugins_dir.exists():
             for plugin_path in plugins_dir.iterdir():
@@ -126,8 +130,10 @@ async def list_all_plugin_configs(
                     continue
 
                 try:
-                    import yaml
                     import json
+
+                    import yaml
+
                     plugin_meta = yaml.safe_load(plugin_yaml.read_text(encoding="utf-8"))
                 except Exception:
                     continue
@@ -142,7 +148,7 @@ async def list_all_plugin_configs(
                             with schema_path.open(encoding="utf-8") as f:
                                 plugin_meta["config_schema"] = json.load(f)
                         except Exception as e:
-                            logger.error(f"Failed to load config_schema from {schema_path}: {e}")
+                            logger.exception(f"Failed to load config_schema from {schema_path}: {e}")
                             plugin_meta["config_schema"] = {}
                     else:
                         logger.warning(f"config_schema file not found: {schema_path}")
@@ -165,10 +171,7 @@ async def list_all_plugin_configs(
         )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list plugin configs: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list plugin configs: {str(e)}")
 
 
 @router.get("/schema")
@@ -196,7 +199,7 @@ async def get_plugin_schema(
 
         # 如果带版本号（如 dingtalk-channel@0.1.0），尝试提取名称查找
         if "@" in plugin_id:
-            plugin_name = plugin_id.split("@")[0]
+            plugin_name = plugin_id.split("@", maxsplit=1)[0]
             logger.debug(f"Plugin ID '{plugin_id}' not found, trying name '{plugin_name}'")
             if plugin_name in list_response.plugins:
                 plugin_info = list_response.plugins[plugin_name]
@@ -210,18 +213,12 @@ async def get_plugin_schema(
 
         # 仍然找不到，返回 404
         available_plugins = list(list_response.plugins.keys())
-        raise HTTPException(
-            status_code=404,
-            detail=f"Plugin '{plugin_id}' not found. Available plugins: {available_plugins}"
-        )
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found. Available plugins: {available_plugins}")
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get plugin schema: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get plugin schema: {str(e)}")
 
 
 @router.get("/config")
@@ -244,16 +241,13 @@ async def get_plugin_config(
             actual_plugin_id = plugin_id
             found = True
         elif "@" in plugin_id:
-            plugin_name = plugin_id.split("@")[0]
+            plugin_name = plugin_id.split("@", maxsplit=1)[0]
             if plugin_name in list_response.plugins:
                 actual_plugin_id = plugin_name
                 found = True
 
         if not found:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Plugin '{plugin_id}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
 
         config = manager.load_plugin_config(actual_plugin_id)
         plugin_info = list_response.plugins[actual_plugin_id]
@@ -269,10 +263,7 @@ async def get_plugin_config(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get plugin config: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get plugin config: {str(e)}")
 
 
 @router.put("/config")
@@ -305,10 +296,7 @@ async def update_plugin_config(
                 found = True
 
         if not found:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Plugin '{request.plugin_id}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Plugin '{request.plugin_id}' not found")
 
         plugin_info = list_response.plugins[actual_plugin_id]
         schema = plugin_info.get("schema")
@@ -317,10 +305,7 @@ async def update_plugin_config(
         is_valid = validate_config_against_schema(request.config, schema)
 
         if not is_valid:
-            raise HTTPException(
-                status_code=400,
-                detail="Configuration validation failed. Please check your input values."
-            )
+            raise HTTPException(status_code=400, detail="Configuration validation failed. Please check your input values.")
 
         # 保存配置
         manager.save_plugin_config(actual_plugin_id, request.config)
@@ -336,10 +321,7 @@ async def update_plugin_config(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update plugin config: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update plugin config: {str(e)}")
 
 
 @router.post("/config/reset")
@@ -372,10 +354,7 @@ async def reset_plugin_config(
                 found = True
 
         if not found:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Plugin '{request.plugin_id}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Plugin '{request.plugin_id}' not found")
 
         plugin_info = list_response.plugins[actual_plugin_id]
         schema = plugin_info.get("schema")
@@ -400,7 +379,4 @@ async def reset_plugin_config(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to reset plugin config: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to reset plugin config: {str(e)}")

@@ -11,7 +11,7 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from .conversation_compressor import CompressionStats
@@ -165,7 +165,7 @@ class ConversationMemoryIntegration:
                                     "metadata": {
                                         "source": "conversation",
                                         "session_id": session_id,
-                                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                                        "timestamp": datetime.now(UTC).isoformat(),
                                     },
                                 },
                             )
@@ -226,7 +226,7 @@ class ConversationMemoryIntegration:
                                 "metadata": {
                                     "source": "conversation",
                                     "session_id": session_id,
-                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "timestamp": datetime.now(UTC).isoformat(),
                                 },
                             },
                         )
@@ -271,7 +271,7 @@ class ConversationMemoryIntegration:
                         "source": "conversation",
                         "session_id": session_id,
                         "message_index": message_index,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     },
                 },
             )
@@ -293,7 +293,7 @@ class ConversationMemoryIntegration:
                         "source": "conversation",
                         "session_id": session_id,
                         "message_index": message_index,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     },
                 },
             )
@@ -351,11 +351,11 @@ class ConversationMemoryIntegration:
         for mem in memories:
             try:
                 memory = MemoryEntry(
-                    id=str(datetime.now(timezone.utc).timestamp()),
+                    id=str(datetime.now(UTC).timestamp()),
                     subject=mem["subject"],
                     predicate=mem["predicate"],
                     object=mem["object"],
-                    valid_start=datetime.now(timezone.utc),
+                    valid_start=datetime.now(UTC),
                     memory_type=MemoryType(mem["type"]),
                     confidence=mem["confidence"],
                     energy=mem["energy"],

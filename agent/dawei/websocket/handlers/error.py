@@ -11,7 +11,7 @@ import contextlib
 import logging
 import traceback
 from collections.abc import Callable
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from enum import StrEnum
 from typing import Any
 
@@ -70,7 +70,7 @@ class ErrorInfo:
         self.details = details or {}
         self.recoverable = recoverable
         self.session_id = session_id
-        self.timestamp = timestamp or datetime.now(timezone.utc)
+        self.timestamp = timestamp or datetime.now(UTC)
         self.stack_trace = traceback.format_exc()
 
     def to_dict(self) -> dict[str, Any]:
@@ -181,7 +181,7 @@ class ErrorHandler(StatefulMessageHandler):
         try:
             timestamp = datetime.fromisoformat(message.timestamp)
         except (ValueError, TypeError, AttributeError):
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
             logger.warning(
                 f"Invalid timestamp format in error message: {message.timestamp}, using current time",
             )
@@ -240,7 +240,7 @@ class ErrorHandler(StatefulMessageHandler):
         try:
             timestamp = datetime.fromisoformat(message.timestamp)
         except (ValueError, TypeError, AttributeError):
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
             logger.warning(
                 f"Invalid timestamp format in warning message: {message.timestamp}, using current time",
             )
@@ -450,7 +450,7 @@ class ErrorHandler(StatefulMessageHandler):
                     details={"original_error_code": error_info.code, "error": str(e)},
                     recoverable=False,
                     session_id=error_info.session_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
                 await self._record_error(recovery_error)
                 # Intentional tolerance: User-provided recovery strategies may fail; we record but don't crash
@@ -488,7 +488,7 @@ class ErrorHandler(StatefulMessageHandler):
                     },
                     recoverable=False,
                     session_id=error_info.session_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
                 await self._record_error(recovery_error)
                 # Intentional tolerance: Category-level recovery strategies may fail; we record but don't crash
@@ -525,7 +525,7 @@ class ErrorHandler(StatefulMessageHandler):
                     details={"callback": callback.__name__, "error": str(e)},
                     recoverable=False,
                     session_id=error_info.session_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
                 await self._record_error(callback_error)
                 # Intentional tolerance: User callbacks may fail; we record but continue processing other callbacks
@@ -557,7 +557,7 @@ class ErrorHandler(StatefulMessageHandler):
                     },
                     recoverable=False,
                     session_id=error_info.session_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
                 await self._record_error(callback_error)
                 # Intentional tolerance: User callbacks may fail; we record but continue processing other callbacks
@@ -591,7 +591,7 @@ class ErrorHandler(StatefulMessageHandler):
                     },
                     recoverable=False,
                     session_id=error_info.session_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
                 await self._record_error(callback_error)
                 # Intentional tolerance: User callbacks may fail; we record but continue processing other callbacks
@@ -699,7 +699,7 @@ class ErrorHandler(StatefulMessageHandler):
             max_age_hours: 最大保留时间（小时）
 
         """
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        cutoff_time = datetime.now(UTC) - timedelta(hours=max_age_hours)
 
         # 清理错误历史
         self.error_history = [error for error in self.error_history if error.timestamp > cutoff_time]

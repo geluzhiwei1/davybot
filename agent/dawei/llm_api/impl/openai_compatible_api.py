@@ -7,7 +7,7 @@
 
 import json
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,10 +17,10 @@ from dawei.core.errors import LLMError, ValidationError
 from dawei.core.metrics import increment_counter
 from dawei.entity.lm_messages import (
     AssistantMessage,
-    LLMMessage,
     ChatGeneration,
     ChatResult,
     FunctionCall,
+    LLMMessage,
     ToolCall,
 )
 from dawei.entity.stream_message import (
@@ -166,7 +166,7 @@ class OpenaiCompatibleClient(BaseClient):
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # 生成唯一的日志文件名（基于时间戳）
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
         request_log_file = log_dir / f"{timestamp}_request.json"
         response_log_file = log_dir / f"{timestamp}_response.json"
 
@@ -185,7 +185,7 @@ class OpenaiCompatibleClient(BaseClient):
             return
 
         request_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "url": f"{self.base_url}/{endpoint}",
             "headers": dict(self._prepare_headers()),
             "params": params,
@@ -355,7 +355,7 @@ class OpenaiCompatibleClient(BaseClient):
 
         """
         error_response_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": status,
             "headers": headers,
             "error": error_text,
@@ -394,7 +394,7 @@ class OpenaiCompatibleClient(BaseClient):
             response_text = combined_bytes.decode("utf-8", errors="ignore")
 
             response_data = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": status or "unknown",
                 "headers": headers or {},
                 "url": url or "unknown",
@@ -405,7 +405,7 @@ class OpenaiCompatibleClient(BaseClient):
         else:
             # 没有响应数据时的日志
             response_data = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": status or "unknown",
                 "headers": headers or {},
                 "url": url or "unknown",

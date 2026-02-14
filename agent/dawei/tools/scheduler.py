@@ -10,7 +10,7 @@
 import asyncio
 import contextlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 from dawei.core.events import CORE_EVENT_BUS, TaskEventType
@@ -136,7 +136,7 @@ class SchedulerEngine:
         try:
             # 更新任务状态
             task.status = TriggerStatus.TRIGGERED
-            task.triggered_at = datetime.now(timezone.utc)
+            task.triggered_at = datetime.now(UTC)
             await self.storage.save_task(task)
 
             # 发出触发事件

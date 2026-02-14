@@ -19,9 +19,9 @@ from dawei.core.error_handler import handle_errors
 from dawei.core.errors import LLMError, ValidationError
 from dawei.entity.lm_messages import (
     AssistantMessage,
-    LLMMessage,
     ChatGeneration,
     ChatResult,
+    LLMMessage,
     UserMessage,
 )
 from dawei.entity.stream_message import (

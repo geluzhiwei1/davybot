@@ -10,7 +10,7 @@
 import json
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import StrEnum
 from typing import Any, ClassVar, Literal, Union
 
@@ -144,7 +144,7 @@ class BaseWebSocketMessage(BaseModel, ABC):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="消息唯一标识")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="消息时间戳",
     )
     type: MessageType = Field(..., description="消息类型")
@@ -311,7 +311,7 @@ class TaskStatusUpdateMessage(BaseWebSocketMessage):
     old_status: str = Field(..., description="旧状态")
     new_status: str = Field(..., description="新状态")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="更新时间戳",
     )
 
@@ -333,7 +333,7 @@ class TaskGraphUpdateMessage(BaseWebSocketMessage):
     update_type: str = Field(..., description="更新类型")
     data: dict[str, Any] = Field(..., description="更新数据")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="更新时间戳",
     )
 
@@ -1091,7 +1091,7 @@ class AgentStopMessage(BaseWebSocketMessage):
     reason: str | None = Field(None, description="停止原因")
     force: bool = Field(False, description="是否强制停止")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="停止时间",
     )
 
@@ -1111,7 +1111,7 @@ class AgentStoppedMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.AGENT_STOP  # 使用相同的消息类型
     task_id: str = Field(..., description="任务ID")
     stopped_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="停止时间",
     )
     result_summary: str = Field(..., description="停止时的结果摘要")
@@ -1232,7 +1232,7 @@ class TaskNodeStoppedMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.TASK_NODE_STOPPED
     task_node_id: str = Field(..., description="任务节点ID")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="停止时间",
     )
     reason: str | None = Field(None, description="停止原因")
@@ -1291,7 +1291,7 @@ class ModeSwitchedMessage(BaseWebSocketMessage):
     previous_mode: str = Field(..., description="切换前的模式")
     current_mode: str = Field(..., description="当前模式")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="切换时间",
     )
     message: str = Field(..., description="切换消息")
@@ -1312,7 +1312,7 @@ class ContextUpdateMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.CONTEXT_UPDATE
     stats: dict[str, Any] = Field(..., description="上下文统计信息")
     warnings: list[str] = Field(default_factory=list, description="警告信息")
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
@@ -1334,7 +1334,7 @@ class PDACycleStartMessage(BaseWebSocketMessage):
     task_goals: list[str] = Field(default_factory=list, description="任务目标")
     success_criteria: list[str] = Field(default_factory=list, description="成功标准")
     start_time: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="开始时间",
     )
 
@@ -1363,7 +1363,7 @@ class PDCAStatusUpdateMessage(BaseWebSocketMessage):
     current_phase_description: str | None = Field(None, description="当前阶段描述")
     estimated_remaining_time: float | None = Field(None, description="预计剩余时间（秒）")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="更新时间",
     )
 
@@ -1387,7 +1387,7 @@ class PDCAPhaseAdvanceMessage(BaseWebSocketMessage):
     reason: str = Field(..., description="推进原因")
     phase_data: dict[str, Any] | None = Field(None, description="阶段数据")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="推进时间",
     )
 
@@ -1414,7 +1414,7 @@ class PDACycleCompleteMessage(BaseWebSocketMessage):
     next_steps: list[str] | None = Field(None, description="后续步骤")
     start_time: str = Field(..., description="开始时间")
     end_time: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="结束时间",
     )
     duration_seconds: float | None = Field(None, description="总耗时（秒）")
@@ -1940,7 +1940,7 @@ class EventMessageSerializer:
             event=event,
             data=data,
             session_id=session_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         return message.json()
 
@@ -1958,7 +1958,7 @@ class EventMessageSerializer:
             JSON字符串
 
         """
-        data = {"task_id": task_id, "timestamp": datetime.now(timezone.utc).isoformat(), **kwargs}
+        data = {"task_id": task_id, "timestamp": datetime.now(UTC).isoformat(), **kwargs}
 
         return EventMessageSerializer.serialize(event, data, session_id)
 

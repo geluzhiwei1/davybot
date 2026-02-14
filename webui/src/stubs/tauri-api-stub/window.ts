@@ -1,4 +1,5 @@
 // Stub for @tauri-apps/api/window
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 export class Window {
   label: string

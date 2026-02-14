@@ -6,7 +6,7 @@
 """
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from enum import StrEnum
 from typing import Any
 
@@ -50,7 +50,7 @@ class ScheduledTask:
 
     # 状态
     status: TriggerStatus = TriggerStatus.PENDING
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     triggered_at: datetime | None = None
     last_error: str | None = None
 
@@ -83,7 +83,7 @@ class ScheduledTask:
 
     def is_due(self) -> bool:
         """检查是否到期"""
-        return self.status == TriggerStatus.PENDING and datetime.now(timezone.utc) >= self.trigger_time
+        return self.status == TriggerStatus.PENDING and datetime.now(UTC) >= self.trigger_time
 
     def should_repeat(self) -> bool:
         """检查是否应该重复"""
@@ -93,7 +93,7 @@ class ScheduledTask:
 
     def schedule_next(self) -> None:
         """安排下一次执行"""
-        self.trigger_time = datetime.now(timezone.utc) + timedelta(seconds=self.repeat_interval)
+        self.trigger_time = datetime.now(UTC) + timedelta(seconds=self.repeat_interval)
         self.repeat_count += 1
         self.status = TriggerStatus.PENDING
 

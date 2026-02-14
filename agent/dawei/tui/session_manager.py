@@ -6,7 +6,7 @@ Handle chat history persistence and restoration.
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -71,9 +71,9 @@ class SessionManager:
 
         """
         if session_id is None:
-            session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            session_id = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         session = ChatSession(
             session_id=session_id,
@@ -109,12 +109,12 @@ class SessionManager:
         message = ChatMessage(
             role=role,
             content=content,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             metadata=metadata or {},
         )
 
         self.current_session.messages.append(message)
-        self.current_session.updated_at = datetime.now(timezone.utc).isoformat()
+        self.current_session.updated_at = datetime.now(UTC).isoformat()
 
         logger.debug(f"Added {role} message to session")
 

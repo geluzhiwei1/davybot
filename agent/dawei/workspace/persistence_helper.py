@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -327,7 +327,7 @@ class WorkspacePersistenceHelper:
                 raise ValueError("error_message must be a string")
 
             # 构建告警数据
-            timestamp = datetime.now(timezone.utc).isoformat()
+            timestamp = datetime.now(UTC).isoformat()
             workspace_id = self.workspace_info.id if self.workspace_info else self.uuid
 
             if not workspace_id:
@@ -378,7 +378,7 @@ class WorkspacePersistenceHelper:
             failure_log_dir.mkdir(parents=True, exist_ok=True)
 
             # 生成日志文件名
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d")
             log_file = failure_log_dir / f"failures_{timestamp}.jsonl"
 
             # 追加写入日志 (JSONL格式)

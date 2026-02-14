@@ -11,14 +11,15 @@ import contextlib
 import time
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 # 只在类型检查时导入，避免运行时循环导入
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from dawei.task_graph.task_node_data import TaskContext
 
 
@@ -181,7 +182,7 @@ class Tool(ABC):
         """工具描述"""
 
     @abstractmethod
-    async def execute(self, parameters: dict[str, Any], context: "TaskContext") -> Any:
+    async def execute(self, parameters: dict[str, Any], context: TaskContext) -> Any:
         """执行工具"""
 
 
@@ -278,7 +279,7 @@ class ModeTransition:
     to_mode: str
     reason: str
     confidence: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -308,7 +309,7 @@ class TaskExecutionPlan:
     """任务执行计划"""
 
     steps: list[dict[str, Any]]
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def add_step(self, step: dict[str, Any]) -> None:
         """添加执行步骤"""
@@ -339,7 +340,7 @@ class TaskSummary:
     subtasks_created: int
     tool_usage: dict[str, dict[str, int]]
     token_usage: dict[str, Any]
-    completed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -356,4 +357,4 @@ class TaskState:
     mcp_requests: list[dict[str, Any]]
     tool_usage: dict[str, dict[str, int]]
     token_usage: dict[str, Any]
-    saved_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    saved_at: datetime = field(default_factory=lambda: datetime.now(UTC))

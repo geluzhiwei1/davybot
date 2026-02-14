@@ -8,7 +8,7 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from dawei.llm_api.model_router import ModelCost, load_cost_config
 
@@ -51,7 +51,7 @@ class CostTracker:
         """
         self.cost_config = cost_config or load_cost_config()
         self.calls: list[LLMMCall] = []
-        self.session_start = datetime.now(timezone.utc)
+        self.session_start = datetime.now(UTC)
         self.logger = logging.getLogger(__name__)
 
     def record_call(
@@ -80,7 +80,7 @@ class CostTracker:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cost=cost,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             task_type=task_type,
             duration_ms=duration_ms,
         )
@@ -220,7 +220,7 @@ class CostTracker:
         summary = self.get_summary()
         suggestions = self.get_optimization_suggestions()
 
-        duration = datetime.now(timezone.utc) - self.session_start
+        duration = datetime.now(UTC) - self.session_start
         hours = duration.total_seconds() / 3600
 
         return {
@@ -249,5 +249,5 @@ class CostTracker:
     def reset(self):
         """重置追踪器"""
         self.calls.clear()
-        self.session_start = datetime.now(timezone.utc)
+        self.session_start = datetime.now(UTC)
         self.logger.info("Cost tracker reset")

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 _plugin_managers: dict[str, PluginManager] = {}
 
 
-def get_cached_plugin_manager(workspace_id: str, workspace_path: Path) -> 'PluginManager':
+def get_cached_plugin_manager(workspace_id: str, workspace_path: Path) -> "PluginManager":
     """Get or create plugin manager for workspace with caching.
 
     Args:
@@ -116,7 +116,7 @@ def save_plugin_settings_file(workspace_path: Path, plugin_settings: dict[str, A
         logger.info(f"Saved {len(plugin_settings)} plugin configs to {plugins_dir}")
         return True
     except Exception as e:
-        logger.error(f"Failed to save plugin settings: {e}")
+        logger.exception(f"Failed to save plugin settings: {e}")
         return False
 
 
@@ -201,8 +201,9 @@ async def get_plugin_manager(
             await manager.discover_and_load_all(settings=settings_for_load)
         except Exception as e:
             import traceback
+
             tb = traceback.format_exc()
-            logger.error(f"Failed to load plugins: {e}\n{tb}")
+            logger.exception(f"Failed to load plugins: {e}\n{tb}")
             # Re-raise to fail fast - plugin loading errors should not be silent
             raise HTTPException(status_code=500, detail=f"Failed to load plugins: {e!s}")
 
@@ -579,7 +580,7 @@ async def plugin_action(
 
             await workspace._save_plugins_config()
 
-            logger.info(f"[DEBUG] Saved plugins_config to file")
+            logger.info("[DEBUG] Saved plugins_config to file")
 
             if plugin.is_activated:
                 result = await manager.deactivate_plugin(plugin_id)
@@ -618,15 +619,16 @@ async def plugin_action(
     except Exception as e:
         # Fast fail: log full stack trace AND return it to client
         import traceback
+
         stack_trace = traceback.format_exc()
-        logger.error(f"Error performing plugin action: {e}\n{stack_trace}")
+        logger.exception(f"Error performing plugin action: {e}\n{stack_trace}")
         raise HTTPException(
             status_code=500,
             detail={
                 "error": str(e),
                 "type": type(e).__name__,
                 "traceback": stack_trace,
-            }
+            },
         )
 
 
@@ -862,11 +864,7 @@ async def enable_plugin_v2(
         # 同步更新 PluginManager.registry 中的 settings
         plugin_config = workspace.plugins_config.plugins.get(plugin_id)
         if plugin_config:
-            await manager.update_plugin_settings(plugin_id, {
-                "enabled": plugin_config.enabled,
-                "activated": plugin_config.activated,
-                **plugin_config.settings
-            })
+            await manager.update_plugin_settings(plugin_id, {"enabled": plugin_config.enabled, "activated": plugin_config.activated, **plugin_config.settings})
 
         # 保存配置
         await workspace._save_plugins_config()
@@ -902,11 +900,7 @@ async def disable_plugin_v2(
         # 同步更新 PluginManager.registry 中的 settings
         plugin_config = workspace.plugins_config.plugins.get(plugin_id)
         if plugin_config:
-            await manager.update_plugin_settings(plugin_id, {
-                "enabled": plugin_config.enabled,
-                "activated": plugin_config.activated,
-                **plugin_config.settings
-            })
+            await manager.update_plugin_settings(plugin_id, {"enabled": plugin_config.enabled, "activated": plugin_config.activated, **plugin_config.settings})
 
         # 保存配置
         await workspace._save_plugins_config()
@@ -942,48 +936,24 @@ async def uninstall_plugin_endpoint(
 
             if not success:
                 # 如果精确卸载失败，尝试按名称卸载（版本可能不匹配）
-                plugin_name = plugin_id.split("@")[0]
-                logger.warning(
-                    f"Failed to uninstall {plugin_id}, trying by name '{plugin_name}'"
-                )
+                plugin_name = plugin_id.split("@", maxsplit=1)[0]
+                logger.warning(f"Failed to uninstall {plugin_id}, trying by name '{plugin_name}'")
                 success = await manager.uninstall_plugin_by_name(plugin_name)
 
                 if success:
                     logger.info(f"Uninstalled plugin by name: {plugin_name}")
-                    return {
-                        "success": True,
-                        "plugin_id": plugin_name,
-                        "message": f"Plugin {plugin_name} (version may differ) has been uninstalled"
-                    }
-                else:
-                    # 仍然失败，返回404
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Plugin {plugin_id} not found or cannot be uninstalled"
-                    )
-            else:
-                logger.info(f"Plugin {plugin_id} uninstalled successfully")
-                return {
-                    "success": True,
-                    "plugin_id": plugin_id,
-                    "message": f"Plugin {plugin_id} has been uninstalled"
-                }
-        else:
-            # 仅名称格式：卸载所有版本
-            success = await manager.uninstall_plugin_by_name(plugin_id)
+                    return {"success": True, "plugin_id": plugin_name, "message": f"Plugin {plugin_name} (version may differ) has been uninstalled"}
+                # 仍然失败，返回404
+                raise HTTPException(status_code=404, detail=f"Plugin {plugin_id} not found or cannot be uninstalled")
+            logger.info(f"Plugin {plugin_id} uninstalled successfully")
+            return {"success": True, "plugin_id": plugin_id, "message": f"Plugin {plugin_id} has been uninstalled"}
+        # 仅名称格式：卸载所有版本
+        success = await manager.uninstall_plugin_by_name(plugin_id)
 
-            if success:
-                logger.info(f"Plugin {plugin_id} uninstalled successfully")
-                return {
-                    "success": True,
-                    "plugin_id": plugin_id,
-                    "message": f"Plugin {plugin_id} has been uninstalled"
-                }
-            else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Plugin {plugin_id} not found or cannot be uninstalled"
-                )
+        if success:
+            logger.info(f"Plugin {plugin_id} uninstalled successfully")
+            return {"success": True, "plugin_id": plugin_id, "message": f"Plugin {plugin_id} has been uninstalled"}
+        raise HTTPException(status_code=404, detail=f"Plugin {plugin_id} not found or cannot be uninstalled")
 
     except HTTPException:
         raise

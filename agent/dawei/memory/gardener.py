@@ -9,7 +9,7 @@ import asyncio
 import contextlib
 import logging
 import sqlite3
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from dawei.core.events import CORE_EVENT_BUS
@@ -147,7 +147,7 @@ class MemoryGardener:
         """
         try:
             # Get recent memories with high energy and access count
-            recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            recent_cutoff = datetime.now(UTC) - timedelta(hours=24)
 
             with sqlite3.connect(self.memory_graph.db_path) as conn:
                 conn.row_factory = sqlite3.Row
@@ -260,7 +260,7 @@ AVOIDS: [things to avoid based on the data]"""
                 keywords=self._extract_keywords(response.content),
                 metadata={
                     "consolidated_from": [m.id for m in memories],
-                    "consolidation_date": datetime.now(timezone.utc).isoformat(),
+                    "consolidation_date": datetime.now(UTC).isoformat(),
                 },
             )
 
@@ -283,7 +283,7 @@ AVOIDS: [things to avoid based on the data]"""
     async def _archive_expired(self):
         """Archive memories that have expired and low energy"""
         try:
-            archive_cutoff = datetime.now(timezone.utc) - timedelta(days=self.archive_days)
+            archive_cutoff = datetime.now(UTC) - timedelta(days=self.archive_days)
 
             with sqlite3.connect(self.memory_graph.db_path) as conn:
                 # Find memories to archive (expired + low energy)

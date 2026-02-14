@@ -96,7 +96,7 @@ interface Props {
   visible: boolean;
   workspaceId: string;
   pluginId: string | null;
-  pluginConfig?: any;
+  pluginConfig?: unknown;
 }
 
 const props = defineProps<Props>();
@@ -104,7 +104,7 @@ const props = defineProps<Props>();
 // Emits
 const emit = defineEmits<{
   'update:visible': [value: boolean];
-  save: [pluginId: string, settings: any];
+  save: [pluginId: string, settings: unknown];
 }>();
 
 // State
@@ -127,7 +127,7 @@ const validationErrors = ref<string[]>([]);
 
 // Form data - use reactive for reactivity
 const formData = reactive({
-  settings: {} as Record<string, any>
+  settings: {} as Record<string, unknown>
 });
 
 // Form props for json-schema-form
@@ -158,13 +158,13 @@ const loadConfigSchema = async () => {
 
     // Initialize form data with defaults and existing config
     if (configSchema.value?.schema?.properties) {
-      const defaultSettings: Record<string, any> = {};
+      const defaultSettings: Record<string, unknown> = {};
       const { properties } = configSchema.value.schema;
 
       // Extract defaults from schema
       for (const [fieldName, fieldSchema] of Object.entries(properties)) {
-        if ((fieldSchema as any).default !== undefined) {
-          defaultSettings[fieldName] = (fieldSchema as any).default;
+        if ((fieldSchema as { default?: unknown }).default !== undefined) {
+          defaultSettings[fieldName] = (fieldSchema as { default?: unknown }).default;
         }
       }
 
@@ -177,7 +177,7 @@ const loadConfigSchema = async () => {
 
       console.log('[PluginSettingsDialog] Initialized settings:', formData.settings);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[PluginSettingsDialog] Failed to load config schema:', error);
     ElMessage.warning(t('workspaceSettings.plugins.pluginConfig.loadSchemaError') + ': ' + (error.message || 'Unknown error'));
   } finally {
@@ -224,7 +224,7 @@ const handleSubmit = async () => {
   saving.value = true;
   try {
     emit('save', props.pluginId, formData.settings);
-  } catch (error: any) {
+  } catch (error: unknown) {
     ElMessage.error(t('workspaceSettings.plugins.pluginConfig.saveError') + ': ' + (error.message || 'Unknown error'));
   } finally {
     saving.value = false;

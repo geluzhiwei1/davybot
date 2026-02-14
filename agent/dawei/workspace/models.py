@@ -9,7 +9,7 @@
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -51,7 +51,7 @@ class WorkspaceInfo:
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00")) if created_at.endswith("Z") else datetime.fromisoformat(created_at)
         elif created_at is None:
-            created_at = datetime.now(timezone.utc)
+            created_at = datetime.now(UTC)
 
         # 处理系统环境信息
         system_env_data = data.get("system_environments", {})
@@ -262,8 +262,6 @@ class AnalyticsConfig(BaseModel):
     retention_days: int = 90
     sampling_rate: float = 1.0
     anonymize_enabled: bool = True
-
-
 
 
 class PluginInstanceConfig(BaseModel):

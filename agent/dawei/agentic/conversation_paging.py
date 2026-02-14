@@ -10,7 +10,7 @@
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from .conversation_compressor import ConversationCompressor
@@ -32,15 +32,15 @@ class ConversationPage:
     tokens: int
 
     # 元数据
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_accessed: float = field(default_factory=lambda: datetime.now(timezone.utc).timestamp())
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_accessed: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
     access_count: int = 0
     keywords: list[str] = field(default_factory=list)
 
     @property
     def lru_score(self) -> float:
         """LRU淘汰分数：越高越容易被淘汰"""
-        age_hours = (datetime.now(timezone.utc).timestamp() - self.last_accessed) / 3600
+        age_hours = (datetime.now(UTC).timestamp() - self.last_accessed) / 3600
         access_factor = 1 / (self.access_count + 1)
         return age_hours * access_factor
 
@@ -334,7 +334,7 @@ class ConversationPagingManager:
 
                 # 更新访问信息
                 page.access_count += 1
-                page.last_accessed = datetime.now(timezone.utc).timestamp()
+                page.last_accessed = datetime.now(UTC).timestamp()
 
                 if len(loaded_pages) >= top_k:
                     break

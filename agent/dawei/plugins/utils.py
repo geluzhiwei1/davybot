@@ -121,9 +121,7 @@ def import_class_from_file(file_path: str | Path, class_name: str) -> type[T]:
     try:
         return getattr(module, class_name)
     except AttributeError:
-        raise ImportError(
-            f"Class '{class_name}' not found in module '{module_name}' (file: {file_path})"
-        )
+        raise ImportError(f"Class '{class_name}' not found in module '{module_name}' (file: {file_path})")
 
 
 def merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

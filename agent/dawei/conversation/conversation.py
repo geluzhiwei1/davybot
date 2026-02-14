@@ -4,7 +4,7 @@
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -35,8 +35,8 @@ class Conversation(BaseModel):
     # 基本信息
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="对话唯一标识符")
     title: str = Field(default="新对话", description="对话标题")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="创建时间")
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="更新时间")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="创建时间")
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="更新时间")
 
     # 对话配置
     agent_mode: str | None = Field(None, description="代理模式")
@@ -183,7 +183,7 @@ class Conversation(BaseModel):
 
         self.messages.append(message)
         self.message_count = len(self.messages)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
         # 如果这是第一条用户消息，可以自动生成标题
         if len(self.messages) == 1 and isinstance(message, UserMessage) and self.title == "新对话":
@@ -256,7 +256,7 @@ class Conversation(BaseModel):
         """清空所有消息"""
         self.messages.clear()
         self.message_count = 0
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def to_json(self, indent: int | None = None) -> str:
         """将对话转换为JSON字符串
@@ -287,7 +287,7 @@ class Conversation(BaseModel):
 
             # 添加时间戳和ID（如果消息没有的话）
             if "timestamp" not in msg_dict:
-                msg_dict["timestamp"] = datetime.now(timezone.utc).isoformat()
+                msg_dict["timestamp"] = datetime.now(UTC).isoformat()
             if "id" not in msg_dict:
                 msg_dict["id"] = str(uuid.uuid4())
             messages_data.append(msg_dict)
@@ -336,7 +336,7 @@ class Conversation(BaseModel):
         def parse_datetime(dt_str: str) -> datetime:
             """解析日期时间字符串，支持多种格式"""
             if not dt_str:
-                return datetime.now(timezone.utc)
+                return datetime.now(UTC)
 
             # 处理带'Z'后缀的ISO格式
             if dt_str.endswith("Z"):
@@ -418,7 +418,7 @@ class Conversation(BaseModel):
             msg_dict = msg.to_dict()
             # 添加时间戳和ID（如果消息没有的话）
             if "timestamp" not in msg_dict:
-                msg_dict["timestamp"] = datetime.now(timezone.utc).isoformat()
+                msg_dict["timestamp"] = datetime.now(UTC).isoformat()
             if "id" not in msg_dict:
                 msg_dict["id"] = str(uuid.uuid4())
             messages_data.append(msg_dict)

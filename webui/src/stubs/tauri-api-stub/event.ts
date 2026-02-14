@@ -1,4 +1,5 @@
 // Stub for @tauri-apps/api/event
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 export type Event<T = unknown> = {
   payload: T

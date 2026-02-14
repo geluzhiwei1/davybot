@@ -346,7 +346,7 @@ const handleExtract = async () => {
     } else {
       ElMessage.warning(result.message || t('memory.extractEmpty'))
     }
-  } catch (e: unknown) {
+  } catch {
     ElMessage.error(t('memory.extractError'))
   }
 }

@@ -16,13 +16,13 @@
 """
 
 import logging
-from typing import Any
 from pathlib import Path
+from typing import Any
 
-from dawei.core.validators import validate_not_none, validate_dict_key, validate_string_not_empty
-from dawei.workspace.user_workspace import UserWorkspace
 from dawi.websocket.protocol import MessageType
 
+from dawei.core.validators import validate_dict_key, validate_not_none, validate_string_not_empty
+from dawei.workspace.user_workspace import UserWorkspace
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +37,7 @@ class BaseMessageHandler:
     - 日志记录
     """
 
-    def __init__(
-        self,
-        user_workspace: UserWorkspace,
-        task_manager: Any = None,
-        agent_lifecycle_manager: Any = None
-    ):
+    def __init__(self, user_workspace: UserWorkspace, task_manager: Any = None, agent_lifecycle_manager: Any = None):
         """
         初始化基础消息处理器
 
@@ -71,10 +66,9 @@ class BaseMessageHandler:
         validate_string_not_empty(session_id, "session_id")
 
         try:
-            session = await self.user_workspace.get_session(session_id)
-            return session
+            return await self.user_workspace.get_session(session_id)
         except Exception as e:
-            logger.error(f"Failed to get session {session_id}: {e}")
+            logger.exception(f"Failed to get session {session_id}: {e}")
             raise
 
     async def get_workspace(self, session_id: str) -> UserWorkspace:
@@ -92,18 +86,12 @@ class BaseMessageHandler:
         validate_not_none(session_id, "session_id")
 
         try:
-            workspace = await self.user_workspace.get_workspace(session_id)
-            return workspace
+            return await self.user_workspace.get_workspace(session_id)
         except Exception as e:
-            logger.error(f"Failed to get workspace {session_id}: {e}")
+            logger.exception(f"Failed to get workspace {session_id}: {e}")
             raise
 
-    async def send_message(
-        self,
-        session_id: str,
-        message_type: str,
-        **kwargs
-    ) -> dict[str, Any]:
+    async def send_message(self, session_id: str, message_type: str, **kwargs) -> dict[str, Any]:
         """发送消息到客户端
 
         Args:
@@ -124,16 +112,10 @@ class BaseMessageHandler:
             # 具体实现由子类提供
             raise NotImplementedError(f"send_message not implemented for {message_type}")
         except Exception as e:
-            logger.error(f"Failed to send {message_type} message: {e}")
+            logger.exception(f"Failed to send {message_type} message: {e}")
             raise
 
-    async def send_error(
-        self,
-        session_id: str,
-        error_code: str,
-        error_message: str,
-        details: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def send_error(self, session_id: str, error_code: str, error_message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
         """发送错误消息
 
         Args:
@@ -163,7 +145,7 @@ class BaseMessageHandler:
             # 具体实现由子类提供
             return await self.send_message(session_id, "error", error_response)
         except Exception as e:
-            logger.error(f"Failed to send error message: {e}")
+            logger.exception(f"Failed to send error message: {e}")
             raise
 
     async def get_task_manager(self) -> Any:

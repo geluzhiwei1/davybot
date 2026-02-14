@@ -1235,7 +1235,7 @@ export class WorkspacesApiService {
     try {
       // 使用统一的 plugin-config/config API
       // 提取纯配置数据（去除 enabled, activated）
-      const { enabled, settings, ...configOnly } = data;
+      const { settings, ...configOnly } = data;
 
       return await httpClient.put<{
         success: boolean;

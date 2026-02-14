@@ -7,7 +7,7 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 import jinja2
@@ -55,7 +55,7 @@ class TemplateRenderer:
             TemplateRenderError: 渲染失败时抛出
 
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         try:
             # 准备渲染环境
@@ -105,7 +105,7 @@ class TemplateRenderer:
             TemplateRenderError: 渲染失败时抛出
 
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         try:
             # 创建临时模板
@@ -372,7 +372,7 @@ class TemplateRenderer:
         self.render_count += 1
 
         if self.debug_mode:
-            render_time = (datetime.now(timezone.utc) - start_time).total_seconds()
+            render_time = (datetime.now(UTC) - start_time).total_seconds()
             record = {
                 "template": template_name,
                 "status": "success",
@@ -398,7 +398,7 @@ class TemplateRenderer:
         self.error_count += 1
 
         if self.debug_mode:
-            render_time = (datetime.now(timezone.utc) - start_time).total_seconds()
+            render_time = (datetime.now(UTC) - start_time).total_seconds()
             record = {
                 "template": template_name,
                 "status": "error",

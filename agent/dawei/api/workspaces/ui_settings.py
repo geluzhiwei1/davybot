@@ -274,17 +274,14 @@ async def get_workspace_system_environments(workspace_id: str):
                     "memory_available": 0,
                     "disk_total": 0,
                     "disk_available": 0,
-                }
+                },
             }
 
         with workspace_file.open(encoding="utf-8") as f:
             workspace_config = json.load(f)
 
         system_envs = workspace_config.get("system_environments", {})
-        return {
-            "success": True,
-            "system_environments": system_envs
-        }
+        return {"success": True, "system_environments": system_envs}
 
     except (OSError, json.JSONDecodeError, AttributeError, KeyError) as e:
         logger.error(f"Failed to get system environments: {e}", exc_info=True)
@@ -296,10 +293,7 @@ async def get_workspace_system_environments(workspace_id: str):
 
 @router.put("/{workspace_id}/system/environments")
 @router.put("/{workspace_id}/system-environments")
-async def update_workspace_system_environments(
-    workspace_id: str,
-    system_update: SystemEnvironmentsUpdate
-):
+async def update_workspace_system_environments(workspace_id: str, system_update: SystemEnvironmentsUpdate):
     """更新工作区的系统环境配置"""
     try:
         workspace = get_user_workspace(workspace_id)
@@ -312,12 +306,7 @@ async def update_workspace_system_environments(
             with workspace_file.open(encoding="utf-8") as f:
                 workspace_config = json.load(f)
         else:
-            workspace_config = {
-                "id": workspace_id,
-                "system_environments": {},
-                "user_ui_environments": {},
-                "user_ui_context": {}
-            }
+            workspace_config = {"id": workspace_id, "system_environments": {}, "user_ui_environments": {}, "user_ui_context": {}}
 
         # 更新系统环境信息
         if "system_environments" not in workspace_config:
@@ -337,11 +326,7 @@ async def update_workspace_system_environments(
 
         logger.info(f"Updated system environments for workspace {workspace_id}")
 
-        return {
-            "success": True,
-            "message": "System environments updated successfully",
-            "system_environments": system_envs
-        }
+        return {"success": True, "message": "System environments updated successfully", "system_environments": system_envs}
 
     except (
         OSError,

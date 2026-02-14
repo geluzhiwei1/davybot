@@ -7,7 +7,7 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -113,7 +113,7 @@ class PDCACycleContext:
         """
         # 结束当前阶段
         current_context = self.phase_contexts[self.current_phase]
-        current_context.end_time = datetime.now(timezone.utc)
+        current_context.end_time = datetime.now(UTC)
         current_context.status = "completed"
 
         # 保存当前阶段数据
@@ -134,7 +134,7 @@ class PDCACycleContext:
             self.cycle_count += 1
 
         # 创建新阶段上下文
-        new_context = PhaseContext(phase=next_phase, start_time=datetime.now(timezone.utc))
+        new_context = PhaseContext(phase=next_phase, start_time=datetime.now(UTC))
         self.phase_contexts[next_phase] = new_context
         self.current_phase = next_phase
 
@@ -248,7 +248,7 @@ class PDCAContextManager:
             session_id=session_id,
             cycle_id=cycle_id,
             domain=domain,
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
             task_description=task_description,
             task_goals=task_goals or [],
             success_criteria=success_criteria or [],
@@ -310,7 +310,7 @@ class PDCAContextManager:
             cycle_id=summary["cycle_id"],
             domain=DomainType(summary["domain"]),
             start_time=datetime.fromisoformat(
-                summary.get("start_time", datetime.now(timezone.utc).isoformat()),
+                summary.get("start_time", datetime.now(UTC).isoformat()),
             ),
             task_description=summary.get("task_description", ""),
             task_goals=summary.get("task_goals", []),

@@ -11,12 +11,13 @@
 - Alpine.js settings: https://www.alpinejs.dev/plugins/settings
 """
 
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
-from enum import StrEnum
 import json
 import logging
+from enum import StrEnum
 from pathlib import Path
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from dawei.core.exceptions import ConfigurationError
 
@@ -27,8 +28,10 @@ logger = logging.getLogger(__name__)
 # JSON Schema 类型映射
 # ============================================================================
 
+
 class JsonSchemaType(StrEnum):
     """JSON Schema 类型枚举"""
+
     STRING = "string"
     NUMBER = "number"
     INTEGER = "integer"
@@ -42,22 +45,24 @@ class JsonSchemaType(StrEnum):
 # 插件配置模型
 # ============================================================================
 
+
 class PluginConfigField(BaseModel):
     """单个配置字段的定义"""
+
     name: str = Field(..., description="字段名称")
     type: JsonSchemaType = Field(..., description="JSON Schema 类型")
     description: str = Field("", description="字段描述")
     default: Any = Field(None, description="默认值")
     required: bool = Field(False, description="是否必填")
-    enum: Optional[List[str]] = Field(None, description="枚举值列表")
-    minimum: Optional[float] = Field(None, description="最小值（数字类型）")
-    maximum: Optional[float] = Field(None, description="最大值（数字类型）")
-    pattern: Optional[str] = Field(None, description="正则表达式（字符串类型）")
-    format: Optional[str] = Field(None, description="格式（如 email、uri、date-time）")
+    enum: list[str] | None = Field(None, description="枚举值列表")
+    minimum: float | None = Field(None, description="最小值（数字类型）")
+    maximum: float | None = Field(None, description="最大值（数字类型）")
+    pattern: str | None = Field(None, description="正则表达式（字符串类型）")
+    format: str | None = Field(None, description="格式（如 email、uri、date-time）")
 
-    def to_schema(self) -> Dict[str, Any]:
+    def to_schema(self) -> dict[str, Any]:
         """转换为 JSON Schema 格式"""
-        schema: Dict[str, Any] = {
+        schema: dict[str, Any] = {
             "type": self.type,
             "description": self.description,
         }
@@ -93,18 +98,12 @@ class PluginConfigManifest(BaseModel):
     schema_type: str = Field(..., description="Schema 类型：object, array, or custom")
     title: str = Field(..., description="配置标题")
     description: str = Field("", description="配置描述")
-    properties: List[PluginConfigField] = Field(
-        default_factory=list,
-        description="配置字段列表"
-    )
-    required: List[str] = Field(
-        default_factory=list,
-        description="必填字段名称列表"
-    )
+    properties: list[PluginConfigField] = Field(default_factory=list, description="配置字段列表")
+    required: list[str] = Field(default_factory=list, description="必填字段名称列表")
 
-    def to_json_schema(self) -> Dict[str, Any]:
+    def to_json_schema(self) -> dict[str, Any]:
         """转换为完整的 JSON Schema"""
-        schema: Dict[str, Any] = {
+        schema: dict[str, Any] = {
             "$schema": "http://json-schema.org/draft-07/schema#",
             "$id": f"plugin_config_{self.schema_type}",
             "title": self.title,
@@ -120,7 +119,7 @@ class PluginConfigManifest(BaseModel):
 
         return schema
 
-    def to_form_config(self) -> Dict[str, Any]:
+    def to_form_config(self) -> dict[str, Any]:
         """转换为前端表单配置"""
         return {
             "schema": self.to_json_schema(),
@@ -129,13 +128,14 @@ class PluginConfigManifest(BaseModel):
                 "description": self.description,
                 "submitLabel": "保存配置",
                 "resetLabel": "重置为默认",
-            }
+            },
         }
 
 
 # ============================================================================
 # 插件配置存储和加载
 # ============================================================================
+
 
 class PluginConfigManager:
     """插件配置管理器 - 统一的配置存储和加载
@@ -180,7 +180,7 @@ class PluginConfigManager:
         # 使用完整的 plugin_id 作为文件名（包含版本号）
         return self.config_dir / f"{plugin_id}.json"
 
-    def load_plugin_config(self, plugin_id: str) -> Dict[str, Any]:
+    def load_plugin_config(self, plugin_id: str) -> dict[str, Any]:
         """加载插件配置
 
         Args:
@@ -203,12 +203,10 @@ class PluginConfigManager:
                 config = json.load(f)
                 logger.info(f"Loaded plugin config: {config_file}")
                 return config
-        except (json.JSONDecodeError, IOError) as e:
-            raise ConfigurationError(
-                f"Invalid plugin config file {config_file}: {e}"
-            )
+        except (OSError, json.JSONDecodeError) as e:
+            raise ConfigurationError(f"Invalid plugin config file {config_file}: {e}")
 
-    def save_plugin_config(self, plugin_id: str, config: Dict[str, Any]) -> None:
+    def save_plugin_config(self, plugin_id: str, config: dict[str, Any]) -> None:
         """保存插件配置
 
         Args:
@@ -228,10 +226,8 @@ class PluginConfigManager:
                 json.dump(config, f, indent=2, ensure_ascii=False)
 
             logger.info(f"Saved plugin config: {config_file}")
-        except IOError as e:
-            raise ConfigurationError(
-                f"Failed to save plugin config {config_file}: {e}"
-            )
+        except OSError as e:
+            raise ConfigurationError(f"Failed to save plugin config {config_file}: {e}")
 
     def delete_plugin_config(self, plugin_id: str) -> None:
         """删除插件配置（恢复默认）"""
@@ -244,10 +240,8 @@ class PluginConfigManager:
 # 辅助函数
 # ============================================================================
 
-def validate_config_against_schema(
-    config: Dict[str, Any],
-    schema: Dict[str, Any]
-) -> bool:
+
+def validate_config_against_schema(config: dict[str, Any], schema: dict[str, Any]) -> bool:
     """
     验证配置是否符合 Schema
 

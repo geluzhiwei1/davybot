@@ -7,7 +7,7 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -38,13 +38,13 @@ class ModeConfigLoader:
         if cache_key not in self._cache_timestamps:
             return False
 
-        age = (datetime.now(timezone.utc) - self._cache_timestamps[cache_key]).total_seconds()
+        age = (datetime.now(UTC) - self._cache_timestamps[cache_key]).total_seconds()
         return age < self._cache_ttl
 
     def _set_cache(self, cache_key: str, configs: dict[str, ModeConfig]):
         """设置缓存"""
         self._cache[cache_key] = configs
-        self._cache_timestamps[cache_key] = datetime.now(timezone.utc)
+        self._cache_timestamps[cache_key] = datetime.now(UTC)
 
     def _get_cache(self, cache_key: str) -> dict[str, ModeConfig] | None:
         """获取缓存"""

@@ -14,7 +14,6 @@ __version__ = "0.1.0"
 
 # Apply Windows IME patch early (before importing Textual)
 from dawei.tui import windows_ime_patch  # noqa: F401
-
 from dawei.tui.app import GeweiTUIApp
 from dawei.tui.config import TUIConfig, create_tui_config
 

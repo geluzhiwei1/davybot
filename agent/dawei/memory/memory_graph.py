@@ -9,7 +9,7 @@ import json
 import logging
 import sqlite3
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -322,7 +322,7 @@ class MemoryGraph:
                 updates["keywords"] = json.dumps(keywords)
             if metadata is not None:
                 updates["metadata"] = json.dumps(metadata)
-            updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+            updates["updated_at"] = datetime.now(UTC).isoformat()
 
             if not updates:
                 return False
@@ -432,7 +432,7 @@ class MemoryGraph:
 
             if only_valid or at_time:
                 # Temporal filtering
-                timestamp = (at_time or datetime.now(timezone.utc)).isoformat()
+                timestamp = (at_time or datetime.now(UTC)).isoformat()
                 query += " AND valid_start <= ? AND (valid_end IS NULL OR valid_end > ?)"
                 params.extend([timestamp, timestamp])
 

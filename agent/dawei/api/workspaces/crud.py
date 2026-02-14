@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -251,7 +251,7 @@ async def create_workspace(request: CreateWorkspaceRequest):
                 name=workspace_name,
                 display_name=request.display_name or workspace_name,
                 description=request.description,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
 
             # 写入工作区级配置
@@ -376,7 +376,7 @@ async def _register_workspace_in_system_index(
                 "name": name,
                 "display_name": display_name,
                 "path": path,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "is_active": True,
             },
         )

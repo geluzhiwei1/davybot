@@ -17,7 +17,7 @@ import hashlib
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -76,13 +76,13 @@ class FileSnapshotIndex:
     file_path: str
     snapshots: list[FileSnapshot] = field(default_factory=list)
     total_size_bytes: int = 0
-    last_updated: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def add_snapshot(self, snapshot: FileSnapshot):
         """添加快照"""
         self.snapshots.append(snapshot)
         self.total_size_bytes += snapshot.size_bytes
-        self.last_updated = datetime.now(timezone.utc)
+        self.last_updated = datetime.now(UTC)
 
     def get_latest_snapshot(self) -> FileSnapshot | None:
         """获取最新快照"""
@@ -203,7 +203,7 @@ class FileSnapshotManager:
                 file_path=file_path,
                 content=content,
                 checksum=checksum,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 reason=reason,
                 size_bytes=len(content.encode("utf-8")),
                 compression_type="gzip" if self.enable_compression else "full",
@@ -587,7 +587,7 @@ class FileSnapshotManager:
     def _generate_snapshot_id(self, file_path: str, strategy: SnapshotStrategy) -> str:
         """生成快照 ID"""
         # 【修复】添加微秒级时间戳，避免同一秒内创建多个快照时 ID 碰撞
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")  # 包含微秒
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")  # 包含微秒
         file_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
         return f"snap_{strategy.value}_{file_hash}_{timestamp}"
 
@@ -670,7 +670,7 @@ class FileSnapshotManager:
             index.snapshots = index.snapshots[-self.max_snapshots_per_file :]
 
         # 2. 按时间清理
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
+        cutoff_time = datetime.now(UTC) - timedelta(days=self.retention_days)
         index.snapshots = [snap for snap in index.snapshots if snap.created_at > cutoff_time or snap.strategy == SnapshotStrategy.MILESTONE]
 
         # 保存更新后的索引

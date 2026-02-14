@@ -21,8 +21,8 @@ from .files import router as files_router
 from .graphs import router as graphs_router
 from .llm import router as llm_router
 from .models import *
-from .plugins import router as plugins_router
 from .plugin_config import router as plugin_config_router
+from .plugins import router as plugins_router
 from .ui_settings import router as ui_settings_router
 
 # 创建主路由器

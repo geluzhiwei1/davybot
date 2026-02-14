@@ -7,7 +7,7 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -58,7 +58,7 @@ class PlanWorkflowState:
         self.questions_asked = 0
         self.plan_file_created = False
         self.plan_exit_called = False
-        self.created_at = datetime.now(timezone.utc)
+        self.created_at = datetime.now(UTC)
 
         # Phase-specific data
         self.phase_data: dict[str, Any] = {
@@ -155,7 +155,7 @@ class PlanWorkflowState:
             {
                 "path": file_path,
                 "description": description,
-                "added_at": datetime.now(timezone.utc).isoformat(),
+                "added_at": datetime.now(UTC).isoformat(),
             },
         )
         logger.debug(f"Added critical file: {file_path}")
@@ -226,7 +226,7 @@ class PlanWorkflowState:
             "plan_file_created": self.plan_file_created,
             "is_complete": self.is_complete(),
             "created_at": self.created_at.isoformat(),
-            "elapsed_seconds": (datetime.now(timezone.utc) - self.created_at).total_seconds(),
+            "elapsed_seconds": (datetime.now(UTC) - self.created_at).total_seconds(),
         }
 
 

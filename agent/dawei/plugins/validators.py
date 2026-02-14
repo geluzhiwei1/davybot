@@ -146,6 +146,7 @@ class PluginManifest(BaseModel):
                 raise ValueError(f"Dependencies '{key}' must be a list")
 
         return v
+
     @field_validator("hooks")
     @classmethod
     def validate_hooks(cls, v):
@@ -192,7 +193,7 @@ class PluginManifest(BaseModel):
         # Skip validation for string paths (will be loaded by PluginLoader)
         if isinstance(v, str):
             # Basic validation: check if it looks like a file path
-            if not (v.startswith("./") or v.startswith("../") or v.startswith("/")):
+            if not (v.startswith(("./", "../", "/"))):
                 logger.warning(f"config_schema path '{v}' should be a relative or absolute file path")
             return v
 
@@ -202,10 +203,7 @@ class PluginManifest(BaseModel):
 
         # Reject old nested format (schema + ui_schema)
         if "schema" in v or "ui_schema" in v:
-            raise ValueError(
-                "Old nested config_schema format (schema + ui_schema) is no longer supported. "
-                "Use standard JSON Schema format with type/properties/required, or reference a JSON file: config_schema: './config_schema.json'"
-            )
+            raise ValueError("Old nested config_schema format (schema + ui_schema) is no longer supported. Use standard JSON Schema format with type/properties/required, or reference a JSON file: config_schema: './config_schema.json'")
 
         # Validate standard JSON Schema format (has 'type' directly)
         if "type" in v:
@@ -226,12 +224,7 @@ class PluginManifest(BaseModel):
             return v
 
         # If we get here, format is invalid
-        raise ValueError(
-            "config_schema must be either:\n"
-            "1. A file path string: './config_schema.json'\n"
-            "2. Standard JSON Schema with 'type: object' at root\n"
-            "Old nested format (schema + ui_schema) is NOT supported."
-        )
+        raise ValueError("config_schema must be either:\n1. A file path string: './config_schema.json'\n2. Standard JSON Schema with 'type: object' at root\nOld nested format (schema + ui_schema) is NOT supported.")
 
     @field_validator("settings")
     @classmethod

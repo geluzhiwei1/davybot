@@ -10,9 +10,9 @@ export interface PluginConfigField {
   name: string;
   type: string;
   description?: string;
-  default?: any;
+  default?: unknown;
   required?: boolean;
-  enum?: Array<{ value: any; label: string }>;
+  enum?: Array<{ value: unknown; label: string }>;
   minimum?: number;
   maximum?: number;
   pattern?: string;
@@ -49,7 +49,7 @@ export interface GetPluginConfigRequest {
 
 export interface UpdatePluginConfigRequest {
   plugin_id: string;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }
 
 export interface ResetPluginConfigRequest {
@@ -62,8 +62,8 @@ export interface ResetPluginConfigRequest {
 
 export interface PluginConfigResponse {
   success: boolean;
-  schema?: Record<string, any>;
-  config: Record<string, any>;
+  schema?: Record<string, unknown>;
+  config: Record<string, unknown>;
   form_config?: {
     title?: string;
     description?: string;
@@ -76,9 +76,9 @@ export interface PluginConfigResponse {
 export interface PluginListResponse {
   success: boolean;
   plugins: Record<string, {
-    manifest: Record<string, any>;
-    schema: Record<string, any>;
-    config: Record<string, any>;
-    form_config?: Record<string, any>;
+    manifest: Record<string, unknown>;
+    schema: Record<string, unknown>;
+    config: Record<string, unknown>;
+    form_config?: Record<string, unknown>;
   }>;
 }

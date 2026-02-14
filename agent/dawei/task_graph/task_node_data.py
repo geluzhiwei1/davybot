@@ -6,7 +6,7 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -43,8 +43,8 @@ class TaskContext:
     task_images: list[str] = field(default_factory=list)
 
     # 时间戳
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
@@ -64,8 +64,8 @@ class TaskContext:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TaskContext":
         """从字典创建实例"""
-        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(timezone.utc)
-        updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(timezone.utc)
+        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC)
+        updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC)
 
         return cls(
             user_id=data["user_id"],
@@ -85,7 +85,7 @@ class TaskContext:
         for key, value in updates.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
 
 from dawei.entity.user_input_message import UserInputMessage
@@ -116,8 +116,8 @@ class TaskData:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     # 时间戳
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         """初始化后处理"""
@@ -128,27 +128,27 @@ class TaskData:
     def update_description(self, description: str) -> None:
         """更新任务描述"""
         self.description = description
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update_status(self, status: TaskStatus) -> None:
         """更新任务状态"""
         self.status = status
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update_mode(self, mode: str) -> None:
         """更新任务模式"""
         self.mode = mode
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update_priority(self, priority: TaskPriority) -> None:
         """更新任务优先级"""
         self.priority = priority
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def add_metadata(self, key: str, value: Any) -> None:
         """添加元数据"""
         self.metadata[key] = value
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
@@ -168,8 +168,8 @@ class TaskData:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TaskData":
         """从字典创建实例"""
-        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(timezone.utc)
-        updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(timezone.utc)
+        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC)
+        updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC)
 
         # 处理上下文
         context_data = data.get("context", {})

@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { setLocale } from '@/i18n'
 import {
   formatTimestamp as fmtTimestamp,
@@ -86,7 +86,6 @@ import {
   formatRelativeTime as fmtRelative,
   formatCalendarTime as fmtCalendar,
   formatDuration,
-  TimezoneManager,
 } from '@/utils/dateFormatter'
 import { useTimezone } from '@/composables/useTimezone'
 

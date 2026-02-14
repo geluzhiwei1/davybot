@@ -105,18 +105,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { useI18n } from 'vue-i18n';
 import { pluginConfigClient } from '@/services/api/pluginConfig';
 
-const { t } = useI18n();
-
-// ============================================================================
 // Props
 // ============================================================================
 
 interface PrivacyConfigTabProps {
   workspaceId: string;
-  initialConfig?: Record<string, any>;
+  initialConfig?: Record<string, unknown>;
 }
 
 const props = defineProps<PrivacyConfigTabProps>();
@@ -176,7 +172,7 @@ const sanitizationSchema = {
 
 const formRef = ref();
 const submitting = ref(false);
-const formData = reactive<Record<string, any>>({
+const formData = reactive<Record<string, unknown>>({
   enabled: true,
   retention_days: 90,
   sampling_rate: 1.0,
@@ -195,13 +191,13 @@ const analyticsSchema = computed(() => analyticsPrivacySchema);
 // ============================================================================
 
 const formRules = computed(() => {
-  const rules: Record<string, any> = {};
+  const rules: Record<string, unknown> = {};
 
   // 启用状态
   if (analyticsPrivacySchema.properties?.enabled?.required) {
     rules.enabled = [
       {
-        validator: (value: any) => value === true,
+        validator: (value: unknown) => value === true,
         message: analyticsPrivacySchema.properties.enabled?.description || '必须启用数据收集'
       }
     ];
@@ -244,7 +240,7 @@ async function handleSubmit() {
       pluginId: 'analytics',
       config: { ...formData },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to save privacy config:', error);
     ElMessage.error('保存配置失败');
   } finally {

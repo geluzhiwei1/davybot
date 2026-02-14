@@ -1,4 +1,4 @@
-/* eslint-disable vue/multi-word-component-names */
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="msg" :class="[message.role, { 'msg--user': message.role === 'user' }]">
     <!-- Avatar -->

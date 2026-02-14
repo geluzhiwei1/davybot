@@ -1060,12 +1060,11 @@
 import { ref, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Setting, Plus, Document, Refresh, Search, ShoppingCart, Download, Delete } from '@element-plus/icons-vue';
+import { Setting, Plus, Document, Refresh, Search, ShoppingCart } from '@element-plus/icons-vue';
 import { apiManager } from '@/services/api';
 import type { Skill } from '@/services/api';
 import MarketDialog from '@/components/market/MarketDialog.vue';
 import PluginConfigPanel from '@/components/workspace/PluginConfigPanel.vue';
-import DynamicPluginConfig from '@/components/DynamicPluginConfig.vue';
 import type { ResourceType } from '@/services/api/services/market';
 
 const { t } = useI18n();
@@ -1087,9 +1086,6 @@ const saving = ref(false);
 
 // 插件配置相关状态
 const pluginConfigDialogVisible = ref(false);
-const currentPlugin = ref<any>(null);
-const currentPluginSchema = ref<any>(null);
-const currentPluginConfig = ref<Record<string, any>>({});
 
 // Market dialog state
 const marketDialogVisible = ref(false);
@@ -1223,13 +1219,6 @@ const llmSettings = ref({
   }>
 });
 
-const modes = ref([
-  { name: 'Code', slug: 'code' },
-  { name: 'Ask', slug: 'ask' },
-  { name: 'Debug', slug: 'debug' },
-  { name: 'Architect', slug: 'architect' }
-]);
-
 // Provider 管理相关
 const showProviderDialog = ref(false);
 const showViewProviderDialog = ref(false);
@@ -1356,14 +1345,14 @@ const mcpForm = ref({
 });
 
 const mcpServerList = computed(() => {
-  return Object.entries(mcpSettings.value || {}).map(([name, config]: [string, any]) => ({
+  return Object.entries(mcpSettings.value || {}).map(([name, config]: [string, unknown]) => ({
     name,
     ...config
   }));
 });
 
 // Plugins Settings 相关
-const pluginList = ref<any[]>([]);
+const pluginList = ref<unknown[]>([]);
 const loadingPlugins = ref(false);
 
 watch(() => props.modelValue, (newVal) => {
@@ -1502,20 +1491,6 @@ const loadUIEnvironments = async () => {
   }
 };
 
-const saveUIEnvironments = async () => {
-  if (!props.workspaceId) return;
-  saving.value = true;
-  try {
-    await apiManager.getWorkspacesApi().updateUIEnvironments(props.workspaceId, uiEnvironments.value);
-    ElMessage.success(t('workspaceSettings.executionEnvironment.user.infoUpdated'));
-  } catch (error) {
-    ElMessage.error(t('workspaceSettings.messages.operationFailed'));
-    console.error('Failed to save UI environments:', error);
-  } finally {
-    saving.value = false;
-  }
-};
-
 const loadSystemEnvironments = async () => {
   if (!props.workspaceId) return;
   try {
@@ -1526,24 +1501,10 @@ const loadSystemEnvironments = async () => {
   }
 };
 
-const saveSystemEnvironments = async () => {
-  if (!props.workspaceId) return;
-  saving.value = true;
-  try {
-    await apiManager.getWorkspacesApi().updateSystemEnvironments(props.workspaceId, systemEnvironments.value);
-    ElMessage.success(t('workspaceSettings.executionEnvironment.system.infoUpdated'));
-  } catch (error) {
-    ElMessage.error(t('workspaceSettings.messages.operationFailed'));
-    console.error('Failed to save system environments:', error);
-  } finally {
-    saving.value = false;
-  }
-};
-
 const loadUIContext = async () => {
   if (!props.workspaceId) return;
   try {
-    const data = await apiManager.getWorkspacesApi().getUIContext(props.workspaceId);
+    await apiManager.getWorkspacesApi().getUIContext(props.workspaceId);
     // UI Context removed
   } catch (error) {
     console.error('Failed to load UI context:', error);
@@ -1990,7 +1951,7 @@ const editModeRules = async (mode: unknown) => {
     const response = await apiManager.getWorkspacesApi().getModeRules(props.workspaceId, mode.slug);
     modeRulesContent.value = response.rules || '';
     showModeRulesDialog.value = true;
-  } catch (error: unknown) {
+  } catch {
     // 如果 rules 文件不存在，使用空内容
     modeRulesContent.value = '';
     showModeRulesDialog.value = true;
@@ -2294,162 +2255,6 @@ const loadPlugins = async () => {
     console.error('Failed to load plugins:', error);
   } finally {
     loadingPlugins.value = false;
-  }
-};
-
-const viewPlugin = (plugin: unknown) => {
-  ElMessageBox.alert(
-    `
-    <div style="text-align: left;">
-      <p><strong>名称:</strong> ${plugin.name}</p>
-      <p><strong>版本:</strong> ${plugin.version || 'N/A'}</p>
-      <p><strong>描述:</strong> ${plugin.description || 'N/A'}</p>
-      <p><strong>安装路径:</strong> ${plugin.install_path || 'N/A'}</p>
-      <p><strong>安装时间:</strong> ${plugin.installed_at || 'N/A'}</p>
-    </div>
-    `,
-    'Plugin 详情',
-    {
-      dangerouslyUseHTMLString: true,
-      confirmButtonText: '关闭'
-    }
-  );
-};
-
-const uninstallPlugin = async (plugin: unknown) => {
-  if (!props.workspaceId) return;
-
-  try {
-    await ElMessageBox.confirm(
-      `确定要卸载 Plugin "${plugin.name}" 吗?此操作不可恢复。`,
-      '确认卸载',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    );
-
-    loadingPlugins.value = true;
-    await apiManager.getMarketApi().uninstallPlugin(plugin.name, props.workspaceId);
-    ElMessage.success(t('workspaceSettings.plugins.uninstallSuccess'));
-    await loadPlugins();
-  } catch (error: unknown) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || t('workspaceSettings.messages.operationFailed'));
-      console.error('Failed to uninstall plugin:', error);
-    }
-  } finally {
-    loadingPlugins.value = false;
-  }
-};
-
-// Configure plugin
-const configurePlugin = (plugin: unknown) => {
-  selectedPlugin.value = plugin;
-  pluginConfigDialogVisible.value = true;
-};
-
-// Handle plugin configuration saved
-const handlePluginConfigSaved = async (config: Record<string, unknown>) => {
-  ElMessage.success('插件配置保存成功');
-  pluginConfigDialogVisible.value = false;
-
-  // Reload plugin list to update status
-  await loadPlugins();
-};
-
-// ==================== Privacy Settings 方法 ====================
-
-// 处理隐私配置更改
-const handlePrivacyConfigChanged = async (payload: { pluginId: string; config: Record<string, unknown> }) => {
-  if (!props.workspaceId) return;
-
-  try {
-    await apiManager.getWorkspacesApi().updateWorkspaceConfig(
-      props.workspaceId,
-      { analytics: payload.config }
-    );
-
-    // 更新本地配置
-    workspaceConfig.value.analytics = payload.config;
-
-    ElMessage.success('隐私配置已保存');
-  } catch (error: unknown) {
-    ElMessage.error('保存隐私配置失败: ' + (error as Error).message);
-    console.error('Failed to save privacy config:', error);
-  }
-};
-
-// 导出分析数据
-const exportAnalyticsData = async () => {
-  if (!props.workspaceId) return;
-
-  try {
-    await ElMessageBox.confirm(
-      '将导出所有与您相关的分析数据(JSON格式)。是否继续?',
-      '导出数据',
-      {
-        confirmButtonText: '导出',
-        cancelButtonText: '取消',
-        type: 'info'
-      }
-    );
-
-    // 调用API导出数据
-    const response = await apiManager.getWorkspacesApi().exportAnalyticsData(props.workspaceId);
-
-    // 创建下载链接
-    const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `analytics-data-${props.workspaceId}-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    ElMessage.success('数据导出成功');
-  } catch (error: unknown) {
-    if (error !== 'cancel') {
-      ElMessage.error('导出失败: ' + (error.response?.data?.detail || error.message || '未知错误'));
-      console.error('Failed to export analytics data:', error);
-    }
-  }
-};
-
-// 删除分析数据
-const deleteAnalyticsData = async () => {
-  if (!props.workspaceId) return;
-
-  try {
-    await ElMessageBox.confirm(
-      '⚠️ 此操作将永久删除所有分析数据,且不可恢复。确定要继续吗?',
-      '删除数据',
-      {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
-        type: 'error',
-        confirmButtonClass: 'el-button--danger'
-      }
-    );
-
-    // 调用API删除数据
-    await apiManager.getWorkspacesApi().deleteAnalyticsData(props.workspaceId);
-
-    // 重置analytics配置
-    workspaceConfig.value.analytics.enabled = false;
-    workspaceConfig.value.analytics.retention_days = 90;
-    workspaceConfig.value.analytics.sampling_rate = 1.0;
-    workspaceConfig.value.analytics.anonymize_enabled = true;
-
-    ElMessage.success('✅ 所有分析数据已删除');
-  } catch (error: unknown) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败: ' + (error.response?.data?.detail || error.message || '未知错误'));
-      console.error('Failed to delete analytics data:', error);
-    }
   }
 };
 </script>

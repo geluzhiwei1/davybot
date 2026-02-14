@@ -9,7 +9,7 @@ import logging
 import sqlite3
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -30,8 +30,8 @@ class ContextPage:
 
     # LRU metadata
     access_count: int = 0
-    last_accessed: float = field(default_factory=lambda: datetime.now(timezone.utc).timestamp())
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_accessed: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Source tracking
     source_type: str = "conversation"  # conversation, document, tool_output
@@ -41,7 +41,7 @@ class ContextPage:
     @property
     def score(self) -> float:
         """LRU score: higher = more likely to evict"""
-        age_hours = (datetime.now(timezone.utc).timestamp() - self.last_accessed) / 3600
+        age_hours = (datetime.now(UTC).timestamp() - self.last_accessed) / 3600
         access_factor = 1 / (self.access_count + 1)
         return age_hours * access_factor
 
@@ -309,7 +309,7 @@ class VirtualContextManager:
             # Update in-memory page
             if page_id in self.active_pages:
                 self.active_pages[page_id].access_count += 1
-                self.active_pages[page_id].last_accessed = datetime.now(timezone.utc).timestamp()
+                self.active_pages[page_id].last_accessed = datetime.now(UTC).timestamp()
 
         except sqlite3.Error as e:
             self.logger.warning(f"Failed to update page access: {e}")

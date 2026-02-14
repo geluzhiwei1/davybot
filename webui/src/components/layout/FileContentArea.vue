@@ -195,9 +195,9 @@ import { computed, ref, watch, onUnmounted, nextTick } from 'vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { useThemeStore } from '@/stores/theme'
-import { ElTabs, ElTabPane, ElCard, ElButton, ElIcon, ElImage, ElInput, ElEmpty, ElRadioGroup, ElRadioButton } from 'element-plus'
+import { ElTabs, ElTabPane, ElCard, ElButton, ElIcon, ElImage, ElInput, ElEmpty } from 'element-plus'
 // ElTabs 和 ElTabPane 已经在上面导入了
-import { Document, VideoPlay, Headset, Picture, ZoomIn, View, Edit } from '@element-plus/icons-vue'
+import { Document, VideoPlay, Headset, Picture, ZoomIn } from '@element-plus/icons-vue'
 // View 和 Edit 图标用于 Markdown 文件的编辑器切换
 import NativeCodeMirror from '@/components/editor/NativeCodeMirror.vue'
 import CSVEditor from '@/components/editor/CSVEditor.vue'

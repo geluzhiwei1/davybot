@@ -184,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Download, Delete, InfoFilled, Document, Position, Location } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
@@ -282,7 +282,7 @@ const PRIVACY_LEVELS: PrivacyLevel[] = [
 
 interface PrivacyConfigSimplifiedProps {
   workspaceId: string;
-  initialConfig?: Record<string, any>;
+  initialConfig?: Record<string, unknown>;
 }
 
 const props = defineProps<PrivacyConfigSimplifiedProps>();
@@ -370,7 +370,7 @@ async function handleSave() {
       pluginId: 'analytics',
       config: { ...formData },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to save privacy config:', error);
     ElMessage.error(t('privacy.saveFailed'));
   } finally {
@@ -420,7 +420,7 @@ async function handleDelete() {
 // ============================================================================
 
 const emit = defineEmits<{
-  'config-changed': [payload: { pluginId: string; config: Record<string, any> }];
+  'config-changed': [payload: { pluginId: string; config: Record<string, unknown> }];
 }>();
 
 onMounted(() => {

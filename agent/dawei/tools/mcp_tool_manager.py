@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -120,13 +120,13 @@ class MCPConfigLoader:
         if cache_key not in self._cache_timestamps:
             return False
 
-        age = (datetime.now(timezone.utc) - self._cache_timestamps[cache_key]).total_seconds()
+        age = (datetime.now(UTC) - self._cache_timestamps[cache_key]).total_seconds()
         return age < self._cache_ttl
 
     def _set_cache(self, cache_key: str, configs: dict[str, MCPConfig]):
         """设置缓存"""
         self._cache[cache_key] = configs
-        self._cache_timestamps[cache_key] = datetime.now(timezone.utc)
+        self._cache_timestamps[cache_key] = datetime.now(UTC)
 
     def _get_cache(self, cache_key: str) -> dict[str, MCPConfig] | None:
         """获取缓存"""
@@ -375,7 +375,7 @@ class MCPToolManager:
 
         # 模拟成功连接
         server_info.status = "connected"
-        server_info.connected_at = datetime.now(timezone.utc)
+        server_info.connected_at = datetime.now(UTC)
         server_info.tools = [
             {
                 "name": f"{server_name}_tool1",

@@ -317,7 +317,7 @@ class PluginRegistry:
 
             # Update settings
             registration.settings.update(settings)
-            if registration.plugin is not None and hasattr(registration.plugin, 'config'):
+            if registration.plugin is not None and hasattr(registration.plugin, "config"):
                 registration.plugin.config.settings.update(settings)
 
             logger.info(f"Updated settings for plugin: {plugin_id}")

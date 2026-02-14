@@ -177,8 +177,4 @@ def find_components_by_type(components: list[dict[str, Any]], component_type: st
         >>> buttons[0]["id"]
         'btn1'
     """
-    return [
-        comp
-        for comp in components
-        if comp.get("component", {}).get("type") == component_type
-    ]
+    return [comp for comp in components if comp.get("component", {}).get("type") == component_type]

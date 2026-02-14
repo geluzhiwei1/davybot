@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import StrEnum
 from typing import Any, Union
 
@@ -101,7 +101,7 @@ class BaseLLMMessage(BaseModel, ABC):
         None,
         description="工具调用列表(仅assistant消息使用)",
     )
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="消息创建时间戳")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="消息创建时间戳")
 
     class Config:
         use_enum_values = True
@@ -194,7 +194,7 @@ class SystemMessage(BaseLLMMessage):
         content = data.get("content", "")
 
         # 处理时间戳
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         if "timestamp" in data:
             try:
                 if isinstance(data["timestamp"], str):
@@ -230,7 +230,7 @@ class UserMessage(BaseLLMMessage):
         content = data.get("content", "")
 
         # 处理时间戳
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         if "timestamp" in data:
             try:
                 if isinstance(data["timestamp"], str):
@@ -311,7 +311,7 @@ class AssistantMessage(BaseLLMMessage):
             content = ""
 
         # 处理时间戳
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         if "timestamp" in data:
             try:
                 if isinstance(data["timestamp"], str):
@@ -364,7 +364,7 @@ class ToolMessage(BaseLLMMessage):
     def from_openai_format(cls, data: dict[str, Any]) -> "ToolMessage":
         """从 OpenAI 格式创建实例"""
         # 处理时间戳
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         if "timestamp" in data:
             try:
                 if isinstance(data["timestamp"], str):
@@ -452,7 +452,7 @@ class ChatResult(BaseModel):
     llm_output: dict[str, Any] | None = Field(None, description="LLM输出信息")
     usage: dict[str, Any] | None = Field(None, description="使用统计信息")
     response_metadata: dict[str, Any] | None = Field(None, description="响应元数据")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="创建时间")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="创建时间")
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -515,7 +515,7 @@ class ChatResult(BaseModel):
             llm_output=data.get("llm_output"),
             usage=data.get("usage"),
             response_metadata=data.get("response_metadata"),
-            created_at=created_at or datetime.now(timezone.utc),
+            created_at=created_at or datetime.now(UTC),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -551,7 +551,7 @@ class LLMResult(BaseModel):
     results: list[ChatResult] = Field(..., description="聊天结果列表")
     llm_output: dict[str, Any] | None = Field(None, description="LLM输出信息")
     usage: dict[str, Any] | None = Field(None, description="使用统计信息")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="创建时间")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="创建时间")
 
     @property
     def first_result(self) -> ChatResult | None:
@@ -585,7 +585,7 @@ class LLMResult(BaseModel):
             results=results,
             llm_output=data.get("llm_output"),
             usage=data.get("usage"),
-            created_at=created_at or datetime.now(timezone.utc),
+            created_at=created_at or datetime.now(UTC),
         )
 
     def to_dict(self) -> dict[str, Any]:

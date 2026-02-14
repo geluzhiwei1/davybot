@@ -88,6 +88,7 @@ class LocalFileSystemStorage(Storage):
 
     async def write_file_content(self, path: str, content: str) -> bool:
         import logging
+
         logger = logging.getLogger(__name__)
 
         safe_path = self._get_safe_path(path)
@@ -100,7 +101,7 @@ class LocalFileSystemStorage(Storage):
                 f.write(content)
         except UnicodeEncodeError as e:
             raise ValueError(f"文件编码错误,无法以 UTF-8 编码写入文件: {e}") from e
-        except (OSError, IOError) as e:
+        except OSError as e:
             raise OSError(f"写入文件失败: {e}") from e
 
         logger.debug(f"Successfully wrote {len(content)} bytes to {safe_path}")

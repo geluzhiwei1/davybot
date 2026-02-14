@@ -7,7 +7,7 @@
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -204,7 +204,7 @@ def create_llm_filename(model_name: str, timestamp: str | None = None) -> str:
     if timestamp is None:
         from datetime import datetime
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
 
     # 清理模型名称，移除不安全字符
     safe_model_name = "".join(c for c in model_name if c.isalnum() or c in ("-", "_"))

@@ -269,9 +269,7 @@ class SystemCommandHandler:
 
             # 使用同步的方式保存（避免异步问题）
             loop = asyncio.get_event_loop()
-            save_success = loop.run_until_complete(
-                user_workspace.save_current_conversation()
-            )
+            save_success = loop.run_until_complete(user_workspace.save_current_conversation())
 
             if save_success:
                 logger.info(

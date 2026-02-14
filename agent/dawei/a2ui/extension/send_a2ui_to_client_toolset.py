@@ -111,12 +111,7 @@ class SendA2uiToClientTool:
         """
         return {
             "name": self.TOOL_NAME,
-            "description": (
-                "Sends A2UI JSON to the client to render rich UI for the user."
-                " This tool can be called multiple times to render multiple UI surfaces.\n"
-                f"Args:\n"
-                f"  {self.A2UI_JSON_ARG_NAME}: Valid A2UI JSON string to send to client."
-            ),
+            "description": (f"Sends A2UI JSON to the client to render rich UI for the user. This tool can be called multiple times to render multiple UI surfaces.\nArgs:\n  {self.A2UI_JSON_ARG_NAME}: Valid A2UI JSON string to send to client."),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -151,10 +146,10 @@ class SendA2uiToClientTool:
             logger.info(f"Validated A2UI JSON with {len(components)} component(s)")
             return components
         except jsonschema.ValidationError as e:
-            logger.error(f"A2UI validation failed: {e.message}")
+            logger.exception(f"A2UI validation failed: {e.message}")
             raise ValueError(f"A2UI validation failed: {e.message}") from e
         except ValueError as e:
-            logger.error(f"Invalid A2UI JSON: {e}")
+            logger.exception(f"Invalid A2UI JSON: {e}")
             raise
 
     async def run_async(
@@ -175,9 +170,7 @@ class SendA2uiToClientTool:
         try:
             a2ui_json = args.get(self.A2UI_JSON_ARG_NAME)
             if not a2ui_json:
-                raise ValueError(
-                    f"Missing required argument: {self.A2UI_JSON_ARG_NAME}"
-                )
+                raise ValueError(f"Missing required argument: {self.A2UI_JSON_ARG_NAME}")
 
             # Validate and parse
             components = await self.validate_and_parse(a2ui_json)
@@ -284,11 +277,7 @@ def get_a2ui_schema_with_instructions(
             },
         }
         component_list = ", ".join(component_types)
-        instructions = (
-            f"Available A2UI component types: {component_list}.\n"
-            "You can create rich UIs using these components.\n"
-            "Each component must have an 'id' and a 'component' object with a 'type'."
-        )
+        instructions = f"Available A2UI component types: {component_list}.\nYou can create rich UIs using these components.\nEach component must have an 'id' and a 'component' object with a 'type'."
     else:
         schema = wrap_as_json_array(
             {
@@ -300,9 +289,6 @@ def get_a2ui_schema_with_instructions(
                 "required": ["id", "component"],
             }
         )
-        instructions = (
-            "You can create rich UIs using A2UI components.\n"
-            "Each component must have an 'id' and a 'component' object with a 'type'."
-        )
+        instructions = "You can create rich UIs using A2UI components.\nEach component must have an 'id' and a 'component' object with a 'type'."
 
     return schema, instructions

@@ -202,8 +202,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -216,9 +215,9 @@ interface PluginField {
   name: string;
   type: string;
   description?: string;
-  default?: any;
+  default?: unknown;
   required?: boolean;
-  enum?: Array<{ value: any; label: string }>;
+  enum?: Array<{ value: unknown; label: string }>;
   minimum?: number;
   maximum?: number;
   pattern?: string;
@@ -241,7 +240,7 @@ const props = defineProps<{
   pluginId: string;
   workspaceId: string;
   schema?: PluginField[];
-  initialConfig?: Record<string, any>;
+  initialConfig?: Record<string, unknown>;
   canReset?: boolean;
 }>();
 
@@ -252,7 +251,7 @@ const props = defineProps<{
 const loading = ref(false);
 const error = ref<string | null>(null);
 const success = ref<string | null>(null);
-const formData = reactive<Record<string, any>>({});
+const formData = reactive<Record<string, unknown>>({});
 const submitting = ref(false);
 
 // ============================================================================
@@ -282,10 +281,10 @@ const isFormDirty = computed(() => {
 // 表单规则
 // ============================================================================
 
-const formRules = computed<Record<string, any>>(() => {
+const formRules = computed<Record<string, unknown>>(() => {
   if (!props.schema) return {};
 
-  const rules: Record<string, any> = {};
+  const rules: Record<string, unknown> = {};
 
   for (const field of props.schema) {
     if (!isTextField(field) && !isNumberField(field) &&
@@ -394,7 +393,7 @@ function getPlaceholder(field: PluginField): string {
   return `Enter ${field.description || field.name}`;
 }
 
-function getFieldOptions(field: PluginField): Array<{ value: any; label: string }> {
+function getFieldOptions(field: PluginField): Array<{ value: unknown; label: string }> {
   return field.enum || [];
 }
 
@@ -449,8 +448,8 @@ async function handleSubmit() {
   try {
     emit('submit', formData);
     success.value = 'Configuration saved successfully';
-  } catch (err: any) {
-    error.value = err.message || 'Failed to save configuration';
+  } catch (err: unknown) {
+    error.value = err instanceof Error ? err.message : 'Failed to save configuration';
     console.error('Failed to submit plugin config:', err);
   } finally {
     submitting.value = false;

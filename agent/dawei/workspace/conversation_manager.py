@@ -8,7 +8,7 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -351,13 +351,13 @@ class WorkspaceConversationManager:
         if isinstance(created_at, datetime):
             created_at = created_at.isoformat()
         elif created_at is None:
-            created_at = datetime.now(timezone.utc).isoformat()
+            created_at = datetime.now(UTC).isoformat()
 
         updated_at = conversation.updated_at
         if isinstance(updated_at, datetime):
             updated_at = updated_at.isoformat()
         elif updated_at is None:
-            updated_at = datetime.now(timezone.utc).isoformat()
+            updated_at = datetime.now(UTC).isoformat()
 
         # 正确序列化消息 - 使用 pydantic 的 model_dump
         messages_data = []

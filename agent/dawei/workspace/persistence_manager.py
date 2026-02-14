@@ -22,7 +22,7 @@ import json
 import logging
 import os
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone, date, datetime
+from datetime import UTC, date, datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, TypeVar
@@ -177,7 +177,7 @@ class WorkspacePersistenceManager:
 
                 # 生成文件名
                 if use_timestamp:
-                    ts = timestamp or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+                    ts = timestamp or datetime.now(UTC).strftime("%Y%m%d%H%M%S")
                     filename = f"{ts}_{resource_id}.json"
                 else:
                     filename = f"{resource_id}.json"
@@ -478,9 +478,9 @@ class WorkspacePersistenceManager:
                 logger.exception(
                     f"[PERSISTENCE] Invalid date format in created_at: {created_at}, error: {date_error}",
                 )
-                timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+                timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
         else:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
 
         return await self.save_resource(
             ResourceType.CONVERSATION,

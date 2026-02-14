@@ -404,29 +404,24 @@ def assert_condition(
             raise exception_type(field_name, None, error_message)
         raise exception_type(error_message)
 
+
 # =============================================================================
 # 通用验证辅助函数
 # =============================================================================
 
+
 def validate_dict_key(data: dict, key: str, field_name: str = "data") -> Any:
     """验证字典包含必需的key"""
     if not isinstance(data, dict):
-        raise ValidationError(
-            field_name=field_name,
-            value=data,
-            reason=f"must be a dict, got {type(data).__name__}"
-        )
+        raise ValidationError(field_name=field_name, value=data, reason=f"must be a dict, got {type(data).__name__}")
     if key not in data:
-        raise ValidationError(
-            field_name=field_name,
-            value=data,
-            reason=f"missing required key '{key}'"
-        )
+        raise ValidationError(field_name=field_name, value=data, reason=f"missing required key '{key}'")
     return data[key]
 
 
 def safe_execute(func):
     """装饰器：安全执行函数，捕获并重新抛出异常"""
+
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -434,8 +429,9 @@ def safe_execute(func):
             raise
         except Exception as e:
             import logging
+
             logger = logging.getLogger(func.__name__)
             logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
             raise type(e)(f"Unexpected error in {func.__name__}: {e}") from e
-    return wrapper
 
+    return wrapper

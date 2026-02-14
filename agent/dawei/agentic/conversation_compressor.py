@@ -11,7 +11,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any, ClassVar
 
 from .context_manager import TokenEstimator
@@ -43,7 +43,7 @@ class MessageMetadata:
     tokens: int
     is_key_message: bool = False
     key_reason: str = ""
-    timestamp: float = field(default_factory=lambda: datetime.now(timezone.utc).timestamp())
+    timestamp: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
 
 
 class ConversationCompressor:

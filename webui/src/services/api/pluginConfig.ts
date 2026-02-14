@@ -9,7 +9,6 @@ import type {
   PluginConfigResponse,
   PluginListResponse,
   UpdatePluginConfigRequest,
-  GetPluginConfigRequest,
   ResetPluginConfigRequest,
 } from './types';
 

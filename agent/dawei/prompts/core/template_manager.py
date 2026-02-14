@@ -8,7 +8,7 @@
 
 import logging
 import threading
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -308,7 +308,7 @@ class TemplateManager:
             {
                 "mode": mode,
                 "language": language,
-                "current_time": datetime.now(timezone.utc),
+                "current_time": datetime.now(UTC),
                 "template_manager": self,
             },
         )
@@ -330,7 +330,7 @@ class TemplateManager:
 
         # 检查缓存是否过期
         timestamp = self.cache_timestamps.get(cache_key)
-        if timestamp and datetime.now(timezone.utc) - timestamp > timedelta(seconds=self.cache_ttl):
+        if timestamp and datetime.now(UTC) - timestamp > timedelta(seconds=self.cache_ttl):
             self.invalidate_cache(cache_key)
             return None
 
@@ -346,9 +346,9 @@ class TemplateManager:
         """
         self.template_cache[cache_key] = {
             "template": template,
-            "cached_at": datetime.now(timezone.utc),
+            "cached_at": datetime.now(UTC),
         }
-        self.cache_timestamps[cache_key] = datetime.now(timezone.utc)
+        self.cache_timestamps[cache_key] = datetime.now(UTC)
 
     def invalidate_cache(self, template_name: str | None = None) -> None:
         """清理缓存

@@ -13,7 +13,7 @@ import time
 import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from dawei.logg.logging import get_logger
@@ -199,7 +199,7 @@ class AsyncTaskManager(IAsyncTaskManager):
                 task_id=task_id,
                 status=TaskStatus.CANCELLED,
                 started_at=self._contexts[task_id].get_data("started_at"),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
             self._results[task_id] = result
 
@@ -434,7 +434,7 @@ class AsyncTaskManager(IAsyncTaskManager):
             return
 
         self._is_running = True
-        self._stats["start_time"] = datetime.now(timezone.utc).isoformat()
+        self._stats["start_time"] = datetime.now(UTC).isoformat()
 
         # 启动调度器任务
         self._scheduler_task = asyncio.create_task(self._scheduler_loop())
@@ -576,7 +576,7 @@ class AsyncTaskManager(IAsyncTaskManager):
         try:
             # 设置任务状态为运行中
             context.set_status(TaskStatus.RUNNING)
-            context.set_data("started_at", datetime.now(timezone.utc))
+            context.set_data("started_at", datetime.now(UTC))
 
             # 更新统计
             self._stats["running_tasks"] += 1
@@ -612,7 +612,7 @@ class AsyncTaskManager(IAsyncTaskManager):
                 result=result,
                 execution_time=execution_time,
                 started_at=context.get_data("started_at"),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
 
             # 更新统计
@@ -630,7 +630,7 @@ class AsyncTaskManager(IAsyncTaskManager):
                 status=TaskStatus.CANCELLED,
                 execution_time=execution_time,
                 started_at=context.get_data("started_at"),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
 
             self._stats["cancelled_tasks"] += 1
@@ -648,7 +648,7 @@ class AsyncTaskManager(IAsyncTaskManager):
                 error=e,
                 execution_time=execution_time,
                 started_at=context.get_data("started_at"),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
             self._stats["failed_tasks"] += 1
             self._stats["running_tasks"] -= 1
@@ -666,7 +666,7 @@ class AsyncTaskManager(IAsyncTaskManager):
                 error=e,
                 execution_time=execution_time,
                 started_at=context.get_data("started_at"),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
             self._stats["failed_tasks"] += 1
             self._stats["running_tasks"] -= 1
@@ -684,7 +684,7 @@ class AsyncTaskManager(IAsyncTaskManager):
                 error=e,
                 execution_time=execution_time,
                 started_at=context.get_data("started_at"),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
             self._stats["failed_tasks"] += 1
             self._stats["running_tasks"] -= 1
@@ -982,7 +982,7 @@ class AsyncTaskManager(IAsyncTaskManager):
 
                 self._logger.info(f"Cleaned up {len(tasks_to_remove)} completed tasks")
 
-        self._stats["last_cleanup_time"] = datetime.now(timezone.utc).isoformat()
+        self._stats["last_cleanup_time"] = datetime.now(UTC).isoformat()
 
     async def _safe_call_callback(self, callback: Callable, *args) -> None:
         """安全调用回调函数"""

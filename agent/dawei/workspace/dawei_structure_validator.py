@@ -8,16 +8,16 @@ Follows Fast Fail principle - raises exceptions immediately on validation failur
 """
 
 import json
-from pathlib import Path
-from typing import List, Optional
-from datetime import datetime
 import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 
 class DaweiStructureValidationError(Exception):
     """Base exception for .dawei structure validation errors."""
 
-    def __init__(self, message: str, path: Optional[Path] = None):
+    def __init__(self, message: str, path: Path | None = None):
         self.path = path
         if path:
             message = f"{path}: {message}"
@@ -27,13 +27,9 @@ class DaweiStructureValidationError(Exception):
 class WorkspaceJsonError(DaweiStructureValidationError):
     """workspace.json format or content error."""
 
-    pass
-
 
 class DirectoryStructureError(DaweiStructureValidationError):
     """Directory structure error."""
-
-    pass
 
 
 class DaweiStructureValidator:
@@ -88,14 +84,14 @@ class DaweiStructureValidator:
         # Check file exists
         if not workspace_json_path.exists():
             raise WorkspaceJsonError(
-                f"workspace.json not found",
+                "workspace.json not found",
                 path=workspace_json_path.parent,
             )
 
         # Check file is readable
         if not workspace_json_path.is_file():
             raise WorkspaceJsonError(
-                f"workspace.json is not a file",
+                "workspace.json is not a file",
                 path=workspace_json_path,
             )
 
@@ -115,9 +111,7 @@ class DaweiStructureValidator:
             )
 
         # Validate required fields
-        missing_fields = [
-            field for field in DaweiStructureValidator.REQUIRED_WORKSPACE_FIELDS if field not in data
-        ]
+        missing_fields = [field for field in DaweiStructureValidator.REQUIRED_WORKSPACE_FIELDS if field not in data]
         if missing_fields:
             raise WorkspaceJsonError(
                 f"Missing required fields: {', '.join(missing_fields)}",
@@ -132,13 +126,13 @@ class DaweiStructureValidator:
             # name and display_name must be non-empty strings
             if not isinstance(data["name"], str) or not data["name"].strip():
                 raise WorkspaceJsonError(
-                    f"'name' must be a non-empty string",
+                    "'name' must be a non-empty string",
                     path=workspace_json_path,
                 )
 
             if not isinstance(data["display_name"], str) or not data["display_name"].strip():
                 raise WorkspaceJsonError(
-                    f"'display_name' must be a non-empty string",
+                    "'display_name' must be a non-empty string",
                     path=workspace_json_path,
                 )
 
@@ -148,7 +142,7 @@ class DaweiStructureValidator:
             # is_active must be a boolean
             if not isinstance(data["is_active"], bool):
                 raise WorkspaceJsonError(
-                    f"'is_active' must be a boolean",
+                    "'is_active' must be a boolean",
                     path=workspace_json_path,
                 )
 
@@ -173,13 +167,13 @@ class DaweiStructureValidator:
         # Check .dawei directory exists
         if not dawei_path.exists():
             raise DirectoryStructureError(
-                f".dawei directory does not exist",
+                ".dawei directory does not exist",
                 path=dawei_path,
             )
 
         if not dawei_path.is_dir():
             raise DirectoryStructureError(
-                f".dawei is not a directory",
+                ".dawei is not a directory",
                 path=dawei_path,
             )
 
@@ -187,7 +181,7 @@ class DaweiStructureValidator:
         workspace_json = dawei_path / "workspace.json"
         if not workspace_json.exists():
             raise DirectoryStructureError(
-                f"workspace.json not found",
+                "workspace.json not found",
                 path=dawei_path,
             )
 
@@ -223,14 +217,14 @@ class DaweiStructureValidator:
                 )
 
     @staticmethod
-    def validate_jsonl_files(dawei_path: Path) -> List[str]:
+    def validate_jsonl_files(dawei_path: Path) -> list[str]:
         """Validate JSONL files in persistence_failures directory.
 
         Args:
             dawei_path: Path to .dawei directory
 
         Returns:
-            List[str]: List of validation warnings (non-critical issues)
+            list[str]: List of validation warnings (non-critical issues)
 
         Raises:
             WorkspaceJsonError: If JSONL file format is invalid
@@ -265,9 +259,7 @@ class DaweiStructureValidator:
             except WorkspaceJsonError:
                 raise  # Re-raise validation errors
             except Exception as e:
-                warnings.append(
-                    f"Warning: Could not validate {jsonl_file.name}: {e}"
-                )
+                warnings.append(f"Warning: Could not validate {jsonl_file.name}: {e}")
 
         return warnings
 
@@ -282,7 +274,7 @@ class DaweiStructureValidator:
             dict: Validation result with keys:
                 - valid (bool): True if validation passed
                 - workspace_data (dict): Parsed workspace.json content
-                - warnings (List[str]): List of non-critical warnings
+                - warnings (list[str]): List of non-critical warnings
 
         Raises:
             DaweiStructureValidationError: If validation fails (Fast Fail)
@@ -315,8 +307,8 @@ class DaweiStructureValidator:
                 - total (int): Total number of workspaces
                 - valid (int): Number of valid workspaces
                 - invalid (int): Number of invalid workspaces
-                - errors (List[dict]): List of validation errors
-                - workspace_details (List[dict]): Details for each workspace
+                - errors (list[dict]): List of validation errors
+                - workspace_details (list[dict]): Details for each workspace
         """
         if not workspaces_root.exists():
             raise DirectoryStructureError(
@@ -359,18 +351,20 @@ class DaweiStructureValidator:
             except DaweiStructureValidationError as e:
                 workspace_detail["error"] = str(e)
                 result["invalid"] += 1
-                result["errors"].append({
-                    "workspace": workspace_dir.name,
-                    "path": str(dawei_path),
-                    "error": str(e),
-                })
+                result["errors"].append(
+                    {
+                        "workspace": workspace_dir.name,
+                        "path": str(dawei_path),
+                        "error": str(e),
+                    }
+                )
 
             result["workspace_details"].append(workspace_detail)
 
         return result
 
 
-def validate_dawei_on_startup(workspaces_root: Optional[Path] = None) -> None:
+def validate_dawei_on_startup(workspaces_root: Path | None = None) -> None:
     """Validate .dawei structure during server startup.
 
     This function is designed to be called during server startup.
@@ -384,8 +378,8 @@ def validate_dawei_on_startup(workspaces_root: Optional[Path] = None) -> None:
         DaweiStructureValidationError: If critical validation errors are found
 
     """
-    import os
     import logging
+    import os
 
     logger = logging.getLogger(__name__)
 
@@ -393,7 +387,7 @@ def validate_dawei_on_startup(workspaces_root: Optional[Path] = None) -> None:
     if workspaces_root is None:
         workspaces_root = Path(os.getenv("WORKSPACES_ROOT", "./workspaces"))
 
-    logger.info(f"=== Validating .dawei directory structure ===")
+    logger.info("=== Validating .dawei directory structure ===")
     logger.info(f"Workspaces root: {workspaces_root}")
 
     try:
@@ -407,7 +401,7 @@ def validate_dawei_on_startup(workspaces_root: Optional[Path] = None) -> None:
         result = DaweiStructureValidator.validate_all_workspaces(workspaces_root)
 
         # Log summary
-        logger.info(f"Validation complete:")
+        logger.info("Validation complete:")
         logger.info(f"  Total workspaces: {result['total']}")
         logger.info(f"  Valid: {result['valid']}")
         logger.info(f"  Invalid: {result['invalid']}")
@@ -419,16 +413,10 @@ def validate_dawei_on_startup(workspaces_root: Optional[Path] = None) -> None:
                 logger.error(f"  - {error['workspace']}: {error['error']}")
 
             # Fast Fail: Raise exception if there are critical errors
-            raise DaweiStructureValidationError(
-                f"Found {result['invalid']} invalid workspace(s). "
-                f"Check logs for details."
-            )
+            raise DaweiStructureValidationError(f"Found {result['invalid']} invalid workspace(s). Check logs for details.")
 
         # Log warnings if any
-        total_warnings = sum(
-            len(detail.get("warnings", []))
-            for detail in result["workspace_details"]
-        )
+        total_warnings = sum(len(detail.get("warnings", [])) for detail in result["workspace_details"])
         if total_warnings > 0:
             logger.warning(f"Found {total_warnings} validation warning(s):")
             for detail in result["workspace_details"]:
@@ -445,9 +433,7 @@ def validate_dawei_on_startup(workspaces_root: Optional[Path] = None) -> None:
     except Exception as e:
         # Fast Fail: Log unexpected errors and raise
         logger.error(f"Unexpected error during .dawei validation: {e}", exc_info=True)
-        raise DaweiStructureValidationError(
-            f"Unexpected error during validation: {e}"
-        ) from e
+        raise DaweiStructureValidationError(f"Unexpected error during validation: {e}") from e
 
 
 __all__ = [

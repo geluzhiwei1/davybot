@@ -15,10 +15,9 @@ Refactoring Changes:
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
-from dawei.core.events import TaskEvent
 from dawei.agentic.agent import Agent
 
 # PDCA Integration
@@ -27,7 +26,7 @@ from dawei.agentic.pdca_context import PDCAPhase
 from dawei.async_task.task_manager import AsyncTaskManager
 from dawei.async_task.types import RetryPolicy, TaskDefinition, TaskStatus
 from dawei.core import local_context
-from dawei.core.events import TaskEventType
+from dawei.core.events import TaskEvent, TaskEventType
 from dawei.core.exceptions import (
     AgentInitializationError,
     ConfigurationError,
@@ -39,12 +38,12 @@ from dawei.core.exceptions import (
 )
 from dawei.entity.user_input_message import UserInputMessage
 from dawei.logg.logging import get_logger
-from dawei.workspace.user_workspace import UserWorkspace
-from dawei.workspace.workspace_manager import workspace_manager
-
 from dawei.websocket.protocol import (
     AgentCompleteMessage,
+    AgentStopMessage,
     ErrorMessage,
+    FollowupResponseMessage,
+    MessageType,
     PDACycleCompleteMessage,
     PDACycleStartMessage,
     PDCAPhaseAdvanceMessage,
@@ -54,13 +53,12 @@ from dawei.websocket.protocol import (
     TaskNodeProgressMessage,
     TaskNodeStartMessage,
     WebSocketMessage,
-    MessageType,
-    FollowupResponseMessage,
-    AgentStopMessage,
 )
+from dawei.workspace.user_workspace import UserWorkspace
+from dawei.workspace.workspace_manager import workspace_manager
 
-from .base import AsyncMessageHandler
 from .agent_lifecycle_handler import AgentLifecycleHandler
+from .base import AsyncMessageHandler
 from .event_forwarding_handler import EventForwardingHandler
 from .system_command_handler import SystemCommandHandler
 
@@ -137,13 +135,9 @@ class ChatHandler(AsyncMessageHandler):
             send_error_callback=self.send_error_message,
         )
 
-        self._event_handler = EventForwardingHandler(
-            send_message_callback=self.send_message
-        )
+        self._event_handler = EventForwardingHandler(send_message_callback=self.send_message)
 
-        self._command_handler = SystemCommandHandler(
-            send_message_callback=self.send_message
-        )
+        self._command_handler = SystemCommandHandler(send_message_callback=self.send_message)
 
         logger.info("[CHAT_HANDLER] Refactored ChatHandler initialized with specialized handlers")
 
@@ -180,9 +174,7 @@ class ChatHandler(AsyncMessageHandler):
             return await self._process_followup_response(session_id, message)
 
         if message.type == MessageType.AGENT_STOP:
-            return await self._lifecycle_handler.process_stop(
-                session_id, message, self._cleanup_event_handlers
-            )
+            return await self._lifecycle_handler.process_stop(session_id, message, self._cleanup_event_handlers)
 
         # 处理 USER_MESSAGE 消息
         session_data = await self.get_session(session_id)
@@ -974,7 +966,7 @@ class ChatHandler(AsyncMessageHandler):
                     reason=f"完成{current_phase}阶段，准备进入{next_phase}阶段",
                 )
 
-                phase_result = pdca_extension.advance_pdca_phase(
+                pdca_extension.advance_pdca_phase(
                     phase_data={"result": None},  # TODO: get actual result
                     next_phase=next_phase,
                 )
@@ -1025,7 +1017,7 @@ class ChatHandler(AsyncMessageHandler):
                 completion=status.get("completion_percentage", 0),
                 result_summary=f"PDCA循环已完成，完成了{status.get('cycle_count', 1)}个循环",
                 start_time=pdca_extension.current_cycle.start_time,
-                end_time=datetime.now(timezone.utc).isoformat(),
+                end_time=datetime.now(UTC).isoformat(),
             )
 
             await self.send_message(session_id, message)

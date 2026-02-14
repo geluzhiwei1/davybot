@@ -69,12 +69,7 @@ def is_a2ui_message(data: dict[str, Any]) -> bool:
         True if the dictionary appears to be A2UI data
 
     """
-    return (
-        isinstance(data, dict)
-        and data.get("mime_type") == A2UI_MIME_TYPE
-        or "components" in data
-        and "surface_id" in data
-    )
+    return isinstance(data, dict) and data.get("mime_type") == A2UI_MIME_TYPE or "components" in data and "surface_id" in data
 
 
 def validate_a2ui_schema(
@@ -114,10 +109,10 @@ def validate_a2ui_schema(
         logger.info("A2UI schema validation passed")
         return True
     except jsonschema.ValidationError as e:
-        logger.error(f"A2UI schema validation failed: {e.message}")
+        logger.exception(f"A2UI schema validation failed: {e.message}")
         raise
     except jsonschema.SchemaError as e:
-        logger.error(f"A2UI schema is invalid: {e.message}")
+        logger.exception(f"A2UI schema is invalid: {e.message}")
         raise
 
 

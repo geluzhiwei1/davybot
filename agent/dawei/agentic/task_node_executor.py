@@ -21,9 +21,9 @@ from dawei.entity.lm_messages import (
     LLMMessage,
     MessageRole,
     SystemMessage,
+    ToolCall,
     ToolMessage,
     UserMessage,
-    ToolCall,
 )
 from dawei.entity.stream_message import (
     CompleteMessage,
@@ -394,7 +394,7 @@ class TaskNodeExecutionEngine:
                 self.logger.error(f"消息格式转换失败: {type(e).__name__}: {e}", exc_info=True)
                 # 记录所有消息供调试
                 for i, msg_dict in enumerate(raw_messages):
-                    self.logger.error(f"原始消息 {i}: type={type(msg_dict).__name__}, value={repr(msg_dict)[:200]}")
+                    self.logger.exception(f"原始消息 {i}: type={type(msg_dict).__name__}, value={repr(msg_dict)[:200]}")
                 raise
 
         async def stream_callback(stream_message: StreamMessages) -> None:

@@ -16,7 +16,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 
 # Import super mode utilities
 from dawei.core.super_mode import is_super_mode_enabled, log_security_bypass
-
 
 if TYPE_CHECKING:
     from dawei.conversation.conversation_history_manager import (
@@ -115,7 +114,8 @@ class UserWorkspace:
         self.workspace_settings: WorkspaceSettings | None = None
 
         # ✨ 新增：统一工作区配置（Pydantic 模型）
-        from .models import WorkspaceConfig, PluginsConfig
+        from .models import PluginsConfig, WorkspaceConfig
+
         self.workspace_config: WorkspaceConfig | None = None
         self.plugins_config: PluginsConfig | None = None  # ✨ 新增：插件配置（独立文件）
 
@@ -398,7 +398,7 @@ class UserWorkspace:
                     name=self.workspace_path.name,
                     display_name=self.workspace_path.name,
                     description=f"Workspace at {self.workspace_path}",
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 await self._save_workspace_info()
 
@@ -565,7 +565,7 @@ class UserWorkspace:
         """
         plugins_dir = self.workspace_path / ".dawei" / "plugins"
 
-        from .models import PluginsConfig, PluginInstanceConfig
+        from .models import PluginInstanceConfig, PluginsConfig
 
         # 从 .dawei/plugins/*.json 加载
         if plugins_dir.exists() and plugins_dir.is_dir():
@@ -618,7 +618,7 @@ class UserWorkspace:
                 saved_count += 1
                 logger.debug(f"Saved plugin config: {plugin_id}")
             except Exception as e:
-                logger.error(f"Failed to save plugin config {plugin_id}: {e}")
+                logger.exception(f"Failed to save plugin config {plugin_id}: {e}")
 
         logger.info(f"Saved {saved_count} plugin configs to {plugins_dir}")
         """初始化MCP工具管理器（现在从 WorkspaceContext 获取）
@@ -856,13 +856,13 @@ class UserWorkspace:
         if isinstance(created_at, datetime):
             created_at = created_at.isoformat()
         elif created_at is None:
-            created_at = datetime.now(timezone.utc).isoformat()
+            created_at = datetime.now(UTC).isoformat()
 
         updated_at = conversation.updated_at
         if isinstance(updated_at, datetime):
             updated_at = updated_at.isoformat()
         elif updated_at is None:
-            updated_at = datetime.now(timezone.utc).isoformat()
+            updated_at = datetime.now(UTC).isoformat()
 
         # 正确序列化消息 - 使用 to_dict() 方法确保 datetime 正确转换
         messages_data = []
@@ -1769,7 +1769,7 @@ class UserWorkspace:
 
             task_data = {
                 "task_graph_id": task_graph.task_node_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "nodes": nodes_dict,
                 "total_tasks": len(all_tasks),
             }
@@ -1908,7 +1908,7 @@ class UserWorkspace:
                 "alert_type": "persistence_failure",
                 "resource_type": resource_type,
                 "error_message": error_message,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "workspace_path": self.absolute_path,
                 "workspace_id": self.workspace_info.id if self.workspace_info else self.uuid,
                 **kwargs,
@@ -1949,7 +1949,7 @@ class UserWorkspace:
             failure_log_dir.mkdir(parents=True, exist_ok=True)
 
             # 生成日志文件名
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d")
             log_file = failure_log_dir / f"failures_{timestamp}.jsonl"
 
             # 追加写入日志 (JSONL格式)

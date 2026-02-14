@@ -133,8 +133,9 @@ class PluginManager:
             return False
 
         # Load manifest
-        from dawei.plugins.utils import load_yaml_file
         import json
+
+        from dawei.plugins.utils import load_yaml_file
 
         yaml_path = plugin_dir / "plugin.yaml"
         manifest_data = load_yaml_file(yaml_path)
@@ -150,7 +151,7 @@ class PluginManager:
                         manifest_data["config_schema"] = json.load(f)
                     logger.debug(f"Loaded config_schema from {schema_path}")
                 except Exception as e:
-                    logger.error(f"Failed to load config_schema from {schema_path}: {e}")
+                    logger.exception(f"Failed to load config_schema from {schema_path}: {e}")
                     manifest_data["config_schema"] = {}
             else:
                 logger.warning(f"config_schema file not found: {schema_path}")
@@ -262,20 +263,14 @@ class PluginManager:
         # If exact plugin not found, check if there's a version mismatch
         if not registration:
             # Try to find any plugin with the same name
-            plugin_name = plugin_id.split("@")[0] if "@" in plugin_id else plugin_id
+            plugin_name = plugin_id.split("@", maxsplit=1)[0] if "@" in plugin_id else plugin_id
 
             # Check all registered plugins for same name
-            matching_plugins = [
-                pid for pid in self.registry.registrations.keys()
-                if pid.startswith(f"{plugin_name}@")
-            ]
+            matching_plugins = [pid for pid in self.registry.registrations if pid.startswith(f"{plugin_name}@")]
 
             if matching_plugins:
                 # Found same plugin but different version
-                logger.warning(
-                    f"Cannot uninstall: Plugin {plugin_id} not found. "
-                    f"Did you mean: {', '.join(matching_plugins)}?"
-                )
+                logger.warning(f"Cannot uninstall: Plugin {plugin_id} not found. Did you mean: {', '.join(matching_plugins)}?")
             else:
                 # No plugin with that name at all
                 logger.warning(f"Cannot uninstall: Plugin {plugin_id} not found")
@@ -292,9 +287,8 @@ class PluginManager:
             return False
 
         # Check if it's a builtin plugin (cannot uninstall)
-        import os
         builtin_dir = Path(__file__).parent / "builtin"
-        if plugin_dir.exists() and builtin_dir.exists() and os.path.samefile(plugin_dir, builtin_dir):
+        if plugin_dir.exists() and builtin_dir.exists() and plugin_dir.samefile(builtin_dir):
             logger.error(f"Cannot uninstall builtin plugin {plugin_id}")
             return False
 
@@ -305,13 +299,14 @@ class PluginManager:
             # Remove plugin directory if it exists
             if plugin_dir.exists():
                 import shutil
+
                 shutil.rmtree(plugin_dir)
                 logger.info(f"Removed plugin directory: {plugin_dir}")
 
             logger.info(f"Uninstalled plugin: {plugin_id}")
             return True
 
-        except Exception as e:
+        except Exception:
             logger.exception(f"Failed to uninstall plugin {plugin_id}: ")
             return False
 
@@ -326,20 +321,14 @@ class PluginManager:
 
         """
         # Find all plugins with this name
-        matching_plugins = [
-            pid for pid in self.registry.registrations.keys()
-            if pid.startswith(f"{plugin_name}@")
-        ]
+        matching_plugins = [pid for pid in self.registry.registrations if pid.startswith(f"{plugin_name}@")]
 
         if not matching_plugins:
             logger.warning(f"Cannot uninstall: No plugin found with name '{plugin_name}'")
             return False
 
         if len(matching_plugins) > 1:
-            logger.warning(
-                f"Multiple versions found for '{plugin_name}': {', '.join(matching_plugins)}. "
-                f"Uninstalling all of them."
-            )
+            logger.warning(f"Multiple versions found for '{plugin_name}': {', '.join(matching_plugins)}. Uninstalling all of them.")
 
         # Uninstall all matching plugins
         success_count = 0

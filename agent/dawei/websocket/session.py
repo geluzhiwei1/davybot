@@ -11,7 +11,7 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from dawei.storage import Storage
@@ -24,8 +24,8 @@ class SessionData:
     """会话数据"""
 
     id: str
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     user_id: str | None = None
     workspace_id: str | None = None
     conversation_id: str | None = None
@@ -52,7 +52,7 @@ class SessionData:
 
     def update_timestamp(self):
         """更新时间戳"""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
 
 class SessionManager:
@@ -366,13 +366,13 @@ class SessionManager:
 
     async def cleanup_expired_sessions(self):
         """清理过期会话"""
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
 
         for session_id, session_data in list(self.sessions.items()):
             # 确保updated_at是timezone-aware以便比较
             updated_at = session_data.updated_at
             if updated_at.tzinfo is None:
-                updated_at = updated_at.replace(tzinfo=timezone.utc)
+                updated_at = updated_at.replace(tzinfo=UTC)
 
             # 检查会话是否超时
             time_diff = current_time - updated_at

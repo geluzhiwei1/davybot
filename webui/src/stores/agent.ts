@@ -26,8 +26,6 @@ import type {
   AgentCompleteMessage,
   AgentModeSwitchMessage,
   AgentThinkingMessage,
-  AgentPausedMessage,
-  AgentResumedMessage,
   AgentStoppedMessage
 } from '@/types/websocket'
 import { useMonitoringStore } from './monitoringStore'

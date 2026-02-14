@@ -81,12 +81,13 @@ class PluginLoader:
                             schema_path = plugin_dir / config_schema_value
                             if schema_path.exists():
                                 import json
+
                                 try:
                                     with schema_path.open(encoding="utf-8") as f:
                                         manifest_data["config_schema"] = json.load(f)
                                     logger.debug(f"Loaded config_schema from {schema_path}")
                                 except Exception as e:
-                                    logger.error(f"Failed to load config_schema from {schema_path}: {e}")
+                                    logger.exception(f"Failed to load config_schema from {schema_path}: {e}")
                                     manifest_data["config_schema"] = {}
                             else:
                                 logger.warning(f"config_schema file not found: {schema_path}")

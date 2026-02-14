@@ -7,7 +7,7 @@
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from dawei.agentic.errors import (
@@ -285,7 +285,7 @@ class TaskGraph:
                     "task_graph_id": self.task_node_id,
                     "root_task_id": task_data.task_node_id,
                     "mode": task_data.mode,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 },
                 task_id=self.task_node_id,
                 source="task_graph_persistence",
@@ -380,7 +380,7 @@ class TaskGraph:
                     "task_graph_id": self.task_node_id,
                     "added_node_id": task_data.task_node_id,
                     "parent_id": parent_id,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 },
                 task_id=self.task_node_id,
                 source="task_graph_persistence",
@@ -485,7 +485,7 @@ class TaskGraph:
                     "updated_node_id": task_id,
                     "old_status": old_status.value if old_status else None,
                     "new_status": status.value,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 },
                 task_id=self.task_node_id,
                 source="task_graph_persistence",
@@ -691,7 +691,7 @@ class TaskGraph:
             checkpoint_data = {
                 "checkpoint_id": checkpoint_id,
                 "task_graph_id": self.task_node_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "nodes": {task_id: node.to_dict() for task_id, node in self._nodes.items()},
                 "root_node_id": self._root_node.task_node_id if self._root_node else None,
                 "states": await self._state_manager.get_all_states(),

@@ -9,7 +9,7 @@
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -108,7 +108,7 @@ class TaskDefinition:
     timeout: float | None = None  # 超时时间（秒）
     retry_policy: RetryPolicy | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         """初始化后处理"""
@@ -171,7 +171,7 @@ class TaskError:
     error_type: str
     error_message: str
     error_details: dict[str, Any] | None = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     recoverable: bool = True
     retry_count: int = 0
 
@@ -196,7 +196,7 @@ class CheckpointData:
     task_id: str = ""
     state_data: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     version: int = 1
 
     def to_dict(self) -> dict[str, Any]:
@@ -259,7 +259,7 @@ class WebSocketState:
 
     def update_heartbeat(self):
         """更新心跳时间"""
-        self.last_heartbeat = datetime.now(timezone.utc)
+        self.last_heartbeat = datetime.now(UTC)
 
     def increment_message_count(self):
         """增加消息计数"""
@@ -296,7 +296,7 @@ class TaskProgress:
     progress: int  # 进度百分比（0-100）
     message: str = ""
     data: dict[str, Any] | None = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""

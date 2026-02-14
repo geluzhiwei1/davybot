@@ -10,7 +10,7 @@ import asyncio
 import json
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -56,7 +56,7 @@ class TaskContext(ITaskContext):
         self._paused_event.set()  # 初始状态为未暂停
 
         # 时间跟踪
-        self._created_at = datetime.now(timezone.utc)
+        self._created_at = datetime.now(UTC)
         self._started_at: datetime | None = None
         self._completed_at: datetime | None = None
         self._last_checkpoint_time: datetime | None = None
@@ -102,14 +102,14 @@ class TaskContext(ITaskContext):
 
             # 更新时间戳
             if status == TaskStatus.RUNNING and self._started_at is None:
-                self._started_at = datetime.now(timezone.utc)
+                self._started_at = datetime.now(UTC)
             elif status in [
                 TaskStatus.COMPLETED,
                 TaskStatus.FAILED,
                 TaskStatus.CANCELLED,
                 TaskStatus.TIMEOUT,
             ]:
-                self._completed_at = datetime.now(timezone.utc)
+                self._completed_at = datetime.now(UTC)
 
             self._logger.info(
                 f"Task {self._task_id} status changed: {old_status.value} -> {status.value}",
@@ -221,7 +221,7 @@ class TaskContext(ITaskContext):
                     f"Checkpoint service returned empty checkpoint_id for task {self._task_id}",
                 )
 
-            self._last_checkpoint_time = datetime.now(timezone.utc)
+            self._last_checkpoint_time = datetime.now(UTC)
             self._last_auto_checkpoint = current_time
             self._logger.info(f"Checkpoint created for task {self._task_id}: {checkpoint_id}")
 
@@ -358,7 +358,7 @@ class TaskContext(ITaskContext):
             if self._started_at is None:
                 return 0.0
 
-            end_time = self._completed_at or datetime.now(timezone.utc)
+            end_time = self._completed_at or datetime.now(UTC)
             return (end_time - self._started_at).total_seconds()
 
     def add_progress_callback(self, callback: ProgressCallback) -> None:

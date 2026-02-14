@@ -7,15 +7,15 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from dawei.api.error_codes import ErrorCodes, error_detail
 from dawei.workspace import workspace_manager
 from dawei.workspace.user_workspace import UserWorkspace
-from dawei.api.error_codes import error_detail, ErrorCodes
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +49,11 @@ def get_user_workspace(workspace_id: str) -> UserWorkspace:
     """Dependency to get a UserWorkspace instance."""
     workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
     if not workspace_info:
-        raise HTTPException(
-            status_code=404,
-            detail=error_detail("workspace.not_found", workspace_id=workspace_id)
-        )
+        raise HTTPException(status_code=404, detail=error_detail("workspace.not_found", workspace_id=workspace_id))
 
     workspace_path = workspace_info.get("path")
     if not workspace_path:
-        raise HTTPException(
-            status_code=404,
-            detail=error_detail("workspace.path_not_found", workspace_id=workspace_id)
-        )
+        raise HTTPException(status_code=404, detail=error_detail("workspace.path_not_found", workspace_id=workspace_id))
 
     return UserWorkspace(workspace_path=workspace_path)
 
@@ -86,10 +80,7 @@ async def get_task_checkpoints(workspace_id: str, task_id: str):
 
     except (AttributeError, KeyError, ValueError, OSError) as e:
         logger.error(f"Failed to get checkpoints for task {task_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=error_detail("checkpoint.list_failed", error=str(e))
-        )
+        raise HTTPException(status_code=500, detail=error_detail("checkpoint.list_failed", error=str(e)))
 
 
 @router.post("/{workspace_id}/tasks/{task_id}/checkpoints")
@@ -106,10 +97,7 @@ async def create_task_checkpoint(
         checkpoint_manager = workspace.checkpoint_manager
 
         if not checkpoint_manager:
-            raise HTTPException(
-                status_code=501,
-                detail=error_detail("checkpoint.not_available")
-            )
+            raise HTTPException(status_code=501, detail=error_detail("checkpoint.not_available"))
 
         # 创建检查点
         checkpoint_id = await checkpoint_manager.create_checkpoint(
@@ -123,17 +111,14 @@ async def create_task_checkpoint(
             "success": True,
             "message": "Checkpoint created successfully",
             "checkpoint_id": checkpoint_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     except HTTPException:
         raise
     except (AttributeError, KeyError, ValueError, OSError) as e:
         logger.error(f"Failed to create checkpoint for task {task_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=error_detail("checkpoint.create_failed", error=str(e))
-        )
+        raise HTTPException(status_code=500, detail=error_detail("checkpoint.create_failed", error=str(e)))
 
 
 @router.get("/{workspace_id}/tasks/{task_id}/checkpoints/{checkpoint_id}")
@@ -146,18 +131,12 @@ async def get_task_checkpoint_detail(workspace_id: str, task_id: str, checkpoint
         checkpoint_manager = workspace.checkpoint_manager
 
         if not checkpoint_manager:
-            raise HTTPException(
-                status_code=501,
-                detail=error_detail("checkpoint.not_available")
-            )
+            raise HTTPException(status_code=501, detail=error_detail("checkpoint.not_available"))
 
         checkpoint_data = await checkpoint_manager.get_checkpoint(checkpoint_id)
 
         if not checkpoint_data:
-            raise HTTPException(
-                status_code=404,
-                detail=error_detail("checkpoint.not_found", checkpoint_id=checkpoint_id)
-            )
+            raise HTTPException(status_code=404, detail=error_detail("checkpoint.not_found", checkpoint_id=checkpoint_id))
 
         return {"success": True, "checkpoint": checkpoint_data}
 
@@ -178,10 +157,7 @@ async def restore_task_checkpoint(workspace_id: str, task_id: str, checkpoint_id
         checkpoint_manager = workspace.checkpoint_manager
 
         if not checkpoint_manager:
-            raise HTTPException(
-                status_code=501,
-                detail=error_detail("checkpoint.not_available")
-            )
+            raise HTTPException(status_code=501, detail=error_detail("checkpoint.not_available"))
 
         # 恢复检查点
         success = await checkpoint_manager.restore_checkpoint(
@@ -198,7 +174,7 @@ async def restore_task_checkpoint(workspace_id: str, task_id: str, checkpoint_id
             "success": True,
             "message": "Checkpoint restored successfully",
             "checkpoint_id": checkpoint_id,
-            "restored_at": datetime.now(timezone.utc).isoformat(),
+            "restored_at": datetime.now(UTC).isoformat(),
         }
 
     except HTTPException:

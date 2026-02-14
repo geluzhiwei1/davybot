@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from dawei.core.validators import validate_not_none, validate_dict_key, validate_string_not_empty
+from dawei.core.validators import validate_dict_key, validate_not_none, validate_string_not_empty
 from dawei.workspace import workspace_manager
 from dawei.workspace.user_workspace import UserWorkspace
 

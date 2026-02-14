@@ -8,7 +8,7 @@
 import asyncio
 import uuid
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -504,11 +504,7 @@ class Agent:
         recent_messages = messages[-10:]  # 最多取最近10条
 
         # 格式化为文本
-        messages_text = "\n".join([
-            f"{msg.role.value}: {msg.content[:500] if hasattr(msg, 'content') and msg.content else ''}"
-            for msg in recent_messages
-            if hasattr(msg, "content") and msg.content
-        ])
+        messages_text = "\n".join([f"{msg.role.value}: {msg.content[:500] if hasattr(msg, 'content') and msg.content else ''}" for msg in recent_messages if hasattr(msg, "content") and msg.content])
 
         if not messages_text.strip():
             return
@@ -568,6 +564,7 @@ class Agent:
                     keywords = []
                     for part in parts:
                         import re
+
                         keywords.extend(re.findall(r"\b[A-Z][a-z]+\b", part))
 
                     memory = MemoryEntry(
@@ -575,7 +572,7 @@ class Agent:
                         subject=parts[0],
                         predicate=parts[1],
                         object=parts[2],
-                        valid_start=datetime.now(timezone.utc),
+                        valid_start=datetime.now(UTC),
                         memory_type=memory_type,
                         confidence=0.7,
                         energy=1.0,
@@ -642,7 +639,7 @@ class Agent:
                         subject=subject,
                         predicate=predicate,
                         object=match.strip(),
-                        valid_start=datetime.now(timezone.utc),
+                        valid_start=datetime.now(UTC),
                         memory_type=mem_type,
                         confidence=0.5,
                         energy=1.0,
@@ -871,7 +868,7 @@ class Agent:
         if not self.selected_models:
             return 0
 
-        cutoff_time = datetime.now(timezone.utc).timestamp() - self._selected_models_max_age_seconds
+        cutoff_time = datetime.now(UTC).timestamp() - self._selected_models_max_age_seconds
         original_len = len(self.selected_models)
 
         # 过滤掉超时的记录
@@ -1021,7 +1018,7 @@ class Agent:
                 subject=subject,
                 predicate=predicate,
                 object=object_,
-                valid_start=datetime.now(timezone.utc),
+                valid_start=datetime.now(UTC),
                 memory_type=MemoryType(memory_type),
                 confidence=confidence,
                 energy=energy,

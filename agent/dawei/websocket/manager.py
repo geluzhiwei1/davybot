@@ -9,7 +9,7 @@
 import asyncio
 import contextlib
 from collections.abc import Callable
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import WebSocket
@@ -44,8 +44,8 @@ class ConnectionInfo:
 
         self.websocket = websocket
         self.session_id = session_id
-        self.connected_at = datetime.now(timezone.utc)
-        self.last_heartbeat = datetime.now(timezone.utc)
+        self.connected_at = datetime.now(UTC)
+        self.last_heartbeat = datetime.now(UTC)
         self.message_count = 0
         self.is_alive = True
         self.error_count = 0  # 错误计数
@@ -53,7 +53,7 @@ class ConnectionInfo:
 
     def update_heartbeat(self):
         """更新心跳时间"""
-        self.last_heartbeat = datetime.now(timezone.utc)
+        self.last_heartbeat = datetime.now(UTC)
 
     def increment_message_count(self, is_heartbeat: bool = False):
         """增加消息计数"""
@@ -67,11 +67,11 @@ class ConnectionInfo:
 
     def is_timeout(self, timeout_seconds: int = 60) -> bool:
         """检查连接是否超时"""
-        return (datetime.now(timezone.utc) - self.last_heartbeat).seconds > timeout_seconds
+        return (datetime.now(UTC) - self.last_heartbeat).seconds > timeout_seconds
 
     def get_uptime(self) -> timedelta:
         """获取连接运行时间"""
-        return datetime.now(timezone.utc) - self.connected_at
+        return datetime.now(UTC) - self.connected_at
 
     def get_status(self) -> dict[str, Any]:
         """获取连接状态信息"""

@@ -8,13 +8,13 @@ from .exception_handlers import (
     # Custom exception classes
     APIException,
     BadRequestException,
-    UnauthorizedException,
-    ForbiddenException,
-    NotFoundException,
     ConflictException,
-    UnprocessableEntityException,
+    ForbiddenException,
     InternalServerException,
+    NotFoundException,
     ServiceUnavailableException,
+    UnauthorizedException,
+    UnprocessableEntityException,
     # Handler registration function
     register_exception_handlers,
 )

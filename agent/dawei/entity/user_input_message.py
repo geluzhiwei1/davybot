@@ -3,7 +3,7 @@
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Union
 
 
@@ -14,7 +14,7 @@ class UserInputText:
     # 唯一id，用于关联用户输入和回复
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     text: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     task_node_id: str | None = None
 
 

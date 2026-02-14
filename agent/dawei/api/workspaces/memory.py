@@ -9,7 +9,7 @@ import csv
 import io
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -121,12 +121,13 @@ def _get_memory_db_path(workspace_id: str) -> str:
 def _get_workspace_path(workspace_id: str) -> Path | None:
     """Get workspace path from workspace ID by reading workspaces.json"""
     try:
-        dawei_home = Path(os.getenv("DAWEI_HOME", os.path.expanduser("~/.dawei")))
+        dawei_home = Path(os.getenv("DAWEI_HOME", str(Path("~/.dawei").expanduser())))
         workspaces_file = dawei_home / "workspaces.json"
 
         if workspaces_file.exists():
             import json
-            with open(workspaces_file, "r", encoding="utf-8") as f:
+
+            with workspaces_file.open(encoding="utf-8") as f:
                 data = json.load(f)
 
             for ws in data.get("workspaces", []):
@@ -162,7 +163,7 @@ def _memory_to_response(memory) -> MemoryResponse:
         keywords=memory.keywords,
         source_event_id=memory.source_event_id,
         metadata=memory.metadata,
-        created_at=(memory.created_at.isoformat() if hasattr(memory, "created_at") else datetime.now(timezone.utc).isoformat()),
+        created_at=(memory.created_at.isoformat() if hasattr(memory, "created_at") else datetime.now(UTC).isoformat()),
     )
 
 
@@ -237,7 +238,7 @@ async def create_memory(workspace_id: str, request: MemoryCreateRequest):
             subject=request.subject,
             predicate=request.predicate,
             object=request.object,
-            valid_start=datetime.now(timezone.utc),
+            valid_start=datetime.now(UTC),
             memory_type=MemoryType(request.memory_type),
             confidence=request.confidence,
             energy=request.energy,
@@ -664,6 +665,7 @@ async def delete_memory(workspace_id: str, memory_id: str):
 
 class ExtractRequest(BaseModel):
     """请求模型"""
+
     text: str | None = None  # 可选的文本输入
 
 
@@ -677,8 +679,8 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
 
     """
     try:
-        import uuid
         import re
+        import uuid
         from datetime import datetime, timezone
 
         db_path = _get_memory_db_path(workspace_id)
@@ -695,7 +697,8 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
             conversation_file = workspace_path / ".dawei" / "conversation.json"
             if conversation_file.exists():
                 import json
-                with open(conversation_file, "r", encoding="utf-8") as f:
+
+                with conversation_file.open(encoding="utf-8") as f:
                     conversation_data = json.load(f)
 
             if not conversation_data or "messages" not in conversation_data:
@@ -705,17 +708,14 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
                     files = sorted(conversation_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
                     if files:
                         import json
-                        with open(files[0], "r", encoding="utf-8") as f:
+
+                        with files[0].open(encoding="utf-8") as f:
                             conversation_data = json.load(f)
 
             if conversation_data and "messages" in conversation_data:
                 messages = conversation_data.get("messages", [])
                 if len(messages) >= 2:
-                    messages_text = "\n".join([
-                        f"{msg.get('role', 'unknown')}: {str(msg.get('content', ''))[:500]}"
-                        for msg in messages[-20:]
-                        if msg.get("content")
-                    ])
+                    messages_text = "\n".join([f"{msg.get('role', 'unknown')}: {str(msg.get('content', ''))[:500]}" for msg in messages[-20:] if msg.get("content")])
 
         if not messages_text or not messages_text.strip():
             # 返回提示信息
@@ -733,8 +733,8 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
         extraction_result = {"extracted": 0, "method": "llm", "details": []}
 
         try:
-            from dawei.llm_api.llm_provider import LLMProvider
             from dawei.entity.lm_messages import UserMessage
+            from dawei.llm_api.llm_provider import LLMProvider
 
             llm_provider = LLMProvider()
 
@@ -765,6 +765,7 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
 
             # 调试日志
             import logging
+
             logger = logging.getLogger(__name__)
             logger.info(f"LLM response raw type: {type(response)}, value: {response}")
 
@@ -807,7 +808,7 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
                             subject=parts[0],
                             predicate=parts[1],
                             object=parts[2],
-                            valid_start=datetime.now(timezone.utc),
+                            valid_start=datetime.now(UTC),
                             memory_type=MemoryType(memory_type),
                             confidence=0.7,
                             energy=1.0,
@@ -825,6 +826,7 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
 
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"LLM extraction failed: {e}", exc_info=True)
             extraction_result["details"].append(f"LLM error: {str(e)}")
 
@@ -842,5 +844,6 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
         raise
     except Exception as e:
         import logging
+
         logging.getLogger(__name__).error(f"Memory extraction failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

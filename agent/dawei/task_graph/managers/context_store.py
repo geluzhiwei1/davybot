@@ -6,7 +6,7 @@
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from dawei.core.errors import ValidationError
@@ -176,7 +176,7 @@ class ContextStore:
                 if images is not None:
                     context.task_images = images
 
-                context.updated_at = datetime.now(timezone.utc)
+                context.updated_at = datetime.now(UTC)
 
                 self.logger.info(
                     f"Updated context files for task {task_id}: {len(files)} files, {len(images or [])} images",
@@ -198,7 +198,7 @@ class ContextStore:
 
                 if file_path not in context.task_files:
                     context.task_files.append(file_path)
-                    context.updated_at = datetime.now(timezone.utc)
+                    context.updated_at = datetime.now(UTC)
 
                 self.logger.info(f"Added file to context for task {task_id}: {file_path}")
                 return True
@@ -218,7 +218,7 @@ class ContextStore:
 
                 if file_path in context.task_files:
                     context.task_files.remove(file_path)
-                    context.updated_at = datetime.now(timezone.utc)
+                    context.updated_at = datetime.now(UTC)
 
                 self.logger.info(f"Removed file from context for task {task_id}: {file_path}")
                 return True
@@ -237,7 +237,7 @@ class ContextStore:
                     return False
 
                 context.metadata[key] = value
-                context.updated_at = datetime.now(timezone.utc)
+                context.updated_at = datetime.now(UTC)
 
                 self.logger.info(f"Added metadata to context for task {task_id}: {key}")
                 return True
@@ -322,7 +322,7 @@ class ContextStore:
             return {
                 "task_id": task_id,
                 "context": context.to_dict(),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except (KeyError, AttributeError, TypeError):
             self.logger.exception("Failed to save context for task {task_id}: ")

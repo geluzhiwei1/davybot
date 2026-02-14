@@ -8,7 +8,8 @@
 """
 
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from dawei.agentic.agent import Agent
 from dawei.core import local_context
@@ -121,21 +122,15 @@ class EventForwardingHandler:
             try:
                 # 处理任务完成事件
                 if event_type_enum == TaskEventType.TASK_COMPLETED:
-                    await self._handle_task_completed(
-                        event_data, session_id, task_id, pdca_phase_callback
-                    )
+                    await self._handle_task_completed(event_data, session_id, task_id, pdca_phase_callback)
 
                 # 处理任务错误事件
                 elif event_type_enum == TaskEventType.TASK_ERROR:
-                    message_to_send = await self._handle_task_error(
-                        event_data, session_id, task_id
-                    )
+                    message_to_send = await self._handle_task_error(event_data, session_id, task_id)
 
                 # 处理错误发生事件
                 elif event_type_enum == TaskEventType.ERROR_OCCURRED:
-                    message_to_send = await self._handle_error_occurred(
-                        event_data, session_id, task_id
-                    )
+                    message_to_send = await self._handle_error_occurred(event_data, session_id, task_id)
 
                 # 处理使用统计事件
                 elif event_type_enum == TaskEventType.USAGE_RECEIVED:
@@ -183,57 +178,39 @@ class EventForwardingHandler:
 
                 # 处理推理事件
                 elif event_type_enum == TaskEventType.REASONING:
-                    message_to_send = await self._handle_reasoning(
-                        event_data, session_id, task_id
-                    )
+                    message_to_send = await self._handle_reasoning(event_data, session_id, task_id)
 
                 # 处理工具调用检测事件
                 elif event_type_enum == TaskEventType.TOOL_CALLS_DETECTED:
-                    await self._handle_tool_calls_detected(
-                        event_data, session_id, task_id, user_message_id, self._send_message
-                    )
+                    await self._handle_tool_calls_detected(event_data, session_id, task_id, user_message_id, self._send_message)
 
                 # 处理工具调用开始事件
                 elif event_type_enum == TaskEventType.TOOL_CALL_START:
-                    message_to_send = await self._handle_tool_call_start(
-                        event_data, session_id, task_id
-                    )
+                    message_to_send = await self._handle_tool_call_start(event_data, session_id, task_id)
 
                 # 处理工具调用进度事件
                 elif event_type_enum == TaskEventType.TOOL_CALL_PROGRESS:
-                    message_to_send = await self._handle_tool_call_progress(
-                        event_data, session_id, task_id
-                    )
+                    message_to_send = await self._handle_tool_call_progress(event_data, session_id, task_id)
 
                 # 处理工具调用结果事件
                 elif event_type_enum == TaskEventType.TOOL_CALL_RESULT:
-                    message_to_send = await self._handle_tool_call_result(
-                        event_data, session_id, task_id, workspace_id
-                    )
+                    message_to_send = await self._handle_tool_call_result(event_data, session_id, task_id, workspace_id)
 
                 # 处理检查点创建事件
                 elif event_type_enum == TaskEventType.CHECKPOINT_CREATED:
-                    message_to_send = await self._handle_checkpoint_created(
-                        event_data, session_id, task_id
-                    )
+                    message_to_send = await self._handle_checkpoint_created(event_data, session_id, task_id)
 
                 # 处理状态变更事件
                 elif event_type_enum == TaskEventType.STATE_CHANGED:
-                    message_to_send = await self._handle_state_changed(
-                        event_data, session_id, task_id
-                    )
+                    message_to_send = await self._handle_state_changed(event_data, session_id, task_id)
 
                 # 处理追问问题事件
                 elif event_type_enum == TaskEventType.FOLLOWUP_QUESTION:
-                    message_to_send = await self._handle_followup_question(
-                        event_data, session_id, task_id, user_message_id
-                    )
+                    message_to_send = await self._handle_followup_question(event_data, session_id, task_id, user_message_id)
 
                 # 处理 A2UI UI 组件事件
                 elif event_type_enum == TaskEventType.A2UI_SURFACE_EVENT:
-                    message_to_send = await self._handle_a2ui_surface_event(
-                        event_data, session_id, task_id, user_message_id
-                    )
+                    message_to_send = await self._handle_a2ui_surface_event(event_data, session_id, task_id, user_message_id)
 
                 # 发送消息
                 if message_to_send:
@@ -290,9 +267,7 @@ class EventForwardingHandler:
 
     async def _handle_task_completed(self, event_data, session_id: str, task_id: str, pdca_phase_callback):
         """处理任务完成事件"""
-        result_content = (
-            event_data.result if hasattr(event_data, "result") and event_data.result else "任务已完成。"
-        )
+        result_content = event_data.result if hasattr(event_data, "result") and event_data.result else "任务已完成。"
 
         logger.info(
             f"[CHAT_HANDLER] 📦 任务完成: task_id={task_id}, 发送 AGENT_COMPLETE 消息",
@@ -357,10 +332,7 @@ class EventForwardingHandler:
             details={"task_id": task_id, **error_details},
         )
 
-    async def _handle_usage_received(
-        self, event_data, session_id: str, task_id: str, user_message_id: str,
-        llm_api_active: bool, llm_request_start_time, current_llm_provider, current_llm_model
-    ):
+    async def _handle_usage_received(self, event_data, session_id: str, task_id: str, user_message_id: str, llm_api_active: bool, llm_request_start_time, current_llm_provider, current_llm_model):
         """处理使用统计事件"""
         message_to_send = StreamUsageMessage.from_stream_message(
             event_data,
@@ -383,10 +355,7 @@ class EventForwardingHandler:
 
         return message_to_send, llm_api_message
 
-    async def _handle_complete_received(
-        self, event_data, session_id: str, task_id: str, user_message_id: str,
-        llm_api_active: bool, llm_request_start_time, current_llm_provider, current_llm_model
-    ):
+    async def _handle_complete_received(self, event_data, session_id: str, task_id: str, user_message_id: str, llm_api_active: bool, llm_request_start_time, current_llm_provider, current_llm_model):
         """处理完成接收事件"""
         message_to_send = StreamCompleteMessage.from_stream_message(
             event_data,
@@ -410,10 +379,7 @@ class EventForwardingHandler:
 
         return message_to_send, llm_api_message
 
-    async def _handle_content_stream(
-        self, event_data, agent, session_id: str, task_id: str,
-        llm_api_active: bool, llm_request_start_time, current_llm_provider, current_llm_model, workspace_id
-    ):
+    async def _handle_content_stream(self, event_data, agent, session_id: str, task_id: str, llm_api_active: bool, llm_request_start_time, current_llm_provider, current_llm_model, workspace_id):
         """处理内容流事件"""
         llm_api_message = None
 
@@ -424,20 +390,14 @@ class EventForwardingHandler:
 
             # 从 agent 获取 LLM 提供商信息
             try:
-                if hasattr(agent, "execution_engine") and hasattr(
-                    agent.execution_engine, "_llm_service"
-                ):
+                if hasattr(agent, "execution_engine") and hasattr(agent.execution_engine, "_llm_service"):
                     llm_service = agent.execution_engine._llm_service
                     current_config = llm_service.get_current_config()
 
                     if current_config and hasattr(current_config, "config"):
                         config = current_config.config
-                        provider = getattr(config, "apiProvider", None) or getattr(
-                            config, "provider", "unknown"
-                        )
-                        model = getattr(config, "model_id", None) or getattr(
-                            config, "openAiModelId", None
-                        ) or "unknown"
+                        provider = getattr(config, "apiProvider", None) or getattr(config, "provider", "unknown")
+                        model = getattr(config, "model_id", None) or getattr(config, "openAiModelId", None) or "unknown"
 
                         current_llm_provider = provider
                         current_llm_model = model
@@ -500,7 +460,7 @@ class EventForwardingHandler:
 
     async def _handle_tool_call_progress(self, event_data, session_id: str, task_id: str):
         """处理工具调用进度事件"""
-        status = getattr(event_data, "status", None)
+        getattr(event_data, "status", None)
         message = getattr(event_data, "message", "")
         progress_percentage = getattr(event_data, "progress_percentage", None)
         current_step = getattr(event_data, "current_step", None)
@@ -600,7 +560,7 @@ class EventForwardingHandler:
     async def _handle_a2ui_surface_event(self, event_data, session_id: str, task_id: str, user_message_id: str):
         """处理 A2UI UI 组件事件"""
         a2ui_message = event_data.get("a2ui_message", {})
-        surface_id = event_data.get("surface_id", "")
+        event_data.get("surface_id", "")
 
         return A2UIServerEventMessage(
             messages=a2ui_message.get("messages", []),

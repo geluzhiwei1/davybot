@@ -11,7 +11,7 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
@@ -90,7 +90,7 @@ class AutoCheckpointStrategy(ICheckpointStrategy):
         self.last_checkpoint_time = None
 
     async def should_create_checkpoint(self, context: dict[str, Any]) -> bool:
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
 
         if self.last_checkpoint_time and current_time - self.last_checkpoint_time < self.min_interval:
             return False
@@ -99,7 +99,7 @@ class AutoCheckpointStrategy(ICheckpointStrategy):
         return context.get("tool_executed", False) or context.get("state_changed", False) or context.get("error_occurred", False) or context.get("milestone_reached", False)
 
     async def prepare_checkpoint_data(self, context: dict[str, Any]) -> dict[str, Any]:
-        self.last_checkpoint_time = datetime.now(timezone.utc)
+        self.last_checkpoint_time = datetime.now(UTC)
         return {"trigger_reason": "auto", "context_snapshot": context}
 
 
@@ -243,7 +243,7 @@ class IntelligentCheckpointManager:
                 checkpoint_id=checkpoint_id,
                 task_id=task_id,
                 checkpoint_type=checkpoint_type,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 size_bytes=len(state_json.encode()),
                 checksum=checksum,
                 tags=tags or [],
@@ -440,7 +440,7 @@ class IntelligentCheckpointManager:
     def _generate_checkpoint_id(self, task_id: str, checkpoint_type: CheckpointType) -> str:
         """生成检查点ID"""
         self._checkpoint_counter += 1
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         # 添加计数器以确保唯一性
         return f"{task_id}_{checkpoint_type.value}_{timestamp}_{self._checkpoint_counter}"
 

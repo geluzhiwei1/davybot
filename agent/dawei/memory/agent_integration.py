@@ -8,7 +8,7 @@ Extends Agent class with memory system capabilities
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 from dawei.agentic.agent import Agent, is_memory_enabled  # ✨ 导入统一配置函数
@@ -164,7 +164,7 @@ Extract facts:"""
                         subject=parts[0],
                         predicate=parts[1],
                         object=parts[2],
-                        valid_start=datetime.now(timezone.utc),
+                        valid_start=datetime.now(UTC),
                         memory_type=_infer_memory_type(parts[0], parts[1], parts[2]),
                         confidence=0.7,  # Moderate confidence for extracted facts
                         energy=1.0,
@@ -172,7 +172,7 @@ Extract facts:"""
                         metadata={
                             "source": "conversation",
                             "conversation_id": str(conversation.id),
-                            "extraction_date": datetime.now(timezone.utc).isoformat(),
+                            "extraction_date": datetime.now(UTC).isoformat(),
                         },
                     )
 
@@ -394,7 +394,7 @@ class AgentWithMemory(Agent):
             subject=subject,
             predicate=predicate,
             object=object,
-            valid_start=datetime.now(timezone.utc),
+            valid_start=datetime.now(UTC),
             memory_type=MemoryType(memory_type),
             confidence=confidence,
             energy=1.0,

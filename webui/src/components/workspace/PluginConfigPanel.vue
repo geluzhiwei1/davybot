@@ -134,7 +134,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Refresh, Setting, ShoppingCart, Delete } from '@element-plus/icons-vue';
@@ -145,8 +145,7 @@ import {
   updatePluginConfig,
   type PluginsConfig
 } from '@/services/api/services/workspaces';
-import { pluginsApi, PluginInfo } from '@/services/api/plugins';
-import type { PluginListOptions } from '@/services/api/plugins';
+import { pluginsApi } from '@/services/api/plugins';
 
 const { t } = useI18n();
 
@@ -174,16 +173,10 @@ const pluginsConfig = ref<PluginsConfig>({
   auto_discovery: true,
   enabled: true
 });
-const pluginsList = ref<any[]>([]);
+const pluginsList = ref<unknown[]>([]);
 const settingsDialogVisible = ref(false);
 const editingPluginId = ref<string | null>(null);
-const editingPluginConfig = ref<any>(null);
-
-// 计算属性
-const pluginCount = computed(() => Object.keys(pluginsConfig.value.plugins).length);
-const enabledPluginCount = computed(
-  () => Object.values(pluginsConfig.value.plugins).filter((p: any) => p.enabled).length
-);
+const editingPluginConfig = ref<unknown>(null);
 
 // 加载插件配置和列表
 const loadPluginsConfig = async () => {
@@ -203,8 +196,8 @@ const loadPluginsConfig = async () => {
     if (response.success) {
       pluginsConfig.value = response.config as PluginsConfig;
     }
-  } catch (error: any) {
-    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.loadError') + ': ' + (error.message || 'Unknown error'));
+  } catch (error: unknown) {
+    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.loadError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     loading.value = false;
   }
@@ -224,8 +217,8 @@ const savePluginsConfig = async () => {
       pluginsConfig.value = response.config as PluginsConfig;
       ElMessage.success(t('workspaceSettings.plugins.pluginConfig.saveSuccess'));
     }
-  } catch (error: any) {
-    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.saveError') + ': ' + (error.message || 'Unknown error'));
+  } catch (error: unknown) {
+    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.saveError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     saving.value = false;
   }
@@ -250,9 +243,9 @@ const resetPluginsConfig = async () => {
       pluginsConfig.value = response.config as PluginsConfig;
       ElMessage.success(t('workspaceSettings.plugins.pluginConfig.resetSuccess'));
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error !== 'cancel') {
-      ElMessage.error(t('workspaceSettings.plugins.pluginConfig.resetError') + ': ' + (error.message || 'Unknown error'));
+      ElMessage.error(t('workspaceSettings.plugins.pluginConfig.resetError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   } finally {
     loading.value = false;
@@ -277,8 +270,8 @@ const togglePluginEnabled = async (pluginId: string, enabled: boolean) => {
     plugin.enabled = enabled;
     // 重新加载配置
     await loadPluginsConfig();
-  } catch (error: any) {
-    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.toggleError') + ': ' + (error.message || 'Unknown error'));
+  } catch (error: unknown) {
+    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.toggleError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
     // 恢复原状态
     plugin.enabled = !enabled;
   } finally {
@@ -300,8 +293,8 @@ const togglePluginActivated = async (pluginId: string, activated: boolean) => {
     }
     plugin.activated = activated;
     ElMessage.success(plugin.activated ? '插件已激活' : '插件已停用');
-  } catch (error: any) {
-    ElMessage.error('操作失败: ' + (error.message || 'Unknown error'));
+  } catch (error: unknown) {
+    ElMessage.error('操作失败: ' + (error instanceof Error ? error.message : 'Unknown error'));
     // 恢复原状态
     plugin.activated = !activated;
   } finally {
@@ -324,7 +317,7 @@ const editPluginSettings = (pluginId: string) => {
 };
 
 // 插件设置保存回调
-const onPluginSettingsSaved = async (pluginId: string, newSettings: any) => {
+const onPluginSettingsSaved = async (pluginId: string, newSettings: Record<string, unknown>) => {
   loading.value = true;
   try {
     const response = await updatePluginConfig(props.workspaceId, pluginId, newSettings);
@@ -339,8 +332,8 @@ const onPluginSettingsSaved = async (pluginId: string, newSettings: any) => {
       settingsDialogVisible.value = false;
       ElMessage.success(t('workspaceSettings.plugins.pluginConfig.settingsSaveSuccess'));
     }
-  } catch (error: any) {
-    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.settingsSaveError') + ': ' + (error.message || 'Unknown error'));
+  } catch (error: unknown) {
+    ElMessage.error(t('workspaceSettings.plugins.pluginConfig.settingsSaveError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     loading.value = false;
   }
@@ -381,8 +374,8 @@ const uninstallPlugin = async (pluginId: string) => {
     } else {
       ElMessage.error(response.message || t('common.error'));
     }
-  } catch (error: any) {
-    ElMessage.error(t('common.error') + ': ' + (error.message || 'Unknown error'));
+  } catch (error: unknown) {
+    ElMessage.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     loading.value = false;
   }

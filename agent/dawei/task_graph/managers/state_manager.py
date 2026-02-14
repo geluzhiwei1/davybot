@@ -7,7 +7,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any, ClassVar
 
 from dawei.core.errors import (
@@ -148,7 +148,7 @@ class StateManager:
                 transition = StateTransition(
                     from_status=current_status,
                     to_status=new_status,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     reason=reason,
                     metadata=metadata,
                 )
@@ -325,7 +325,7 @@ class StateManager:
                     transition = StateTransition(
                         from_status=old_status,
                         to_status=TaskStatus.PENDING,
-                        timestamp=datetime.now(timezone.utc),
+                        timestamp=datetime.now(UTC),
                         reason=f"Reset: {reason}",
                         metadata={"reset": True},
                     )
@@ -371,7 +371,7 @@ class StateManager:
                 "task_id": task_id,
                 "status": status.value if status else None,
                 "history": [transition.to_dict() for transition in history],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except (TaskStateError, StateTransitionError, ValidationError) as e:
             self.logger.exception(f"Failed to save state for task {task_id}: {e}")

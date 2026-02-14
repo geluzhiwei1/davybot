@@ -6,7 +6,7 @@
 Rich chat display with markdown rendering and syntax highlighting.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from textual.containers import Vertical
 from textual.reactive import reactive
@@ -137,7 +137,7 @@ class EnhancedChatArea(Vertical):
         self.mount(bubble)
 
         # Add to history
-        self._messages.append({"content": content, "role": role, "timestamp": datetime.now(timezone.utc)})
+        self._messages.append({"content": content, "role": role, "timestamp": datetime.now(UTC)})
 
         # Limit history
         if len(self._messages) > self.max_messages:
@@ -200,7 +200,7 @@ class EnhancedChatArea(Vertical):
         """
         lines = []
         lines.append("# Chat History\n")
-        lines.append(f"Exported: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        lines.append(f"Exported: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         lines.append("---\n\n")
 
         for msg in self._messages:

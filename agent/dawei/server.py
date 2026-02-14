@@ -12,7 +12,7 @@ import json
 import os
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 # 强制 UTF-8 编码（解决 Windows 控制台编码问题）
@@ -72,18 +72,15 @@ class UTF8StreamHandler(logging.StreamHandler):
             # 统一使用字符串写入（流已经是 UTF-8 编码的文本流）
             self.stream.write(msg + "\n")
             self.flush()
-        except (OSError, IOError, ValueError) as e:
+        except (OSError, ValueError):
             # Fast Fail: 只捕获预期的I/O错误，让其他错误快速失败
             self.handleError(record)
         except Exception as e:
             # Fast Fail: 记录未预期的错误但仍快速失败
             # 添加上下文信息以便调试
             import logging
-            logging.getLogger(__name__).error(
-                f"Unexpected error in UTF8StreamHandler.emit: {e}",
-                exc_info=True,
-                extra={"record": record}
-            )
+
+            logging.getLogger(__name__).error(f"Unexpected error in UTF8StreamHandler.emit: {e}", exc_info=True, extra={"record": record})
             self.handleError(record)
             raise  # 重新抛出未预期的异常
 
@@ -154,7 +151,7 @@ def record_server_start(host: str, port: int) -> None:
         start_data = {
             "host": host,
             "port": port,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "web_ui": f"http://{accessible_host}:{port}/",
             "api_docs": f"http://{accessible_host}:{port}/docs",
             "websocket": f"ws://{accessible_host}:{port}/ws",

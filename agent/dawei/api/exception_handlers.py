@@ -7,9 +7,10 @@ Provides centralized exception handling for all API endpoints following fast fai
 """
 
 from typing import Any
+
 from fastapi import HTTPException, Request, status
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from dawei.logg.logging import get_logger
 

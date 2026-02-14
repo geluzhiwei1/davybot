@@ -40,6 +40,7 @@ def is_port_in_use(port: int, host: str = "0.0.0.0") -> bool:
     except Exception as e:
         # Log unexpected errors for debugging
         import logging
+
         logging.getLogger(__name__).warning(f"Unexpected error checking port {port}: {e}", exc_info=True)
         return False  # Assume port is free on unexpected errors
 
@@ -83,6 +84,7 @@ def find_process_using_port(port: int) -> tuple[int, str] | None:
                         except Exception as e:
                             # Log subprocess failure but still return PID
                             import logging
+
                             logging.getLogger(__name__).warning(f"Failed to get process name for PID {pid}: {e}", exc_info=True)
                             return (int(pid), "unknown")
 

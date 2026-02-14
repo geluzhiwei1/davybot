@@ -18,8 +18,6 @@ Categories:
 - market: Market operations
 """
 
-from typing import Dict
-
 
 class ErrorCodes:
     """Standardized error codes and their English messages."""
@@ -121,7 +119,7 @@ class ErrorCodes:
             Formatted error message, or code itself if not found
 
         """
-        all_messages: Dict[str, str] = {}
+        all_messages: dict[str, str] = {}
         all_messages.update(cls.WORKSPACE_MESSAGES)
         all_messages.update(cls.CHECKPOINT_MESSAGES)
         all_messages.update(cls.LLM_CONFIG_MESSAGES)
@@ -139,7 +137,7 @@ class ErrorCodes:
             return f"{template} | Params: {params}"
 
     @classmethod
-    def create_error_detail(cls, code: str, **params) -> Dict[str, any]:
+    def create_error_detail(cls, code: str, **params) -> dict[str, any]:
         """Create standardized error detail dictionary.
 
         Args:
@@ -150,15 +148,11 @@ class ErrorCodes:
             Dictionary with 'code' and 'message' keys
 
         """
-        return {
-            "code": code,
-            "message": cls.get_message(code, **params),
-            "params": params or {}
-        }
+        return {"code": code, "message": cls.get_message(code, **params), "params": params or {}}
 
 
 # Convenience function for creating error details
-def error_detail(code: str, **params) -> Dict[str, any]:
+def error_detail(code: str, **params) -> dict[str, any]:
     """Create error detail dictionary from error code.
 
     Args:

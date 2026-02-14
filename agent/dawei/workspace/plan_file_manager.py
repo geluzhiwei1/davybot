@@ -7,7 +7,7 @@
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +50,7 @@ class PlanFileManager:
 
         """
         if timestamp is None:
-            timestamp = int(datetime.now(timezone.utc).timestamp())
+            timestamp = int(datetime.now(UTC).timestamp())
 
         # 格式: {timestamp}-{session_id}.md
         filename = f"{timestamp}-{session_id}.md"
@@ -79,7 +79,7 @@ class PlanFileManager:
 
         # 如果没有提供内容，使用默认模板
         if content is None:
-            creation_time = datetime.now(timezone.utc).isoformat()
+            creation_time = datetime.now(UTC).isoformat()
             content = f"""# {title}
 
 **Created**: {creation_time}

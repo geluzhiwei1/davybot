@@ -8,7 +8,7 @@
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from dawei.core.events import TaskEvent
@@ -359,7 +359,7 @@ class ChatHandler(AsyncMessageHandler):
         except ValueError as e:
             logger.error(f"[CHAT_HANDLER] Invalid UI context data: {e}", exc_info=True)
             raise
-        except IOError as e:
+        except OSError as e:
             logger.error(f"[CHAT_HANDLER] Failed to save UI context: {e}", exc_info=True)
             raise
 
@@ -407,7 +407,7 @@ class ChatHandler(AsyncMessageHandler):
         except FileNotFoundError as e:
             logger.error(f"[CHAT_HANDLER] Conversation history not found: {e}", exc_info=True)
             raise
-        except IOError as e:
+        except OSError as e:
             logger.error(f"[CHAT_HANDLER] Failed to load conversation: {e}", exc_info=True)
             raise
 
@@ -675,7 +675,7 @@ class ChatHandler(AsyncMessageHandler):
             )
             await self.send_message(session_id, agent_start_message)
             logger.info(f"[CHAT_HANDLER] ✅ Sent AGENT_START message: mode={agent_mode}")
-        except (ConnectionError, IOError, WebSocketError) as e:
+        except (OSError, ConnectionError, WebSocketError) as e:
             logger.error(f"[CHAT_HANDLER] Failed to send agent start message: {e}", exc_info=True)
             raise
 
@@ -841,7 +841,7 @@ class ChatHandler(AsyncMessageHandler):
                 completion=status.get("completion_percentage", 0),
                 result_summary=f"PDCA循环已完成，完成了{status.get('cycle_count', 1)}个循环",
                 start_time=pdca_extension.current_cycle.start_time,
-                end_time=datetime.now(timezone.utc).isoformat(),
+                end_time=datetime.now(UTC).isoformat(),
             )
 
             await self.send_message(session_id, message)
@@ -1066,7 +1066,7 @@ class ChatHandler(AsyncMessageHandler):
                 logger.warning(
                     f"[CHAT_HANDLER] Failed to save conversation {user_workspace.current_conversation.id}",
                 )
-        except IOError as e:
+        except OSError as e:
             logger.error(f"[CHAT_HANDLER] Error saving conversation: {e}", exc_info=True)
             raise
 

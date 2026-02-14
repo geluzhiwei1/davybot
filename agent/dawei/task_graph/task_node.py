@@ -6,7 +6,7 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import TYPE_CHECKING, Any, Optional
 
 from dawei.entity.task_types import TaskStatus
@@ -37,8 +37,8 @@ class TaskNode:
     sub_graph: Optional["TaskGraph"] = None
 
     # 时间戳
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         """初始化后处理"""
@@ -94,47 +94,47 @@ class TaskNode:
         """添加子节点ID"""
         if child_id not in self.child_ids:
             self.child_ids.append(child_id)
-            self.updated_at = datetime.now(timezone.utc)
+            self.updated_at = datetime.now(UTC)
 
     def remove_child(self, child_id: str) -> bool:
         """移除子节点ID"""
         if child_id in self.child_ids:
             self.child_ids.remove(child_id)
-            self.updated_at = datetime.now(timezone.utc)
+            self.updated_at = datetime.now(UTC)
             return True
         return False
 
     def set_parent(self, parent_id: str | None) -> None:
         """设置父节点ID"""
         self.parent_id = parent_id
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update_data(self, **kwargs) -> None:
         """更新任务数据"""
         for key, value in kwargs.items():
             if hasattr(self.data, key):
                 setattr(self.data, key, value)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update_status(self, status: TaskStatus) -> None:
         """更新任务状态"""
         self.data.update_status(status)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update_description(self, description: str) -> None:
         """更新任务描述"""
         self.data.update_description(description)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def update_mode(self, mode: str) -> None:
         """更新任务模式"""
         self.data.update_mode(mode)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def add_metadata(self, key: str, value: Any) -> None:
         """添加元数据"""
         self.data.add_metadata(key, value)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def get_hierarchy_info(self) -> dict[str, Any]:
         """获取层级信息"""
@@ -163,8 +163,8 @@ class TaskNode:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TaskNode":
         """从字典创建实例"""
-        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(timezone.utc)
-        updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(timezone.utc)
+        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC)
+        updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC)
 
         # 创建TaskData对象
         task_data = TaskData.from_dict(data["data"])

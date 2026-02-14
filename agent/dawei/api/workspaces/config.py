@@ -15,8 +15,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from dawei.workspace import workspace_manager
-from dawei.workspace.user_workspace import UserWorkspace
 from dawei.workspace.models import WorkspaceConfig  # ✨ 新增：导入统一配置模型
+from dawei.workspace.user_workspace import UserWorkspace
 
 logger = logging.getLogger(__name__)
 

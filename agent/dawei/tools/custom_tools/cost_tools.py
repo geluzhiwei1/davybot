@@ -4,7 +4,7 @@
 """成本追踪工具 - 显示 LLM 使用成本和优化建议"""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -77,7 +77,7 @@ class ShowCostTool(CustomBaseTool):
 
     def _format_summary(self, summary, tracker) -> str:
         """Format summary level report"""
-        duration = datetime.now(timezone.utc) - tracker.session_start
+        duration = datetime.now(UTC) - tracker.session_start
         hours = duration.total_seconds() / 3600
 
         output = {
@@ -97,7 +97,7 @@ class ShowCostTool(CustomBaseTool):
 
     def _format_detailed(self, summary, tracker) -> str:
         """Format detailed level report"""
-        duration = datetime.now(timezone.utc) - tracker.session_start
+        duration = datetime.now(UTC) - tracker.session_start
         hours = duration.total_seconds() / 3600
 
         output = {

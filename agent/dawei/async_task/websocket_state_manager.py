@@ -10,7 +10,7 @@ import asyncio
 import contextlib
 import threading
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from dawei.logg.logging import get_logger
@@ -81,7 +81,7 @@ class WebSocketStateManager(IWebSocketStateManager):
             connection_state = WebSocketState(
                 session_id=session_id,
                 state=ConnectionState.CONNECTING,
-                connected_at=datetime.now(timezone.utc),
+                connected_at=datetime.now(UTC),
             )
 
             self._connections[session_id] = connection_state
@@ -180,7 +180,7 @@ class WebSocketStateManager(IWebSocketStateManager):
 
             # 更新连接时间
             if state == ConnectionState.CONNECTED and old_state != ConnectionState.CONNECTED:
-                self._connections[session_id].connected_at = datetime.now(timezone.utc)
+                self._connections[session_id].connected_at = datetime.now(UTC)
                 self._connections[session_id].reconnect_attempts = 0
             elif state == ConnectionState.RECONNECTING:
                 self._connections[session_id].reconnect_attempts += 1
@@ -298,7 +298,7 @@ class WebSocketStateManager(IWebSocketStateManager):
         stale_connections = []
 
         with self._lock:
-            current_time = datetime.now(timezone.utc)
+            current_time = datetime.now(UTC)
 
             for session_id, connection in self._connections.items():
                 # 检查连接是否过期
@@ -348,7 +348,7 @@ class WebSocketStateManager(IWebSocketStateManager):
                 )
 
         if cleaned_count > 0:
-            self._stats["last_cleanup_time"] = datetime.now(timezone.utc).isoformat()
+            self._stats["last_cleanup_time"] = datetime.now(UTC).isoformat()
             self._logger.info(f"Cleaned up {cleaned_count} stale connections")
 
         return cleaned_count
@@ -385,7 +385,7 @@ class WebSocketStateManager(IWebSocketStateManager):
             return
 
         self._is_running = True
-        self._stats["start_time"] = datetime.now(timezone.utc).isoformat()
+        self._stats["start_time"] = datetime.now(UTC).isoformat()
 
         # 启动心跳检查任务
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
@@ -586,7 +586,7 @@ class WebSocketStateManager(IWebSocketStateManager):
 
     async def _check_heartbeats(self) -> None:
         """检查心跳"""
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
         timeout_connections = []
 
         with self._lock:
