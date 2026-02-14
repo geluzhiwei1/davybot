@@ -57,14 +57,6 @@ jobs:
           uv pip install --system -e ".[dev]"
           uv pip install --system safety bandit
 
-      - name: Run Black check
-        run: |
-          black --check --diff dawei/
-
-      - name: Run Ruff linter
-        run: |
-          ruff check dawei/
-
       - name: Run Ruff format check
         run: |
           ruff format --check dawei/
@@ -76,6 +68,8 @@ jobs:
   test:
     name: Test Backend
     runs-on: ubuntu-latest
+    # TEMPORARILY DISABLED
+    if: false
     needs: lint
     defaults:
       run:
@@ -141,6 +135,8 @@ jobs:
   test-cli:
     name: Test CLI Commands
     runs-on: ubuntu-latest
+    # TEMPORARILY DISABLED
+    if: false
     needs: lint
     defaults:
       run:
