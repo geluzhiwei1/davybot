@@ -41,10 +41,20 @@
     </el-aside>
 
     <!-- 左侧内容区 - 独立的 aside，可折叠 -->
-    <el-aside v-show="!isSidePanelCollapsed" class="content-panel" width="400px">
+    <el-aside v-show="!isSidePanelCollapsed" class="content-panel" :width="sidePanelWidth + 'px'">
       <SidePanel ref="sidePanelRef" @open-file="handleOpenFile" :side-panel-collapsed="isSidePanelCollapsed"
         :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-aside>
+
+    <!-- 左侧面板拖动分隔条 -->
+    <ResizerBar
+      v-if="!isSidePanelCollapsed"
+      :panel-ref="{ width: sidePanelWidth }"
+      :min-width="250"
+      :max-width="600"
+      storage-key="dawei-sidepanel-width"
+      @resize="sidePanelWidth = $event"
+    />
 
     <el-container v-show="!isChatPanelCollapsed" class="main-content">
       <el-header height="auto">
@@ -67,7 +77,18 @@
       </el-footer>
     </el-container>
 
-    <el-aside v-if="isRightPanelVisible" class="right-panel">
+    <!-- 主内容区和右侧面板之间的拖动分隔条 -->
+    <ResizerBar
+      v-if="isRightPanelVisible && !isChatPanelCollapsed"
+      :panel-ref="{ width: rightPanelWidth }"
+      :min-width="300"
+      :max-width="800"
+      storage-key="dawei-rightpanel-width"
+      position="right"
+      @resize="rightPanelWidth = $event"
+    />
+
+    <el-aside v-if="isRightPanelVisible" class="right-panel" :width="rightPanelWidth + 'px'">
       <FileContentArea :files="openFiles" :active-file-id="currentActiveFileId" @close-file="handleCloseFile"
         @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
         @update-file-content="updateFileContent" />
@@ -107,6 +128,7 @@ import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User } from '@e
 import '@/styles/chat-ultra-minimal.css';
 
 import SidePanel from '@/components/layout/SidePanel.vue';
+import ResizerBar from '@/components/layout/ResizerBar.vue';
 import FileContentArea from '@/components/layout/FileContentArea.vue';
 import TopBar from '@/components/layout/TopBar.vue';
 import MessageArea from '@/components/layout/MessageArea.vue';
@@ -162,6 +184,11 @@ const isSidePanelCollapsed = ref(false);
 const isChatPanelCollapsed = ref(false);
 const isSettingsDrawerVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
+
+// 面板宽度控制
+const sidePanelWidth = ref(400);
+const rightPanelWidth = ref(500);
+const savedSidePanelWidth = ref(400); // 折叠前保存宽度
 
 // Agents状态 - 默认显示面板
 const isMonitoringPanelVisible = ref(true);
@@ -250,9 +277,39 @@ onMounted(async () => {
   console.log('[ChatView] Is Tauri:', import.meta.env.CLIENT_TAWSI ?? 'false');
   console.log('[ChatView] Expected API URL:', apiBaseUrl === '/api' ? '✅ /api (correct for Web dev mode)' : `❌ ${apiBaseUrl} (should be /api)`);
   console.log('='.repeat(60));
+
+  // 恢复面板宽度
+  try {
+    const savedSideWidth = localStorage.getItem('dawei-sidepanel-width');
+    if (savedSideWidth) {
+      const width = parseInt(savedSideWidth, 10);
+      if (!isNaN(width) && width >= 250 && width <= 600) {
+        sidePanelWidth.value = width;
+        console.log('[ChatView] Restored side panel width:', width);
+      }
+    }
+
+    const savedRightWidth = localStorage.getItem('dawei-rightpanel-width');
+    if (savedRightWidth) {
+      const width = parseInt(savedRightWidth, 10);
+      if (!isNaN(width) && width >= 300 && width <= 800) {
+        rightPanelWidth.value = width;
+        console.log('[ChatView] Restored right panel width:', width);
+      }
+    }
+  } catch (error) {
+    console.warn('[ChatView] Failed to restore panel widths:', error);
+  }
 });
 
 const toggleSidePanel = () => {
+  if (!isSidePanelCollapsed.value) {
+    // 折叠前保存当前宽度
+    savedSidePanelWidth.value = sidePanelWidth.value;
+  } else {
+    // 展开时恢复之前的宽度
+    sidePanelWidth.value = savedSidePanelWidth.value;
+  }
   isSidePanelCollapsed.value = !isSidePanelCollapsed.value;
 };
 
@@ -740,9 +797,9 @@ async function handleFollowupResponse(toolCallId: string, response: string) {
   background: var(--el-bg-color);
   backdrop-filter: blur(10px);
   transition: all var(--duration-base) var(--ease-default);
-  flex: 1;
+  flex-shrink: 0;
   min-width: 300px;
-  max-width: 60%;
+  max-width: 800px;
   overflow: hidden;
   box-shadow: -2px 0 12px rgba(0, 0, 0, 0.03);
 }

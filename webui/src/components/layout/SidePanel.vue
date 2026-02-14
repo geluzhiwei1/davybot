@@ -553,6 +553,11 @@ const handleRefreshFiles = async () => {
   ElMessage.success('文件树已刷新');
 };
 
+// 打开上传文件对话框
+const handleUploadFile = () => {
+  isUploadDialogVisible.value = true;
+};
+
 // 处理上传成功
 const handleUploadSuccess = async () => {
   // 重新加载文件树
