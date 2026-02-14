@@ -56,7 +56,7 @@ def _load_settings_file(settings_file: Path, source: str) -> dict[str, LLMProvid
     """
     if not settings_file.exists():
         logger.debug(f"Settings file not found: {settings_file}")
-        return {}
+        return {}, {}
 
     try:
         with Path(settings_file).open(encoding="utf-8") as f:

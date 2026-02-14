@@ -1,40 +1,22 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
-  <el-dialog
-    v-model="visible"
-    :title="isEditMode ? '编辑工作区' : '创建工作区'"
-    width="700px"
-    :close-on-click-modal="false"
-    @close="handleClose"
-  >
-    <el-form
-      ref="formRef"
-      :model="formData"
-      :rules="formRules"
-      label-width="140px"
-      @submit.prevent="handleSubmit"
-    >
+  <el-dialog v-model="visible" :title="isEditMode ? '编辑工作区' : '创建工作区'" width="700px" :close-on-click-modal="false"
+    @close="handleClose">
+    <el-form ref="formRef" :model="formData" :rules="formRules" label-width="140px" @submit.prevent="handleSubmit">
       <!-- 工作区路径（仅创建时显示） -->
       <el-form-item label="工作区路径" prop="path" v-if="!isEditMode">
-        <el-input
-          v-model="formData.path"
-          placeholder="/home/user/my-project"
-          @blur="validatePath"
-        >
+        <el-input v-model="formData.path" placeholder="~/my-project" @blur="validatePath">
           <template #prepend>
-            <el-icon><Folder /></el-icon>
+            <el-icon>
+              <Folder />
+            </el-icon>
           </template>
           <template #append>
-            <el-button
-              v-if="isTauri"
-              :icon="FolderOpened"
-              @click="selectDirectory"
-              :disabled="selectingDirectory"
-            >
+            <el-button v-if="isTauri" :icon="FolderOpened" @click="selectDirectory" :disabled="selectingDirectory">
               {{ selectingDirectory ? '选择中...' : '选择目录' }}
             </el-button>
           </template>
@@ -47,47 +29,31 @@
         </div>
 
         <!-- 路径验证状态 -->
-        <el-alert
-          v-if="pathValidation.status"
-          :type="pathValidation.status"
-          :closable="false"
-          style="margin-top: 10px"
-        >
+        <el-alert v-if="pathValidation.status" :type="pathValidation.status" :closable="false" style="margin-top: 10px">
           {{ pathValidation.message }}
         </el-alert>
       </el-form-item>
 
       <!-- 显示名称 -->
       <el-form-item label="显示名称" prop="display_name">
-        <el-input
-          v-model="formData.display_name"
-          placeholder="我的项目"
-        >
+        <el-input v-model="formData.display_name" placeholder="我的项目">
           <template #prepend>
-            <el-icon><FolderOpened /></el-icon>
+            <el-icon>
+              <FolderOpened />
+            </el-icon>
           </template>
         </el-input>
       </el-form-item>
 
       <!-- 描述 -->
       <el-form-item label="描述" prop="description">
-        <el-input
-          v-model="formData.description"
-          type="textarea"
-          :rows="3"
-          placeholder="简单描述这个工作区的用途..."
-        />
+        <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="简单描述这个工作区的用途..." />
       </el-form-item>
     </el-form>
 
     <template #footer>
       <el-button @click="handleClose">取消</el-button>
-      <el-button
-        type="primary"
-        @click="handleSubmit"
-        :loading="submitting"
-        :disabled="!isValidPath"
-      >
+      <el-button type="primary" @click="handleSubmit" :loading="submitting" :disabled="!isValidPath">
         {{ isEditMode ? '保存' : '创建' }}
       </el-button>
     </template>

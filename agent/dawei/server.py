@@ -178,6 +178,18 @@ async def lifespan(app: FastAPI):
     # Startup
     await websocket_server.initialize()
 
+    # ✅ Validate .dawei directory structure
+    try:
+        from .workspace.dawei_structure_validator import validate_dawei_on_startup
+
+        validate_dawei_on_startup()
+        print("[Dawei Server] ✓ .dawei directory structure validation passed")
+    except ImportError as e:
+        print(f"[Dawei Server] ⚠ .dawei validation module not available: {e}")
+    except Exception as e:
+        # Fast Fail: Critical validation error prevents server startup
+        print(f"[Dawei Server] ❌ .dawei directory structure validation failed: {e}")
+
     # Record server startup parameters
     host = getattr(app.state, "host", "0.0.0.0")
     port = getattr(app.state, "port", 8465)
