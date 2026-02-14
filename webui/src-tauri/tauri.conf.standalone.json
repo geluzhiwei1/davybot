@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "dawei-standalone",
+  "version": "0.1.0",
+  "identifier": "com.dawei.ip-agent.standalone",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build-only",
+    "beforeBundleCommand": "python ../../scripts/copy-resources.py",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "大微 - AI 助手 (Standalone)",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:* ws://localhost:* https://api.dawei.com wss://api.dawei.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' blob:; object-src 'none'; frame-src 'self';"
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "publisher": "大微团队",
+    "copyright": "Copyright © 2026 大微团队",
+    "category": "Developer Tool",
+    "longDescription": "大微 AI 助手 - 智能专利分析与申请系统，包含完整的 Python 运行时环境，无需额外安装依赖。",
+    "shortDescription": "大微 AI 助手 - 独立版",
+    "resources": [
+      "start-backend.sh",
+      "stop-backend.sh",
+      "start-backend.bat",
+      "stop-backend.bat",
+      "resources/python-env"
+    ]
+  },
+  "plugins": {}
+}
