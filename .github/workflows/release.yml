@@ -33,9 +33,10 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: conventional-changelog/conventional-changelog-github-action@v3
+        uses: conventional-changelog/conventional-changelog-github-action@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          output-file: false
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
