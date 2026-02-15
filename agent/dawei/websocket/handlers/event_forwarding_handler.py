@@ -13,7 +13,7 @@ from typing import Any
 
 from dawei.agentic.agent import Agent
 from dawei.core import local_context
-from dawei.core.events import TaskEventType
+from dawei.core.events import CORE_EVENT_BUS, TaskEventType
 from dawei.logg.logging import get_logger
 from dawei.websocket.protocol import (
     A2UIServerEventMessage,
@@ -246,7 +246,7 @@ class EventForwardingHandler:
         # 获取 Agent 的事件总线
         event_bus = agent.event_bus
 
-        # 注册事件处理器
+        # 注册事件处理器到 Agent 事件总线
         handler_ids = {}
         for event_type in event_types_to_forward:
             try:
@@ -257,6 +257,20 @@ class EventForwardingHandler:
                 )
             except Exception as e:
                 logger.error(f"订阅事件 {event_type} 时出错: {e}", exc_info=True)
+
+        # 额外订阅全局事件总线的 TOOL_CALL_START 事件
+        # 因为 tool_executor 通过全局事件总线发送 TOOL_CALL_START，需要单独订阅
+        try:
+            global_tool_start_handler_id = CORE_EVENT_BUS.add_handler(
+                TaskEventType.TOOL_CALL_START,
+                event_handler
+            )
+            handler_ids[TaskEventType.TOOL_CALL_START.value] = global_tool_start_handler_id
+            logger.info(
+                f"[EVENT_HANDLER] ✅ Subscribed to global CORE_EVENT_BUS for TOOL_CALL_START (handler: {global_tool_start_handler_id}, task: {task_id})"
+            )
+        except Exception as e:
+            logger.error(f"订阅全局TOOL_CALL_START事件时出错: {e}", exc_info=True)
 
         logger.info(
             f"[EVENT_HANDLER] ✅ Successfully registered {len(handler_ids)} event handlers for task {task_id}",
@@ -450,6 +464,8 @@ class EventForwardingHandler:
 
     async def _handle_tool_call_start(self, event_data, session_id: str, task_id: str):
         """处理工具调用开始事件"""
+        logger.info(f"[EVENT_FORWARDING] 🔧 Handling TOOL_CALL_START event: tool_name={event_data.tool_name if hasattr(event_data, 'tool_name') else 'unknown'}, session_id={session_id}, task_id={task_id}")
+
         return ToolCallStartMessage(
             session_id=session_id,
             task_id=task_id,

@@ -120,19 +120,14 @@ async def get_workspace_llm_settings_all_levels(
         await workspace.initialize()
 
     try:
-        # 获取 LLM Provider 实例
-        from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
-
-        # 创建或获取现有的配置管理器
-        if not workspace.llm_manager:
-            llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
-            await llm_config_manager.initialize()
-            workspace.llm_manager = llm_config_manager.llm_provider
-        else:
-            llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
-            await llm_config_manager.initialize()
-
+        # 直接使用 user_workspace 已有的 llm_manager（包含多级加载逻辑）
         llm_provider = workspace.llm_manager
+        if not llm_provider:
+            from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
+            llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
+            await llm_config_manager.initialize()
+            llm_provider = llm_config_manager.llm_provider
+            workspace.llm_manager = llm_provider
 
         # 获取带来源信息的所有配置
         configs_with_source = llm_provider.get_all_configs_with_source()
@@ -418,6 +413,153 @@ async def update_llm_provider(
     except Exception as e:
         logger.exception("Failed to update LLM provider: ")
         raise HTTPException(status_code=500, detail=f"Failed to update LLM provider: {e!s}")
+
+
+@router.post("/{workspace_id}/llm-providers/test")
+async def test_llm_provider(
+    provider_data: LLMProviderCreate,
+    workspace: UserWorkspace = Depends(get_user_workspace),
+):
+    """测试 LLM Provider 是否支持 Tool Call"""
+    if not workspace.is_initialized():
+        await workspace.initialize()
+
+    try:
+        from dawei.llm_api.impl.openai_compatible_api import OpenaiCompatibleClient
+
+        # 构建 provider 配置
+        api_provider = provider_data.apiProvider
+
+        # 构建 config dict
+        if api_provider == "ollama":
+            model_id = provider_data.ollamaModelId or "llama3.1:latest"
+            config = {
+                "apiProvider": "ollama",
+                "ollamaBaseUrl": provider_data.ollamaBaseUrl or "http://localhost:11434",
+                "ollamaApiKey": provider_data.ollamaApiKey or "ollama",
+                "ollamaModelId": model_id,
+            }
+        else:
+            # OpenAI 兼容格式
+            model_id = provider_data.openAiModelId or "gpt-4o"
+            config = {
+                "apiProvider": api_provider,
+                "openAiBaseUrl": provider_data.openAiBaseUrl or "https://api.openai.com/v1",
+                "openAiApiKey": provider_data.openAiApiKey or "",
+                "openAiModelId": model_id,
+                "openAiLegacyFormat": provider_data.openAiLegacyFormat or False,
+            }
+
+        # 创建 API 实例
+        llm_api = OpenaiCompatibleClient(config)
+
+        # 准备测试消息 - 带一个简单的 tool 定义
+        from dawei.entity.lm_messages import UserMessage
+
+        test_messages = [
+            UserMessage(
+                content="Hello"
+            )
+        ]
+
+        # 准备一个简单的 tool
+        test_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "test_function",
+                    "description": "A test function",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "test_param": {
+                                "type": "string",
+                                "description": "A test parameter"
+                            }
+                        },
+                        "required": ["test_param"]
+                    }
+                }
+            }
+        ]
+
+        # 尝试调用
+        try:
+            # 使用流式 API 并迭代获取完整响应
+            from dawei.entity.stream_message import CompleteMessage
+
+            all_tool_calls = []
+            async for chunk in llm_api.create_message(
+                messages=test_messages,
+                tools=test_tools,
+                temperature=0.7,
+            ):
+                if isinstance(chunk, CompleteMessage):
+                    if chunk.tool_calls:
+                        all_tool_calls.extend(chunk.tool_calls)
+
+            has_tool_call = len(all_tool_calls) > 0
+
+            if has_tool_call:
+                return {
+                    "success": True,
+                    "supported": True,
+                    "message": "Tool Call 支持正常",
+                    "model": model_id,
+                }
+            else:
+                # 没有返回 tool call，可能是模型不支持或没有强制要求
+                # 尝试强制要求 tool call
+                try:
+                    all_tool_calls_force = []
+                    async for chunk in llm_api.create_message(
+                        messages=test_messages,
+                        tools=test_tools,
+                        tool_choice="required",
+                        temperature=0.7,
+                    ):
+                        if isinstance(chunk, CompleteMessage):
+                            if chunk.tool_calls:
+                                all_tool_calls_force.extend(chunk.tool_calls)
+
+                    if all_tool_calls_force:
+                        return {
+                            "success": True,
+                            "supported": True,
+                            "message": "Tool Call 支持正常 (强制模式)",
+                            "model": model_id,
+                        }
+                except Exception:
+                    pass
+
+                return {
+                    "success": True,
+                    "supported": False,
+                    "message": "该模型不支持 Tool Call 或未返回 tool call",
+                    "model": model_id,
+                }
+
+        except Exception as e:
+            error_msg = str(e)
+            # 判断是否是模型不支持 tool call 的错误
+            if "tool" in error_msg.lower() or "function" in error_msg.lower():
+                return {
+                    "success": True,
+                    "supported": False,
+                    "message": f"该模型不支持 Tool Call: {error_msg}",
+                    "model": model_id,
+                }
+            # 其他错误（网络、认证等）
+            raise HTTPException(
+                status_code=400,
+                detail=f"API 调用失败: {error_msg}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to test LLM provider: ")
+        raise HTTPException(status_code=500, detail=f"测试失败: {e!s}")
 
 
 @router.delete("/{workspace_id}/llm-providers/{provider_name}")

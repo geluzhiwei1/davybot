@@ -1561,6 +1561,14 @@ class UserWorkspace:
             if self.current_conversation and self.current_conversation.message_count > 0:
                 await self.save_current_conversation()
 
+            # 🔧 修复内存泄漏：清理 TaskGraph 的事件处理器
+            if self.task_graph:
+                try:
+                    self.task_graph.cleanup()
+                    logger.info(f"  ✓ Cleaned up TaskGraph event handlers")
+                except Exception as e:
+                    logger.warning(f"  ⚠️ Failed to cleanup TaskGraph handlers: {e}")
+
             # ⭐ 核心改动：释放对 WorkspaceContext 的引用（不停止共享资源）
             if self._context:
                 ref_count_before = self._context.ref_count
@@ -1587,11 +1595,17 @@ class UserWorkspace:
         """
         logger.info("Reloading workspace...")
 
-        # 先清理
+        # 先清理（会自动清理 TaskGraph 事件处理器）
         await self.cleanup()
 
-        # 重新初始化
-        return await self.initialize()
+        # 重新初始化（会创建新的 TaskGraph 并注册新的事件处理器）
+        success = await self.initialize()
+        if success:
+            logger.info("Workspace reloaded successfully")
+        else:
+            logger.error("Failed to reload workspace")
+
+        return success
 
     def is_initialized(self) -> bool:
         """检查工作区是否已初始化"""

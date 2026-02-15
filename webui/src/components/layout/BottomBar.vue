@@ -63,6 +63,8 @@ import { useRoute } from 'vue-router';
 import { useChatStore } from '@/stores/chat';
 import { ElFooter, ElDropdown, ElDropdownMenu, ElDropdownItem, ElButton, ElIcon, ElMessage } from 'element-plus';
 import { ArrowDown, Cpu } from '@element-plus/icons-vue';
+import { workspacesApi } from '@/services/api';
+import { httpClient } from '@/services/api/http';
 
 interface Mode {
   slug: string;
@@ -136,8 +138,9 @@ onMounted(async () => {
 
   const fetchModes = async () => {
     try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/modes`);
-      const data = await response.json();
+      const data = await httpClient.get<{ success: boolean; modes: Mode[] }>(
+        `/workspaces/${workspaceId}/modes`
+      );
       if (data.success && Array.isArray(data.modes)) {
         modes.value = data.modes;
         currentMode.value = data.modes.find((m: Mode) => m.is_default) || data.modes[0];
@@ -153,8 +156,9 @@ onMounted(async () => {
 
   const fetchLLMs = async () => {
     try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/llms`);
-      const data = await response.json();
+      const data = await httpClient.get<{ success: boolean; models: LLM[] }>(
+        `/workspaces/${workspaceId}/llms`
+      );
       if (data.success && Array.isArray(data.models)) {
         llms.value = data.models;
         currentLLM.value = data.models[0];
@@ -174,25 +178,13 @@ onMounted(async () => {
 const selectMode = async (mode: Mode) => {
   try {
     const workspaceId = route.params.workspaceId as string;
-    const response = await fetch(`/api/workspaces/${workspaceId}/ui/context`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        context: {
-          current_mode: mode.slug
-        }
-      })
+    await workspacesApi.updateUIContext(workspaceId, {
+      current_mode: mode.slug
     });
 
-    if (response.ok) {
-      currentMode.value = mode;
-      // 更新 chatStore 中的 uiContext
-      chatStore.uiContext.currentMode = mode.slug;
-    } else {
-      console.error('Failed to update mode, status:', response.status);
-    }
+    currentMode.value = mode;
+    // 更新 chatStore 中的 uiContext
+    chatStore.uiContext.currentMode = mode.slug;
   } catch (error) {
     console.error('Error updating mode:', error);
   }
@@ -208,29 +200,14 @@ const selectLLM = async (llm: LLM) => {
       return;
     }
 
-    const url = `/api/workspaces/${workspaceId}/ui/context`;
-
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        current_llm_id: llm.llm_id
-      })
+    await workspacesApi.updateUIContext(workspaceId, {
+      current_llm_id: llm.llm_id
     });
 
-    if (response.ok) {
-      currentLLM.value = llm;
-      // 更新 chatStore 中的 uiContext
-      chatStore.uiContext.currentLlmId = llm.llm_id;
-      ElMessage.success('LLM 已更新');
-    } else {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      console.error('Failed to update LLM:', response.status, errorData);
-      // 显示错误提示给用户
-      ElMessage.error(`更新LLM失败 (${response.status}): ${errorData.detail || response.statusText}`);
-    }
+    currentLLM.value = llm;
+    // 更新 chatStore 中的 uiContext
+    chatStore.uiContext.currentLlmId = llm.llm_id;
+    ElMessage.success('LLM 已更新');
   } catch (error) {
     console.error('Error updating LLM:', error);
     ElMessage.error('更新LLM时发生网络错误');

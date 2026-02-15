@@ -141,6 +141,11 @@ async def list_all_plugin_configs(
                     logger.debug(f"Skipping plugin {plugin_id} due to config load error")
                     continue
 
+                # Construct plugin_id with version to match config file naming (e.g., feishu-channel@0.1.0)
+                plugin_version = plugin_meta.get("version", "")
+                if plugin_version:
+                    plugin_id = f"{plugin_id}@{plugin_version}"
+
                 # Handle config_schema file reference
                 config_schema_value = plugin_meta.get("config_schema")
                 if isinstance(config_schema_value, str):
@@ -162,10 +167,13 @@ async def list_all_plugin_configs(
                 # 加载当前配置
                 config = manager.load_plugin_config(plugin_id)
 
+                # Return inner settings to frontend (层级结构中提取 settings)
+                settings = config.get("settings", {})
+
                 # 直接返回原始 schema，不做任何转换
                 plugins[plugin_id] = {
                     "schema": schema_to_use,
-                    "config": config,
+                    "config": settings,
                 }
 
         return PluginListResponse(
@@ -255,11 +263,14 @@ async def get_plugin_config(
         config = manager.load_plugin_config(actual_plugin_id)
         plugin_info = list_response.plugins[actual_plugin_id]
 
+        # Return inner settings to frontend (层级结构中提取 settings)
+        settings = config.get("settings", {})
+
         return PluginConfigResponse(
             success=True,
             schema=plugin_info.get("schema"),
-            config=config,
-            existing_config=config,
+            config=settings,
+            existing_config=settings,
             form_config=plugin_info.get("form_config"),
         )
 
@@ -317,8 +328,17 @@ async def update_plugin_config(
             logger.error(f"[PLUGIN CONFIG SAVE] Validation failed!")
             raise HTTPException(status_code=400, detail="Configuration validation failed. Please check your input values.")
 
+        # 加载现有配置，合并后保存（保持层级结构）
+        existing_config = manager.load_plugin_config(actual_plugin_id)
+        full_config = {
+            "enabled": existing_config.get("enabled", True),
+            "activated": existing_config.get("activated", False),
+            "version": existing_config.get("version"),
+            "settings": request.config,
+        }
+
         # 保存配置
-        manager.save_plugin_config(actual_plugin_id, request.config)
+        manager.save_plugin_config(actual_plugin_id, full_config)
         logger.info(f"[PLUGIN CONFIG SAVE] Saved successfully")
 
         return PluginConfigResponse(
@@ -378,8 +398,17 @@ async def reset_plugin_config(
             if "default" in field:
                 defaults[field["name"]] = field["default"]
 
+        # 加载现有配置，保持层级结构
+        existing_config = manager.load_plugin_config(actual_plugin_id)
+        full_config = {
+            "enabled": existing_config.get("enabled", True),
+            "activated": existing_config.get("activated", False),
+            "version": existing_config.get("version"),
+            "settings": defaults,
+        }
+
         # 保存默认配置
-        manager.save_plugin_config(actual_plugin_id, defaults)
+        manager.save_plugin_config(actual_plugin_id, full_config)
 
         return PluginConfigResponse(
             success=True,

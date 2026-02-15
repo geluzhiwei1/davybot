@@ -25,6 +25,7 @@ from .types import (
     CompletionCallback,
     ErrorCallback,
     ProgressCallback,
+    StartCallback,
     StateChangeCallback,
     TaskDefinition,
     TaskError,
@@ -77,6 +78,7 @@ class AsyncTaskManager(IAsyncTaskManager):
         self._state_change_callback: StateChangeCallback | None = None
         self._error_callback: ErrorCallback | None = None
         self._completion_callback: CompletionCallback | None = None
+        self._start_callback: StartCallback | None = None
 
         # 任务执行器注册表
         self._executors: list[ITaskExecutor] = []
@@ -427,6 +429,19 @@ class AsyncTaskManager(IAsyncTaskManager):
         """
         self._completion_callback = callback
 
+    async def set_start_callback(self, callback: StartCallback) -> None:
+        """设置开始回调
+
+        Args:
+            callback: 开始回调函数
+
+        """
+        self._start_callback = callback
+        # 为现有上下文设置回调
+        with self._lock:
+            for context in self._contexts.values():
+                context.add_start_callback(callback)
+
     async def start(self) -> None:
         """启动任务管理器"""
         if self._is_running:
@@ -582,6 +597,10 @@ class AsyncTaskManager(IAsyncTaskManager):
             self._stats["running_tasks"] += 1
 
             self._logger.info(f"Task started: {task_id}")
+
+            # 🔧 调用任务开始回调
+            if self._start_callback:
+                await self._start_callback(task_id, context)
 
             # 执行任务
             if asyncio.iscoroutinefunction(task_def.executor):

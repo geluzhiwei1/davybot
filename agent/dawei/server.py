@@ -86,7 +86,7 @@ class UTF8StreamHandler(logging.StreamHandler):
 
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[UTF8StreamHandler()],
 )

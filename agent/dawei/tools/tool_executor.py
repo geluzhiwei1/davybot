@@ -105,6 +105,7 @@ class ToolExecutor(IToolCallService):
         self._active_tool_tasks: dict[str, str] = {}
 
         # Set up task manager callbacks
+        self._task_manager.set_start_callback(self._on_tool_task_start)
         self._task_manager.set_progress_callback(self._on_tool_task_progress)
         self._task_manager.set_state_change_callback(self._on_tool_task_state_change)
         self._task_manager.set_error_callback(self._on_tool_task_error)
@@ -328,6 +329,7 @@ class ToolExecutor(IToolCallService):
         tool_name: str,
         parameters: dict[str, Any],
         context: Any,
+        task_id: str | None = None,
     ) -> dict[str, Any]:
         """Execute tool with permission checks and snapshot creation.
 
@@ -335,6 +337,7 @@ class ToolExecutor(IToolCallService):
             tool_name: Tool name to execute
             parameters: Tool parameters
             context: Execution context
+            task_id: Optional task ID for tracking
 
         Returns:
             Tool execution result
@@ -602,6 +605,10 @@ class ToolExecutor(IToolCallService):
 
         # Emit tool call start event
         from dawei.core.events import TaskEventType, emit_typed_event
+
+        self.logger.info(
+            f"[TOOL_EXECUTOR] 🔧 Emitting TOOL_CALL_START event: tool_name={tool_name}, tool_call_id={tool_call_id}, task_id={task_id}",
+        )
 
         await emit_typed_event(
             TaskEventType.TOOL_CALL_START,
@@ -873,6 +880,59 @@ class ToolExecutor(IToolCallService):
         except Exception as e:
             self.logger.error(f"Error in tool task progress callback: {e}", exc_info=True)
 
+    async def _on_tool_task_start(self, task_id: str, context):
+        """Tool task start callback."""
+        try:
+            # Find corresponding tool call ID
+            tool_call_id = None
+            for tc_id, t_id in self._active_tool_tasks.items():
+                if t_id == task_id:
+                    tool_call_id = tc_id
+                    break
+
+            if tool_call_id:
+                # Get tool name and input from task definition
+                tool_name = "unknown"
+                tool_input = {}
+
+                # Try to get tool info from task definition
+                task_def = None
+                for tc_id, t_id in self._active_tool_tasks.items():
+                    if t_id == task_id:
+                        # Find the task definition in task manager
+                        if hasattr(self, '_task_manager') and self._task_manager:
+                            for tid, tdef in self._task_manager._tasks.items():
+                                if tid == task_id:
+                                    task_def = tdef
+                                    break
+                            break
+
+                if task_def and hasattr(task_def, 'parameters'):
+                    tool_name = task_def.parameters.get('tool_name', 'unknown')
+                    tool_input = task_def.parameters.get('tool_input', {})
+
+                # Emit tool call start event
+                from dawei.core.events import TaskEventType, emit_typed_event
+                from dawei.entity.tool_event_data import ToolCallStartData
+
+                await emit_typed_event(
+                    TaskEventType.TOOL_CALL_START,
+                    ToolCallStartData(
+                        tool_name=tool_name,
+                        tool_input=tool_input,
+                        tool_call_id=tool_call_id,
+                        task_id=task_id,
+                    ),
+                    task_id=task_id,
+                    source="tool_executor",
+                )
+
+                self.logger.info(
+                    f"[TOOL_EXECUTOR] 🔧 Tool call started: tool_name={tool_name}, tool_call_id={tool_call_id}, task_id={task_id}",
+                )
+        except Exception as e:
+            self.logger.error(f"Error in tool task start callback: {e}", exc_info=True)
+
     async def _on_tool_task_state_change(
         self,
         task_id: str,
@@ -939,6 +999,7 @@ class ToolExecutor(IToolCallService):
                     break
 
             if tool_call_id:
+                # 🔧 严格按照数据结构判断错误状态
                 if task_result.is_success:
                     # Emit tool call result event (success)
                     from dawei.core.events import TaskEventType, emit_typed_event
@@ -949,7 +1010,7 @@ class ToolExecutor(IToolCallService):
                         ToolCallResultData(
                             tool_name=f"tool_{tool_call_id}",
                             result=task_result.result,
-                            is_error=False,
+                            is_error=False,  # ← 任务成功，is_error 必须为 False
                             tool_call_id=tool_call_id,
                             task_id=task_result.task_id,
                             execution_time=task_result.execution_time,

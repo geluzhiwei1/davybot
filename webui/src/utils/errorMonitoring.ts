@@ -8,6 +8,8 @@
  * 用于监控错误消息处理性能和layer使用情况
  */
 
+import { httpClient } from '@/services/api/http'
+
 export interface ErrorMetrics {
   // 错误消息总数
   totalErrors: number
@@ -280,13 +282,10 @@ export function startMetricsReporting(intervalMs: number = 60000): void {
 
       // 或发送到后端API
       if (health.status !== 'healthy') {
-        fetch('/api/metrics/error-handling', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: errorMonitoring.exportToJson()
-        }).catch(err => {
-          console.error('[ErrorMonitoring] Failed to report metrics:', err)
-        })
+        httpClient.post('/metrics/error-handling', errorMonitoring.exportToJson())
+          .catch(err => {
+            console.error('[ErrorMonitoring] Failed to report metrics:', err)
+          })
       }
     }, intervalMs)
   }

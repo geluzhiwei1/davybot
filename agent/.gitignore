@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.vercel
+logs/
+.roo/
+-*/
+# frontend/ directory contains CI-built frontend artifacts
+# (do NOT ignore - it needs to be packaged in the wheel)
+# dawei/frontend/
+dist/
+build/
+*.egg-info/
+
+frontend/

@@ -128,6 +128,7 @@ import {
   ArrowRight
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { httpClient } from '@/services/api/http'
 
 interface ImageInfo {
   src: string
@@ -289,8 +290,20 @@ const nextImage = () => {
 
 const downloadImage = async () => {
   try {
-    const response = await fetch(currentImage.value)
-    const blob = await response.blob()
+    let blob: Blob
+
+    // 判断是否为 API 路径
+    if (currentImage.value.startsWith('/api/') || currentImage.value.startsWith('/workspaces/')) {
+      // 使用统一 httpClient 下载
+      const url = currentImage.value.replace('/api/', '/')
+      blob = await httpClient.download(url)
+    } else {
+      // 对于 blob URL 或外部 URL，保留使用 fetch
+      // eslint-disable-next-line no-restricted-globals
+      const response = await fetch(currentImage.value)
+      blob = await response.blob()
+    }
+
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -324,6 +337,7 @@ const handleImageLoad = () => {
     }
 
     // Calculate file size
+    // eslint-disable-next-line no-restricted-globals
     fetch(currentImage.value)
       .then(res => {
         imageSize.value = 0

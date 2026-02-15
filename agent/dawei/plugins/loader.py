@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from dawei.plugins.base import BasePlugin, PluginConfig, PluginMetadata, PluginType
+from dawei.plugins.config import resolve_env_vars
 from dawei.plugins.utils import (
     create_plugin_id,
     import_class,
@@ -143,12 +144,30 @@ class PluginLoader:
 
             plugin_class = import_class_from_file(plugin_file, class_name)
 
+            # Extract inner settings from hierarchical config
+            # Support both formats:
+            # - Hierarchical: {"enabled": true, "settings": {"app_id": "..."}}
+            # - Flat: {"app_id": "..."} (legacy)
+            if isinstance(settings, dict) and "settings" in settings:
+                # Create new dict to avoid mutating original
+                inner_settings = dict(settings.get("settings", {}))
+                # Include enabled/activated at root level for plugin convenience
+                inner_settings["enabled"] = settings.get("enabled", True)
+                inner_settings["activated"] = settings.get("activated", False)
+                plugin_settings = inner_settings
+            else:
+                plugin_settings = settings or {}
+
+            # Resolve environment variables in settings
+            # 支持 ${VAR} 和 $VAR 格式
+            plugin_settings = resolve_env_vars(plugin_settings)
+
             # Create plugin config
             config = PluginConfig(
                 name=manifest.name,
                 version=manifest.version,
                 plugin_type=PluginType(manifest.plugin_type),
-                settings=settings,
+                settings=plugin_settings,
                 metadata=manifest.dict(),
             )
 

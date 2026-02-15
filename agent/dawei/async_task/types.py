@@ -13,6 +13,11 @@ from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import Any
 
+try:
+    from .interfaces import ITaskContext
+except ImportError:
+    ITaskContext = None  # type: ignore
+
 
 class TaskStatus(Enum):
     """任务状态枚举"""
@@ -311,6 +316,8 @@ class TaskProgress:
 
 # 类型别名定义
 TaskExecutor = Callable[..., Awaitable[Any]]
+
+StartCallback = Callable[[str, ITaskContext], Awaitable[None]]
 ProgressCallback = Callable[[TaskProgress], Awaitable[None]]
 StateChangeCallback = Callable[[str, TaskStatus, TaskStatus], Awaitable[None]]
 ErrorCallback = Callable[[TaskError], Awaitable[None]]

@@ -130,8 +130,14 @@ async def get_plugin_manager(
             settings_for_load = {}
             if workspace.plugins_config and workspace.plugins_config.plugins:
                 for plugin_name, plugin_config in workspace.plugins_config.plugins.items():
-                    # Merge metadata fields into settings
-                    merged_settings = {"enabled": plugin_config.enabled, "activated": plugin_config.activated, "version": plugin_config.version, "install_path": plugin_config.install_path, **plugin_config.settings}
+                    # Keep hierarchical structure: metadata at root, settings in nested "settings" key
+                    merged_settings = {
+                        "enabled": plugin_config.enabled,
+                        "activated": plugin_config.activated,
+                        "version": plugin_config.version,
+                        "install_path": plugin_config.install_path,
+                        "settings": plugin_config.settings,  # 保持层级结构
+                    }
                     settings_for_load[plugin_name] = merged_settings
 
             await manager.discover_and_load_all(settings=settings_for_load)
@@ -442,7 +448,8 @@ async def update_plugin_settings(
             updated["enabled"] = request.enabled
 
         if request.settings is not None:
-            updated["settings"] = {**settings.get("settings", {}), **request.settings}
+            # settings is now already the inner settings (after loader.py extraction)
+            updated["settings"] = {**settings, **request.settings}
 
         # Apply update
         success = await manager.update_plugin_settings(plugin_id, updated)
@@ -456,6 +463,29 @@ async def update_plugin_settings(
                 await manager.activate_plugin(plugin_id)
             elif not request.enabled and manager.get_plugin(plugin_id).is_activated:
                 await manager.deactivate_plugin(plugin_id)
+
+        # Persist to disk (保持层级结构)
+        if workspace.plugins_config is None:
+            await workspace._load_plugins_config()
+
+        # Try exact match first, then try without version suffix
+        actual_plugin_id = plugin_id
+        if plugin_id not in workspace.plugins_config.plugins:
+            # Try extracting name from name@version format
+            if "@" in plugin_id:
+                base_name = plugin_id.split("@")[0]
+                for key in workspace.plugins_config.plugins:
+                    if key.startswith(base_name + "@"):
+                        actual_plugin_id = key
+                        break
+
+        if actual_plugin_id in workspace.plugins_config.plugins:
+            plugin_config = workspace.plugins_config.plugins[actual_plugin_id]
+            if "settings" in updated:
+                plugin_config.settings = updated["settings"]
+            if "enabled" in updated:
+                plugin_config.enabled = updated["enabled"]
+            await workspace._save_plugins_config()
 
         return {"success": True, "settings": manager.get_plugin_settings(plugin_id)}
 
@@ -760,3 +790,221 @@ async def uninstall_plugin_endpoint(
     except Exception as e:
         logger.exception(f"Failed to uninstall plugin {plugin_id}: ")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 飞书插件专用端点
+# ============================================================================
+
+class TestFeishuMessageRequest(BaseModel):
+    """测试飞书消息发送请求"""
+    message: str = Field(default="这是一条测试消息", description="测试消息内容")
+
+
+@router.post("/{plugin_id}/test-connection")
+async def test_feishu_connection(
+    plugin_id: str,
+    workspace: UserWorkspace = Depends(get_user_workspace),
+    manager: PluginManager = Depends(get_plugin_manager),
+) -> dict[str, Any]:
+    """测试飞书长连接状态
+
+    检查项目：
+    1. 插件是否已启用
+    2. 插件是否已激活
+    3. 事件服务器是否运行（检查端口）
+    4. 健康检查端点是否响应
+    """
+    try:
+        # 只支持飞书插件
+        if not plugin_id.startswith("feishu-channel"):
+            return {
+                "success": False,
+                "error": "此功能仅支持飞书插件"
+            }
+
+        # 直接从配置文件读取状态（简单直接）
+        import json
+        from pathlib import Path
+
+        config_file = Path(workspace.workspace_path) / ".dawei" / "plugins" / f"{plugin_id}.json"
+
+        if not config_file.exists():
+            return {
+                "success": False,
+                "error": "插件配置文件不存在"
+            }
+
+        with open(config_file) as f:
+            plugin_config = json.load(f)
+
+        enabled = plugin_config.get("enabled", False)
+        activated = plugin_config.get("activated", False)
+
+        if not enabled:
+            return {
+                "success": False,
+                "error": "插件未启用"
+            }
+
+        if not activated:
+            return {
+                "success": False,
+                "error": "插件未激活",
+                "status": "inactive"
+            }
+
+        # 获取插件实例以访问配置
+        plugin = manager.get_plugin(plugin_id)
+
+        if not plugin:
+            return {
+                "success": False,
+                "error": "插件未加载"
+            }
+
+        # 检查事件服务器状态
+        import socket
+        event_port = plugin_config.get("settings", {}).get("event_port", 8466)
+        event_host = plugin.config.settings.get("event_host", "0.0.0.0")
+        
+        # 检查端口是否监听
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex(('localhost', event_port))
+        sock.close()
+        
+        port_listening = (result == 0)
+        
+        # 健康检查
+        health_ok = False
+        health_status = {}
+        
+        if port_listening:
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"http://localhost:{event_port}/feishu/health",
+                        timeout=aiohttp.ClientTimeout(total=2)
+                    ) as resp:
+                        if resp.status == 200:
+                            health_data = await resp.json()
+                            health_ok = (health_data.get("status") == "ok")
+                            health_status = health_data
+            except Exception as e:
+                health_ok = False
+                health_status = {"error": str(e)}
+        
+        return {
+            "success": True,
+            "plugin_id": plugin_id,
+            "connection_status": {
+                "plugin_activated": True,
+                "event_server_running": port_listening,
+                "health_check_passed": health_ok,
+                "event_port": event_port,
+                "event_host": event_host
+            },
+            "health_status": health_status,
+            "message": "✅ 长连接已建立" if (port_listening and health_ok) else "⚠️ 长连接未完全建立"
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error testing feishu connection: ")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@router.post("/{plugin_id}/send-test-message")
+async def send_feishu_test_message(
+    plugin_id: str,
+    request: TestFeishuMessageRequest,
+    workspace: UserWorkspace = Depends(get_user_workspace),
+    manager: PluginManager = Depends(get_plugin_manager),
+) -> dict[str, Any]:
+    """发送飞书测试消息
+
+    发送一条测试消息到配置的飞书群聊
+    """
+    try:
+        # 只支持飞书插件
+        if not plugin_id.startswith("feishu-channel"):
+            return {
+                "success": False,
+                "error": "此功能仅支持飞书插件"
+            }
+
+        # 直接从配置文件读取状态（与 test-connection 保持一致）
+        import json
+        from pathlib import Path
+
+        config_file = Path(workspace.workspace_path) / ".dawei" / "plugins" / f"{plugin_id}.json"
+
+        if not config_file.exists():
+            return {
+                "success": False,
+                "error": "插件配置文件不存在"
+            }
+
+        with open(config_file) as f:
+            plugin_config = json.load(f)
+
+        enabled = plugin_config.get("enabled", False)
+        activated = plugin_config.get("activated", False)
+
+        if not enabled:
+            return {
+                "success": False,
+                "error": "插件未启用"
+            }
+
+        if not activated:
+            return {
+                "success": False,
+                "error": "插件未激活，请先激活插件"
+            }
+
+        plugin = manager.get_plugin(plugin_id)
+
+        if not plugin:
+            return {
+                "success": False,
+                "error": "插件未加载"
+            }
+        
+        # 获取配置
+        receive_id = plugin.config.settings.get("receive_id")
+        if not receive_id:
+            return {
+                "success": False,
+                "error": "未配置receive_id，请先配置插件"
+            }
+        
+        # 发送测试消息
+        test_message = f"🔔 测试消息\n\n{request.message}\n\n发送时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        success = await plugin.send_message(test_message)
+        
+        if success:
+            return {
+                "success": True,
+                "plugin_id": plugin_id,
+                "message": "测试消息发送成功！",
+                "sent_content": test_message,
+                "receive_id": receive_id
+            }
+        else:
+            return {
+                "success": False,
+                "error": "消息发送失败，请检查配置和权限"
+            }
+        
+    except Exception as e:
+        logger.exception(f"Error sending feishu test message: ")
+        return {
+            "success": False,
+            "error": str(e)
+        }

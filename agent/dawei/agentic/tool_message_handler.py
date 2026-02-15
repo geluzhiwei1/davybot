@@ -237,9 +237,11 @@ class ToolMessageHandle:
                 source="tool_execution",
             )
 
-            # 执行工具
-            self.logger.debug(f"Calling tool service to execute: {function_name}")
-            result = await self._tool_call_service.execute_tool(function_name, arguments, context)
+            # 执行工具 - 保持原始context传递逻辑，同时传递task_id
+            task_id = self.task_node.task_node_id
+            self.logger.debug(
+                f"Calling tool service to execute: {function_name} with task_id: {task_id}")
+            result = await self._tool_call_service.execute_tool(function_name, arguments, context, task_id=task_id)
             self.logger.debug(
                 f"Tool execution result type: {type(result)}, size: {len(str(result)) if result else 0}",
             )

@@ -219,9 +219,6 @@ class WebSocketServer:
             session_id: 会话ID
 
         """
-        # DEBUG: Print function start to verify execution
-        print(f"[DEBUG] _message_loop called for session_id={session_id}")
-
         try:
             message_count = 0
             while True:
@@ -232,7 +229,6 @@ class WebSocketServer:
                 logger.debug(
                     f"📥 [WS_RAW] #{message_count} 收到原始数据 (length={len(data)}): {data[:200]}",
                 )
-                print(f"[DEBUG] Message #{message_count} received: {data[:100]}")
 
                 try:
                     # 1. 反序列化和验证消息

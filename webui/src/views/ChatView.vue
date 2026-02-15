@@ -116,10 +116,10 @@ import { useChatStore } from '@/stores/chat';
 import { useConnectionStore } from '@/stores/connection';
 import { useParallelTasksStore } from '@/stores/parallelTasks';
 import { apiManager } from '@/services/api';
+import { httpClient } from '@/services/api/http';
 import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
-import { getApiBaseUrl } from '@/utils/platform';
 import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User } from '@element-plus/icons-vue';
 
 // 导入极简样式
@@ -345,17 +345,10 @@ const fetchFileContent = async (node: { path: string; name: string; is_directory
     // 处理媒体文件（图像、视频、音频、PDF）
     if (fileType === 'image' || fileType === 'video' || fileType === 'audio' || fileType === 'pdf') {
       try {
-        // 使用fetch获取二进制数据
-        const apiBaseUrl = getApiBaseUrl();
-        const mediaUrl = `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodeURIComponent(node.path)}`;
-
-        const response = await fetch(mediaUrl);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch media file: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
+        // 使用统一 httpClient 获取二进制数据
+        const blob = await httpClient.download(
+          `/workspaces/${workspaceId}/files?path=${encodeURIComponent(node.path)}`
+        );
         const blobUrl = URL.createObjectURL(blob);
 
         return { content: blobUrl, type: fileType };

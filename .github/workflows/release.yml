@@ -33,7 +33,7 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: meowfernando/conventional-changelog-github-action@v2
+        uses: conventional-changelog/conventional-changelog-github-action@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 

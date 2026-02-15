@@ -245,5 +245,76 @@ export const pluginsApi = {
     )
 
     return response
+  },
+
+  /**
+   * Test Feishu plugin connection status
+   */
+  async testFeishuConnection(
+    workspaceId: string,
+    pluginId: string
+  ): Promise<{
+    success: boolean
+    plugin_id: string
+    connection_status?: {
+      plugin_activated: boolean
+      event_server_running: boolean
+      health_check_passed: boolean
+      event_port: number
+      event_host: string
+    }
+    health_status?: Record<string, unknown>
+    message?: string
+    error?: string
+  }> {
+    const response = await httpClient.post<{
+      success: boolean
+      plugin_id: string
+      connection_status?: {
+        plugin_activated: boolean
+        event_server_running: boolean
+        health_check_passed: boolean
+        event_port: number
+        event_host: string
+      }
+      health_status?: Record<string, unknown>
+      message?: string
+      error?: string
+    }>(
+      `${BASE_URL}/${workspaceId}/plugins/${pluginId}/test-connection`,
+      {}
+    )
+
+    return response
+  },
+
+  /**
+   * Send test message to Feishu
+   */
+  async sendFeishuTestMessage(
+    workspaceId: string,
+    pluginId: string,
+    message?: string
+  ): Promise<{
+    success: boolean
+    plugin_id: string
+    message: string
+    sent_content?: string
+    receive_id?: string
+    error?: string
+  }> {
+    const response = await httpClient.post<{
+      success: boolean
+      plugin_id: string
+      message: string
+      sent_content?: string
+      receive_id?: string
+      error?: string
+    }>(
+      `${BASE_URL}/${workspaceId}/plugins/${pluginId}/send-test-message`,
+      { message: message || '这是一条测试消息' }
+    )
+
+    return response
   }
 }

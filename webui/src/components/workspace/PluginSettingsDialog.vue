@@ -89,6 +89,15 @@ import { ElMessage, ElAlert, ElDivider, ElForm, ElFormItem } from 'element-plus'
 import JsonSchemaForm from '@lljj/vue3-form-element';
 import { pluginsApi, type PluginConfigSchema } from '@/services/api/plugins';
 
+// 插件配置项类型（可能包含元数据）
+interface PluginConfigItem {
+  enabled?: boolean;
+  activated?: boolean;
+  version?: string;
+  install_path?: string;
+  [key: string]: unknown;
+}
+
 const { t } = useI18n();
 
 // Props
@@ -164,11 +173,12 @@ const loadConfigSchema = async () => {
       }
 
       // Merge with existing config (existing config takes precedence)
-      // existing_config may be full config object or pure config values
+      // existing_config structure: { enabled, activated, settings: {...}, version }
       let existingConfigValues: Record<string, unknown> = {};
       if (response.existing_config) {
-        const { enabled, activated, version, install_path, ...pureConfig } = response.existing_config as any;
-        existingConfigValues = pureConfig || {};
+        // Settings are nested under the "settings" key
+        const existingSettings = (response.existing_config as { settings?: Record<string, unknown> }).settings;
+        existingConfigValues = existingSettings || {};
       }
 
       const finalSettings = {
@@ -251,14 +261,14 @@ watch(
   (newConfig) => {
     if (newConfig) {
       // 提取纯配置值（排除 enabled, activated 等元数据）
-      const { enabled, activated, version, install_path, ...pureConfig } = newConfig as any;
+      const { enabled, activated, version, install_path, ...pureConfig } = newConfig as PluginConfigItem;
       // 使用 Object.assign 更新 reactive 对象，而不是替换整个对象
       Object.assign(formData, {
         settings: { ...(pureConfig || {}) }
       });
     }
   },
-  { immediate: false, deep: true }
+  { immediate: true, deep: true }
 );
 </script>
 

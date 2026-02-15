@@ -21,6 +21,7 @@ from .types import (
     CheckpointData,
     ProgressCallback,
     StateChangeCallback,
+    StartCallback,
     TaskProgress,
     TaskStatus,
 )
@@ -64,6 +65,7 @@ class TaskContext(ITaskContext):
         # 回调函数
         self._progress_callbacks: list[ProgressCallback] = []
         self._state_change_callbacks: list[StateChangeCallback] = []
+        self._start_callbacks: list[StartCallback] = []
 
         # 自动检查点
         self._auto_checkpoint_interval = auto_checkpoint_interval
@@ -391,7 +393,15 @@ class TaskContext(ITaskContext):
         """
         with self._lock:
             self._state_change_callbacks.append(callback)
+    def add_start_callback(self, callback: StartCallback) -> None:
+        """添加开始回调
 
+        Args:
+            callback: 开始回调函数
+
+        """
+        with self._lock:
+            self._start_callbacks.append(callback)
     def remove_state_change_callback(self, callback: StateChangeCallback) -> None:
         """移除状态变化回调
 

@@ -792,6 +792,40 @@ export class WorkspacesApiService {
     }
   }
 
+  // 测试 LLM Provider 是否支持 Tool Call
+  async testLLMProvider(
+    workspaceId: string,
+    data: {
+      name: string;
+      apiProvider: string;
+      openAiBaseUrl?: string;
+      openAiApiKey?: string;
+      openAiModelId?: string;
+      openAiLegacyFormat?: boolean;
+      openAiHeaders?: Record<string, string>;
+      ollamaBaseUrl?: string;
+      ollamaModelId?: string;
+      ollamaApiKey?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    supported: boolean;
+    message: string;
+    model?: string;
+  }> {
+    try {
+      // LLM provider test needs longer timeout (60s) for API calls
+      return await httpClient.post<{
+        success: boolean;
+        supported: boolean;
+        message: string;
+        model?: string;
+      }>(`${this.baseUrl}/${workspaceId}/llm-providers/test`, data, { timeout: 60000 });
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   // 删除 LLM Provider
   async deleteLLMProvider(
     workspaceId: string,
@@ -1400,6 +1434,7 @@ export const {
   updateLLMSettings: workspacesApi.updateLLMSettings.bind(workspacesApi),
   createLLMProvider: workspacesApi.createLLMProvider.bind(workspacesApi),
   updateLLMProvider: workspacesApi.updateLLMProvider.bind(workspacesApi),
+  testLLMProvider: workspacesApi.testLLMProvider.bind(workspacesApi),
   deleteLLMProvider: workspacesApi.deleteLLMProvider.bind(workspacesApi),
   getModeSettings: workspacesApi.getModeSettings.bind(workspacesApi),
   updateModeSettings: workspacesApi.updateModeSettings.bind(workspacesApi),

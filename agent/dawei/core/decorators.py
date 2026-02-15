@@ -138,8 +138,10 @@ async def _execute_with_error_handling_async(
                 raise
 
             if config.log_errors:
-                log_message = f"Error in {config.component}.{operation_name}: {e.__class__.__name__}: {e!s}"
-                getattr(logger, config.log_level.lower())(log_message)
+                # Fast fail: 增强错误消息格式以便快速定位问题
+                log_message = f"[FALLBACK] {config.component}.{operation_name} failed: {e.__class__.__name__}: {e!s} (returning fallback value)"
+                # Fast fail: 记录完整堆栈跟踪以便调试
+                getattr(logger, config.log_level.lower())(log_message, exc_info=True)
 
             error_context = ErrorContext(
                 component=config.component,
@@ -200,8 +202,10 @@ def _execute_with_error_handling_sync(
                 raise
 
             if config.log_errors:
-                log_message = f"Error in {config.component}.{operation_name}: {e.__class__.__name__}: {e!s}"
-                getattr(logger, config.log_level.lower())(log_message)
+                # Fast fail: 增强错误消息格式以便快速定位问题
+                log_message = f"[FALLBACK] {config.component}.{operation_name} failed: {e.__class__.__name__}: {e!s} (returning fallback value)"
+                # Fast fail: 记录完整堆栈跟踪以便调试
+                getattr(logger, config.log_level.lower())(log_message, exc_info=True)
 
             error_context = ErrorContext(
                 component=config.component,

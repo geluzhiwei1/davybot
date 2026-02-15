@@ -13,6 +13,8 @@
 
 import json
 import logging
+import os
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Optional
@@ -22,6 +24,59 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from dawei.core.exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# 环境变量替换
+# ============================================================================
+
+ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def resolve_env_vars(config: dict[str, Any]) -> dict[str, Any]:
+    """递归替换配置中的环境变量
+
+    支持的格式:
+    - ${VAR_NAME} - 推荐格式
+    - $VAR_NAME - 简短格式
+
+    如果环境变量不存在,保留原始字符串并记录警告。
+
+    Args:
+        config: 包含环境变量引用的配置字典
+
+    Returns:
+        替换后的配置字典
+    """
+    import copy
+
+    def replace_value(value: Any) -> Any:
+        if isinstance(value, str):
+            # 替换字符串中的环境变量
+            def replacer(match):
+                var_name = match.group(1) or match.group(2)
+                env_value = os.environ.get(var_name)
+                if env_value is not None:
+                    return env_value
+                else:
+                    logger.warning(f"Environment variable '{var_name}' not found, keeping original: {match.group(0)}")
+                    return match.group(0)
+
+            return ENV_VAR_PATTERN.sub(replacer, value)
+
+        elif isinstance(value, dict):
+            return {k: replace_value(v) for k, v in value.items()}
+
+        elif isinstance(value, list):
+            return [replace_value(item) for item in value]
+
+        else:
+            # 非字符串类型直接返回
+            return value
+
+    # 深拷贝避免修改原始配置
+    resolved = copy.deepcopy(config)
+    return replace_value(resolved)
 
 
 # ============================================================================

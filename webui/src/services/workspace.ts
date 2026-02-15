@@ -9,7 +9,7 @@
  * 工作区 CRUD API 服务
  */
 
-import axios from 'axios'
+import { httpClient } from './api/http'
 
 /**
  * 工作区信息（基础信息，来自 workspaces.json）
@@ -100,8 +100,7 @@ export const workspaceService = {
    * 验证工作区路径
    */
   async validatePath(data: ValidatePathRequest): Promise<ValidatePathResponse> {
-    const response = await axios.post<ValidatePathResponse>('/api/workspaces/workspaces/validate-path', data)
-    return response.data
+    return await httpClient.post<ValidatePathResponse>('/workspaces/workspaces/validate-path', data)
   },
 
   /**
@@ -110,24 +109,21 @@ export const workspaceService = {
   async getWorkspaces(params?: {
     include_inactive?: boolean
   }): Promise<WorkspaceListResponse> {
-    const response = await axios.get<WorkspaceListResponse>('/api/workspaces/workspaces', { params })
-    return response.data
+    return await httpClient.get<WorkspaceListResponse>('/workspaces/workspaces', params)
   },
 
   /**
    * 获取工作区详情
    */
   async getWorkspaceInfo(workspaceId: string): Promise<WorkspaceResponse> {
-    const response = await axios.get<WorkspaceResponse>(`/api/workspaces/workspaces/${workspaceId}/info`)
-    return response.data
+    return await httpClient.get<WorkspaceResponse>(`/workspaces/workspaces/${workspaceId}/info`)
   },
 
   /**
    * 创建工作区
    */
   async createWorkspace(data: CreateWorkspaceRequest): Promise<WorkspaceResponse> {
-    const response = await axios.post<WorkspaceResponse>('/api/workspaces/workspaces', data)
-    return response.data
+    return await httpClient.post<WorkspaceResponse>('/workspaces/workspaces', data)
   },
 
   /**
@@ -137,8 +133,7 @@ export const workspaceService = {
     workspaceId: string,
     data: UpdateWorkspaceRequest
   ): Promise<WorkspaceResponse> {
-    const response = await axios.put<WorkspaceResponse>(`/api/workspaces/workspaces/${workspaceId}`, data)
-    return response.data
+    return await httpClient.put<WorkspaceResponse>(`/workspaces/workspaces/${workspaceId}`, data)
   },
 
   /**
@@ -149,14 +144,14 @@ export const workspaceService = {
     deleteConfig?: boolean,
     deleteFiles?: boolean
   ): Promise<WorkspaceResponse> {
-    const queryParams = new URLSearchParams()
-    if (deleteConfig !== undefined) queryParams.append('delete_config', String(deleteConfig))
-    if (deleteFiles !== undefined) queryParams.append('delete_files', String(deleteFiles))
+    const params: Record<string, string> = {}
+    if (deleteConfig !== undefined) params.delete_config = String(deleteConfig)
+    if (deleteFiles !== undefined) params.delete_files = String(deleteFiles)
 
-    const response = await axios.delete<WorkspaceResponse>(
-      `/api/workspaces/workspaces/${workspaceId}?${queryParams.toString()}`
+    return await httpClient.delete<WorkspaceResponse>(
+      `/workspaces/workspaces/${workspaceId}`,
+      { params }
     )
-    return response.data
   }
 }
 

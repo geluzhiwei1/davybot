@@ -100,6 +100,7 @@ import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { UploadFilled, Folder, FolderOpened } from '@element-plus/icons-vue';
 import type { UploadInstance, UploadUserFile, UploadProps } from 'element-plus';
+import { httpClient } from '@/services/api/http';
 
 interface Props {
   modelValue: boolean;
@@ -268,18 +269,14 @@ const uploadFolder = async () => {
       formData.append('files', file, relativePath);
     }
 
-    const response = await fetch(`/api/workspaces/${props.workspaceId}/files/upload-folder`, {
-      method: 'POST',
-      body: formData
-    });
+    await httpClient.upload(
+      `/workspaces/${props.workspaceId}/files/upload-folder`,
+      formData
+    );
 
-    if (response.ok) {
-      ElMessage.success('文件夹上传完成');
-      handleClose();
-      emit('success');
-    } else {
-      throw new Error('Upload failed');
-    }
+    ElMessage.success('文件夹上传完成');
+    handleClose();
+    emit('success');
   } catch {
     ElMessage.error('文件夹上传失败');
   } finally {

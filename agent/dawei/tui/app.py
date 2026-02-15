@@ -343,7 +343,6 @@ class GeweiTUIApp(App):
         status_bar = self.query_one("#status_bar", StatusBar)
         status_bar.set_status("Ready")
 
-        print(f"[DEBUG] _update_initial_status: mode={self.config.mode}, llm={self.config.llm}")
         logger.info(f"_update_initial_status: mode={self.config.mode}, llm={self.config.llm}")
 
         status_bar.set_mode(self.config.mode)

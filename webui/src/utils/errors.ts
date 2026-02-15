@@ -134,7 +134,7 @@ export class ErrorHandler {
    * Log error with context
    */
   static log(error: Error, context?: Record<string, unknown>): void {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const { logger } = require('./logger')
     logger.error(error.message, error, context)
   }

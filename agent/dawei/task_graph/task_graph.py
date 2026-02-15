@@ -89,6 +89,9 @@ class TaskGraph:
         # 锁
         self._lock = asyncio.Lock()
 
+        # 🔧 修复内存泄漏：追踪事件处理器ID以便后续清理
+        self._handler_ids: list[str] = []
+
         # 设置事件监听
         self._setup_event_listeners()
 
@@ -96,10 +99,18 @@ class TaskGraph:
         """设置事件监听器（纯强类型）"""
         from dawei.core.events import TaskEventType
 
-        # 监听状态变化事件
-        self.event_bus.add_handler(TaskEventType.STATE_CHANGED, self._on_status_changed)
-        self.event_bus.add_handler(TaskEventType.TODOS_UPDATED, self._on_todos_updated)
-        self.event_bus.add_handler(TaskEventType.CONTEXT_UPDATED, self._on_context_updated)
+        # 监听状态变化事件，并追踪handler ID以便清理
+        # 🔧 修复：保存handler ID以便后续清理
+        handler_id = self.event_bus.add_handler(TaskEventType.STATE_CHANGED, self._on_status_changed)
+        self._handler_ids.append((TaskEventType.STATE_CHANGED, handler_id))
+
+        handler_id = self.event_bus.add_handler(TaskEventType.TODOS_UPDATED, self._on_todos_updated)
+        self._handler_ids.append((TaskEventType.TODOS_UPDATED, handler_id))
+
+        handler_id = self.event_bus.add_handler(TaskEventType.CONTEXT_UPDATED, self._on_context_updated)
+        self._handler_ids.append((TaskEventType.CONTEXT_UPDATED, handler_id))
+
+        self.logger.debug(f"Registered {len(self._handler_ids)} event handlers for TaskGraph {self.task_node_id}")
 
     async def _on_status_changed(self, event: Any):
         """状态变化事件处理"""
@@ -215,6 +226,65 @@ class TaskGraph:
         if task_id in self._nodes:
             # 上下文更新会通过ContextStore处理
             self.logger.debug(f"Context updated for task {task_id}")
+
+    # ==================== 资源清理 ====================
+
+    def cleanup(self):
+        """清理事件处理器，防止内存泄漏
+
+        在TaskGraph不再使用时应调用此方法，从事件总线中移除所有已注册的处理器。
+
+        ⚠️ 重要：此方法必须手动调用，否则会导致内存泄漏！
+        """
+        if not hasattr(self, '_handler_ids') or not self._handler_ids:
+            return
+
+        from dawei.core.events import TaskEventType
+
+        removed_count = 0
+        failed_count = 0
+
+        # 反向遍历，安全移除
+        for event_type, handler_id in reversed(self._handler_ids):
+            try:
+                success = self.event_bus.remove_handler(event_type, handler_id)
+                if success:
+                    removed_count += 1
+                else:
+                    failed_count += 1
+                    self.logger.warning(f"Failed to remove handler {handler_id} for {event_type.value}")
+            except Exception as e:
+                failed_count += 1
+                self.logger.error(f"Error removing handler {handler_id}: {e}", exc_info=True)
+
+        # 清空追踪列表
+        self._handler_ids.clear()
+
+        self.logger.info(
+            f"Cleaned up {removed_count} event handlers for TaskGraph {self.task_node_id}"
+            + (f" ({failed_count} failed)" if failed_count > 0 else "")
+        )
+
+    def __del__(self):
+        """析构函数 - 作为最后防线尝试清理处理器
+
+        ⚠️ 注意：不要依赖此方法进行清理，应该显式调用 cleanup()
+        因为：
+        1. Python不保证__del__何时被调用
+        2. 循环引用可能阻止对象被垃圾回收
+        3. 在__del__中访问self.event_bus可能不安全
+        """
+        try:
+            if hasattr(self, '_handler_ids') and self._handler_ids and hasattr(self, 'logger'):
+                self.logger.warning(
+                    f"TaskGraph {self.task_node_id} is being garbage collected without explicit cleanup(). "
+                    "This may indicate a memory leak. Consider calling cleanup() when the TaskGraph is no longer needed."
+                )
+                # 尝试清理，但不保证成功
+                # self.cleanup()  # 注释掉，因为在__del__中访问event_bus可能不安全
+        except Exception:
+            # 在__del__中忽略所有错误，避免程序崩溃
+            pass
 
     # ==================== 任务节点管理 ====================
 

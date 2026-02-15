@@ -1176,11 +1176,13 @@ export const useChatStore = defineStore('chat', () => {
     if (message.type !== MessageType.TOOL_CALL_PROGRESS) return
     const progressMessage = message as unknown
 
+    let found = false
     for (const msg of messageStore.messages) {
       if (msg.role === MessageRole.ASSISTANT) {
         for (const content of msg.content) {
           if (content.type === ContentType.TOOL_EXECUTION &&
             (content as unknown).toolCallId === progressMessage.tool_call_id) {
+            found = true
 
             const toolExecution = content as unknown
 
@@ -1217,17 +1219,55 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
     }
+
+    // ✅ 如果没有找到匹配的块，创建一个新的 TOOL_EXECUTION 块
+    if (!found) {
+      const toolCallId = progressMessage.tool_call_id
+      const toolName = progressMessage.tool_name || 'unknown'
+
+      // 查找最新的 assistant 消息或创建新的
+      const assistantMessages = messageStore.messages.filter(m => m.role === MessageRole.ASSISTANT)
+      const lastAssistantMsg = assistantMessages[assistantMessages.length - 1]
+
+      if (lastAssistantMsg) {
+        const newToolExecutionBlock = {
+          type: ContentType.TOOL_EXECUTION,
+          toolCallId: toolCallId,
+          toolName: toolName,
+          toolInput: {},
+          status: 'in_progress',
+          startTime: new Date().toISOString(),
+          progressPercentage: progressMessage.progress_percentage,
+          currentStep: progressMessage.current_step,
+          totalSteps: progressMessage.total_steps,
+          progressHistory: [
+            {
+              timestamp: new Date().toISOString(),
+              message: progressMessage.message,
+              progress_percentage: progressMessage.progress_percentage,
+              step: progressMessage.current_step
+            }
+          ]
+        }
+
+        const newContent = [...lastAssistantMsg.content, newToolExecutionBlock]
+        messageStore.updateMessage(lastAssistantMsg.id, { content: newContent })
+        logger.debug('[handleToolCallProgress] Created new TOOL_EXECUTION block:', toolCallId)
+      }
+    }
   }
 
   const handleToolCallResult = (message: WebSocketMessage) => {
     if (message.type !== MessageType.TOOL_CALL_RESULT) return
     const resultMessage = message as unknown
 
+    let found = false
     for (const msg of messageStore.messages) {
       if (msg.role === MessageRole.ASSISTANT) {
         for (const content of msg.content) {
           if (content.type === ContentType.TOOL_EXECUTION &&
             (content as unknown).toolCallId === resultMessage.tool_call_id) {
+            found = true
 
             const toolExecution = content as unknown
 
@@ -1252,6 +1292,40 @@ export const useChatStore = defineStore('chat', () => {
             logger.debug('[handleToolCallResult] Tool result updated:', msg.id)
           }
         }
+      }
+    }
+
+    // ✅ 如果没有找到匹配的块，创建一个新的 TOOL_EXECUTION 块
+    if (!found) {
+      const toolCallId = resultMessage.tool_call_id
+      const toolName = resultMessage.tool_name || 'unknown'
+      const isError = resultMessage.is_error
+
+      // 查找最新的 assistant 消息
+      const assistantMessages = messageStore.messages.filter(m => m.role === MessageRole.ASSISTANT)
+      const lastAssistantMsg = assistantMessages[assistantMessages.length - 1]
+
+      if (lastAssistantMsg) {
+        const newToolExecutionBlock = {
+          type: ContentType.TOOL_EXECUTION,
+          toolCallId: toolCallId,
+          toolName: toolName,
+          toolInput: {},
+          status: isError ? 'failed' : 'completed',
+          result: resultMessage.result,
+          isError: isError,
+          errorCode: resultMessage.error_code,
+          errorMessage: resultMessage.error_message,
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          executionTime: resultMessage.execution_time
+        }
+
+        const newContent = [...lastAssistantMsg.content, newToolExecutionBlock]
+        messageStore.updateMessage(lastAssistantMsg.id, { content: newContent })
+        logger.debug('[handleToolCallResult] Created new TOOL_EXECUTION block:', toolCallId)
+      } else {
+        console.warn('[handleToolCallResult] No assistant message found to attach tool result')
       }
     }
   }

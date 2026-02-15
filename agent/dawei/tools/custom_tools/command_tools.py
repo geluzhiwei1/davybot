@@ -128,7 +128,7 @@ class ExecuteCommandTool(CustomBaseTool):
     def _run(
         self,
         command: str,
-        _cwd: str | None = None,
+        cwd: str | None = None,
         timeout: int = 30,
         shell: bool = True,
     ) -> str:
@@ -327,7 +327,7 @@ class ShellCommandTool(CustomBaseTool):
         "shell_command",
         fallback_value='{"status": "error", "message": "Failed to execute shell command"}',
     )
-    def _run(self, command: str, args: list[str], _cwd: str | None = None) -> str:
+    def _run(self, command: str, args: list[str], cwd: str | None = None) -> str:
         """Execute shell command with arguments.
 
         Args:

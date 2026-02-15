@@ -8,6 +8,7 @@ import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } fro
 import type { ApiResponse, HttpConfig } from './types';
 import { logger } from '@/utils/logger';
 import { NetworkError } from '@/utils/errors';
+import { getApiBaseUrl } from '@/utils/platform';
 
 // HTTP客户端类
 export class HttpClient {
@@ -293,7 +294,7 @@ declare module 'axios' {
 // 创建默认HTTP客户端实例
 export const createHttpClient = (config?: Partial<HttpConfig>): HttpClient => {
   const defaultConfig: HttpConfig = {
-    baseURL: '/api', // 后端API直接在根路径下
+    baseURL: getApiBaseUrl(), // 使用平台检测获取正确的API基础URL
     timeout: 10000,
     headers: {
       'Content-Type': 'application/json'

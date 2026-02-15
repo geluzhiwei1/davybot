@@ -167,7 +167,7 @@ For files larger than 200 lines (especially HTML/CSS/JS), use **smart_file_edit*
     args_schema: type[BaseModel] = WriteToFileInput
 
     @safe_tool_operation("write_to_file", fallback_value="Error: Failed to write file")
-    def _run(self, path: str, content: str, _line_count: int | None = None) -> str:
+    def _run(self, path: str, content: str, line_count: int | None = None) -> str:
         """Write content to file."""
         # Get workspace directory from context
         workspace_dir = None

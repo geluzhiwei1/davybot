@@ -51,7 +51,7 @@ class LoggingConfig(BaseSettings):
     )
 
     # 基础配置
-    level: str = Field(default="INFO", alias="log_level")
+    level: str = Field(default="WARNING", alias="log_level")
     format: str = Field(
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         alias="log_format",

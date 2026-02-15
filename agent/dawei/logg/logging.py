@@ -180,7 +180,7 @@ def get_logger(name: str, level: str | None = None) -> AgenticLogger:
 
     """
     if name not in _loggers:
-        log_level = level or os.environ.get("AGENT_LOG_LEVEL", "INFO")
+        log_level = level or os.environ.get("AGENT_LOG_LEVEL", "WARNING")
         _loggers[name] = AgenticLogger(name, log_level)
 
     return _loggers[name]

@@ -215,34 +215,24 @@ export class MemoryApiService {
     format: MemoryExportFormat = 'json',
     filters?: MemoryFilters
   ): Promise<Blob> {
-    const params = new URLSearchParams()
-    params.append('format', format)
+    const params: Record<string, string> = {
+      format
+    }
 
     if (filters?.type && filters.type !== 'all') {
-      params.append('type', filters.type)
+      params.type = filters.type
     }
     if (filters?.dateFrom) {
-      params.append('date_from', filters.dateFrom)
+      params.date_from = filters.dateFrom
     }
     if (filters?.dateTo) {
-      params.append('date_to', filters.dateTo)
+      params.date_to = filters.dateTo
     }
 
-    const response = await fetch(
-      `/workspaces/${workspaceId}/memory/export?${params}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
+    const queryString = new URLSearchParams(params).toString()
+    return httpClient.download(
+      `/workspaces/${workspaceId}/memory/export${queryString ? `?${queryString}` : ''}`
     )
-
-    if (!response.ok) {
-      throw new Error(`Export failed: ${response.statusText}`)
-    }
-
-    return response.blob()
   }
 
   /**

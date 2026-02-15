@@ -193,7 +193,6 @@ class StatusBar(Static):
             mode: New mode
 
         """
-        print(f"[DEBUG] StatusBar.set_mode: {mode!r}")
         self.mode = mode
 
     def set_model(self, model: str) -> None:
@@ -203,7 +202,6 @@ class StatusBar(Static):
             model: New model
 
         """
-        print(f"[DEBUG] StatusBar.set_model: {model!r}")
         # Truncate long model names
         if len(model) > 30:
             model = model[:27] + "..."

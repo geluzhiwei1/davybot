@@ -57,6 +57,19 @@ SPDX-License-Identifier: AGPL-3.0-only
                     <el-switch v-model="plugin.activated" :loading="plugin._activating"
                       :disabled="!plugin.enabled || !canEdit" @change="togglePluginActivated(plugin.id, $event)"
                       active-text="激活" inactive-text="停用" style="margin-right: 8px;" />
+
+                    <!-- 飞书插件专用按钮 -->
+                    <template v-if="plugin.id && plugin.id.startsWith('feishu-channel')">
+                      <el-button size="small" :icon="Connection" :loading="plugin._testingConnection"
+                        :disabled="!plugin.activated" @click="testFeishuConnection(plugin)">
+                        检查连接
+                      </el-button>
+                      <el-button size="small" :icon="Message" :loading="plugin._sendingTest"
+                        :disabled="!plugin.activated" @click="sendFeishuTestMessage(plugin)">
+                        发送测试
+                      </el-button>
+                    </template>
+
                     <el-button size="small" :icon="Setting" @click="editPluginSettings(plugin.id)">
                       {{ $t('workspaceSettings.plugins.pluginConfig.settings') }}
                     </el-button>
@@ -118,7 +131,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Refresh, Setting, ShoppingCart, Delete } from '@element-plus/icons-vue';
+import { Refresh, Setting, ShoppingCart, Delete, Connection, Message } from '@element-plus/icons-vue';
 import {
   getPluginsConfig,
   updatePluginsConfig,
@@ -127,6 +140,21 @@ import {
   type PluginsConfig
 } from '@/services/api/services/workspaces';
 import { pluginsApi } from '@/services/api/plugins';
+
+// 插件数据类型（包含元数据和内部状态）
+interface PluginItem {
+  id: string;
+  name?: string;
+  enabled: boolean;
+  activated: boolean;
+  version?: string;
+  install_path?: string;
+  [key: string]: unknown; // 其他配置属性
+  _loading?: boolean;
+  _activating?: boolean;
+  _testingConnection?: boolean;
+  _sendingTest?: boolean;
+}
 
 const { t } = useI18n();
 
@@ -151,7 +179,7 @@ const saving = ref(false);
 const pluginsConfig = ref<PluginsConfig>({
   plugins: {}
 });
-const pluginsList = ref<unknown[]>([]);
+const pluginsList = ref<PluginItem[]>([]);
 const settingsDialogVisible = ref(false);
 const editingPluginId = ref<string | null>(null);
 const editingPluginConfig = ref<unknown>(null);
@@ -167,7 +195,9 @@ const loadPluginsConfig = async () => {
     pluginsList.value = plugins.map(p => ({
       ...p,
       _loading: false,
-      _activating: false
+      _activating: false,
+      _testingConnection: false,
+      _sendingTest: false
     }));
 
     // 加载插件配置
@@ -286,7 +316,7 @@ const editPluginSettings = (pluginId: string) => {
 
   editingPluginId.value = pluginId;
   // 只传递纯配置数据（不包含 enabled, activated 等元数据）
-  const { enabled, activated, version, install_path, ...pureSettings } = plugin as any;
+  const { enabled, activated, version, install_path, _loading, _activating, ...pureSettings } = plugin;
   editingPluginConfig.value = pureSettings;
   settingsDialogVisible.value = true;
 };
@@ -346,6 +376,98 @@ const uninstallPlugin = async (pluginId: string) => {
     ElMessage.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
   } finally {
     loading.value = false;
+  }
+};
+
+// 测试飞书长连接状态
+const testFeishuConnection = async (plugin: PluginItem) => {
+  if (!plugin.id) return;
+
+  plugin._testingConnection = true;
+  try {
+    const response = await pluginsApi.testFeishuConnection(props.workspaceId, plugin.id);
+
+    if (response.success) {
+      const status = response.connection_status;
+      const health = response.health_status;
+
+      let message = '飞书长连接状态检查结果：\n\n';
+      message += `✅ 插件状态: ${status?.plugin_activated ? '已激活' : '未激活'}\n`;
+      message += `🔗 事件服务器: ${status?.event_server_running ? '运行中' : '未运行'}\n`;
+      message += `🏥 健康检查: ${status?.health_check_passed ? '通过' : '未通过'}\n`;
+      message += `\n端口: ${status?.event_host}:${status?.event_port}\n`;
+
+      if (status?.health_check_passed && status?.event_server_running) {
+        ElMessage.success(response.message || '长连接已建立！');
+        // 显示详细信息
+        ElMessageBox.alert(message, '连接状态', {
+          confirmButtonText: '确定',
+          type: 'success'
+        });
+      } else {
+        ElMessage.warning(response.message || '长连接未完全建立');
+        // 显示详细信息和解决建议
+        const suggestions = [];
+        if (!status?.event_server_running) {
+          suggestions.push('请先启动飞书事件服务器');
+        }
+        if (!status?.health_check_passed) {
+          suggestions.push('请检查事件服务器健康状态');
+        }
+
+        if (suggestions.length > 0) {
+          message += '\n建议：\n' + suggestions.map(s => `• ${s}`).join('\n');
+        }
+
+        ElMessageBox.alert(message, '连接状态', {
+          confirmButtonText: '确定',
+          type: 'warning'
+        });
+      }
+    } else {
+      ElMessage.error(response.error || '连接测试失败');
+    }
+  } catch (error: unknown) {
+    ElMessage.error('测试失败: ' + (error instanceof Error ? error.message : 'Unknown error'));
+  } finally {
+    plugin._testingConnection = false;
+  }
+};
+
+// 发送飞书测试消息
+const sendFeishuTestMessage = async (plugin: PluginItem) => {
+  if (!plugin.id) return;
+
+  plugin._sendingTest = true;
+  try {
+    const response = await pluginsApi.sendFeishuTestMessage(
+      props.workspaceId,
+      plugin.id,
+      '🔔 这是一条来自Dawei系统的测试消息'
+    );
+
+    if (response.success) {
+      ElMessage.success({
+        message: '测试消息发送成功！请检查飞书群聊',
+        duration: 5000
+      });
+
+      // 显示详细信息
+      ElMessageBox.alert(
+        `✅ 消息已发送\n\n接收ID: ${response.receive_id}\n\n消息内容:\n${response.sent_content}`,
+        '发送成功',
+        {
+          confirmButtonText: '确定',
+          type: 'success'
+        }
+      );
+    } else {
+      ElMessage.error(response.error || '消息发送失败');
+    }
+  } catch (error: unknown) {
+    ElMessage.error('发送失败: ' + (error instanceof Error ? error.message : 'Unknown error'));
+  } finally {
+    plugin._sendingTest = false;
   }
 };
 

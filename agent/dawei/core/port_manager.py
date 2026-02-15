@@ -24,19 +24,22 @@ def is_port_in_use(port: int, host: str = "0.0.0.0") -> bool:
         host: Host address (default: 0.0.0.0)
 
     Returns:
-        True if port is in use, False otherwise
+        True if port is in use and actively listening, False otherwise
 
     """
     try:
-        # Try to bind to the port WITHOUT SO_REUSEADDR
-        # This will fail if the port is already in use
+        # Use SO_REUSEADDR to handle TIME_WAIT state
+        # This allows binding to a port that's in TIME_WAIT
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            # Note: We don't set SO_REUSEADDR here because it allows
-            # multiple binds to the same address (especially on Windows)
-            s.bind((host, port))
-            return False  # Successfully bound, so port was free
-    except OSError:
-        return True  # Failed to bind, so port is in use
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.settimeout(1)  # Add timeout to avoid hanging
+            try:
+                s.bind((host, port))
+                # Now check if something is actually listening
+                s.listen(1)
+                return False  # Successfully bound and can listen, port is free
+            except OSError:
+                return True  # Failed to bind, port is in use
     except Exception as e:
         # Log unexpected errors for debugging
         import logging

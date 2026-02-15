@@ -151,7 +151,7 @@ async function fetchWorkspaceFiles(): Promise<void> {
 /**
  * 递归搜索目录
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 async function searchDirectory(_path: string): Promise<PathItem[]> {
   // TODO: 实现真实的目录搜索 API
   return [];

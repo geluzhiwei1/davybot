@@ -34,8 +34,6 @@ dependencies = [
     "click>=8.1.0",
     "davybot-market-cli>=0.1.0",
     "python-dotenv",
-    "python-docx",
-    "PyMuPDF",
 ]
 
 [project.optional-dependencies]
@@ -54,16 +52,21 @@ dev = [
     "types-aiofiles",
     "pre-commit>=3.6.0",
 ]
-
 docs = [
+    "markitdown",
     "python-docx",
     "PyMuPDF",
+    "pypdfium2"
 ]
+
+instant_message = [
+    "lark_oapi"
+]
+
 all = [
     "docker",
     "prometheus_client"
 ]
-
 [project.urls]
 Homepage = "https://github.com/geluzhiwei1/davybot.git"
 Documentation = "https://github.com/geluzhiwei1/davybot.git"
@@ -81,8 +84,8 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-data = {dawei = ["*.yaml", "*.yml", "json/**/*.json", "frontend/**/*"]}
-include-package-data = false
+package-data = {dawei = ["*.yaml", "*.yml", "**/*.yaml", "**/*.yml", "**/*.j2", "**/*.jinja2", "**/*.md", "json/**/*.json", "frontend/**/*"]}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]

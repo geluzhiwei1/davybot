@@ -305,7 +305,7 @@ const exportCSV = () => {
 }
 
 // 处理单元格点击（已废弃，改用startEditing）
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const handleCellClick = (_row: TableRow, _column: unknown) => {
   // 点击事件现在由单元格内的span处理
 }

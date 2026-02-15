@@ -15,7 +15,8 @@
       <!-- Show warning if no workspace ID -->
       <el-empty v-if="!props.workspaceId" description="未选择工作区" />
 
-      <el-tabs v-else v-model="activeTab" type="border-card" tab-position="left">
+      <!-- 添加 v-if 确保数据加载完成后再渲染 tabs，避免首次打开不显示内容的问题 -->
+      <el-tabs v-else-if="settingsLoaded" v-model="activeTab" type="border-card" tab-position="left">
         <!-- Workspace Tab (simplified, only basic info) -->
         <el-tab-pane :label="t('workspaceSettings.tabs.workspace')" name="workspace">
           <div class="workspace-config">
@@ -54,17 +55,25 @@
               <el-alert title="Provider 管理" type="info" :closable="false" show-icon>
                 <template #default>
                   <p style="margin: 0; font-size: 13px;">
-                    管理工作区的 LLM Provider 配置。所有配置保存在 <code>settings.json</code>
+                    管理用户和工作区的 LLM Provider 配置。所有配置保存在 <code>settings.json</code>
                   </p>
                 </template>
               </el-alert>
 
-              <el-button type="primary" @click="showCreateProviderDialog" style="margin-top: 16px;">
-                <el-icon>
-                  <Plus />
-                </el-icon>
-                添加 Provider
-              </el-button>
+              <div class="provider-actions" style="margin-top: 16px; display: flex; gap: 8px;">
+                <el-button type="primary" @click="showCreateProviderDialog">
+                  <el-icon>
+                    <Plus />
+                  </el-icon>
+                  添加 Provider
+                </el-button>
+                <el-button @click="loadLLMSettings" :loading="loading">
+                  <el-icon>
+                    <Refresh />
+                  </el-icon>
+                  刷新
+                </el-button>
+              </div>
             </div>
 
             <!-- Provider 列表 -->
@@ -295,7 +304,7 @@
               <el-table-column :label="t('workspaceSettings.agents.table.actions')" width="280" fixed="right">
                 <template #default="scope">
                   <el-button size="small" @click="viewModel(scope.row)">{{ t('workspaceSettings.agents.table.view')
-                  }}</el-button>
+                    }}</el-button>
                   <el-button size="small" type="primary" @click="editMode(scope.row)"
                     :disabled="scope.row.source === 'system'">{{ t('workspaceSettings.agents.table.edit') }}</el-button>
                   <el-button size="small" type="warning" @click="editModeRules(scope.row)">
@@ -359,11 +368,12 @@
           </div>
         </el-tab-pane>
 
-        <!-- Features Tab -->
+        <!-- Features Tab (暂时禁用，功能未实现) -->
+        <!--
         <el-tab-pane :label="t('workspaceSettings.tabs.features')" name="features">
           <el-scrollbar max-height="calc(100vh - 200px)">
             <el-form :model="workspaceConfig" label-width="180px" class="workspace-form">
-              <!-- 技能系统配置 -->
+              <!- - 技能系统配置 - ->
               <el-divider content-position="left">{{ t('workspaceSettings.workspace.skills') }}</el-divider>
               <el-form-item :label="t('workspaceSettings.workspace.skillsEnabled')">
                 <el-switch v-model="workspaceConfig.skills.enabled" />
@@ -372,7 +382,7 @@
                 <el-switch v-model="workspaceConfig.skills.auto_discovery" />
               </el-form-item>
 
-              <!-- 工具系统配置 -->
+              <!- - 工具系统配置 - ->
               <el-divider content-position="left">{{ t('workspaceSettings.workspace.tools') }}</el-divider>
               <el-form-item :label="t('workspaceSettings.workspace.builtinToolsEnabled')">
                 <el-switch v-model="workspaceConfig.tools.builtin_tools_enabled" />
@@ -395,7 +405,7 @@
                   style="width: 100%" />
               </el-form-item>
 
-              <!-- 操作按钮 -->
+              <!- - 操作按钮 - ->
               <el-form-item style="margin-top: 30px;">
                 <el-button type="primary" @click="saveWorkspaceConfig" :loading="saving">
                   {{ t('workspaceSettings.workspace.actions.save') }}
@@ -407,6 +417,7 @@
             </el-form>
           </el-scrollbar>
         </el-tab-pane>
+        -->
 
         <!-- Execution Config Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.execution')" name="execution">
@@ -670,7 +681,7 @@
 
                 <el-form-item>
                   <el-button @click="loadUIEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                  }}</el-button>
+                    }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -735,7 +746,7 @@
 
                 <el-form-item>
                   <el-button @click="loadSystemEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                  }}</el-button>
+                    }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -773,11 +784,11 @@
           <el-select v-model="providerForm.apiProvider" placeholder="选择 API 类型" style="width: 100%"
             @change="onApiProviderChange" filterable>
             <el-option-group label="主流提供商">
-              <el-option label="OpenAI" value="openai" />
               <el-option label="DeepSeek" value="deepseek" />
               <el-option label="Moonshot (Kimi)" value="moonshot" />
               <el-option label="Qwen (通义千问)" value="qwen" />
               <el-option label="GLM (智谱)" value="glm" />
+              <el-option label="MiniMax" value="minimax" />
             </el-option-group>
             <el-option-group label="国际提供商">
               <el-option label="Gemini (Google)" value="gemini" />
@@ -785,7 +796,7 @@
               <el-option label="OpenRouter" value="openrouter" />
             </el-option-group>
             <el-option-group label="其他">
-              <el-option label="MiniMax" value="minimax" />
+              <el-option label="OpenAI兼容" value="openai" />
               <el-option label="Ollama (本地)" value="ollama" />
             </el-option-group>
           </el-select>
@@ -794,11 +805,10 @@
           </div>
         </el-form-item>
 
-        <el-divider content-position="left">{{ providerForm.apiProvider === 'openai' ? 'OpenAI 配置' : 'Ollama 配置'
-          }}</el-divider>
+        <el-divider content-position="left">{{ getProviderDividerTitle(providerForm.apiProvider) }}</el-divider>
 
-        <!-- OpenAI 配置 -->
-        <template v-if="providerForm.apiProvider === 'openai'">
+        <!-- OpenAI 兼容配置 (openai, deepseek, moonshot, qwen, glm, gemini, claude, minimax, openrouter) -->
+        <template v-if="!isOllamaProvider(providerForm.apiProvider)">
           <el-form-item label="Base URL" required>
             <el-input v-model="providerForm.openAiBaseUrl" placeholder="https://api.openai.com/v1" />
           </el-form-item>
@@ -886,8 +896,21 @@
       </el-form>
 
       <template #footer>
-        <el-button @click="showProviderDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveProvider" :loading="saving">保存</el-button>
+        <div style="display: flex; justify-content: flex-end; width: 100%; gap: 8px;">
+          <el-button @click="testProvider" :loading="testingProvider"
+            :disabled="!providerForm.openAiModelId && providerForm.apiProvider !== 'ollama'">
+            测试 Tool Call
+          </el-button>
+          <span v-if="providerTestResult" style="display: flex; align-items: center;">
+            <el-tag :type="providerTestResult.supported ? 'success' : 'danger'" size="small">
+              {{ providerTestResult.supported ? '支持' : '不支持' }}
+            </el-tag>
+          </span>
+          <el-button @click="showProviderDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveProvider" :loading="saving" :disabled="!providerTestResult?.supported">
+            保存
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -1111,6 +1134,9 @@ const visible = ref(props.modelValue);
 const activeTab = ref(props.initialTab || 'workspace');
 const activeEnvironmentSubTab = ref('user');
 const saving = ref(false);
+const settingsLoaded = ref(false); // 用于控制 tabs 渲染时机，避免首次打开不显示内容
+const testingProvider = ref(false);
+const providerTestResult = ref<{ success: boolean; supported: boolean; message: string } | null>(null);
 
 // 插件配置相关状态
 const pluginConfigDialogVisible = ref(false);
@@ -1386,6 +1412,8 @@ const loadingPlugins = ref(false);
 watch(() => props.modelValue, (newVal) => {
   visible.value = newVal;
   if (newVal && props.workspaceId) {
+    // 重置加载状态，确保首次打开时 tabs 在数据加载完成后才渲染
+    settingsLoaded.value = false;
     // 如果有指定 initialTab，则切换到该 tab
     if (props.initialTab) {
       activeTab.value = props.initialTab;
@@ -1397,6 +1425,8 @@ watch(() => props.modelValue, (newVal) => {
 // Watch for workspaceId changes and load settings when it becomes available
 watch(() => props.workspaceId, (newWorkspaceId) => {
   if (newWorkspaceId && visible.value) {
+    // 重置加载状态
+    settingsLoaded.value = false;
     // 如果有指定 initialTab，则切换到该 tab
     if (props.initialTab) {
       activeTab.value = props.initialTab;
@@ -1411,6 +1441,7 @@ watch(visible, (newVal) => {
 
 const loadSettings = async () => {
   if (!props.workspaceId) return;
+  settingsLoaded.value = false; // 开始加载时重置状态
   await Promise.all([
     loadWorkspaceInfo(),
     loadWorkspaceConfig(),
@@ -1424,6 +1455,7 @@ const loadSettings = async () => {
     loadSkills(),
     loadPlugins()
   ]);
+  settingsLoaded.value = true; // 加载完成后设置状态，确保 tabs 正确渲染
 };
 
 // 工作区配置相关方法
@@ -1545,6 +1577,7 @@ const loadUIContext = async () => {
 
 const loadLLMSettings = async () => {
   if (!props.workspaceId) return;
+  loading.value = true;
   try {
     // 调用新的 API 端点获取所有级别的配置
     const response = await apiManager.getWorkspacesApi().getLLMSettingsAllLevels(props.workspaceId);
@@ -1574,6 +1607,8 @@ const loadLLMSettings = async () => {
   } catch (error) {
     ElMessage.error('加载 LLM 配置失败');
     console.error('Failed to load LLM settings:', error);
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -1751,6 +1786,66 @@ const editProvider = (provider: unknown) => {
     : '';
 
   showProviderDialog.value = true;
+  // 重置测试结果
+  providerTestResult.value = null;
+};
+
+// 测试 Provider 是否支持 Tool Call
+const testProvider = async () => {
+  if (!props.workspaceId) return;
+  if (!providerForm.value.openAiModelId && providerForm.value.apiProvider !== 'ollama') {
+    ElMessage.error('请填写模型 ID');
+    return;
+  }
+  if (providerForm.value.apiProvider === 'ollama' && !providerForm.value.ollamaModelId) {
+    ElMessage.error('请填写模型 ID');
+    return;
+  }
+
+  testingProvider.value = true;
+  providerTestResult.value = null;
+
+  try {
+    // 解析自定义 Headers
+    let headers: Record<string, string> = {};
+    if (customHeadersText.value.trim()) {
+      try {
+        headers = JSON.parse(customHeadersText.value);
+      } catch {
+        ElMessage.error('自定义 Headers 格式错误，请输入有效的 JSON');
+        testingProvider.value = false;
+        return;
+      }
+    }
+
+    const providerData = {
+      ...providerForm.value,
+      openAiHeaders: headers
+    };
+
+    const response = await apiManager.getWorkspacesApi().testLLMProvider(
+      props.workspaceId,
+      providerData
+    );
+
+    providerTestResult.value = response;
+
+    if (response.supported) {
+      ElMessage.success(response.message || '测试通过');
+    } else {
+      ElMessage.warning(response.message || '测试失败');
+    }
+  } catch (error: unknown) {
+    const errMsg = error.response?.data?.detail || error.message || '测试失败';
+    ElMessage.error(errMsg);
+    providerTestResult.value = {
+      success: false,
+      supported: false,
+      message: errMsg
+    };
+  } finally {
+    testingProvider.value = false;
+  }
 };
 
 const saveProvider = async () => {
@@ -2205,7 +2300,7 @@ const filterSkills = () => {
 
 // 提供商显示名称映射
 const providerDisplayNames: Record<string, string> = {
-  openai: 'OpenAI',
+  openai: 'OpenAI兼容',
   deepseek: 'DeepSeek',
   moonshot: 'Moonshot (Kimi)',
   qwen: 'Qwen (通义千问)',
@@ -2215,6 +2310,28 @@ const providerDisplayNames: Record<string, string> = {
   minimax: 'MiniMax',
   openrouter: 'OpenRouter',
   ollama: 'Ollama (本地)'
+};
+
+// 判断是否为 Ollama Provider
+const isOllamaProvider = (provider: string): boolean => {
+  return provider === 'ollama';
+};
+
+// 获取 Provider 分隔标题
+const getProviderDividerTitle = (provider: string): string => {
+  const titles: Record<string, string> = {
+    openai: 'OpenAI兼容 配置',
+    deepseek: 'DeepSeek 配置',
+    moonshot: 'Moonshot 配置',
+    qwen: 'Qwen 配置',
+    glm: 'GLM 配置',
+    gemini: 'Gemini 配置',
+    claude: 'Claude 配置',
+    minimax: 'MiniMax 配置',
+    openrouter: 'OpenRouter 配置',
+    ollama: 'Ollama 配置'
+  };
+  return titles[provider] || 'API 配置';
 };
 
 // 提供商标签类型映射
