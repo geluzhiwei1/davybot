@@ -14,7 +14,6 @@ on:
 permissions:
   contents: write
   packages: write
-  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -77,33 +76,30 @@ jobs:
           rm -rf dist/ build/ *.egg-info
           python3 -m build
 
-      - name: Upload backend artifacts
+      - name: Store the distribution packages
         uses: actions/upload-artifact@v4
         with:
-          name: backend-package
+          name: python-package-distributions
           path: agent/dist/
           retention-days: 90
 
-  # Publish to TestPyPI (automatic)
-  publish-testpypi:
+  # Publish to TestPyPI
+  publish-to-testpypi:
     name: Publish to TestPyPI
-    needs: [build-backend]
+    needs: build-backend
     runs-on: ubuntu-latest
     environment:
       name: testpypi
       url: https://test.pypi.org/p/davybot
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download backend artifacts
+      - name: Download all the dists
         uses: actions/download-artifact@v4
         with:
-          name: backend-package
-          path: agent/dist/
+          name: python-package-distributions
+          path: dist/
 
-      - name: Publish to TestPyPI
+      - name: Publish distribution to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -112,9 +108,9 @@ jobs:
           skip-existing: true
 
   # Publish to PyPI (requires manual approval)
-  publish-pypi:
+  publish-to-pypi:
     name: Publish to PyPI
-    needs: publish-testpypi
+    needs: publish-to-testpypi
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -122,18 +118,42 @@ jobs:
       # 需要在 GitHub Settings → Environments 中配置 required reviewers
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download backend artifacts
+      - name: Download all the dists
         uses: actions/download-artifact@v4
         with:
-          name: backend-package
-          path: agent/dist/
+          name: python-package-distributions
+          path: dist/
 
-      - name: Publish to PyPI
+      - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
+
+  # Create GitHub Release
+  github-release:
+    name: Create GitHub Release
+    needs: publish-to-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' \
+            --repo '${{ github.repository }}' \
+            --notes "Release ${{ github.ref_name }}" \
+            dist/*
