@@ -900,16 +900,16 @@ class ToolExecutor(IToolCallService):
                 for tc_id, t_id in self._active_tool_tasks.items():
                     if t_id == task_id:
                         # Find the task definition in task manager
-                        if hasattr(self, '_task_manager') and self._task_manager:
+                        if hasattr(self, "_task_manager") and self._task_manager:
                             for tid, tdef in self._task_manager._tasks.items():
                                 if tid == task_id:
                                     task_def = tdef
                                     break
                             break
 
-                if task_def and hasattr(task_def, 'parameters'):
-                    tool_name = task_def.parameters.get('tool_name', 'unknown')
-                    tool_input = task_def.parameters.get('tool_input', {})
+                if task_def and hasattr(task_def, "parameters"):
+                    tool_name = task_def.parameters.get("tool_name", "unknown")
+                    tool_input = task_def.parameters.get("tool_input", {})
 
                 # Emit tool call start event
                 from dawei.core.events import TaskEventType, emit_typed_event

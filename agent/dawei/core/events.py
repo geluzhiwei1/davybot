@@ -307,23 +307,17 @@ class SimpleEventBus(IEventBus):
 
         # 🔧 修复：验证handler_id是否存在于映射中
         if handler_id not in self._handler_id_map:
-            self._logger.warning(
-                f"[EVENT_BUS] Handler ID {handler_id} not found in registry"
-            )
+            self._logger.warning(f"[EVENT_BUS] Handler ID {handler_id} not found in registry")
             return False
 
         # 🔧 修复：验证handler_id映射的event_type是否匹配
         mapped_event_type = self._handler_id_map[handler_id]
         if mapped_event_type != event_type:
-            self._logger.error(
-                f"[EVENT_BUS] Handler ID mismatch: {handler_id} is registered for {mapped_event_type.value}, but removal attempted for {event_type.value}"
-            )
+            self._logger.error(f"[EVENT_BUS] Handler ID mismatch: {handler_id} is registered for {mapped_event_type.value}, but removal attempted for {event_type.value}")
             return False
 
         if event_type not in self._handlers:
-            self._logger.warning(
-                f"[EVENT_BUS] No handlers registered for event type {event_type.value}"
-            )
+            self._logger.warning(f"[EVENT_BUS] No handlers registered for event type {event_type.value}")
             return False
 
         handlers = self._handlers[event_type]
@@ -337,9 +331,7 @@ class SimpleEventBus(IEventBus):
                 break
 
         if handler_to_remove is None:
-            self._logger.warning(
-                f"[EVENT_BUS] Handler {handler_id} not found in handlers list for event {event_type.value}"
-            )
+            self._logger.warning(f"[EVENT_BUS] Handler {handler_id} not found in handlers list for event {event_type.value}")
             return False
 
         # 移除handler
@@ -350,14 +342,10 @@ class SimpleEventBus(IEventBus):
             del self._handler_id_map[handler_id]
             del self._handler_to_id_map[id(handler_to_remove)]
 
-            self._logger.debug(
-                f"[EVENT_BUS] Removed handler {handler_id} for event type {event_type.value}. Remaining handlers: {len(handlers)}"
-            )
+            self._logger.debug(f"[EVENT_BUS] Removed handler {handler_id} for event type {event_type.value}. Remaining handlers: {len(handlers)}")
             return True
         except ValueError:
-            self._logger.error(
-                f"[EVENT_BUS] Failed to remove handler {handler_id} from list"
-            )
+            self._logger.error(f"[EVENT_BUS] Failed to remove handler {handler_id} from list")
             return False
 
     async def emit_event(self, event_message) -> None:

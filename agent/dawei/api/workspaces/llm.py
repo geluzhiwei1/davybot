@@ -124,6 +124,7 @@ async def get_workspace_llm_settings_all_levels(
         llm_provider = workspace.llm_manager
         if not llm_provider:
             from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
+
             llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
             await llm_config_manager.initialize()
             llm_provider = llm_config_manager.llm_provider
@@ -456,32 +457,10 @@ async def test_llm_provider(
         # 准备测试消息 - 带一个简单的 tool 定义
         from dawei.entity.lm_messages import UserMessage
 
-        test_messages = [
-            UserMessage(
-                content="Hello"
-            )
-        ]
+        test_messages = [UserMessage(content="Hello")]
 
         # 准备一个简单的 tool
-        test_tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "test_function",
-                    "description": "A test function",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "test_param": {
-                                "type": "string",
-                                "description": "A test parameter"
-                            }
-                        },
-                        "required": ["test_param"]
-                    }
-                }
-            }
-        ]
+        test_tools = [{"type": "function", "function": {"name": "test_function", "description": "A test function", "parameters": {"type": "object", "properties": {"test_param": {"type": "string", "description": "A test parameter"}}, "required": ["test_param"]}}}]
 
         # 尝试调用
         try:
@@ -550,10 +529,7 @@ async def test_llm_provider(
                     "model": model_id,
                 }
             # 其他错误（网络、认证等）
-            raise HTTPException(
-                status_code=400,
-                detail=f"API 调用失败: {error_msg}"
-            )
+            raise HTTPException(status_code=400, detail=f"API 调用失败: {error_msg}")
 
     except HTTPException:
         raise

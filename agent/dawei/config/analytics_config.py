@@ -186,7 +186,7 @@ INTEGRATION_CONFIG = {
         # Sentry 集成（错误追踪）
         "sentry": {
             "enabled": False,
-        "dsn": os.getenv("SENTRY_DSN", ""),  # 从环境变量加载
+            "dsn": os.getenv("SENTRY_DSN", ""),  # 从环境变量加载
             "environment": "production",
             "traces_sample_rate": 0.1,
         },

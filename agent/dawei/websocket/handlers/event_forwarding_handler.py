@@ -261,14 +261,9 @@ class EventForwardingHandler:
         # 额外订阅全局事件总线的 TOOL_CALL_START 事件
         # 因为 tool_executor 通过全局事件总线发送 TOOL_CALL_START，需要单独订阅
         try:
-            global_tool_start_handler_id = CORE_EVENT_BUS.add_handler(
-                TaskEventType.TOOL_CALL_START,
-                event_handler
-            )
+            global_tool_start_handler_id = CORE_EVENT_BUS.add_handler(TaskEventType.TOOL_CALL_START, event_handler)
             handler_ids[TaskEventType.TOOL_CALL_START.value] = global_tool_start_handler_id
-            logger.info(
-                f"[EVENT_HANDLER] ✅ Subscribed to global CORE_EVENT_BUS for TOOL_CALL_START (handler: {global_tool_start_handler_id}, task: {task_id})"
-            )
+            logger.info(f"[EVENT_HANDLER] ✅ Subscribed to global CORE_EVENT_BUS for TOOL_CALL_START (handler: {global_tool_start_handler_id}, task: {task_id})")
         except Exception as e:
             logger.error(f"订阅全局TOOL_CALL_START事件时出错: {e}", exc_info=True)
 

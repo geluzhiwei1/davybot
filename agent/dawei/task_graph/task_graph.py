@@ -236,7 +236,7 @@ class TaskGraph:
 
         ⚠️ 重要：此方法必须手动调用，否则会导致内存泄漏！
         """
-        if not hasattr(self, '_handler_ids') or not self._handler_ids:
+        if not hasattr(self, "_handler_ids") or not self._handler_ids:
             return
 
         from dawei.core.events import TaskEventType
@@ -260,10 +260,7 @@ class TaskGraph:
         # 清空追踪列表
         self._handler_ids.clear()
 
-        self.logger.info(
-            f"Cleaned up {removed_count} event handlers for TaskGraph {self.task_node_id}"
-            + (f" ({failed_count} failed)" if failed_count > 0 else "")
-        )
+        self.logger.info(f"Cleaned up {removed_count} event handlers for TaskGraph {self.task_node_id}" + (f" ({failed_count} failed)" if failed_count > 0 else ""))
 
     def __del__(self):
         """析构函数 - 作为最后防线尝试清理处理器
@@ -275,11 +272,8 @@ class TaskGraph:
         3. 在__del__中访问self.event_bus可能不安全
         """
         try:
-            if hasattr(self, '_handler_ids') and self._handler_ids and hasattr(self, 'logger'):
-                self.logger.warning(
-                    f"TaskGraph {self.task_node_id} is being garbage collected without explicit cleanup(). "
-                    "This may indicate a memory leak. Consider calling cleanup() when the TaskGraph is no longer needed."
-                )
+            if hasattr(self, "_handler_ids") and self._handler_ids and hasattr(self, "logger"):
+                self.logger.warning(f"TaskGraph {self.task_node_id} is being garbage collected without explicit cleanup(). This may indicate a memory leak. Consider calling cleanup() when the TaskGraph is no longer needed.")
                 # 尝试清理，但不保证成功
                 # self.cleanup()  # 注释掉，因为在__del__中访问event_bus可能不安全
         except Exception:

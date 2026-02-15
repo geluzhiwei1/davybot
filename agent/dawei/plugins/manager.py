@@ -86,23 +86,34 @@ class PluginManager:
 
         # Load plugins
         loaded_count = 0
+        activated_count = 0
         for manifest in manifests:
             # Try full plugin_id first (name@version), then fallback to just name
             plugin_id = f"{manifest.name}@{manifest.version}"
             plugin_settings = settings.get(plugin_id) or settings.get(manifest.name) or manifest.settings
 
-            # Register plugin (don't auto-activate to avoid config errors)
-            # User can activate manually after configuration
+            # Check if plugin should be auto-activated based on config
+            # Priority: settings.activated > settings.enabled > manifest.settings.auto_activate
+            should_activate = plugin_settings.get("activated", False)
+            if not should_activate:
+                should_activate = plugin_settings.get("enabled", False)
+
+            # Register plugin
             success = await self.registry.register_plugin(
                 manifest,
                 plugin_settings,
-                auto_activate=False,  # Changed from True to avoid activation failures
+                auto_activate=should_activate,
             )
 
             if success:
                 loaded_count += 1
+                # Check if actually activated
+                registration = self.registry.registrations.get(plugin_id)
+                if registration and registration.activated:
+                    activated_count += 1
+                    logger.info(f"✅ Activated plugin: {plugin_id}")
 
-        logger.info(f"Loaded {loaded_count}/{len(manifests)} plugins")
+        logger.info(f"Loaded {loaded_count}/{len(manifests)} plugins, activated {activated_count}")
         return loaded_count
 
     async def load_plugin_from_path(self, plugin_dir: Path, settings: dict[str, Any]) -> bool:
@@ -153,11 +164,17 @@ class PluginManager:
         manifest = PluginMetadata(**manifest_data)
         manifest._plugin_dir = plugin_dir
 
+        # Check if plugin should be auto-activated based on config
+        # Priority: settings.activated > settings.enabled
+        should_activate = settings.get("activated", False)
+        if not should_activate:
+            should_activate = settings.get("enabled", True)
+
         # Register plugin
         return await self.registry.register_plugin(
             manifest,
             settings,
-            auto_activate=settings.get("enabled", True),
+            auto_activate=should_activate,
         )
 
     async def activate_plugin(self, plugin_id: str) -> bool:

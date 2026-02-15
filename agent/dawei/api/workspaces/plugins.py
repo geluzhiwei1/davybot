@@ -796,8 +796,10 @@ async def uninstall_plugin_endpoint(
 # 飞书插件专用端点
 # ============================================================================
 
+
 class TestFeishuMessageRequest(BaseModel):
     """测试飞书消息发送请求"""
+
     message: str = Field(default="这是一条测试消息", description="测试消息内容")
 
 
@@ -818,10 +820,7 @@ async def test_feishu_connection(
     try:
         # 只支持飞书插件
         if not plugin_id.startswith("feishu-channel"):
-            return {
-                "success": False,
-                "error": "此功能仅支持飞书插件"
-            }
+            return {"success": False, "error": "此功能仅支持飞书插件"}
 
         # 直接从配置文件读取状态（简单直接）
         import json
@@ -830,10 +829,7 @@ async def test_feishu_connection(
         config_file = Path(workspace.workspace_path) / ".dawei" / "plugins" / f"{plugin_id}.json"
 
         if not config_file.exists():
-            return {
-                "success": False,
-                "error": "插件配置文件不存在"
-            }
+            return {"success": False, "error": "插件配置文件不存在"}
 
         with open(config_file) as f:
             plugin_config = json.load(f)
@@ -842,80 +838,60 @@ async def test_feishu_connection(
         activated = plugin_config.get("activated", False)
 
         if not enabled:
-            return {
-                "success": False,
-                "error": "插件未启用"
-            }
+            return {"success": False, "error": "插件未启用"}
 
         if not activated:
-            return {
-                "success": False,
-                "error": "插件未激活",
-                "status": "inactive"
-            }
+            return {"success": False, "error": "插件未激活", "status": "inactive"}
 
         # 获取插件实例以访问配置
         plugin = manager.get_plugin(plugin_id)
 
         if not plugin:
-            return {
-                "success": False,
-                "error": "插件未加载"
-            }
+            return {"success": False, "error": "插件未加载"}
 
         # 检查事件服务器状态
         import socket
+
         event_port = plugin_config.get("settings", {}).get("event_port", 8466)
         event_host = plugin.config.settings.get("event_host", "0.0.0.0")
-        
+
         # 检查端口是否监听
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
-        result = sock.connect_ex(('localhost', event_port))
+        result = sock.connect_ex(("localhost", event_port))
         sock.close()
-        
-        port_listening = (result == 0)
-        
+
+        port_listening = result == 0
+
         # 健康检查
         health_ok = False
         health_status = {}
-        
+
         if port_listening:
             try:
                 import aiohttp
+
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        f"http://localhost:{event_port}/feishu/health",
-                        timeout=aiohttp.ClientTimeout(total=2)
-                    ) as resp:
+                    async with session.get(f"http://localhost:{event_port}/feishu/health", timeout=aiohttp.ClientTimeout(total=2)) as resp:
                         if resp.status == 200:
                             health_data = await resp.json()
-                            health_ok = (health_data.get("status") == "ok")
+                            health_ok = health_data.get("status") == "ok"
                             health_status = health_data
             except Exception as e:
                 health_ok = False
                 health_status = {"error": str(e)}
-        
+
         return {
             "success": True,
             "plugin_id": plugin_id,
-            "connection_status": {
-                "plugin_activated": True,
-                "event_server_running": port_listening,
-                "health_check_passed": health_ok,
-                "event_port": event_port,
-                "event_host": event_host
-            },
+            "connection_status": {"plugin_activated": True, "event_server_running": port_listening, "health_check_passed": health_ok, "event_port": event_port, "event_host": event_host},
             "health_status": health_status,
-            "message": "✅ 长连接已建立" if (port_listening and health_ok) else "⚠️ 长连接未完全建立"
+            "message": "✅ 长连接已建立" if (port_listening and health_ok) else "⚠️ 长连接未完全建立",
         }
-        
+
     except Exception as e:
         logger.exception(f"Error testing feishu connection: ")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 @router.post("/{plugin_id}/send-test-message")
@@ -932,10 +908,7 @@ async def send_feishu_test_message(
     try:
         # 只支持飞书插件
         if not plugin_id.startswith("feishu-channel"):
-            return {
-                "success": False,
-                "error": "此功能仅支持飞书插件"
-            }
+            return {"success": False, "error": "此功能仅支持飞书插件"}
 
         # 直接从配置文件读取状态（与 test-connection 保持一致）
         import json
@@ -944,10 +917,7 @@ async def send_feishu_test_message(
         config_file = Path(workspace.workspace_path) / ".dawei" / "plugins" / f"{plugin_id}.json"
 
         if not config_file.exists():
-            return {
-                "success": False,
-                "error": "插件配置文件不存在"
-            }
+            return {"success": False, "error": "插件配置文件不存在"}
 
         with open(config_file) as f:
             plugin_config = json.load(f)
@@ -956,55 +926,31 @@ async def send_feishu_test_message(
         activated = plugin_config.get("activated", False)
 
         if not enabled:
-            return {
-                "success": False,
-                "error": "插件未启用"
-            }
+            return {"success": False, "error": "插件未启用"}
 
         if not activated:
-            return {
-                "success": False,
-                "error": "插件未激活，请先激活插件"
-            }
+            return {"success": False, "error": "插件未激活，请先激活插件"}
 
         plugin = manager.get_plugin(plugin_id)
 
         if not plugin:
-            return {
-                "success": False,
-                "error": "插件未加载"
-            }
-        
+            return {"success": False, "error": "插件未加载"}
+
         # 获取配置
         receive_id = plugin.config.settings.get("receive_id")
         if not receive_id:
-            return {
-                "success": False,
-                "error": "未配置receive_id，请先配置插件"
-            }
-        
+            return {"success": False, "error": "未配置receive_id，请先配置插件"}
+
         # 发送测试消息
         test_message = f"🔔 测试消息\n\n{request.message}\n\n发送时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        
+
         success = await plugin.send_message(test_message)
-        
+
         if success:
-            return {
-                "success": True,
-                "plugin_id": plugin_id,
-                "message": "测试消息发送成功！",
-                "sent_content": test_message,
-                "receive_id": receive_id
-            }
+            return {"success": True, "plugin_id": plugin_id, "message": "测试消息发送成功！", "sent_content": test_message, "receive_id": receive_id}
         else:
-            return {
-                "success": False,
-                "error": "消息发送失败，请检查配置和权限"
-            }
-        
+            return {"success": False, "error": "消息发送失败，请检查配置和权限"}
+
     except Exception as e:
         logger.exception(f"Error sending feishu test message: ")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}

@@ -393,6 +393,7 @@ class TaskContext(ITaskContext):
         """
         with self._lock:
             self._state_change_callbacks.append(callback)
+
     def add_start_callback(self, callback: StartCallback) -> None:
         """添加开始回调
 
@@ -402,6 +403,7 @@ class TaskContext(ITaskContext):
         """
         with self._lock:
             self._start_callbacks.append(callback)
+
     def remove_state_change_callback(self, callback: StateChangeCallback) -> None:
         """移除状态变化回调
 
