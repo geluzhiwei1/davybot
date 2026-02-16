@@ -53,6 +53,7 @@ class LLMProviderCreate(BaseModel):
     openAiApiKey: str | None = Field(None, description="OpenAI API 密钥")
     openAiModelId: str | None = Field(None, description="OpenAI 模型 ID")
     openAiLegacyFormat: bool | None = Field(False, description="使用旧版 OpenAI 格式")
+    openAiHeaders: dict[str, str] | None = Field(None, description="自定义 HTTP Headers")
     ollamaBaseUrl: str | None = Field(None, description="Ollama 基础 URL")
     ollamaModelId: str | None = Field(None, description="Ollama 模型 ID")
     ollamaApiKey: str | None = Field(None, description="Ollama API 密钥")

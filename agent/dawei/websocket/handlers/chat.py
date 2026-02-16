@@ -1267,12 +1267,12 @@ class ChatHandler(AsyncMessageHandler):
             agent: Agent实例（可选，如果不提供则尝试从_active_agents获取）
 
         """
-        # 检查是否有注册的事件处理器
-        if task_id not in self._task_event_handler_ids:
-            logger.debug(f"[EVENT_HANDLER] No event handlers to cleanup for task {task_id}")
+        handler_ids = self._task_event_handler_ids.pop(task_id, None)
+
+        if not handler_ids:
+            logger.debug(f"[EVENT_HANDLER] ✅ Task {task_id} handlers already cleaned up or never registered")
             return
 
-        handler_ids = self._task_event_handler_ids[task_id]
         logger.info(
             f"[EVENT_HANDLER] 🧹 Cleaning up {len(handler_ids)} event handlers for task {task_id}",
         )
@@ -1288,12 +1288,12 @@ class ChatHandler(AsyncMessageHandler):
             logger.warning(
                 f"[EVENT_HANDLER] ⚠️ Cannot cleanup handlers for task {task_id}: no event bus available. Handlers will remain registered (potential memory leak).",
             )
-            # 即使没有event_bus，也要从映射中删除
-            del self._task_event_handler_ids[task_id]
+            # handler_ids 已经被 pop，无需再次删除
             return
 
         # 移除所有事件处理器
         removed_count = 0
+        already_removed_count = 0
         for event_type_value, handler_id in handler_ids.items():
             try:
                 # 将字符串转换为TaskEventType枚举
@@ -1305,12 +1305,14 @@ class ChatHandler(AsyncMessageHandler):
                         f"[EVENT_HANDLER] ✅ Removed handler {handler_id} for event {event_type_value}",
                     )
                 else:
-                    logger.warning(
-                        f"[EVENT_HANDLER] ⚠️ Failed to remove handler {handler_id} for event {event_type_value}",
+                    # 🔧 优化：将 WARNING 降为 DEBUG，因为这是正常情况（可能已被其他路径清理）
+                    already_removed_count += 1
+                    logger.debug(
+                        f"[EVENT_HANDLER] ℹ️ Handler {handler_id} for event {event_type_value} was already removed (normal, may be cleaned by other path)",
                     )
             except ValueError:
-                logger.exception(
-                    f"[EVENT_HANDLER] ❌ Invalid event type {event_type_value}, skipping cleanup",
+                logger.debug(
+                    f"[EVENT_HANDLER] ⚠️ Invalid event type {event_type_value}, skipping cleanup",
                 )
             except Exception as e:
                 logger.error(
@@ -1318,11 +1320,10 @@ class ChatHandler(AsyncMessageHandler):
                     exc_info=True,
                 )
 
-        # 从映射中删除
-        del self._task_event_handler_ids[task_id]
-
         logger.info(
-            f"[EVENT_HANDLER] ✅ Cleanup complete for task {task_id}: removed {removed_count}/{len(handler_ids)} handlers. Remaining active handlers: {len(self._task_event_handler_ids)}",
+            f"[EVENT_HANDLER] ✅ Cleanup complete for task {task_id}: "
+            f"removed {removed_count}, already removed {already_removed_count}/{len(handler_ids)} handlers. "
+            f"Remaining active handlers: {len(self._task_event_handler_ids)}",
         )
 
     # ==================== 重构后的主执行方法 ====================

@@ -42,6 +42,7 @@ class LLMProviderCreate(BaseModel):
     openAiApiKey: str | None = Field(None, description="OpenAI API 密钥")
     openAiModelId: str | None = Field(None, description="OpenAI 模型 ID")
     openAiLegacyFormat: bool | None = Field(False, description="使用旧版 OpenAI 格式")
+    openAiHeaders: dict[str, str] | None = Field(None, description="自定义 HTTP Headers")
     ollamaBaseUrl: str | None = Field(None, description="Ollama 基础 URL")
     ollamaModelId: str | None = Field(None, description="Ollama 模型 ID")
     ollamaApiKey: str | None = Field(None, description="Ollama API 密钥")
@@ -292,7 +293,7 @@ async def create_llm_provider(
                 provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
             if provider_data.openAiCustomModelInfo:
                 provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
-            provider_config["openAiHeaders"] = {}
+            provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else {}
 
         # 添加 Ollama 特定配置
         elif provider_data.apiProvider == "ollama":
@@ -381,7 +382,8 @@ async def update_llm_provider(
                 provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
             if provider_data.openAiCustomModelInfo:
                 provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
-            provider_config["openAiHeaders"] = existing_config.get("openAiHeaders", {})
+            # 使用前端传来的 openAiHeaders，如果没有则使用现有配置的值
+            provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else existing_config.get("openAiHeaders", {})
 
         elif provider_data.apiProvider == "ollama":
             if provider_data.ollamaBaseUrl:
@@ -543,25 +545,53 @@ async def delete_llm_provider(
     provider_name: str,
     workspace: UserWorkspace = Depends(get_user_workspace),
 ):
-    """删除 LLM Provider 配置"""
+    """删除 LLM Provider 配置
+
+    支持删除用户级和工作区级的 Provider 配置
+    """
     if not workspace.is_initialized():
         await workspace.initialize()
 
     try:
+        from pathlib import Path as PathlibPath
+        import os
+
+        # 首先尝试从工作区级配置中删除
         settings_file = workspace.user_config_dir / "settings.json"
 
         if not settings_file.exists():
-            raise HTTPException(status_code=404, detail="Settings file not found")
+            # 如果工作区配置不存在，尝试用户级配置
+            user_settings_file = PathlibPath.home() / ".dawei" / "configs" / "settings.json"
+            if not user_settings_file.exists():
+                raise HTTPException(status_code=404, detail="Settings file not found")
+            settings_file = user_settings_file
+        else:
+            # 先检查工作区配置是否存在该 provider
+            with Path(settings_file).open(encoding="utf-8") as f:
+                settings = json.load(f)
 
-        with Path(settings_file).open(encoding="utf-8") as f:
-            settings = json.load(f)
+            provider_profiles = settings.get("providerProfiles", {})
+            api_configs = provider_profiles.get("apiConfigs", {})
 
-        provider_profiles = settings.get("providerProfiles", {})
-        api_configs = provider_profiles.get("apiConfigs", {})
+            if provider_name in api_configs:
+                # 在工作区配置中找到，直接删除
+                pass
+            else:
+                # 工作区配置中没有，尝试用户级配置
+                user_settings_file = PathlibPath.home() / ".dawei" / "configs" / "settings.json"
+                if user_settings_file.exists():
+                    settings_file = user_settings_file
+                    with Path(settings_file).open(encoding="utf-8") as f:
+                        settings = json.load(f)
+                    provider_profiles = settings.get("providerProfiles", {})
+                    api_configs = provider_profiles.get("apiConfigs", {})
 
         # 检查 provider 是否存在
         if provider_name not in api_configs:
             raise HTTPException(status_code=404, detail=f"Provider '{provider_name}' not found")
+
+        # 在删除前获取 provider 的 id
+        deleted_provider_id = api_configs[provider_name].get("id")
 
         # 删除配置
         del api_configs[provider_name]
@@ -572,10 +602,10 @@ async def delete_llm_provider(
 
         # 清除 modeApiConfigs 中的引用
         mode_configs = provider_profiles.get("modeApiConfigs", {})
-        deleted_provider_id = api_configs.get(provider_name, {}).get("id")
-        for mode, config_id in list(mode_configs.items()):
-            if config_id == deleted_provider_id:
-                mode_configs[mode] = None
+        if deleted_provider_id:
+            for mode, config_id in list(mode_configs.items()):
+                if config_id == deleted_provider_id:
+                    mode_configs[mode] = None
 
         provider_profiles["apiConfigs"] = api_configs
         provider_profiles["modeApiConfigs"] = mode_configs
@@ -584,7 +614,7 @@ async def delete_llm_provider(
         with settings_file.open("w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Deleted LLM provider: {provider_name}")
+        logger.info(f"Deleted LLM provider: {provider_name} from {settings_file}")
 
         return {
             "success": True,

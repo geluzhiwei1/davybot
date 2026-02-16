@@ -61,9 +61,20 @@ class LLMProviderConfig:
     source: str = "user"  # system/user/workspace
     priority: int = 50
     is_default: bool = False
+    raw_config: dict[str, Any] = field(default_factory=dict)  # 存储完整的原始配置数据
 
     def to_dict(self) -> dict[str, Any]:
-        """转换为字典"""
+        """转换为字典,返回完整的配置数据(包括所有字段)"""
+        # 如果有原始配置,优先使用原始配置
+        if self.raw_config:
+            return {
+                "name": self.name,
+                "config": self.raw_config,  # 返回完整的原始配置
+                "source": self.source,
+                "priority": self.priority,
+                "is_default": self.is_default,
+            }
+        # 兼容旧代码,如果没有原始配置则使用 config.__dict__
         return {
             "name": self.name,
             "config": self.config.__dict__,

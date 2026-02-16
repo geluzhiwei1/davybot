@@ -1589,10 +1589,16 @@ const loadLLMSettings = async () => {
     // 为了兼容旧代码，构建 allConfigs（合并后的配置）
     llmSettings.value.allConfigs = {};
     for (const item of llmSettings.value.userConfigs) {
-      llmSettings.value.allConfigs[item.name] = item.config.config || item.config;
+      // item.config 包含 {name, config: {...}, source, ...}
+      // 真正的配置数据在 item.config.config 中
+      const configData = item.config.config || item.config;
+      llmSettings.value.allConfigs[item.name] = configData;
     }
     for (const item of llmSettings.value.workspaceConfigs) {
-      llmSettings.value.allConfigs[item.name] = item.config.config || item.config;
+      // item.config 包含 {name, config: {...}, source, ...}
+      // 真正的配置数据在 item.config.config 中
+      const configData = item.config.config || item.config;
+      llmSettings.value.allConfigs[item.name] = configData;
     }
 
     // 初始化 modeApiConfigs,如果后端没有返回则使用空值

@@ -80,6 +80,7 @@ def _load_settings_file(settings_file: Path, source: str) -> dict[str, LLMProvid
                 config=llm_config,
                 source=source,
                 is_default=(config_name == current_config_name),
+                raw_config=config_data,  # 保存完整的原始配置数据
             )
             configs[config_name] = provider_config
 

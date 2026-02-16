@@ -121,13 +121,8 @@ class OpenaiCompatibleClient(BaseClient):
         """准备请求头"""
         headers = {
             "Content-Type": "application/json",
-            # Mimic headers sent by the VSCode extension
-            "HTTP-Referer": "https://github.com/RooVetGit/Roo-Cline",
-            "X-Title": "Roo Code",
-            "User-Agent": "RooCode/3.38.0",  # Hardcoded version for testing
         }
 
-        # roo code 自定义headers
         # 支持两种字段名：openAiHeaders（原始配置）和 custom_headers（LLMConfig内部字段）
         custom_headers = self.config.get("openAiHeaders", self.config.get("custom_headers"))
         if custom_headers and isinstance(custom_headers, dict):
