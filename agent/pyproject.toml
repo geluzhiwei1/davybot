@@ -1,5 +1,5 @@
 [project]
-name = "daweibot"
+name = "davybot"
 version = "0.1.0"
 description = "Dawei AI Assistant - Server Package (Backend + Frontend)"
 readme = "README.md"

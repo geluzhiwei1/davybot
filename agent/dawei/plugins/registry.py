@@ -173,8 +173,8 @@ class PluginRegistry:
         registration = self.registrations[plugin_id]
 
         if registration.activated:
-            logger.warning(f"Plugin {plugin_id} already activated")
-            return False
+            logger.info(f"Plugin {plugin_id} already activated")
+            return True  # Already in desired state, not a failure
 
         try:
             await registration.plugin.activate()
@@ -204,8 +204,8 @@ class PluginRegistry:
         registration = self.registrations[plugin_id]
 
         if not registration.activated:
-            logger.warning(f"Plugin {plugin_id} not activated")
-            return False
+            logger.info(f"Plugin {plugin_id} not activated (already in desired state)")
+            return True  # Already in desired state, not a failure
 
         try:
             await registration.plugin.deactivate()
