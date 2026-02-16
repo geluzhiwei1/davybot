@@ -1,5 +1,5 @@
 [project]
-name = "dawei-agent"
+name = "daweibot"
 version = "0.1.0"
 description = "Dawei AI Assistant - Server Package (Backend + Frontend)"
 readme = "README.md"
@@ -8,7 +8,7 @@ license = {text = "Proprietary"}
 authors = [
     {name = "Dawei Team", email = "contact@dawei.com"}
 ]
-keywords = ["patent", "ai", "agent", "llm", "fastapi"]
+keywords = ["ai", "agent", "llm", "fastapi"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
