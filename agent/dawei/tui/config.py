@@ -8,8 +8,11 @@ Extends CLIConfig with TUI-specific settings.
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from dawei.config import get_workspaces_root
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +83,8 @@ class TUIConfig:
                     print(f"[CONFIG] Loaded LLM from workspace settings.json: {current_llm}")
                     return current_llm
 
-            # Try user settings
-            user_settings_file = Path.home() / ".dawei" / "configs" / "settings.json"
+            # Try user settings (DAWEI_HOME)
+            user_settings_file = Path(get_workspaces_root()) / "configs" / "settings.json"
             if user_settings_file.exists():
                 with Path(user_settings_file).open() as f:
                     settings = json.load(f)

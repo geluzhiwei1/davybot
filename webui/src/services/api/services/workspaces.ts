@@ -792,7 +792,7 @@ export class WorkspacesApiService {
     }
   }
 
-  // 测试 LLM Provider 是否支持 Tool Call
+  // Test LLM Provider Tool Call support
   async testLLMProvider(
     workspaceId: string,
     data: {
@@ -986,29 +986,31 @@ export class WorkspacesApiService {
     }
   }
 
-  // 获取 Mode 的 rules.md 内容
+  // 获取 Mode 的 rules.md 内容（支持多个文件）
   async getModeRules(
     workspaceId: string,
     modeSlug: string
   ): Promise<{
     success: boolean;
-    rules: string;
+    rules: Record<string, string>;  // key 是完整文件名（含 .md 扩展名），value 是文件内容
+    directory: string | null;
   }> {
     try {
       return await httpClient.get<{
         success: boolean;
-        rules: string;
+        rules: Record<string, string>;  // key 是完整文件名（含 .md 扩展名），value 是文件内容
+        directory: string | null;
       }>(`${this.baseUrl}/${workspaceId}/modes/${modeSlug}/rules`);
     } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  // 更新 Mode 的 rules.md 内容
+  // 更新 Mode 的 rules.md 内容（支持多个文件）
   async updateModeRules(
     workspaceId: string,
     modeSlug: string,
-    rules: string
+    rules: Record<string, string>  // key 是完整文件名（含 .md 扩展名），value 是文件内容
   ): Promise<{
     success: boolean;
     message: string;
@@ -1026,7 +1028,7 @@ export class WorkspacesApiService {
   }
 
   // 获取 Mode 列表
-  async getModes(workspaceId: string): Promise<{
+  async getModes(workspaceId: string, reload?: boolean): Promise<{
     success: boolean;
     modes: Array<{
       slug: string;
@@ -1037,6 +1039,7 @@ export class WorkspacesApiService {
     }>;
   }> {
     try {
+      const params = reload ? { reload: true } : undefined;
       return await httpClient.get<{
         success: boolean;
         modes: Array<{
@@ -1046,7 +1049,7 @@ export class WorkspacesApiService {
           is_default: boolean;
           source: 'system' | 'user' | 'workspace';
         }>;
-      }>(`${this.baseUrl}/${workspaceId}/modes`);
+      }>(`${this.baseUrl}/${workspaceId}/modes`, params);
     } catch (error) {
       throw this.handleError(error);
     }

@@ -248,13 +248,6 @@ class LoggingConfig(BaseModel):
     sanitize_sensitive_data: bool = True
 
 
-class MonitoringConfig(BaseModel):
-    """监控配置"""
-
-    prometheus_enabled: bool = True
-    prometheus_port: int = 9090
-
-
 class AnalyticsConfig(BaseModel):
     """分析配置"""
 
@@ -330,7 +323,6 @@ class WorkspaceConfig(BaseModel):
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
     analytics: AnalyticsConfig = Field(default_factory=AnalyticsConfig)
     # ✨ 新增：插件配置（第二层：动态配置）
     plugins: PluginsConfig = Field(default_factory=PluginsConfig)
@@ -379,7 +371,6 @@ class WorkspaceConfig(BaseModel):
             "skills": self.skills.model_dump(),
             "tools": self.tools.model_dump(),
             "logging": self.logging.model_dump(),
-            "monitoring": self.monitoring.model_dump(),
             "analytics": self.analytics.model_dump(),
             "plugins": self.plugins.model_dump(),  # ✨ 新增：插件配置
         }

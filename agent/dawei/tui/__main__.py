@@ -149,6 +149,15 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main entry point for dawei.tui"""
+    # Load environment variables from current working directory's .env file
+    # Use find_dotenv() to locate .env from current working directory
+    # Use override=True to ensure DAWEI_HOME from .env takes precedence
+    from dotenv import find_dotenv, load_dotenv
+
+    env_path = find_dotenv()
+    if env_path:
+        load_dotenv(env_path, override=True)
+
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
         description="Dawei TUI - Terminal User Interface for Agent",

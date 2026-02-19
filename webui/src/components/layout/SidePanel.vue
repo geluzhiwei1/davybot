@@ -15,7 +15,7 @@
             data-testid="conversations-tab"
           >
             <el-icon><ChatDotRound /></el-icon>
-            <span>会话</span>
+            <span>{{ t('sidePanel.conversations') }}</span>
           </button>
           <button
             :class="['tab-button', { active: activeTab === 'files' }]"
@@ -23,15 +23,16 @@
             data-testid="files-tab"
           >
             <el-icon><Folder /></el-icon>
-            <span>工作区</span>
+            <span>{{ t('sidePanel.workspace') }}</span>
           </button>
           <button
+            v-if="!memoryPanelDisabled"
             :class="['tab-button', { active: activeTab === 'memory' }]"
             @click="activeTab = 'memory'"
             data-testid="memory-tab"
           >
             <el-icon><Connection /></el-icon>
-            <span>记忆</span>
+            <span>{{ t('sidePanel.memory') }}</span>
           </button>
         </div>
 
@@ -39,8 +40,8 @@
         <div v-show="activeTab === 'conversations'" class="tab-panel">
           <div class="panel-content">
             <div class="conversation-actions">
-              <el-button type="primary" :icon="Plus" @click="handleNewChat" class="flex-1" size="small">新建会话</el-button>
-              <el-button type="danger" :icon="Delete" @click="handleDeleteAllConversations" class="flex-1" size="small">删除所有</el-button>
+              <el-button type="primary" :icon="Plus" @click="handleNewChat" class="flex-1" size="small">{{ t('sidePanel.newConversation') }}</el-button>
+              <el-button type="danger" :icon="Delete" @click="handleDeleteAllConversations" class="flex-1" size="small">{{ t('sidePanel.deleteAll') }}</el-button>
             </div>
             <el-scrollbar>
               <el-menu :default-active="activeConversationId" @select="handleSelectConversation" v-loading="loading" class="conversation-menu">
@@ -59,12 +60,12 @@
                       size="small"
                       class="conv-delete-btn"
                       @click.stop="handleDeleteConversation(conv)"
-                      title="删除对话"
+                      :title="t('sidePanel.deleteConversation')"
                     />
                   </div>
                 </el-menu-item>
               </el-menu>
-              <el-empty v-if="!loading && conversations.length === 0" description="暂无历史对话" :image-size="60" />
+              <el-empty v-if="!loading && conversations.length === 0" :description="t('sidePanel.noConversations')" :image-size="60" />
             </el-scrollbar>
           </div>
         </div>
@@ -79,18 +80,18 @@
                   <!-- 项目文件树 -->
                   <div class="section-block">
                     <div class="section-header">
-                      <h4>文件树</h4>
+                      <h4>{{ t('sidePanel.fileTree') }}</h4>
                       <div class="file-actions">
-                        <el-tooltip content="刷新" placement="top">
+                        <el-tooltip :content="t('sidePanel.refresh')" placement="top">
                           <el-button :icon="Refresh" text circle size="small" @click="handleRefreshFiles" />
                         </el-tooltip>
-                        <el-tooltip content="上传文件" placement="top">
+                        <el-tooltip :content="t('sidePanel.uploadFile')" placement="top">
                           <el-button :icon="Upload" text circle size="small" @click="handleUploadFile()" />
                         </el-tooltip>
-                        <el-tooltip content="新建文件" placement="top">
+                        <el-tooltip :content="t('sidePanel.newFile')" placement="top">
                           <el-button :icon="Document" text circle size="small" @click="handleCreateFile()" />
                         </el-tooltip>
-                        <el-tooltip content="新建目录" placement="top">
+                        <el-tooltip :content="t('sidePanel.newDirectory')" placement="top">
                           <el-button :icon="FolderAdd" text circle size="small" @click="handleCreateDirectory()" />
                         </el-tooltip>
                       </div>
@@ -123,13 +124,13 @@
                               size="small"
                               class="node-delete-btn"
                               @click.stop="handleQuickDelete(data)"
-                              title="删除"
+                              :title="t('sidePanel.delete')"
                             />
                           </span>
                         </span>
                       </template>
                     </el-tree>
-                    <el-empty v-if="nestedFileTree.length === 0" description="暂无文件" :image-size="40" />
+                    <el-empty v-if="nestedFileTree.length === 0" :description="t('sidePanel.noFiles')" :image-size="40" />
                   </div>
                 </div>
               </div>
@@ -138,7 +139,7 @@
         </div>
 
         <!-- 记忆面板 -->
-        <div v-show="activeTab === 'memory'" class="tab-panel">
+        <div v-if="!memoryPanelDisabled" v-show="activeTab === 'memory'" class="tab-panel">
           <MemoryBrowser
             v-if="workspaceId"
             :workspace-id="workspaceId"
@@ -170,24 +171,24 @@
       >
         <div class="context-menu-item" @click="handleCreateFile(selectedFileNode)">
           <el-icon><Document /></el-icon>
-          <span>新建文件</span>
+          <span>{{ t('sidePanel.newFile') }}</span>
         </div>
         <div class="context-menu-item" @click="handleCreateDirectory(selectedFileNode)">
           <el-icon><FolderAdd /></el-icon>
-          <span>新建目录</span>
+          <span>{{ t('sidePanel.newDirectory') }}</span>
         </div>
         <div v-if="selectedFileNode" class="context-menu-divider"></div>
         <div v-if="selectedFileNode" class="context-menu-item" @click="handleRename">
           <el-icon><Edit /></el-icon>
-          <span>重命名</span>
+          <span>{{ t('sidePanel.rename') }}</span>
         </div>
         <div v-if="selectedFileNode" class="context-menu-item" @click="handleCopy">
           <el-icon><CopyDocument /></el-icon>
-          <span>复制</span>
+          <span>{{ t('sidePanel.copy') }}</span>
         </div>
         <div v-if="selectedFileNode" class="context-menu-item danger" @click="handleDelete">
           <el-icon><Delete /></el-icon>
-          <span>删除</span>
+          <span>{{ t('sidePanel.delete') }}</span>
         </div>
       </div>
     </teleport>
@@ -198,6 +199,7 @@
 /* eslint-disable */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useChatStore } from '@/stores/chat';
 import { apiManager } from '@/services/api';
 import { ElMessageBox, ElMessage } from 'element-plus';
@@ -210,7 +212,7 @@ import FileUploadDialog from '@/components/FileUploadDialog.vue';
 import MemoryBrowser from './MemoryBrowser.vue';
 
 const chatStore = useChatStore();
-
+const { t } = useI18n();
 
 
 
@@ -219,17 +221,17 @@ const handleClickOutside = () => {
   closeContextMenu();
 };
 
-// 更新临时会话为真实会话
+// Update temporary conversation to real conversation
 const updateTempConversation = (tempId: string, realId: string) => {
-  // 查找临时会话在列表中的索引
+  // Find temporary conversation index in list
   const tempIndex = conversations.value.findIndex((c: any) => c.id === tempId);
 
   if (tempIndex !== -1) {
-    // 更新会话ID和移除临时标记
+    // Update conversation ID and remove temporary flag
     conversations.value[tempIndex].id = realId;
     conversations.value[tempIndex].isTemp = false;
 
-    // 如果当前选中的是临时会话，更新选中状态
+    // If currently selected is temporary, update selected state
     if (activeConversationId.value === tempId) {
       activeConversationId.value = realId;
     }
@@ -238,7 +240,11 @@ const updateTempConversation = (tempId: string, realId: string) => {
 
 const props = defineProps({
   collapsed: Boolean,
-  workspaceId: String
+  workspaceId: String,
+  memoryPanelDisabled: {
+    type: Boolean,
+    default: false
+  }
 });
 
 const emit = defineEmits(['open-file', 'open-settings']);
@@ -247,15 +253,38 @@ const emit = defineEmits(['open-file', 'open-settings']);
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
 
-  // 注册更新临时会话的全局函数
+  // Register global function for updating temporary conversations
   if (typeof window !== 'undefined') {
     (window as unknown).updateTempConversation = updateTempConversation;
   }
+
+  // ✅ 监听任务完成事件，自动刷新文件树
+  window.addEventListener('task-node-complete-refresh', handleTaskCompleteRefresh);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
+  window.removeEventListener('task-node-complete-refresh', handleTaskCompleteRefresh);
 });
+
+// ✅ 处理任务完成后的自动刷新
+const handleTaskCompleteRefresh = async (event: unknown) => {
+  const customEvent = event as CustomEvent<{workspaceId: string; taskNodeId: string}>
+
+  // 只刷新当前工作区的文件树
+  if (customEvent.detail.workspaceId === props.workspaceId) {
+    console.log('[SidePanel] Auto-refreshing file tree after task completion')
+    await loadFiles()
+    // 刷新 el-tree 组件的节点
+    if (fileTreeRef.value) {
+      // Element Plus el-tree 的刷新方法
+      const tree = fileTreeRef.value as { setData?: (data: unknown[]) => void }
+      if (tree.setData) {
+        tree.setData(fileTree.value)
+      }
+    }
+  }
+}
 
 // 用户设置抽屉
 const isUserSettingsVisible = ref(false);
@@ -265,6 +294,13 @@ const isUploadDialogVisible = ref(false);
 
 // 当前激活的标签页（默认选择"工作区"）
 const activeTab = ref<'conversations' | 'files' | 'memory'>('files');
+
+// 监听 memoryPanelDisabled 变化，如果当前是 memory tab 且被禁用，切换到 files tab
+watch(() => props.memoryPanelDisabled, (newDisabled) => {
+  if (newDisabled && activeTab.value === 'memory') {
+    activeTab.value = 'files';
+  }
+});
 
 // 历史会话
 const conversations = ref<unknown[]>([]);
@@ -364,24 +400,24 @@ const handleNewChat = () => {
   // 清空聊天
   chatStore.clearChat();
 
-  // 生成临时会话ID（使用时间戳和随机数）
+  // Generate temporary conversation ID (using timestamp and random number)
   const tempConversationId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-  // 设置为临时会话（不发送conversationId给后端）
+  // Set as temporary conversation (don't send conversationId to backend)
   chatStore.setTempConversation(tempConversationId);
 
-  // 创建临时会话对象
+  // Create temporary conversation object
   const tempConversation = {
     id: tempConversationId,
     title: '新会话',
     lastUpdated: new Date().toISOString(),
-    isTemp: true // 标记为临时会话，用于区分已保存的会话
+    isTemp: true // Mark as temporary conversation to distinguish from saved conversations
   };
 
-  // 将临时会话添加到列表顶部
+  // Add temporary conversation to top of list
   conversations.value.unshift(tempConversation);
 
-  // 设置为当前选中会话
+  // Set as currently selected conversation
   activeConversationId.value = tempConversationId;
 };
 

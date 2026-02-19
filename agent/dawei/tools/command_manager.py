@@ -19,15 +19,13 @@ mode: code  # 可选：指定agent模式
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    from frontmatter import Frontmatter, Post
-except ImportError:
-    # 如果没有python-frontmatter，使用简单的yaml+markdown解析
-    Frontmatter = None
-    Post = None
+from dawei.config import get_workspaces_root
+
+import frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +70,7 @@ class CommandManager:
 
         """
         self.workspace_root = workspace_root
-        self.user_root = user_root or Path.home() / ".dawei"
+        self.user_root = user_root or Path(get_workspaces_root())
 
         # 命令注册表: name -> Command（高优先级覆盖低优先级）
         self._commands: dict[str, Command] = {}
@@ -207,25 +205,19 @@ class CommandManager:
             mode = None
             command_content = content
 
-            if Frontmatter is not None:
-                # 使用python-frontmatter库
-                try:
-                    if not content or not content.strip():
-                        logger.warning(f"Empty content in command file {file_path}")
-                        return None
-                    post = Frontmatter.read(content)
-                    description = post.get("description")
-                    argument_hint = post.get("argument-hint")
-                    mode = post.get("mode")
-                    command_content = post.content
-                except Exception as e:
-                    logger.debug(f"Failed to parse frontmatter with python-frontmatter: {e}")
-                    # 尝试手动解析
-                    description, argument_hint, mode, command_content = self._parse_frontmatter(
-                        content,
-                    )
-            else:
-                # 手动解析frontmatter
+            # 使用python-frontmatter库解析
+            try:
+                if not content or not content.strip():
+                    logger.warning(f"Empty content in command file {file_path}")
+                    return None
+                post = frontmatter.loads(content)
+                description = post.get("description")
+                argument_hint = post.get("argument-hint")
+                mode = post.get("mode")
+                command_content = post.content
+            except Exception as e:
+                logger.debug(f"Failed to parse frontmatter with python-frontmatter: {e}")
+                # 尝试手动解析
                 description, argument_hint, mode, command_content = self._parse_frontmatter(content)
 
             return Command(

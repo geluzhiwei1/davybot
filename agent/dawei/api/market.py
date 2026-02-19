@@ -12,12 +12,14 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from dawei.market import (
+    CliExecutionError,
+    CliNotFoundError,
     InstallationError,
-    MarketClient,
     MarketError,
     MarketInstaller,
     ResourceNotFoundError,
 )
+from dawei.market.cli_wrapper import CliWrapper
 
 from .workspaces import get_user_workspace
 
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/market", tags=["market"])
 
 # Singleton instances
-_market_client: MarketClient | None = None
+_cli_wrapper: CliWrapper | None = None
 _installers: dict[str, MarketInstaller] = {}
 
 
@@ -89,12 +91,12 @@ class UninstallRequest(BaseModel):
 # ============================================================================
 
 
-def get_market_client() -> MarketClient:
-    """Get or create global market client instance."""
-    global _market_client
-    if _market_client is None:
-        _market_client = MarketClient()
-    return _market_client
+def get_cli_wrapper() -> CliWrapper:
+    """Get or create global CLI wrapper instance."""
+    global _cli_wrapper
+    if _cli_wrapper is None:
+        _cli_wrapper = CliWrapper()
+    return _cli_wrapper
 
 
 def get_installer(workspace: str) -> MarketInstaller:
@@ -125,8 +127,8 @@ def validate_workspace(workspace: str) -> Path:
 @router.get("/health")
 async def health_check():
     """Check Market API health status."""
-    client = get_market_client()
-    return client.health()
+    cli = get_cli_wrapper()
+    return cli.health()
 
 
 @router.post("/search", response_model=SearchResponse)
@@ -136,58 +138,50 @@ async def search_resources(request: SearchRequest):
     Supports searching for skills, agents, and plugins.
     """
     try:
-        client = get_market_client()
+        cli = get_cli_wrapper()
 
         # Route to appropriate search method
-        # Note: The official API doesn't support 'plugin' type in search
-        # so we use list_resources for plugins instead
         if request.type == "skill":
-            results = client.search_skills(request.query, request.limit)
+            search_result = cli.search_skills(request.query, request.limit)
         elif request.type == "agent":
-            results = client.search_agents(request.query, request.limit)
+            search_result = cli.search_agents(request.query, request.limit)
         elif request.type == "plugin":
-            # Use list_resources for plugins since search doesn't support plugin type
-            # If query is empty, return all plugins, otherwise filter manually
-            all_plugins = client.list_resources("plugin", request.limit, 0)
-            if request.query:
-                # Simple filter by name/description/tags
-                query_lower = request.query.lower()
-                results = [p for p in all_plugins if (query_lower in p.name.lower() or query_lower in p.description.lower() or any(query_lower in tag.lower() for tag in p.tags))][: request.limit]
-            else:
-                results = all_plugins
+            # Plugin search via CLI
+            search_result = cli.search(request.query, "plugin", request.limit)
         else:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid resource type: {request.type}. Use skill, agent, or plugin.",
             )
 
+        # CLI returns dict with 'items' or 'results' key (depending on SDK version)
+        results = search_result.get("items") or search_result.get("results", [])
+
         return SearchResponse(
             success=True,
             query=request.query,
             type=request.type,
             total=len(results),
-            results=[r.to_dict() for r in results],
+            results=results,
         )
 
-    except MarketError as e:
-        logger.warning(f"Market API unavailable for search: {e}")
-        # Return empty results instead of 500 error
-        return SearchResponse(
-            success=True,
-            query=request.query,
-            type=request.type,
-            total=0,
-            results=[],
+    except CliNotFoundError as e:
+        logger.error(f"Market CLI not found: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "market_cli_not_found", "message": str(e)},
         )
-    except Exception:
-        logger.exception("Search failed unexpectedly")
-        # Return empty results instead of 500 error for better UX
-        return SearchResponse(
-            success=True,
-            query=request.query,
-            type=request.type,
-            total=0,
-            results=[],
+    except CliExecutionError as e:
+        logger.exception("Market CLI execution error during search: ")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "search_failed", "message": str(e)},
+        )
+    except Exception as e:
+        logger.exception("Search failed unexpectedly: ")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "search_failed", "message": str(e)},
         )
 
 
@@ -209,25 +203,30 @@ async def get_resource_info(resource_type: str, resource_name: str):
     Returns full resource details including readme, dependencies, etc.
     """
     try:
-        client = get_market_client()
+        cli = get_cli_wrapper()
 
-        # Route to appropriate get method
-        if resource_type == "skill":
-            info = client.get_skill(resource_name)
-        elif resource_type == "agent":
-            info = client.get_agent(resource_name)
-        elif resource_type == "plugin":
-            info = client.get_plugin(resource_name)
-        else:
+        if resource_type not in ("skill", "agent", "plugin"):
             raise HTTPException(status_code=400, detail=f"Invalid resource type: {resource_type}")
 
-        if info is None:
-            return InfoResponse(success=False, error=f"Resource '{resource_name}' not found")
+        info = cli.info(resource_type, resource_name)
 
-        return InfoResponse(success=True, resource=info.to_dict())
+        if not info.get("success", True):
+            return InfoResponse(success=False, error=info.get("error", " error"))
 
-    except ResourceNotFoundError as e:
-        raise HTTPException(status_code=404, detail=e.to_dict())
+        return InfoResponse(success=True, resource=info)
+
+    except CliNotFoundError as e:
+        logger.error(f"Market CLI not found: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "market_cli_not_found", "message": str(e)},
+        )
+    except CliExecutionError as e:
+        logger.exception("Market CLI execution error during info retrieval: ")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "info_failed", "message": str(e)},
+        )
     except Exception as e:
         logger.exception("Get resource info failed")
         raise HTTPException(status_code=500, detail={"error": "info_failed", "message": str(e)})
@@ -311,15 +310,12 @@ async def list_installed_resources(
             "total": 0,
             "resources": [],
         }
-    except Exception:
-        logger.exception("List installed failed")
-        # Return empty list instead of 500 error for better UX
-        return {
-            "success": True,
-            "type": resource_type,
-            "total": 0,
-            "resources": [],
-        }
+    except Exception as e:
+        logger.exception("List installed failed: ")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "list_installed_failed", "message": str(e)},
+        )
 
 
 @router.delete("/installed/plugin/{plugin_name}")
@@ -381,51 +377,64 @@ async def list_categories():
 async def get_featured_resources(
     type: str = Query("skill", description="Resource type filter"),
     limit: int = Query(10, description="Number of results"),
+    skip: int = Query(0, description="Number of results to skip"),
 ):
     """Get featured/popular resources from the market.
 
     Returns highly rated and frequently downloaded resources.
+    Supports pagination via limit and skip parameters.
     """
     try:
-        client = get_market_client()
+        cli = get_cli_wrapper()
 
-        # For plugins, use list_resources (search doesn't support plugin type)
-        # For skills/agents, use search with a generic term
+        # Get ALL resources to calculate correct total and sort
+        # Use a large limit to fetch all available resources
         if type == "skill":
-            results = client.search_skills("*", limit)
+            list_result = cli.list_skills(limit=1000, skip=0)
         elif type == "agent":
-            results = client.search_agents("*", limit)
+            list_result = cli.list_agents(limit=1000, skip=0)
         elif type == "plugin":
-            # Use list_resources for plugins since search doesn't support plugin type
-            results = client.list_resources("plugin", limit, 0)
+            list_result = cli.list_plugins(limit=1000, skip=0)
         else:
             raise HTTPException(status_code=400, detail=f"Invalid resource type: {type}")
 
-        # Sort by downloads/rating
-        sorted_results = sorted(results, key=lambda r: (r.downloads, r.rating or 0), reverse=True)[:limit]
+        # CLI returns dict with 'items' or 'results' key (depending on SDK version)
+        all_results = list_result.get("items") or list_result.get("results", [])
+
+        # Sort by downloads/rating (handle dict format)
+        def get_popularity(r: dict) -> tuple:
+            downloads = r.get("downloads", 0) or 0
+            rating = r.get("rating", 0) or 0
+            return (downloads, rating)
+
+        sorted_results = sorted(all_results, key=get_popularity, reverse=True)
+
+        # Apply pagination
+        paginated_results = sorted_results[skip:skip + limit]
+        total_count = len(sorted_results)
 
         return {
             "success": True,
             "type": type,
-            "total": len(sorted_results),
-            "resources": [r.to_dict() for r in sorted_results],
+            "total": total_count,
+            "resources": paginated_results,
         }
 
-    except MarketError as e:
-        logger.warning(f"Market API unavailable for featured resources: {e}")
-        # Return empty results instead of 500 error
-        return {
-            "success": True,
-            "type": type,
-            "total": 0,
-            "resources": [],
-        }
-    except Exception:
-        logger.exception("Get featured failed for type {type}: ")
-        # Return empty results instead of 500 error for better UX
-        return {
-            "success": True,
-            "type": type,
-            "total": 0,
-            "resources": [],
-        }
+    except CliNotFoundError as e:
+        logger.error(f"Market CLI not found: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "market_cli_not_found", "message": str(e)},
+        )
+    except CliExecutionError as e:
+        logger.exception("Market CLI execution error during featured retrieval: ")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "featured_failed", "message": str(e)},
+        )
+    except Exception as e:
+        logger.exception("Get featured failed: ")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "featured_failed", "message": str(e)},
+        )

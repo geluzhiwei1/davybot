@@ -168,9 +168,10 @@ const loadResourceDetails = async () => {
 
   loading.value = true;
   try {
+    // Use full resource.id instead of short name for API call
     const info = await marketStore.getResourceInfo(
       props.resource.type,
-      props.resource.name
+      props.resource.id
     );
     resourceInfo.value = info;
   } catch (err: unknown) {

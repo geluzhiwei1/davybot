@@ -180,11 +180,13 @@ globalRouter.on(MessageType.TASK_NODE_PROGRESS, (message) => {
   getParallelTasksStore().handleTaskNodeProgress(msg)
 })
 
-// 注册流式推理消息
-globalRouter.on(MessageType.STREAM_REASONING, (message) => {
-  const msg = message as unknown
-  getParallelTasksStore().handleStreamContent(msg)
-})
+// 🔴 修复：移除 STREAM_REASONING 的重复注册
+// Chat store 已经在 connectionStore 中处理了 STREAM_REASONING 消息
+// ParallelTasks store 不需要重复处理，否则会导致消息重复显示
+// globalRouter.on(MessageType.STREAM_REASONING, (message) => {
+//   const msg = message as unknown
+//   getParallelTasksStore().handleStreamContent(msg)
+// })
 
 // 注册任务节点完成消息
 globalRouter.on(MessageType.TASK_NODE_COMPLETE, (message) => {

@@ -173,9 +173,6 @@ class MessageValidationMiddleware:
 
             return True, None
 
-        # INTENTIONAL BROAD EXCEPTION: This is a security validation middleware that must never crash.
-        # Any unexpected error (bugs in validation logic, encoding issues, etc.) should result in
-        # "validation failed" rather than breaking the entire WebSocket routing system.
         # The method returns a boolean tuple, so all errors are converted to validation failures.
         except Exception as e:
             logger.error(

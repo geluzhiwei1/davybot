@@ -44,6 +44,7 @@
   },
   "common": {
     "save": "保存",
+    "saveFailed": "保存失败",
     "cancel": "取消",
     "delete": "删除",
     "edit": "编辑",
@@ -251,9 +252,6 @@
       "fileOutput": "文件输出",
       "performanceLogging": "性能日志",
       "sanitizeSensitiveData": "清理敏感数据",
-      "monitoring": "监控配置",
-      "prometheusEnabled": "启用 Prometheus",
-      "prometheusPort": "Prometheus 端口",
       "analytics": "分析配置",
       "analyticsEnabled": "启用分析",
       "retentionDays": "数据保留天数",
@@ -353,6 +351,8 @@
       "availableSkills": "可用技能",
       "marketInstall": "集市安装",
       "refreshList": "刷新列表",
+      "createSkill": "创建技能",
+      "deleteConfirm": "确定要删除技能 \"{name}\" 吗？",
       "filter": {
         "mode": "筛选模式",
         "scope": "筛选范围",
@@ -368,15 +368,50 @@
         "description": "描述",
         "category": "分类",
         "mode": "模式",
-        "scope": "范围"
+        "scope": "范围",
+        "actions": "操作"
+      },
+      "actions": {
+        "edit": "编辑",
+        "delete": "删除"
+      },
+      "editDialog": {
+        "title": "编辑技能",
+        "name": "技能名称",
+        "description": "描述",
+        "content": "内容（Markdown格式）"
+      },
+      "createDialog": {
+        "title": "创建新技能",
+        "name": "技能名称",
+        "namePlaceholder": "输入技能名称",
+        "description": "描述",
+        "scope": "范围",
+        "workspace": "工作区",
+        "user": "用户",
+        "content": "内容（Markdown格式）",
+        "create": "创建"
       },
       "noSkills": "未找到技能",
-      "skillsLoaded": "已加载 {count} 个技能"
+      "skillsLoaded": "已加载 {count} 个技能",
+      "editor": {
+        "files": "文件列表",
+        "refresh": "刷新",
+        "noFiles": "暂无文件",
+        "selectFile": "请选择文件",
+        "selectFileHint": "请在左侧选择一个文件进行编辑",
+        "mainFile": "主文件",
+        "save": "保存",
+        "loadTreeFailed": "加载文件树失败",
+        "loadContentFailed": "加载文件内容失败",
+        "saveSuccess": "文件保存成功",
+        "saveFailed": "文件保存失败"
+      }
     },
     "agents": {
-      "title": "自定义代理管理",
+      "title": "自定义智能体管理",
       "description": "管理工作区的自定义代理模式",
-      "currentAgents": "当前代理",
+      "currentAgents": "当前智能体",
       "marketInstall": "集市安装",
       "addAgent": "添加代理",
       "table": {
@@ -599,5 +634,95 @@
     "file.read_failed": "读取文件失败: {error}",
     "file.write_failed": "写入文件失败: {error}",
     "file.delete_failed": "删除文件失败: {error}"
+  },
+  "sidePanel": {
+    "conversations": "会话",
+    "workspace": "工作区",
+    "memory": "记忆",
+    "newConversation": "新建会话",
+    "deleteAll": "删除所有",
+    "deleteConversation": "删除对话",
+    "noConversations": "暂无历史对话",
+    "fileTree": "文件树",
+    "refresh": "刷新",
+    "uploadFile": "上传文件",
+    "newFile": "新建文件",
+    "newDirectory": "新建目录",
+    "delete": "删除",
+    "rename": "重命名",
+    "copy": "复制",
+    "noFiles": "暂无文件",
+    "unknown": "未知",
+    "loadFailed": "加载失败",
+    "switchWorkspace": "切换工作区",
+    "userSettings": "用户设置"
+  },
+  "topBar": {
+    "newConversation": "新对话",
+    "unnamedConversation": "未命名会话",
+    "selectOrCreateConversation": "请选择或创建会话",
+    "connected": "已连接",
+    "connecting": "连接中",
+    "reconnecting": "重连中",
+    "connectionError": "连接错误",
+    "disconnected": "已断开",
+    "notConnected": "未连接"
+  },
+  "userSettings": {
+    "title": "用户设置",
+    "tabs": {
+      "profile": "个人信息",
+      "preferences": "偏好设置",
+      "shortcuts": "快捷键",
+      "about": "关于"
+    },
+    "profile": {
+      "username": "用户名",
+      "email": "邮箱",
+      "bio": "个人简介",
+      "timezone": "时区",
+      "language": "语言",
+      "save": "保存个人信息",
+      "refresh": "刷新",
+      "saveSuccess": "个人信息保存成功",
+      "usernamePlaceholder": "请输入用户名",
+      "emailPlaceholder": "请输入邮箱",
+      "bioPlaceholder": "请输入个人简介"
+    },
+    "preferences": {
+      "theme": "主题",
+      "themeLight": "浅色",
+      "themeDark": "深色",
+      "themeAuto": "跟随系统",
+      "fontSize": "字体大小",
+      "messageDensity": "消息显示密度",
+      "densityComfortable": "舒适",
+      "densityCompact": "紧凑",
+      "codeTheme": "代码主题",
+      "notifications": "启用通知",
+      "autoSave": "自动保存",
+      "save": "保存偏好设置",
+      "refresh": "刷新",
+      "saveSuccess": "偏好设置保存成功"
+    },
+    "shortcuts": {
+      "customShortcut": "自定义快捷键",
+      "reset": "恢复默认快捷键",
+      "resetSuccess": "快捷键已重置为默认值",
+      "quickSearch": "快速搜索",
+      "newConversation": "新建会话",
+      "toggleSidePanel": "切换侧边栏",
+      "save": "保存",
+      "openSettings": "打开设置"
+    },
+    "about": {
+      "title": "大微",
+      "subtitle": "通用 AI 助手",
+      "version": "版本",
+      "buildTime": "构建时间",
+      "vueVersion": "Vue版本",
+      "elementVersion": "Element版本",
+      "homepage": "主页"
+    }
   }
 }

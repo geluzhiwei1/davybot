@@ -14,9 +14,12 @@
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from dawei.config import get_workspaces_root
 
 from .tool_provider import CustomToolProvider, OpenAIToolProvider
 
@@ -227,8 +230,7 @@ def _load_user_tools() -> dict[str, ToolConfig]:
 
     """
     tools = {}
-    user_home = Path.home()
-    user_config_dir = user_home / ".dawei" / "configs"
+    user_config_dir = Path(get_workspaces_root()) / "configs"
     tools_config_file = user_config_dir / ".tools.json"
 
     if not tools_config_file.exists():

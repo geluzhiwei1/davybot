@@ -13,7 +13,8 @@ from typing import Any
 
 from dawei.agentic.agent import Agent
 from dawei.core import local_context
-from dawei.core.events import CORE_EVENT_BUS, TaskEventType
+# from dawei.core.events import CORE_EVENT_BUS  # REMOVED: CORE_EVENT_BUS deleted
+from dawei.core.events import TaskEventType
 from dawei.logg.logging import get_logger
 from dawei.websocket.protocol import (
     A2UIServerEventMessage,
@@ -258,14 +259,7 @@ class EventForwardingHandler:
             except Exception as e:
                 logger.error(f"订阅事件 {event_type} 时出错: {e}", exc_info=True)
 
-        # 额外订阅全局事件总线的 TOOL_CALL_START 事件
-        # 因为 tool_executor 通过全局事件总线发送 TOOL_CALL_START，需要单独订阅
-        try:
-            global_tool_start_handler_id = CORE_EVENT_BUS.add_handler(TaskEventType.TOOL_CALL_START, event_handler)
-            handler_ids[TaskEventType.TOOL_CALL_START.value] = global_tool_start_handler_id
-            logger.info(f"[EVENT_HANDLER] ✅ Subscribed to global CORE_EVENT_BUS for TOOL_CALL_START (handler: {global_tool_start_handler_id}, task: {task_id})")
-        except Exception as e:
-            logger.error(f"订阅全局TOOL_CALL_START事件时出错: {e}", exc_info=True)
+        logger.warning("[EVENT_HANDLER] ⚠️ CORE_EVENT_BUS subscription for TOOL_CALL_START has been disabled - CORE_EVENT_BUS was removed")
 
         logger.info(
             f"[EVENT_HANDLER] ✅ Successfully registered {len(handler_ids)} event handlers for task {task_id}",
@@ -559,12 +553,26 @@ class EventForwardingHandler:
         """处理追问问题事件"""
         event_session_id = event_data.get("session_id", session_id)
 
+        # 🔍 详细日志：记录从事件中提取的数据
+        from dawei.logg.logging import get_logger
+        logger = get_logger(__name__)
+
+        question = event_data.get("question", "")
+        suggestions = event_data.get("suggestions", [])
+        tool_call_id = event_data.get("tool_call_id", "")
+
+        if not suggestions:
+            logger.error(
+                f"[FOLLOWUP_DEBUG] ❌ CRITICAL in event forwarding: suggestions is empty! "
+                f"event_data keys: {list(event_data.keys())}, full event_data: {event_data}"
+            )
+
         return FollowupQuestionMessage(
             session_id=event_session_id,
             task_id=task_id,
-            question=event_data.get("question", ""),
-            suggestions=event_data.get("suggestions", []),
-            tool_call_id=event_data.get("tool_call_id", ""),
+            question=question,
+            suggestions=suggestions,
+            tool_call_id=tool_call_id,
             user_message_id=user_message_id,
         )
 

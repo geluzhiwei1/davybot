@@ -46,11 +46,11 @@ def _import_task_graph_components():
 class AskFollowupQuestionInput(BaseModel):
     """Input for AskFollowupQuestionTool."""
 
-    question: ClassVar[str] = Field(
+    question: str = Field(
         ...,
         description="Clear, specific question addressinging information needed.",
     )
-    follow_up: ClassVar[list[str]] = Field(
+    follow_up: list[str] = Field(
         ...,
         description="List of 2-4 suggested answers, each in its own <suggest> tag.",
     )
@@ -115,7 +115,7 @@ class AskFollowupQuestionTool(CustomBaseTool):
 class AttemptCompletionInput(BaseModel):
     """Input for AttemptCompletionTool."""
 
-    result: ClassVar[str] = Field(..., description="Final result of task to present to user.")
+    result: str = Field(..., description="Final result of task to present to user.")
 
 
 class AttemptCompletionTool(CustomBaseTool):
@@ -173,11 +173,11 @@ class AttemptCompletionTool(CustomBaseTool):
 class SwitchModeInput(BaseModel):
     """Input for SwitchModeTool."""
 
-    mode_slug: ClassVar[str] = Field(
+    mode_slug: str = Field(
         ...,
         description="Slug of mode to switch to (e.g., 'orchestrator', 'plan', 'do', 'check', 'act').",
     )
-    reason: ClassVar[str | None] = Field(None, description="Reason for switching modes.")
+    reason: str | None = Field(None, description="Reason for switching modes.")
 
 
 class SwitchModeTool(CustomBaseTool):
@@ -301,8 +301,8 @@ class SwitchModeTool(CustomBaseTool):
 class NewTaskInput(BaseModel):
     """Input for NewTaskTool."""
 
-    mode: ClassVar[str] = Field(..., description="Slug of mode to start new task in.")
-    message: ClassVar[str] = Field(..., description="Initial user message or instructions for new task.")
+    mode: str = Field(..., description="Slug of mode to start new task in.")
+    message: str = Field(..., description="Initial user message or instructions for new task.")
 
 
 class NewTaskTool(CustomBaseTool):
@@ -433,7 +433,7 @@ class NewTaskTool(CustomBaseTool):
 class UpdateTodoListInput(BaseModel):
     """Input for UpdateTodoListTool."""
 
-    todos: ClassVar[list[str]] = Field(
+    todos: list[str] = Field(
         ...,
         description="List of todo items with status markers: [ ] pending, [x] completed, [-] in progress.",
     )
@@ -532,7 +532,7 @@ class UpdateTodoListTool(CustomBaseTool):
 class GetTaskStatusInput(BaseModel):
     """Input for GetTaskStatusTool."""
 
-    task_id: ClassVar[str | None] = Field(None, description="Task ID to get status for (optional).")
+    task_id: str | None = Field(None, description="Task ID to get status for (optional).")
 
 
 class GetTaskStatusTool(CustomBaseTool):
@@ -655,7 +655,7 @@ class TaskComplexityAnalyzer:
     def analyze(
         self,
         task_description: str,
-        _context: ClassVar[dict[str, Any] | None] = None,
+        _context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """分析任务复杂度"""
         # 检测复杂度级别
@@ -869,8 +869,8 @@ class TaskComplexityAnalyzer:
 class AnalyzeTaskComplexityInput(BaseModel):
     """Input for AnalyzeTaskComplexityTool."""
 
-    task_description: ClassVar[str] = Field(..., description="Description of the task to analyze.")
-    context: ClassVar[dict[str, Any] | None] = Field(
+    task_description: str = Field(..., description="Description of the task to analyze.")
+    context: dict[str, Any] | None = Field(
         None,
         description="Additional context about the task.",
     )
@@ -951,7 +951,7 @@ class TodoPlanGenerator:
         self,
         task_description: str,
         complexity_result: dict[str, Any],
-        _context: ClassVar[dict[str, Any] | None] = None,
+        _context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """生成 TODO 计划"""
         # 基于复杂度生成 TODO 项
@@ -1170,12 +1170,12 @@ class TodoPlanGenerator:
 class GenerateTodoPlanInput(BaseModel):
     """Input for GenerateTodoPlanTool."""
 
-    task_description: ClassVar[str] = Field(..., description="Description of the task.")
-    complexity_analysis: ClassVar[dict[str, Any] | None] = Field(
+    task_description: str = Field(..., description="Description of the task.")
+    complexity_analysis: dict[str, Any] | None = Field(
         None,
         description="Result from analyze_task_complexity tool.",
     )
-    context: ClassVar[dict[str, Any] | None] = Field(None, description="Additional context.")
+    context: dict[str, Any] | None = Field(None, description="Additional context.")
 
 
 class GenerateTodoPlanTool(CustomBaseTool):
@@ -1194,8 +1194,8 @@ class GenerateTodoPlanTool(CustomBaseTool):
     def _run(
         self,
         task_description: str,
-        complexity_analysis: ClassVar[dict[str, Any] | None] = None,
-        context: ClassVar[dict[str, Any] | None] = None,
+        complexity_analysis: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """Generate TODO plan."""
         try:
@@ -1448,8 +1448,8 @@ class TodoPlanValidator:
 class ValidateTodoPlanInput(BaseModel):
     """Input for ValidateTodoPlanTool."""
 
-    todos: ClassVar[list[dict[str, Any]]] = Field(..., description="TODO list to validate.")
-    task_description: ClassVar[str] = Field(..., description="Original task description.")
+    todos: list[dict[str, Any]] = Field(..., description="TODO list to validate.")
+    task_description: str = Field(..., description="Original task description.")
 
 
 class ValidateTodoPlanTool(CustomBaseTool):
@@ -1524,13 +1524,13 @@ class ValidateTodoPlanTool(CustomBaseTool):
 class AdjustTodoOrderInput(BaseModel):
     """Input for AdjustTodoOrderTool."""
 
-    current_todos: ClassVar[list[dict[str, Any]]] = Field(..., description="Current TODO list.")
-    adjustment_type: ClassVar[str] = Field(
+    current_todos: list[dict[str, Any]] = Field(..., description="Current TODO list.")
+    adjustment_type: str = Field(
         ...,
         description="Type of adjustment: 'reorder', 'add', 'remove', 'update'.",
     )
-    adjustment_data: ClassVar[dict[str, Any]] = Field(..., description="Data for the adjustment.")
-    reason: ClassVar[str | None] = Field(None, description="Reason for the adjustment.")
+    adjustment_data: dict[str, Any] = Field(..., description="Data for the adjustment.")
+    reason: str | None = Field(None, description="Reason for the adjustment.")
 
 
 class AdjustTodoOrderTool(CustomBaseTool):
@@ -1550,7 +1550,7 @@ class AdjustTodoOrderTool(CustomBaseTool):
         current_todos: list[dict[str, Any]],
         adjustment_type: str,
         adjustment_data: dict[str, Any],
-        reason: ClassVar[str | None] = None,
+        reason: str | None = None,
     ) -> str:
         """Adjust TODO order dynamically."""
         try:
@@ -1844,8 +1844,8 @@ class DAGTaskGraphManager:
 class CreateTaskGraphInput(BaseModel):
     """Input for CreateTaskGraphTool."""
 
-    graph_id: ClassVar[str] = Field(..., description="Unique identifier for the task graph.")
-    description: ClassVar[str | None] = Field(None, description="Description of the task graph.")
+    graph_id: str = Field(..., description="Unique identifier for the task graph.")
+    description: str | None = Field(None, description="Description of the task graph.")
 
 
 class CreateTaskGraphTool(CustomBaseTool):
@@ -1902,14 +1902,14 @@ class CreateTaskGraphTool(CustomBaseTool):
 class AddTaskNodeInput(BaseModel):
     """Input for AddTaskNodeTool."""
 
-    graph_id: ClassVar[str] = Field(..., description="ID of the task graph to add the node to.")
-    task_id: ClassVar[str] = Field(..., description="Unique identifier for the task node.")
-    description: ClassVar[str] = Field(..., description="Description of the task.")
-    mode: ClassVar[str] = Field(
+    graph_id: str = Field(..., description="ID of the task graph to add the node to.")
+    task_id: str = Field(..., description="Unique identifier for the task node.")
+    description: str = Field(..., description="Description of the task.")
+    mode: str = Field(
         default="orchestrator",
         description="Task execution mode (orchestrator, plan, do, check, act).",
     )
-    metadata: ClassVar[dict[str, Any] | None] = Field(
+    metadata: dict[str, Any] | None = Field(
         None,
         description="Additional metadata for the task.",
     )
@@ -1932,8 +1932,8 @@ class AddTaskNodeTool(CustomBaseTool):
         graph_id: str,
         task_id: str,
         description: str,
-        mode: ClassVar[str] = "orchestrator",
-        metadata: ClassVar[dict[str, Any] | None] = None,
+        mode: str = "orchestrator",
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Add a task node to the graph."""
         try:
@@ -2003,9 +2003,9 @@ class AddTaskNodeTool(CustomBaseTool):
 class SetTaskDependencyInput(BaseModel):
     """Input for SetTaskDependencyTool."""
 
-    graph_id: ClassVar[str] = Field(..., description="ID of the task graph.")
-    task_id: ClassVar[str] = Field(..., description="Task that has the dependency.")
-    depends_on: ClassVar[str] = Field(..., description="Task that must be completed before task_id can run.")
+    graph_id: str = Field(..., description="ID of the task graph.")
+    task_id: str = Field(..., description="Task that has the dependency.")
+    depends_on: str = Field(..., description="Task that must be completed before task_id can run.")
 
 
 class SetTaskDependencyTool(CustomBaseTool):
@@ -2080,8 +2080,8 @@ class SetTaskDependencyTool(CustomBaseTool):
 class GetTaskGraphInput(BaseModel):
     """Input for GetTaskGraphTool."""
 
-    graph_id: ClassVar[str] = Field(..., description="ID of the task graph to get.")
-    include_execution_order: ClassVar[bool] = Field(
+    graph_id: str = Field(..., description="ID of the task graph to get.")
+    include_execution_order: bool = Field(
         default=False,
         description="Include topological sort execution order.",
     )

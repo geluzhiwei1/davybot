@@ -39,10 +39,10 @@ from .settings import (
     StorageConfig,
     ToolConfig,
     get_database_url,
+    get_workspaces_root,
     get_redis_url,
     # 便捷函数
     get_settings,
-    get_workspaces_root,
     is_development,
     is_production,
     is_staging,
@@ -85,9 +85,9 @@ __all__ = [
     "get_settings",
     "reload_settings",
     "get_database_url",
+    "get_workspaces_root",
     "get_redis_url",
     "is_development",
     "is_production",
     "is_staging",
-    "get_workspaces_root",
 ]

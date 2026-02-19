@@ -14,7 +14,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, ClassVar
 
-from .cli_wrapper import CliWrapper
+from .cli_wrapper import CliWrapper, CliExecutionError
 from .models import (
     InstallationError,
     InstalledResource,
@@ -81,6 +81,67 @@ class MarketInstaller:
             logger.debug(f"Saved market settings to {settings_file}")
         except Exception:
             logger.exception("Failed to save market settings: ")
+
+    def _resolve_resource_id(self, resource_type: ResourceType, resource_name: str) -> str:
+        """Resolve resource name/ID for installation.
+
+        Args:
+            resource_type: Resource type (SKILL or AGENT)
+            resource_name: Resource name or full ID
+
+        Returns:
+            Resource URI in format "type://id" suitable for CLI (e.g., "skill://github.com/anthropics/skills/skills/xlsx")
+        """
+        # If already a full ID (contains '/'), wrap with type:// prefix for CLI
+        if "/" in resource_name:
+            # Full ID like "github.com/anthropics/skills/skills/xlsx"
+            # CLI needs format: "skill://github.com/anthropics/skills/skills/xlsx"
+            return f"{resource_type.value}://{resource_name}"
+
+        # For short names without "/", try to resolve via search
+        logger.info(f"Resolving {resource_type.value} name '{resource_name}' to full ID...")
+
+        try:
+            # Search for the resource using CLI
+            if resource_type == ResourceType.SKILL:
+                search_result = self.cli.search_skills(resource_name, limit=5)
+            elif resource_type == ResourceType.AGENT:
+                search_result = self.cli.search_agents(resource_name, limit=5)
+            else:
+                return f"{resource_type.value}://{resource_name}"  # Return with prefix
+
+            # CLI returns dict with 'results' key
+            search_results = search_result.get("results", [])
+
+            if not search_results:
+                raise InstallationError(
+                    f"Search returned no results for '{resource_name}'. "
+                    f"Please check the resource name and try again."
+                )
+
+            # Find exact match by name or id
+            for result in search_results:
+                result_name = result.get("name", "")
+                result_id = result.get("id", "")
+                if result_name == resource_name or result_id.endswith(f"/{resource_name}"):
+                    logger.info(f"Resolved '{resource_name}' to '{result_id}'")
+                    return f"{resource_type.value}://{result_id}"
+
+            # Use first result if no exact match
+            if search_results:
+                first_result = search_results[0]
+                first_id = first_result.get("id", "")
+                logger.info(f"Using '{first_id}' for '{resource_name}' (best match)")
+                return f"{resource_type.value}://{first_id}"
+
+        except CliExecutionError as e:
+            raise InstallationError(
+                f"Failed to search for '{resource_name}': {e.message}"
+            ) from e
+        except Exception as e:
+            raise InstallationError(
+                f"Failed to search for '{resource_name}': {e}"
+            ) from e
 
     def _get_resource_dir(self, resource_type: ResourceType) -> Path:
         """Get installation directory for resource type."""
@@ -156,22 +217,69 @@ class MarketInstaller:
                     error=f"Invalid resource type: {resource_type}",
                 )
 
-            # Check if already installed
+            # Check if already installed - verify both settings AND actual files
             if not force and self.settings.is_installed(resource_type, resource_name):
-                logger.info(f"{resource_type} '{resource_name}' already installed")
-                return InstallResult(
-                    success=True,
-                    resource_type=rtype,
-                    resource_name=resource_name,
-                    message=f"{resource_type.capitalize()} '{resource_name}' is already installed",
-                    requires_restart=False,
-                )
+                # Verify installation directory actually exists
+                install_dir = self._get_resource_dir(rtype)
 
-            # Build resource URI
-            resource_uri = f"{resource_type}://{resource_name}" if not resource_name.startswith(f"{resource_type}://") else resource_name
+                # For skills, extract skill name from resource ID
+                # e.g., "github.com/anthropics/skills/skills/xlsx" -> "xlsx"
+                if rtype == ResourceType.SKILL:
+                    skill_name = resource_name.split("/")[-1] if "/" in resource_name else resource_name
+                    skill_dir = install_dir / skill_name
+
+                    if skill_dir.exists() and (skill_dir / "SKILL.md").exists():
+                        logger.info(f"{resource_type} '{resource_name}' already installed")
+                        return InstallResult(
+                            success=True,
+                            resource_type=rtype,
+                            resource_name=resource_name,
+                            message=f"{resource_type.capitalize()} '{resource_name}' is already installed",
+                            requires_restart=False,
+                        )
+                    else:
+                        # Settings say installed, but files don't exist - need to reinstall
+                        logger.warning(
+                            f"{resource_type} '{resource_name}' marked as installed but files missing. "
+                            f"Reinstalling..."
+                        )
+                        # Remove from settings to allow reinstallation
+                        self.settings.remove_installed(resource_type, resource_name)
+                        self._save_settings()
+
+                # For agents, also check if files exist
+                elif rtype == ResourceType.AGENT:
+                    agent_name = resource_name.split("/")[-1] if "/" in resource_name else resource_name
+                    agent_dir = install_dir / agent_name
+
+                    if agent_dir.exists() and any((agent_dir / f).exists() for f in ["custom.md", "rules.md", "agent.md"]):
+                        logger.info(f"{resource_type} '{resource_name}' already installed")
+                        return InstallResult(
+                            success=True,
+                            resource_type=rtype,
+                            resource_name=resource_name,
+                            message=f"{resource_type.capitalize()} '{resource_name}' is already installed. Use force=True to update.",
+                            requires_restart=False,
+                        )
+                    else:
+                        # Settings say installed, but files don't exist - need to reinstall
+                        logger.warning(
+                            f"{resource_type} '{resource_name}' marked as installed but files missing. "
+                            f"Reinstalling..."
+                        )
+                        # Remove from settings to allow reinstallation
+                        self.settings.remove_installed(resource_type, resource_name)
+                        self._save_settings()
 
             # Get installation directory
             install_dir = self._get_resource_dir(rtype)
+
+            # For skills/agents, resolve short name to full ID via search
+            if rtype in (ResourceType.SKILL, ResourceType.AGENT):
+                resource_uri = self._resolve_resource_id(rtype, resource_name)
+            else:
+                # Build resource URI for plugins
+                resource_uri = f"{resource_type}://{resource_name}" if not resource_name.startswith(f"{resource_type}://") else resource_name
 
             # For plugins, use the dedicated plugin install command
             if rtype == ResourceType.PLUGIN:
@@ -475,24 +583,33 @@ class MarketInstaller:
                             install_path=str(item),
                             enabled=True,
                             metadata=metadata,
+                            scope="project",  # Installed via market, always workspace-level
                         ),
                     )
 
         return installed
 
     def list_plugins(self) -> list[dict[str, Any]]:
-        """List installed plugins using davy-market CLI.
+        """List installed plugins from local settings.
 
         Returns:
             List of plugin dictionaries
 
         """
-        cli_result = self.cli.plugin_list(workspace=str(self.workspace))
+        # Read from local market settings
+        installed_plugins = self.settings.installed.get("plugins", [])
 
-        if cli_result.get("success"):
-            return cli_result.get("plugins", [])
+        # Convert to plugin dictionaries
+        plugins = []
+        for plugin_name in installed_plugins:
+            plugins.append({
+                "name": plugin_name,
+                "type": "plugin",
+                "install_path": f"{self.workspace}/.dawei/plugins/{plugin_name}",
+                "scope": "workspace"
+            })
 
-        return []
+        return plugins
 
     # ========================================================================
     # Utility Methods

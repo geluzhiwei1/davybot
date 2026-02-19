@@ -37,6 +37,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { ChatDotRound, Check } from '@element-plus/icons-vue'
+import { setLocale } from '@/i18n'
 
 interface Language {
   value: string;
@@ -59,20 +60,23 @@ const currentLanguageLabel = computed(() => {
 
 // 加载保存的语言设置
 onMounted(() => {
-  const savedLang = localStorage.getItem('user-language') || 'zh-CN';
+  const savedLang = localStorage.getItem('locale') || 'zh-CN';
   currentLanguage.value = savedLang;
 });
 
 // 监听语言变化
 watch(currentLanguage, (newLang) => {
-  localStorage.setItem('user-language', newLang);
-
-  // 触发语言变化事件（可以在这里添加i18n逻辑）
+  // 保存到 locale key，与 i18n.ts 保持一致
+  localStorage.setItem('locale', newLang);
+  // 调用 setLocale 真正改变 i18n 的语言
+  setLocale(newLang);
 });
 
 // 选择语言
 const selectLanguage = (langValue: string) => {
   currentLanguage.value = langValue;
+  // 直接调用 setLocale 确保语言切换
+  setLocale(langValue);
 };
 
 // 处理下拉菜单显示/隐藏

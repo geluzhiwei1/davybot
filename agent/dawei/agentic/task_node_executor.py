@@ -194,6 +194,7 @@ class TaskNodeExecutionEngine:
                     "reason": "pause",
                     "state": state,
                 },
+                self._event_bus,
                 task_id=task_node.task_node_id,
                 source="pause",
             )
@@ -232,6 +233,7 @@ class TaskNodeExecutionEngine:
             await emit_typed_event(
                 TaskEventType.ERROR_OCCURRED,
                 stream_message,
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="stream_message",
             )
@@ -255,6 +257,7 @@ class TaskNodeExecutionEngine:
                     "content": stream_message.content,
                     "message_id": self._current_message_id,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="stream_message",
             )
@@ -264,6 +267,7 @@ class TaskNodeExecutionEngine:
             await emit_typed_event(
                 TaskEventType.USAGE_RECEIVED,
                 stream_message,
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="stream_message",
             )
@@ -274,6 +278,7 @@ class TaskNodeExecutionEngine:
             await emit_typed_event(
                 TaskEventType.COMPLETE_RECEIVED,
                 stream_message,
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="stream_message",
             )
@@ -303,6 +308,7 @@ class TaskNodeExecutionEngine:
                     "content": stream_message.content,
                     "message_id": self._current_message_id,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="stream_message",
             )
@@ -678,6 +684,7 @@ class TaskNodeExecutionEngine:
                 "message_count": len(conversation_messages),
                 "task_count": len(task_graph_data.get("nodes", {})),
             },
+            self._event_bus,
             task_id=self.task_node.task_node_id,
             source="task_node_executor",
         )
@@ -891,6 +898,7 @@ class TaskNodeExecutionEngine:
                         "checkpoint_path": f"/.dawei/checkpoints/{task_node.task_node_id}",
                         "checkpoint_size": len(str(state)),
                     },
+                    self._event_bus,
                     task_id=task_node.task_node_id,
                     source="periodic_checkpoint",
                 )
@@ -1036,6 +1044,7 @@ class TaskNodeExecutionEngine:
                     "message": error_message,
                     "details": error_details,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="task_node_executor",
             )

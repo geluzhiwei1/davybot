@@ -186,6 +186,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
                     "groups": getattr(mode_info, "groups", []),
                     "source": getattr(mode_info, "source", ""),
                     "custom_instructions": getattr(mode_info, "custom_instructions", ""),
+                    "mode_rules": getattr(mode_info, "rules", {}),  # 添加 mode rules 字段
                 },
             )
 
@@ -249,6 +250,9 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         # Markdown 规则段落
         sections["markdown_rules"] = self._generate_markdown_rules_content(context)
+
+        # 模式特定规则段落
+        sections["mode_specific_rules"] = self._generate_mode_specific_rules_content(context)
 
         # 系统信息段落
         sections["system_information"] = self._generate_system_information_content(context)
@@ -332,6 +336,23 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         """
         template_path = "sections/markdown_rules.j2"
+        return self.template_manager.render_template(template_path, context)
+
+    def _generate_mode_specific_rules_content(self, context: dict[str, Any]) -> str:
+        """生成模式特定规则内容
+
+        Args:
+            context: 渲染上下文
+
+        Returns:
+            str: 模式特定规则内容
+
+        Raises:
+            TemplateRenderError: 模板渲染失败
+            FileNotFoundError: 模板文件不存在
+
+        """
+        template_path = "sections/mode_specific_rules.j2"
         return self.template_manager.render_template(template_path, context)
 
     def _generate_system_information_content(self, context: dict[str, Any]) -> str:

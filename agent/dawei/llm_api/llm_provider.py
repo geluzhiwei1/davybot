@@ -20,6 +20,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+from dawei.config import get_workspaces_root
 from dawei.core.exceptions import ConfigurationError
 from dawei.entity.llm_config import LLMConfig, LLMProviderConfig
 from dawei.entity.lm_messages import LLMMessage
@@ -96,8 +97,7 @@ def _load_user_llm_configs() -> tuple[dict[str, LLMProviderConfig], dict[str, st
         (配置字典, 模式配置字典)
 
     """
-    user_home = Path.home()
-    settings_file = user_home / ".dawei" / "configs" / "settings.json"
+    settings_file = Path(get_workspaces_root()) / "configs" / "settings.json"
     configs, mode_configs = _load_settings_file(settings_file, "user")
     logger.info(f"Loaded {len(configs)} user LLM configs")
     return configs, mode_configs

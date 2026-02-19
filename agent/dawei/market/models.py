@@ -214,6 +214,7 @@ class InstalledResource:
     installed_at: datetime | None = None
     enabled: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)
+    scope: str = "project"  # "project" for workspace-level, "global" for user-level
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "InstalledResource":
@@ -231,6 +232,7 @@ class InstalledResource:
             installed_at=installed_at,
             enabled=data.get("enabled", True),
             metadata=data.get("metadata", {}),
+            scope=data.get("scope", "project"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -243,6 +245,7 @@ class InstalledResource:
             "installed_at": self.installed_at.isoformat() if self.installed_at else None,
             "enabled": self.enabled,
             "metadata": self.metadata,
+            "scope": self.scope,
         }
 
 

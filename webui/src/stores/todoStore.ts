@@ -33,7 +33,7 @@ export const useTodoStore = defineStore('todos', () => {
   // 所有TODO项（按task_node_id分组）
   const todoGroups = ref<Map<string, TodoGroup>>(new Map())
 
-  // TODO历史记录
+  // Todo history
   const history = ref<TodoHistoryEntry[]>([])
 
   // 通知
@@ -568,13 +568,13 @@ export const useTodoStore = defineStore('todos', () => {
  * 注册WebSocket消息路由
  */
 export function registerTodoWebSocketRoutes(): void {
-  // TODO创建
+  // Todo created
   globalRouter.on(MessageType.TODO_CREATED, (message) => {
     const store = useTodoStore()
     store.handleTodoCreated(message)
   })
 
-  // TODO更新
+  // Todo updated
   globalRouter.on(MessageType.TODO_UPDATED, (message) => {
     const store = useTodoStore()
     store.handleTodoUpdated(message)

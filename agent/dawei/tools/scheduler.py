@@ -13,7 +13,7 @@ import logging
 from datetime import UTC, datetime, timezone
 from pathlib import Path
 
-from dawei.core.events import CORE_EVENT_BUS, TaskEventType
+from dawei.core.events import SimpleEventBus, TaskEventType
 from dawei.entity.scheduled_task import ScheduledTask, TriggerStatus
 from dawei.workspace.scheduled_task_storage import ScheduledTaskStorage
 
@@ -26,16 +26,18 @@ class SchedulerEngine:
     负责单个 workspace 的任务调度和执行
     """
 
-    def __init__(self, workspace_id: str, workspace_path: str):
+    def __init__(self, workspace_id: str, workspace_path: str, event_bus: SimpleEventBus):
         """初始化调度引擎
 
         Args:
             workspace_id: workspace ID
             workspace_path: workspace 路径
+            event_bus: 事件总线
 
         """
         self.workspace_id = workspace_id
         self.workspace_path = Path(workspace_path)
+        self.event_bus = event_bus  # 🔴 修复：使用独立的 event_bus
 
         self.storage = ScheduledTaskStorage(str(workspace_path))
 
@@ -140,7 +142,7 @@ class SchedulerEngine:
             await self.storage.save_task(task)
 
             # 发出触发事件
-            await CORE_EVENT_BUS.publish(
+            await self.event_bus.publish(
                 TaskEventType.TIMER_TRIGGERED,
                 {
                     "task_id": task.task_id,
@@ -176,7 +178,7 @@ class SchedulerEngine:
                 await self.storage.save_task(task)
 
                 # 发出完成事件
-                await CORE_EVENT_BUS.publish(
+                await self.event_bus.publish(
                     TaskEventType.TIMER_COMPLETED,
                     {
                         "task_id": task.task_id,
@@ -196,7 +198,7 @@ class SchedulerEngine:
 
             # 发出失败事件
             try:
-                await CORE_EVENT_BUS.publish(
+                await self.event_bus.publish(
                     TaskEventType.TIMER_FAILED,
                     {
                         "task_id": task.task_id,
@@ -221,6 +223,7 @@ class SchedulerManager:
         self._engines: dict[str, SchedulerEngine] = {}
         self._lock = asyncio.Lock()
         self._initialized = False
+        self._event_bus = SimpleEventBus()  # 🔴 修复：创建独立的 event_bus 给 scheduler 使用
 
     async def initialize(self) -> None:
         """初始化（在 server lifespan 启动时调用）"""
@@ -260,7 +263,7 @@ class SchedulerManager:
         """
         async with self._lock:
             if workspace_id not in self._engines:
-                engine = SchedulerEngine(workspace_id, workspace_path)
+                engine = SchedulerEngine(workspace_id, workspace_path, self._event_bus)  # 🔴 修复：传递 event_bus
                 await engine.start()
                 self._engines[workspace_id] = engine
                 logger.info(f"[SCHEDULER] Created scheduler for workspace {workspace_id}")

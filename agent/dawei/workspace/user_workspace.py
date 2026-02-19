@@ -20,8 +20,9 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from dawei.config import get_workspaces_root
 from dawei.conversation.conversation import Conversation, create_conversation
-from dawei.core.events import CORE_EVENT_BUS
+# from dawei.core.events import CORE_EVENT_BUS  # REMOVED: CORE_EVENT_BUS deleted
 from dawei.entity.llm_config import LLMConfig
 from dawei.task_graph.task_node_data import TaskContext
 from dawei.tools.mcp_tool_manager import MCPConfig, MCPToolManager
@@ -126,6 +127,10 @@ class UserWorkspace:
         self.tool_manager: ToolManager | None = None
         self.mcp_tool_manager: MCPToolManager | None = None
 
+        # 🔴 修复：UserWorkspace 不再拥有 event_bus
+        # 所有 event_bus 由 Agent 创建和管理，避免多个 Agent 共享 event_bus 导致的 handler 干扰
+        # self.event_bus = None  # 不再需要
+
         # Skills工具 - 单独管理
         self._skills_tools: list | None = None
 
@@ -140,8 +145,7 @@ class UserWorkspace:
         self._initialized = False
         self._loaded = False
 
-        # event bug
-        self.event_bus = CORE_EVENT_BUS
+        # event_bus 已在 __init__ 前面设置为独立实例（不使用全局单例）
 
         logger.info(f"UserWorkspace initialized: {self.absolute_path}")
 
@@ -332,9 +336,11 @@ class UserWorkspace:
             await self._initialize_conversation_management()
             logger.info("  ✓ Conversation management initialized")
 
-            # task graph
-            self.task_graph = await self.create_or_restore_task_graph()
-            logger.info("  ✓ Task graph created/restored")
+            # 🔧 修复：不在 UserWorkspace 创建 TaskGraph
+            # TaskGraph 应该由 Agent 创建并使用 Agent 的 event_bus
+            # 这里设置为 None,Agent 稍后会创建自己的 TaskGraph
+            self.task_graph = None
+            logger.info("  ✓ Task graph placeholder set (will be created by Agent)")
 
             # 启动对话自动保存任务
             await self._start_auto_save_conversation()
@@ -647,7 +653,7 @@ class UserWorkspace:
             """查找所有可能包含skills的根目录
             返回两个级别的根目录列表（workspace和global user）
 
-            新的路径结构：.dawei/configs/skills/
+            新的路径结构：.dawei/skills/
             """
             roots = []
             ws_path = Path(self.absolute_path)
@@ -669,38 +675,39 @@ class UserWorkspace:
             logger.debug(f"Current mode for skills: {current_mode}")
 
             # ===== Level 1: UserWorkspace级别 =====
-            # 1.1 {workspace}/.dawei/configs/skills/
-            ws_dawei_configs = ws_path / ".dawei" / "configs"
+            # 1.1 {workspace}/.dawei/skills/
+            ws_dawei_configs = ws_path / ".dawei"
             ws_skills_dir = ws_dawei_configs / "skills"
             if ws_skills_dir.exists() and any(ws_skills_dir.iterdir()):
-                logger.info("[Level 1: Workspace] Found .dawei/configs/skills in workspace")
+                logger.info("[Level 1: Workspace] Found .dawei/skills in workspace")
                 roots.append(ws_path)
 
-            # 1.2 {workspace}/.dawei/configs/skills-{mode}/
+            # 1.2 {workspace}/.dawei/skills-{mode}/
             if current_mode:
                 ws_mode_skills = ws_dawei_configs / f"skills-{current_mode}"
                 if ws_mode_skills.exists() and any(ws_mode_skills.iterdir()):
                     logger.info(
-                        f"[Level 1: Workspace] Found .dawei/configs/skills-{current_mode} in workspace",
+                        f"[Level 1: Workspace] Found .dawei/skills-{current_mode} in workspace",
                     )
                     roots.append(ws_path)
 
             # ===== Level 2: Global User级别 =====
-            # 2.1 ~/.dawei/configs/skills/
-            global_dawei_configs = Path.home() / ".dawei" / "configs"
+            # 2.1 {DAWEI_HOME}/skills/
+            dawei_home = get_workspaces_root()
+            global_dawei_configs = dawei_home 
             global_skills_dir = global_dawei_configs / "skills"
             if global_skills_dir.exists() and any(global_skills_dir.iterdir()):
-                logger.info("[Level 2: Global User] Found .dawei/configs/skills in home directory")
-                roots.append(Path.home())
+                logger.info("[Level 2: Global User] Found .dawei/skills in DAWEI_HOME")
+                roots.append(dawei_home)
 
-            # 2.2 ~/.dawei/configs/skills-{mode}/
+            # 2.2 {DAWEI_HOME}/skills-{mode}/
             if current_mode:
                 global_mode_skills = global_dawei_configs / f"skills-{current_mode}"
                 if global_mode_skills.exists() and any(global_mode_skills.iterdir()):
                     logger.info(
-                        f"[Level 2: Global User] Found .dawei/configs/skills-{current_mode} in home directory",
+                        f"[Level 2: Global User] Found .dawei/skills-{current_mode} in DAWEI_HOME",
                     )
-                    roots.append(Path.home())
+                    roots.append(dawei_home)
 
             logger.info(f"Skills discovery: found {len(roots)} root(s) with skills")
             return roots
@@ -1859,7 +1866,7 @@ class UserWorkspace:
             # 创建新的TaskGraph实例
             task_graph = TaskGraph(
                 task_id=task_graph_data["task_graph_id"],
-                event_bus=self.event_bus,
+                event_bus=None,  # 不再使用 workspace 的 event_bus
             )
 
             # 恢复节点数据
@@ -1903,7 +1910,8 @@ class UserWorkspace:
 
         # 创建空的任务图
         logger.info("Creating empty task graph")
-        return TaskGraph(task_id="default", event_bus=self.event_bus)
+        # 🔴 修复：TaskGraph 不再使用 UserWorkspace 的 event_bus
+        return TaskGraph(task_id="default", event_bus=None)
 
     # ==================== 持久化失败告警机制 ====================
 
@@ -1934,12 +1942,13 @@ class UserWorkspace:
                 extra={"alert_data": alert_data},
             )
 
-            # 2. 发送到事件总线 (如果其他组件需要监听)
-            if self.event_bus:
-                try:
-                    await self.event_bus.emit("persistence_failure", alert_data)
-                except Exception as e:
-                    logger.warning(f"Failed to emit persistence_failure event: {e}")
+            # 🔴 修复：UserWorkspace 不再使用 event_bus,所以不发送事件
+            # 如果需要发送事件，应该使用 Agent 的 event_bus
+            # if self.event_bus:
+            #     try:
+            #         await self.event_bus.emit("persistence_failure", alert_data)
+            #     except Exception as e:
+            #         logger.warning(f"Failed to emit persistence_failure event: {e}")
 
             # 3. 保存到持久化失败日志文件
             await self._log_persistence_failure(alert_data)

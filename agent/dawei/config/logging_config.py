@@ -11,11 +11,11 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
-def get_dawei_home() -> Path:
+def get_workspaces_root() -> Path:
     """获取 DAWEI_HOME 路径
 
     Returns:
@@ -33,7 +33,7 @@ def get_log_dir() -> Path:
         Path: 日志目录的绝对路径（DAWEI_HOME/logs）
 
     """
-    return get_dawei_home() / "logs"
+    return Path(get_workspaces_root()) / "logs"
 
 
 class LoggingConfig(BaseSettings):
@@ -90,6 +90,21 @@ class LoggingConfig(BaseSettings):
     sanitize_sensitive_data: bool = Field(default=True)
     sensitive_fields: list[str] = Field(default_factory=lambda: ["api_key", "password", "secret", "credential"])
 
+    @model_validator(mode="before")
+    @classmethod
+    def convert_max_file_size_unit(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """转换 max_file_size 单位
+
+        前端传入的是 MB (1-100)，后端存储的是字节
+        如果值小于 1000，认为是 MB，转换为字节
+        """
+        if isinstance(data, dict) and "max_file_size" in data:
+            max_file_size = data["max_file_size"]
+            # 如果值小于 1000，认为是 MB（前端输入范围 1-100）
+            if isinstance(max_file_size, (int, float)) and max_file_size < 1000:
+                data["max_file_size"] = int(max_file_size * 1024 * 1024)  # MB -> Bytes
+        return data
+
     def __init__(self, **data):
         """初始化日志配置
 
@@ -109,7 +124,7 @@ class LoggingConfig(BaseSettings):
         Path(self.llm_dir).mkdir(parents=True, exist_ok=True)
 
         # 打印路径信息用于调试
-        dawei_home = get_dawei_home()
+        dawei_home = get_workspaces_root()
         print(f"[LoggingConfig] DAWEI_HOME: {dawei_home}")
         print(f"[LoggingConfig] Log directory: {self.dir}")
         print(f"[LoggingConfig] LLM log directory: {self.llm_dir}")

@@ -70,15 +70,29 @@
     <!-- Featured Section -->
     <div v-if="!hasSearchResults && featuredResources.length > 0" class="featured-section">
       <div class="section-header">
-        <h3>推荐资源</h3>
-        <el-text type="info">精选的{{ activeType }}资源</el-text>
+        <div>
+          <h3>推荐资源</h3>
+          <el-text type="info">共 {{ totalFeaturedCount }} 个{{ activeType === 'skill' ? '技能' : activeType === 'agent' ? '代理' : '插件' }}</el-text>
+        </div>
       </div>
       <el-row :gutter="16">
         <el-col v-for="resource in featuredResources" :key="resource.id" :span="8">
           <ResourceCard :resource="resource" :installing="isInstalling(resource.name)"
-            :installed="isResourceInstalled(resource)" @install="handleInstall" @view-details="handleViewDetails" />
+            :installed="isResourceInstalled(resource)" @install="handleInstall" @install-force="handleForceInstall"
+            @view-details="handleViewDetails" />
         </el-col>
       </el-row>
+
+      <!-- Pagination -->
+      <div v-if="totalFeaturedCount > featuredPageSize" class="pagination-container">
+        <el-pagination
+          v-model:current-page="featuredCurrentPage"
+          :page-size="featuredPageSize"
+          :total="totalFeaturedCount"
+          layout="prev, pager, next, total"
+          @current-change="handlePageChange"
+        />
+      </div>
     </div>
 
     <!-- Search Results -->
@@ -93,7 +107,8 @@
       <el-row :gutter="16" v-loading="isSearching(activeType)">
         <el-col v-for="resource in searchResults" :key="resource.id" :span="8">
           <ResourceCard :resource="resource" :installing="isInstalling(resource.name)"
-            :installed="isResourceInstalled(resource)" @install="handleInstall" @view-details="handleViewDetails" />
+            :installed="isResourceInstalled(resource)" @install="handleInstall" @install-force="handleForceInstall"
+            @view-details="handleViewDetails" />
         </el-col>
       </el-row>
 
@@ -118,7 +133,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { Search, Files, Connection, User, InfoFilled, TopRight } from '@element-plus/icons-vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useMarketStore } from '@/stores/market';
 import ResourceCard from './ResourceCard.vue';
 import ResourceDetailDialog from './ResourceDetailDialog.vue';
@@ -140,6 +155,11 @@ const marketStore = useMarketStore();
 
 const activeType = ref<ResourceType>(props.initialType);
 const searchQuery = ref('');
+
+// Pagination
+const featuredCurrentPage = ref(1);
+const featuredPageSize = ref(18); // Show 18 items per page (6 rows x 3 columns)
+const totalFeaturedCount = ref(0);
 
 // Watch for initialType changes
 watch(() => props.initialType, (newType) => {
@@ -175,19 +195,64 @@ const handleTabChange = async () => {
   marketStore.clearSearchResults(activeType.value);
   searchQuery.value = '';
 
+  // Reset pagination
+  featuredCurrentPage.value = 1;
+  totalFeaturedCount.value = 0;
+
   // Load featured resources for the new tab
   await handleLoadFeatured();
 };
 
 const handleLoadFeatured = async () => {
-  await marketStore.loadFeaturedResources(activeType.value, 9);
+  const response = await marketStore.loadFeaturedResources(
+    activeType.value,
+    featuredPageSize.value,
+    (featuredCurrentPage.value - 1) * featuredPageSize.value
+  );
+  if (response && response.total !== undefined) {
+    totalFeaturedCount.value = response.total;
+  }
+};
+
+const handlePageChange = async (page: number) => {
+  featuredCurrentPage.value = page;
+  await handleLoadFeatured();
+  // Scroll to top of featured section
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
 const handleInstall = async (resource: SearchResult) => {
-  const result = await marketStore.installResource(resource.type, resource.name);
+  // Use full resource.id (e.g., "github.com/anthropics/skills/skills/xlsx") instead of short name
+  const resourceId = resource.id;
+  const result = await marketStore.installResource(resource.type, resourceId, false);
 
   if (result) {
     ElMessage.success(`安装 ${resource.name} 成功`);
+  }
+};
+
+const handleForceInstall = async (resource: SearchResult) => {
+  // Use full resource.id (e.g., "github.com/anthropics/skills/skills/xlsx") instead of short name
+  const resourceId = resource.id;
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要强制重新安装 "${resource.name}" 吗？这将覆盖当前安装的版本。`,
+      '强制重装确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+
+    const result = await marketStore.installResource(resource.type, resourceId, true);
+
+    if (result) {
+      ElMessage.success(`强制重装 ${resource.name} 成功`);
+    }
+  } catch {
+    // User cancelled
   }
 };
 
@@ -267,6 +332,13 @@ onMounted(async () => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  padding: 16px 0;
 }
 
 .empty-state {

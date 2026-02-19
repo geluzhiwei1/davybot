@@ -23,13 +23,7 @@
       <!-- 建议答案 -->
       <div class="suggestions-section">
         <div class="section-label">建议答案：</div>
-        <div style="background: yellow; padding: 10px; margin: 10px 0;">
-          调试信息: suggestions数组长度 = {{ suggestions?.length || 0 }}
-        </div>
         <div v-if="suggestions && suggestions.length > 0" class="suggestions-list">
-          <div style="background: lightblue; padding: 10px; margin: 10px 0;">
-            调试: 开始渲染 {{ suggestions.length }} 个建议按钮
-          </div>
           <el-button
             v-for="(suggestion, index) in suggestions"
             :key="index"
@@ -42,8 +36,18 @@
             <span class="suggestion-text">{{ suggestion }}</span>
           </el-button>
         </div>
-        <div v-else style="background: red; padding: 10px; margin: 10px 0;">
-          调试: suggestions 为空或未定义！
+        <div v-else class="no-suggestions-warning">
+          <el-alert
+            title="未提供建议答案"
+            type="warning"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              <p>LLM 未为此问题提供建议答案，请直接输入您的回答。</p>
+              <p class="debug-info">Debug: suggestions 为空或未定义 (长度: {{ suggestions?.length || 0 }})</p>
+            </template>
+          </el-alert>
         </div>
       </div>
 
@@ -287,6 +291,17 @@ defineExpose({
 
 .dialog-footer :deep(.el-button) {
   min-width: 120px;
+}
+
+.no-suggestions-warning {
+  margin: 10px 0;
+}
+
+.no-suggestions-warning .debug-info {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+  font-family: 'Courier New', monospace;
 }
 
 /* 动画 */

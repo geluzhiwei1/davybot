@@ -188,7 +188,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Download, Delete, InfoFilled, Document, Position, Location } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
-import { pluginConfigClient } from '@/services/api/pluginConfig';
+import { privacyConfigClient } from '@/services/api/privacy';
 
 const { t } = useI18n();
 
@@ -354,20 +354,15 @@ async function handleSave() {
   submitting.value = true;
 
   try {
-    await pluginConfigClient.updatePluginConfig({
-      workspace_id: props.workspaceId,
-      plugin_id: 'analytics',
-      config: {
-        enabled: formData.enabled,
-        retention_days: formData.retention_days,
-        sampling_rate: formData.sampling_rate,
-        anonymize_enabled: formData.anonymize_enabled,
-      }
+    await privacyConfigClient.updatePrivacyConfig({
+      enabled: formData.enabled,
+      retention_days: formData.retention_days,
+      sampling_rate: formData.sampling_rate,
+      anonymize_enabled: formData.anonymize_enabled,
     });
 
     ElMessage.success(t('privacy.configSaved'));
     emit('config-changed', {
-      pluginId: 'analytics',
       config: { ...formData },
     });
   } catch (error: unknown) {
@@ -423,8 +418,29 @@ const emit = defineEmits<{
   'config-changed': [payload: { pluginId: string; config: Record<string, unknown> }];
 }>();
 
-onMounted(() => {
-  // 从初始配置初始化表单
+onMounted(async () => {
+  // 加载保存的隐私配置
+  try {
+    const response = await privacyConfigClient.getPrivacyConfig();
+    if (response.success && response.config) {
+      Object.assign(formData, response.config);
+
+      // 检测匹配的级别
+      const matchedLevel = PRIVACY_LEVELS.find(
+        level => JSON.stringify(level.config) === JSON.stringify(response.config)
+      );
+      if (matchedLevel) {
+        selectedLevel.value = matchedLevel.id;
+      } else {
+        selectedLevel.value = 'custom';
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load privacy config:', error);
+    // 使用默认配置
+  }
+
+  // 从初始配置初始化表单（如果有）
   if (props.initialConfig) {
     Object.assign(formData, props.initialConfig);
 

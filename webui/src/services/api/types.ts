@@ -421,3 +421,25 @@ export interface PluginConfigUpdateRequest {
   enabled?: boolean;
   settings?: Record<string, unknown>;
 }
+
+export interface PluginListResponse {
+  success: boolean;
+  plugins: Array<{
+    plugin_id: string;
+    exists: boolean;
+    enabled: boolean;
+    activated: boolean;
+    version: string | null;
+    install_path: string | null;
+  }>;
+  message?: string;
+}
+
+export interface UpdatePluginConfigRequest {
+  plugin_id: string;
+  config: Record<string, unknown>;
+}
+
+export interface ResetPluginConfigRequest {
+  plugin_id: string;
+}

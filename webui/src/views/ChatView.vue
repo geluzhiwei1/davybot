@@ -27,13 +27,13 @@
 
         <!-- 下部按钮 -->
         <div class="bottom-buttons">
-          <el-tooltip content="工作区设置" placement="right">
+          <el-tooltip :content="t('workspaceSettings.title')" placement="right">
             <el-button :icon="Setting" @click="handleOpenSettings" text circle />
           </el-tooltip>
-          <el-tooltip content="切换工作区" placement="right">
+          <el-tooltip :content="t('sidePanel.switchWorkspace')" placement="right">
             <el-button :icon="Switch" @click="handleSwitchWorkspace" text circle />
           </el-tooltip>
-          <el-tooltip content="用户设置" placement="right">
+          <el-tooltip :content="t('sidePanel.userSettings')" placement="right">
             <el-button :icon="User" @click="handleUserSettings" text circle />
           </el-tooltip>
         </div>
@@ -43,7 +43,8 @@
     <!-- 左侧内容区 - 独立的 aside，可折叠 -->
     <el-aside v-show="!isSidePanelCollapsed" class="content-panel" :width="sidePanelWidth + 'px'">
       <SidePanel ref="sidePanelRef" @open-file="handleOpenFile" :side-panel-collapsed="isSidePanelCollapsed"
-        :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined" />
+        :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined"
+        :memory-panel-disabled="true" />
     </el-aside>
 
     <!-- 左侧面板拖动分隔条 -->
@@ -87,7 +88,7 @@
     />
 
     <el-aside v-if="isRightPanelVisible" class="right-panel" :width="rightPanelWidth + 'px'">
-      <FileContentArea :files="openFiles" :active-file-id="currentActiveFileId" @close-file="handleCloseFile"
+      <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId" @close-file="handleCloseFile"
         @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
         @update-file-content="updateFileContent" />
     </el-aside>
@@ -106,6 +107,9 @@
     <!-- Global Image Viewer -->
     <ImageViewer v-model:visible="globalImageViewerVisible" :images="globalImageViewerImages"
       :initial-index="globalImageViewerIndex" />
+
+    <!-- 用户设置抽屉 -->
+    <UserSettingsDrawer v-model="isUserSettingsVisible" />
   </el-container>
 </template>
 
@@ -121,6 +125,9 @@ import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
 import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User } from '@element-plus/icons-vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 // 导入极简样式
 import '@/styles/chat-ultra-minimal.css';
@@ -135,6 +142,7 @@ import UserInputArea from '@/components/layout/UserInputArea.vue';
 import ServerStatusIndicator from '@/components/ServerStatusIndicator.vue';
 import BottomBar from '@/components/layout/BottomBar.vue';
 import WorkspaceSettingsDrawer from '@/components/layout/WorkspaceSettingsDrawer.vue';
+import UserSettingsDrawer from '@/components/layout/UserSettingsDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
 import ImageViewer from '@/components/chat/ImageViewer.vue';
@@ -181,6 +189,7 @@ const sidePanelRef = ref<InstanceType<typeof SidePanel> | null>(null);
 const isSidePanelCollapsed = ref(false);
 const isChatPanelCollapsed = ref(false);
 const isSettingsDrawerVisible = ref(false);
+const isUserSettingsVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
 // 面板宽度控制
@@ -226,7 +235,7 @@ const handleCloseFile = (fileId: string) => {
   }
 };
 
-// 添加全局测试函数（仅用于开发调试）
+// Development helper: expose test function globally
 if (import.meta.env.DEV) {
   (window as unknown).testFollowupDialog = () => {
     followupData.value = {
@@ -442,7 +451,7 @@ const handleOpenSettings = () => {
 
 // 用户设置
 const handleUserSettings = () => {
-  // TODO: 实现用户设置功能
+  isUserSettingsVisible.value = true;
 };
 
 const getValidWorkspaceId = async (): Promise<string | null> => {
@@ -479,6 +488,9 @@ onMounted(async () => {
     handleFollowupQuestion(event.detail as unknown);
   }) as EventListener);
 
+  // ✅ 监听任务完成事件，自动刷新已打开的文件内容
+  window.addEventListener('task-node-complete-refresh', handleTaskCompleteRefresh);
+
   const workspaceId = await getValidWorkspaceId();
   if (!workspaceId) {
     router.push('/workspaces');
@@ -510,7 +522,38 @@ watch(() => parallelTasksStore.activeTasks.length, (count) => {
 
 onUnmounted(() => {
   // 组件卸载时的清理工作（如果需要）
+  window.removeEventListener('task-node-complete-refresh', handleTaskCompleteRefresh);
 });
+
+// ✅ 处理任务完成后的自动刷新
+const fileContentAreaRef = ref<unknown>(null)
+
+const handleTaskCompleteRefresh = async (event: Event) => {
+  const customEvent = event as CustomEvent<{workspaceId: string; taskNodeId: string}>
+
+  // 只刷新当前工作区的文件
+  if (customEvent.detail.workspaceId === chatStore.workspaceId) {
+    console.log('[ChatView] Auto-refreshing open files after task completion')
+
+    // 重新加载所有已打开文件的内容
+    const filesToRefresh = [...openFiles.value]
+    for (const file of filesToRefresh) {
+      try {
+        const fileInfo = { path: (file as { id: string }).id, name: (file as { name: string }).name }
+        const { content, type } = await fetchFileContent(fileInfo)
+
+        // 更新文件内容
+        const fileIndex = openFiles.value.findIndex(f => (f as { id: string }).id === fileInfo.path)
+        if (fileIndex !== -1) {
+          (openFiles.value[fileIndex] as { content: string; type: string }).content = content
+          console.log(`[ChatView] Refreshed file: ${fileInfo.name}`)
+        }
+      } catch (error) {
+        console.error(`[ChatView] Failed to refresh file ${(file as { name: string }).name}:`, error)
+      }
+    }
+  }
+}
 
 // 监听路由参数变化，切换工作区时更新状态
 // 注意：不使用 immediate: true，因为 onMounted 已经处理了初始化
@@ -539,6 +582,18 @@ watch(() => route.params.workspaceId, async (newWorkspaceId) => {
 
 // 处理追问问题
 function handleFollowupQuestion(message: FollowupQuestionMessage) {
+  // 🔍 详细日志：记录前端收到的 FollowupQuestionMessage
+  console.log('[FOLLOWUP_DEBUG] Frontend received FollowupQuestionMessage:', {
+    fullMessage: message,
+    question: message.question,
+    suggestions: message.suggestions,
+    suggestionsLength: message.suggestions?.length || 0,
+    suggestionsType: typeof message.suggestions,
+    toolCallId: message.tool_call_id,
+    taskId: message.task_id,
+    allKeys: Object.keys(message)
+  });
+
   // 更新追问数据
   followupData.value = {
     question: message.question,
@@ -546,6 +601,8 @@ function handleFollowupQuestion(message: FollowupQuestionMessage) {
     toolCallId: message.tool_call_id,
     taskId: message.task_id
   };
+
+  console.log('[FOLLOWUP_DEBUG] followupData.value after update:', followupData.value);
 
   // 显示对话框
   showFollowupDialog.value = true;

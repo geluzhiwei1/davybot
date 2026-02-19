@@ -115,13 +115,22 @@ class StateManager:
     """状态管理器"""
 
     def __init__(self, event_bus=None):
-        # 使用延迟导入避免循环导入
-        self.event_bus = event_bus or get_core_event_bus()
+        self._event_bus = event_bus
         self._states: dict[str, TaskStatus] = {}
         self._state_history: dict[str, list[StateTransition]] = {}
         self._lock = asyncio.Lock()
         self._validator = StateValidator()
         self.logger = get_logger(__name__)
+
+    @property
+    def event_bus(self):
+        """获取 event_bus"""
+        return self._event_bus
+
+    @event_bus.setter
+    def event_bus(self, value):
+        """设置 event_bus"""
+        self._event_bus = value
 
     async def update_status(
         self,
@@ -173,6 +182,7 @@ class StateManager:
                         "reason": reason,
                         "task_id": task_id,
                     },
+                    self.event_bus,  # 🔧 修复：添加 event_bus 参数
                     task_id=task_id,
                     source="state_manager",
                 )
@@ -258,6 +268,7 @@ class StateManager:
                             "reason": update.reason,
                             "task_id": update.task_id,
                         },
+                        self.event_bus,  # 🔧 修复：添加 event_bus 参数
                         task_id=update.task_id,
                         source="state_manager_batch",
                     )
@@ -345,6 +356,7 @@ class StateManager:
                             "reason": f"Reset: {reason}",
                             "task_id": task_id,
                         },
+                        self.event_bus,  # 🔧 修复：添加 event_bus 参数
                         task_id=task_id,
                         source="state_manager",
                     )
@@ -406,6 +418,7 @@ class StateManager:
                         "reason": reason,
                         "task_id": task_id,
                     },
+                    self.event_bus,  # 🔧 修复：添加 event_bus 参数
                     task_id=task_id,
                     source="state_manager",
                 )

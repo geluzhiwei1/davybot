@@ -80,16 +80,32 @@
     <template #footer>
       <div class="resource-footer">
         <el-button
+          v-if="!isInstalled"
           type="primary"
           size="small"
           :loading="installing"
-          :disabled="isInstalled"
           @click="handleInstall"
         >
-          <el-icon v-if="!isInstalled"><Plus /></el-icon>
-          <el-icon v-else><Check /></el-icon>
-          {{ isInstalled ? '已安装' : '安装' }}
+          <el-icon><Plus /></el-icon>
+          安装
         </el-button>
+        <template v-else>
+          <el-button
+            type="success"
+            size="small"
+            @click="handleInstall"
+          >
+            <el-icon><Refresh /></el-icon>
+            更新
+          </el-button>
+          <el-button
+            size="small"
+            @click="handleForceInstall"
+          >
+            <el-icon><RefreshRight /></el-icon>
+            强制重装
+          </el-button>
+        </template>
         <el-button
           size="small"
           @click="handleViewDetails"
@@ -103,7 +119,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Plus, Check, Download, Star, User } from '@element-plus/icons-vue';
+import { Plus, Refresh, RefreshRight, Download, Star, User } from '@element-plus/icons-vue';
 import type { SearchResult, ResourceType } from '@/services/api/services/market';
 
 interface Props {
@@ -119,6 +135,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'install', resource: SearchResult): void;
+  (e: 'install-force', resource: SearchResult): void;
   (e: 'view-details', resource: SearchResult): void;
 }>();
 
@@ -151,6 +168,10 @@ const formatNumber = (num: number) => {
 
 const handleInstall = () => {
   emit('install', props.resource);
+};
+
+const handleForceInstall = () => {
+  emit('install-force', props.resource);
 };
 
 const handleViewDetails = () => {

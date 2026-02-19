@@ -222,10 +222,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     logger.debug(`[WORKSPACE_STORE] Pagination: skip=${skip}, limit=${limit}`)
     logger.debug(`[WORKSPACE_STORE] currentWorkspaceId: ${currentWorkspaceId.value}`)
 
-    // 检查是否是临时会话
+    // Check if this is a temporary conversation
     if (conversationId && conversationId.startsWith('temp_')) {
       logger.debug('[WORKSPACE_STORE] Temporary conversation detected, skipping API load')
-      // 临时会话不需要从后端加载，直接返回空数组
       return []
     }
 

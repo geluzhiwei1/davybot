@@ -271,7 +271,7 @@ class SimpleEventBus(IEventBus):
         existing_handlers = self._handlers[event_type]
         if len(existing_handlers) > 50:  # 阈值：超过50个handler视为异常
             self._logger.warning(
-                f"[EVENT_BUS] ⚠️ Abnormally high number of handlers detected for event {event_type.value}: {len(existing_handlers)}. This may indicate duplicate handler registrations (memory leak). Consider checking if handlers are being properly removed.",
+                f"⚠️ Abnormally high number of handlers detected for event {event_type.value}: {len(existing_handlers)}. This may indicate duplicate handler registrations (memory leak). Consider checking if handlers are being properly removed.",
             )
 
         # Store handler with its ID for later removal
@@ -283,7 +283,7 @@ class SimpleEventBus(IEventBus):
 
         # 🔧 修复：添加详细的日志，包含当前handler总数
         self._logger.debug(
-            f"[EVENT_BUS] Added handler {handler_id} for event type {event_type.value}. Total handlers for this event: {len(self._handlers[event_type])}",
+            f"Added handler {handler_id} for event type {event_type.value}. Total handlers: {len(self._handlers[event_type])}",
         )
 
         return handler_id
@@ -307,17 +307,17 @@ class SimpleEventBus(IEventBus):
 
         # 🔧 修复：验证handler_id是否存在于映射中
         if handler_id not in self._handler_id_map:
-            self._logger.warning(f"[EVENT_BUS] Handler ID {handler_id} not found in registry")
+            self._logger.debug(f"Handler ID {handler_id} not found in registry")
             return False
 
         # 🔧 修复：验证handler_id映射的event_type是否匹配
         mapped_event_type = self._handler_id_map[handler_id]
         if mapped_event_type != event_type:
-            self._logger.error(f"[EVENT_BUS] Handler ID mismatch: {handler_id} is registered for {mapped_event_type.value}, but removal attempted for {event_type.value}")
+            self._logger.debug(f"Handler ID mismatch: {handler_id} is registered for {mapped_event_type.value}, but removal attempted for {event_type.value}")
             return False
 
         if event_type not in self._handlers:
-            self._logger.warning(f"[EVENT_BUS] No handlers registered for event type {event_type.value}")
+            self._logger.debug(f"No handlers registered for event type {event_type.value}")
             return False
 
         handlers = self._handlers[event_type]
@@ -325,28 +325,36 @@ class SimpleEventBus(IEventBus):
         # 🔧 修复：通过遍历查找handler并移除（使用identity比较）
         # 由于我们维护了_handler_to_id_map，我们可以反向查找handler
         handler_to_remove = None
+        handler_object_id = None
         for handler in handlers:
             if id(handler) in self._handler_to_id_map and self._handler_to_id_map[id(handler)] == handler_id:
                 handler_to_remove = handler
+                handler_object_id = id(handler)
                 break
 
         if handler_to_remove is None:
-            self._logger.warning(f"[EVENT_BUS] Handler {handler_id} not found in handlers list for event {event_type.value}")
+
+            # 仍然清理映射表（如果存在）
+            if handler_id in self._handler_id_map:
+                del self._handler_id_map[handler_id]
+
+            # 清理 _handler_to_id_map 中的残留条目
+            keys_to_remove = [k for k, v in self._handler_to_id_map.items() if v == handler_id]
+            for key in keys_to_remove:
+                del self._handler_to_id_map[key]
+
             return False
 
         # 移除handler
-        try:
-            handlers.remove(handler_to_remove)
+        handlers.remove(handler_to_remove)
 
-            # 清理映射
-            del self._handler_id_map[handler_id]
-            del self._handler_to_id_map[id(handler_to_remove)]
+        # 清理映射
+        del self._handler_id_map[handler_id]
+        if handler_object_id in self._handler_to_id_map:
+            del self._handler_to_id_map[handler_object_id]
 
-            self._logger.debug(f"[EVENT_BUS] Removed handler {handler_id} for event type {event_type.value}. Remaining handlers: {len(handlers)}")
-            return True
-        except ValueError:
-            self._logger.error(f"[EVENT_BUS] Failed to remove handler {handler_id} from list")
-            return False
+        self._logger.debug(f"Removed handler {handler_id} for event type {event_type.value}. Remaining handlers: {len(handlers)}")
+        return True
 
     async def emit_event(self, event_message) -> None:
         """发送强类型事件消息（实现 IEventBus 接口）
@@ -410,6 +418,30 @@ class SimpleEventBus(IEventBus):
             # 执行处理器（使用简化的执行逻辑）
             if event_type in self._handlers:
                 handlers = self._handlers[event_type].copy()  # 创建副本避免在迭代时修改
+
+                # 🔍 诊断日志：追踪 CONTENT_STREAM 事件的 handler 数量
+                if event_type == TaskEventType.CONTENT_STREAM:
+                    content_preview = str(event.data)[:50] if hasattr(event, 'data') and event.data else ""
+
+                    handler_info = []
+                    for h in handlers:
+                        # 尝试从闭包中获取 task_id
+                        if hasattr(h, '__closure__') and h.__closure__:
+                            closure_vars = {}
+                            for i, cell in enumerate(h.__closure__):
+                                try:
+                                    closure_vars[f'var_{i}'] = cell.cell_contents
+                                except (AttributeError, ValueError):
+                                    # Cell doesn't contain expected content type or was garbage collected
+                                    pass
+                            handler_info.append({
+                                'id': id(h),
+                                'closure_vars': list(closure_vars.keys())
+                            })
+                        else:
+                            handler_info.append({'id': id(h), 'no_closure': True})
+
+
                 for i, handler in enumerate(handlers):
                     await self._execute_handler(handler, event, event_type, i)
 
@@ -1012,22 +1044,29 @@ class SimpleEventBus(IEventBus):
         return list(self._handler_id_map.keys())
 
 
-# core events
-CORE_EVENT_BUS = SimpleEventBus()
+# 🔴 修复：彻底删除全局 CORE_EVENT_BUS
+# 所有 event_bus 由 Agent 创建和管理,避免全局共享导致的 handler 干扰
+# 每个 Agent 有自己独立的 SimpleEventBus 实例
+# CORE_EVENT_BUS = SimpleEventBus()
 
 
 # 便利函数
 async def emit_typed_event(
     event_type: TaskEventType,
     data: Any,
+    event_bus: IEventBus,  # 🔴 修复：event_bus 现在是必需参数，移到前面（必需参数必须在可选参数之前）
     task_id: str = "",
     source: str = "system",
 ) -> str:
     """发送强类型事件的便利函数
 
+    ⚠️ BREAKING CHANGE: event_bus 参数现在是必需的（之前使用全局 CORE_EVENT_BUS）
+    迁移指南: 如果你有旧代码调用 emit_typed_event(...)，需要传入 agent.event_bus
+
     Args:
         event_type: 事件类型枚举
         data: 事件数据（泛型）
+        event_bus: 必需的事件总线实例（通常是 Agent 的 event_bus）
         task_id: 任务ID
         source: 事件源
 
@@ -1036,8 +1075,10 @@ async def emit_typed_event(
 
     """
     event_id = str(uuid.uuid4())
-    # 使用 publish() 方法，它接受多个参数并创建 TaskEvent 对象
-    await CORE_EVENT_BUS.publish(event_type, data, task_id, source)
+
+    # 🔴 修复：必须提供 event_bus，不再有 CORE_EVENT_BUS 全局变量
+    # 这样强制所有事件都通过 Agent 自己的 event_bus 发送
+    await event_bus.publish(event_type, data, task_id, source)
     return event_id
 
 
@@ -1054,5 +1095,5 @@ __all__ = [
     "remove_event_handler",
     "get_event_history",
     "get_event_statistics",
-    "CORE_EVENT_BUS",
+    # CORE_EVENT_BUS 已移除 - 每个 Agent 现在使用自己独立的 event_bus 实例
 ]

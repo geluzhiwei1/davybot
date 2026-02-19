@@ -1,13 +1,13 @@
 /* eslint-disable */
 <template>
-  <el-drawer v-model="visible" title="工作区设置" direction="rtl" :size="'80%'" class="workspace-settings-drawer"
-    @close="handleClose">
+  <el-drawer v-model="visible" :title="t('workspaceSettings.title')" direction="rtl" :size="'80%'"
+    class="workspace-settings-drawer" @close="handleClose">
     <template #header>
       <div class="drawer-header">
         <el-icon :size="20">
           <Setting />
         </el-icon>
-        <span class="drawer-title">工作区设置</span>
+        <span class="drawer-title">{{ t('workspaceSettings.title') }}</span>
       </div>
     </template>
 
@@ -141,8 +141,8 @@
               <template #default>
                 <p style="margin: 0; font-size: 13px;">`
                   {{ t('workspaceSettings.skills.description') }}
-                  <br>• {{ t('workspaceSettings.skills.workspaceDir') }}<code>.dawei/configs/skills/</code>
-                  <br>• {{ t('workspaceSettings.skills.globalDir') }}<code>~/.dawei/configs/skills/</code>
+                  <br>• {{ t('workspaceSettings.skills.workspaceDir') }}<code>.dawei/skills/</code>
+                  <br>• {{ t('workspaceSettings.skills.globalDir') }}<code>~/.dawei/skills/</code>
                 </p>
               </template>
             </el-alert>
@@ -152,7 +152,13 @@
                 {{ t('workspaceSettings.skills.availableSkills') }} ({{ skillsList.length }})
               </span>
               <div>
-                <el-button type="success" size="small" @click="openMarketDialog('skill')">
+                <el-button type="primary" size="small" @click="openCreateSkillDialog">
+                  <el-icon>
+                    <Plus />
+                  </el-icon>
+                  {{ t('workspaceSettings.skills.createSkill') }}
+                </el-button>
+                <el-button type="success" size="small" @click="openMarketDialog('skill')" style="margin-left: 8px;">
                   <el-icon>
                     <ShoppingCart />
                   </el-icon>
@@ -182,8 +188,9 @@
               <el-select v-model="skillsFilter.scope" :placeholder="t('workspaceSettings.skills.filter.scope')"
                 clearable style="width: 150px;" @change="filterSkills">
                 <el-option :label="t('workspaceSettings.skills.filter.allScopes')" value="" />
-                <el-option :label="t('workspaceSettings.skills.filter.project')" value="project" />
-                <el-option :label="t('workspaceSettings.skills.filter.global')" value="global" />
+                <el-option label="项目" value="workspace" />
+                <el-option label="系统" value="system" />
+                <el-option label="全局" value="user" />
               </el-select>
 
               <el-input v-model="skillsFilter.search" :placeholder="t('workspaceSettings.skills.filter.search')"
@@ -230,16 +237,163 @@
 
               <el-table-column prop="scope" :label="t('workspaceSettings.skills.table.scope')" width="100">
                 <template #default="scope">
-                  <el-tag :type="scope.row.scope === 'project' ? 'warning' : 'success'" size="small">
-                    {{ scope.row.scope === 'project' ? t('workspaceSettings.skills.filter.project') :
-                      t('workspaceSettings.skills.filter.global') }}
+                  <el-tag :type="getScopeTagType(scope.row.scope)" size="small">
+                    {{ getScopeDisplayName(scope.row.scope) }}
                   </el-tag>
+                </template>
+              </el-table-column>
+
+              <el-table-column :label="t('workspaceSettings.skills.table.actions')" width="160" align="center">
+                <template #default="scope">
+                  <el-button v-if="scope.row.scope !== 'system'" type="primary" size="small" link
+                    @click="openSkillEditorDialog(scope.row)">
+                    <el-icon>
+                      <Edit />
+                    </el-icon>
+                    {{ t('workspaceSettings.skills.actions.edit') }}
+                  </el-button>
+                  <el-popconfirm v-if="scope.row.scope !== 'system'"
+                    :title="t('workspaceSettings.skills.deleteConfirm', { name: scope.row.name })"
+                    @confirm="deleteSkill(scope.row)">
+                    <template #reference>
+                      <el-button type="danger" size="small" link>
+                        <el-icon>
+                          <Delete />
+                        </el-icon>
+                        {{ t('workspaceSettings.skills.actions.delete') }}
+                      </el-button>
+                    </template>
+                  </el-popconfirm>
+                  <span v-else style="color: var(--el-text-color-secondary); font-size: 12px;">-</span>
                 </template>
               </el-table-column>
             </el-table>
 
             <el-empty v-if="!loadingSkills && filteredSkills.length === 0"
               :description="t('workspaceSettings.skills.noSkills')" />
+
+            <!-- 技能编辑对话框 -->
+            <el-dialog v-model="editSkillDialogVisible" :title="t('workspaceSettings.skills.editDialog.title')"
+              width="700px">
+              <el-form :model="editSkillForm" label-width="100px">
+                <el-form-item :label="t('workspaceSettings.skills.editDialog.name')">
+                  <el-input v-model="editSkillForm.name" />
+                </el-form-item>
+                <el-form-item :label="t('workspaceSettings.skills.editDialog.description')">
+                  <el-input v-model="editSkillForm.description" type="textarea" :rows="2" />
+                </el-form-item>
+                <el-form-item :label="t('workspaceSettings.skills.editDialog.content')">
+                  <el-input v-model="editSkillForm.content" type="textarea" :rows="15"
+                    style="font-family: monospace;" />
+                </el-form-item>
+              </el-form>
+              <template #footer>
+                <el-button @click="editSkillDialogVisible = false">
+                  {{ t('common.cancel') }}
+                </el-button>
+                <el-button type="primary" @click="saveSkill" :loading="savingSkill">
+                  {{ t('common.save') }}
+                </el-button>
+              </template>
+            </el-dialog>
+
+            <!-- 新建技能对话框 -->
+            <el-dialog v-model="createSkillDialogVisible" :title="t('workspaceSettings.skills.createDialog.title')"
+              width="700px">
+              <el-form :model="createSkillForm" label-width="100px">
+                <el-form-item :label="t('workspaceSettings.skills.createDialog.name')" required>
+                  <el-input v-model="createSkillForm.name"
+                    :placeholder="t('workspaceSettings.skills.createDialog.namePlaceholder')" />
+                </el-form-item>
+                <el-form-item :label="t('workspaceSettings.skills.createDialog.description')">
+                  <el-input v-model="createSkillForm.description" type="textarea" :rows="2" />
+                </el-form-item>
+                <el-form-item :label="t('workspaceSettings.skills.createDialog.scope')">
+                  <el-radio-group v-model="createSkillForm.scope">
+                    <el-radio value="workspace">{{ t('workspaceSettings.skills.createDialog.workspace') }}</el-radio>
+                    <el-radio value="user">{{ t('workspaceSettings.skills.createDialog.user') }}</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+                <el-form-item :label="t('workspaceSettings.skills.createDialog.content')">
+                  <el-input v-model="createSkillForm.content" type="textarea" :rows="15"
+                    style="font-family: monospace;" />
+                </el-form-item>
+              </el-form>
+              <template #footer>
+                <el-button @click="createSkillDialogVisible = false">
+                  {{ t('common.cancel') }}
+                </el-button>
+                <el-button type="primary" @click="createSkill" :loading="creatingSkill"
+                  :disabled="!createSkillForm.name">
+                  {{ t('workspaceSettings.skills.createDialog.create') }}
+                </el-button>
+              </template>
+            </el-dialog>
+
+            <!-- 技能文件编辑器对话框（带文件树） -->
+            <el-dialog v-model="showSkillEditorDialog" :title="`编辑技能 - ${editingSkill?.name || ''}`" width="1100px"
+              @close="closeSkillEditorDialog">
+              <div v-if="editingSkill" style="display: flex; gap: 16px; height: 650px;">
+                <!-- 左侧：文件树 -->
+                <div style="width: 280px; display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 600; font-size: 14px;">{{ t('workspaceSettings.skills.editor.files')
+                    }}</span>
+                    <el-button size="small" @click="refreshSkillFileTree" :icon="Refresh">
+                      {{ t('workspaceSettings.skills.editor.refresh') }}
+                    </el-button>
+                  </div>
+
+                  <div v-if="skillFileTreeLoading" style="display: flex; justify-content: center; padding: 20px;">
+                    <el-icon class="is-loading" size="24">
+                      <Loading />
+                    </el-icon>
+                  </div>
+                  <div v-else-if="skillFileTree.length === 0"
+                    style="padding: 20px; text-align: center; color: var(--el-text-color-secondary);">
+                    {{ t('workspaceSettings.skills.editor.noFiles') }}
+                  </div>
+                  <div v-else
+                    style="flex: 1; overflow-y: auto; border: 1px solid var(--el-border-color); border-radius: 4px; padding: 8px;">
+                    <FileTreeNode v-for="item in skillFileTree" :key="item.path" :item="item"
+                      :selected="currentSkillFile?.path === item.path" @item-click="handleSkillFileClick" />
+                  </div>
+                </div>
+
+                <!-- 右侧：编辑器 -->
+                <div style="flex: 1; display: flex; flex-direction: column;">
+                  <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <el-tooltip v-if="currentSkillFile" :content="currentSkillFile.path" placement="top">
+                      <span
+                        style="font-weight: 600; font-size: 14px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">
+                        {{ currentSkillFile.name }}
+                      </span>
+                    </el-tooltip>
+                    <span v-else style="font-weight: 600; font-size: 14px;">
+                      {{ t('workspaceSettings.skills.editor.selectFile') }}
+                    </span>
+                    <el-tag v-if="currentSkillFile?.name === 'SKILL.md'" type="success" size="small">
+                      {{ t('workspaceSettings.skills.editor.mainFile') }}
+                    </el-tag>
+                  </div>
+
+                  <div v-if="currentSkillFile" ref="skillVditorRef" class="skill-editor-container" style="flex: 1;">
+                  </div>
+                  <div v-else
+                    style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--el-text-color-secondary);">
+                    {{ t('workspaceSettings.skills.editor.selectFileHint') }}
+                  </div>
+                </div>
+              </div>
+
+              <template #footer>
+                <el-button @click="showSkillEditorDialog = false">{{ t('common.cancel') }}</el-button>
+                <el-button type="primary" @click="saveSkillFile" :loading="savingSkillFile"
+                  :disabled="!currentSkillFile">
+                  {{ t('workspaceSettings.skills.editor.save') }}
+                </el-button>
+              </template>
+            </el-dialog>
           </div>
         </el-tab-pane>
 
@@ -303,8 +457,6 @@
 
               <el-table-column :label="t('workspaceSettings.agents.table.actions')" width="280" fixed="right">
                 <template #default="scope">
-                  <el-button size="small" @click="viewModel(scope.row)">{{ t('workspaceSettings.agents.table.view')
-                    }}</el-button>
                   <el-button size="small" type="primary" @click="editMode(scope.row)"
                     :disabled="scope.row.source === 'system'">{{ t('workspaceSettings.agents.table.edit') }}</el-button>
                   <el-button size="small" type="warning" @click="editModeRules(scope.row)">
@@ -573,67 +725,6 @@
           </el-scrollbar>
         </el-tab-pane>
 
-        <!-- Monitoring Tab -->
-        <el-tab-pane :label="t('workspaceSettings.tabs.monitoring')" name="monitoring">
-          <el-scrollbar max-height="calc(100vh - 200px)">
-            <el-form :model="workspaceConfig" label-width="180px" class="workspace-form">
-              <!-- 日志配置 -->
-              <el-divider content-position="left">{{ t('workspaceSettings.workspace.logging') }}</el-divider>
-              <el-form-item :label="t('workspaceSettings.workspace.logLevel')">
-                <el-select v-model="workspaceConfig.logging.level" style="width: 100%">
-                  <el-option label="DEBUG" value="DEBUG" />
-                  <el-option label="INFO" value="INFO" />
-                  <el-option label="WARNING" value="WARNING" />
-                  <el-option label="ERROR" value="ERROR" />
-                </el-select>
-              </el-form-item>
-              <el-form-item :label="t('workspaceSettings.workspace.logDir')">
-                <el-input v-model="workspaceConfig.logging.dir" placeholder="~/.dawei/logs" />
-              </el-form-item>
-              <el-form-item :label="t('workspaceSettings.workspace.maxFileSize')">
-                <el-input-number v-model="workspaceConfig.logging.max_file_size" :min="1" :max="100"
-                  style="width: 100%" />
-              </el-form-item>
-              <el-form-item :label="t('workspaceSettings.workspace.backupCount')">
-                <el-input-number v-model="workspaceConfig.logging.backup_count" :min="1" :max="20"
-                  style="width: 100%" />
-              </el-form-item>
-              <el-form-item :label="t('workspaceSettings.workspace.consoleOutput')">
-                <el-switch v-model="workspaceConfig.logging.console_output" />
-              </el-form-item>
-              <el-form-item :label="t('workspaceSettings.workspace.fileOutput')">
-                <el-switch v-model="workspaceConfig.logging.file_output" />
-              </el-form-item>
-              <el-form-item :label="t('workspaceSettings.workspace.performanceLogging')">
-                <el-switch v-model="workspaceConfig.logging.enable_performance_logging" />
-              </el-form-item>
-
-              <!-- 监控配置 -->
-              <el-divider content-position="left">{{ t('workspaceSettings.workspace.monitoring') }}</el-divider>
-              <el-form-item :label="t('workspaceSettings.workspace.prometheusEnabled')">
-                <el-switch v-model="workspaceConfig.monitoring.prometheus_enabled" />
-              </el-form-item>
-              <el-form-item :label="t('workspaceSettings.workspace.prometheusPort')">
-                <el-input-number v-model="workspaceConfig.monitoring.prometheus_port" :min="1024" :max="65535"
-                  style="width: 100%" />
-              </el-form-item>
-
-              <!-- 操作按钮 -->
-              <el-form-item style="margin-top: 30px;">
-                <el-button type="primary" @click="saveWorkspaceConfig" :loading="saving">
-                  {{ t('workspaceSettings.workspace.actions.save') }}
-                </el-button>
-                <el-button @click="loadWorkspaceConfig">
-                  {{ t('workspaceSettings.workspace.actions.refresh') }}
-                </el-button>
-                <el-button @click="resetWorkspaceConfig">
-                  {{ t('workspaceSettings.workspace.actions.reset') }}
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </el-scrollbar>
-        </el-tab-pane>
-
         <!-- 执行环境 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.executionEnvironment')" name="environments">
           <el-tabs v-model="activeEnvironmentSubTab" type="card" class="environment-sub-tabs">
@@ -855,7 +946,7 @@
 
         <el-divider content-position="left">高级设置</el-divider>
 
-        <el-row :gutter="20">
+        <el-row :gutter="20" v-if="false">
           <el-col :span="12">
             <el-form-item label="启用差异编辑">
               <el-switch v-model="providerForm.diffEnabled" />
@@ -967,12 +1058,21 @@
     </el-dialog>
 
     <!-- Mode 编辑/创建对话框 -->
-    <el-dialog v-model="showModeDialog" :title="editingMode ? '编辑模式' : '添加模式'" width="800px" @close="resetModeForm">
-      <el-form :model="modeForm" label-width="140px">
+    <el-dialog v-model="showModeDialog" :title="editingMode ? '编辑模式配置' : '添加模式'" width="1000px" @close="resetModeForm">
+      <el-alert title="YAML 格式配置" type="info" :closable="false" show-icon style="margin-bottom: 16px;">
+        <template #default>
+          <p style="margin: 0; font-size: 13px;">
+            请使用 YAML 格式编辑模式配置。编辑模式下会加载现有配置。
+          </p>
+        </template>
+      </el-alert>
+
+      <el-form :model="modeForm" label-width="100px" v-if="!editingMode">
+        <!-- 创建模式时只显示基本字段 -->
         <el-form-item label="模式标识符" required>
-          <el-input v-model="modeForm.slug" placeholder="例如: my-custom-mode" :disabled="editingMode !== null" />
+          <el-input v-model="modeForm.slug" placeholder="例如: my-custom-mode" />
           <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
-            模式的唯一标识符,创建后不可修改
+            模式的唯一标识符
           </div>
         </el-form-item>
 
@@ -983,19 +1083,13 @@
         <el-form-item label="模式描述" required>
           <el-input v-model="modeForm.description" type="textarea" :rows="2" placeholder="简要描述这个模式的用途" />
         </el-form-item>
-
-        <el-form-item label="角色定义" required>
-          <el-input v-model="modeForm.roleDefinition" type="textarea" :rows="4" placeholder="定义这个模式的角色和能力" />
-        </el-form-item>
-
-        <el-form-item label="使用场景" required>
-          <el-input v-model="modeForm.whenToUse" type="textarea" :rows="3" placeholder="说明什么时候应该使用这个模式" />
-        </el-form-item>
-
-        <el-form-item label="自定义指令">
-          <el-input v-model="modeForm.customInstructions" type="textarea" :rows="3" placeholder="可选的额外指令" />
-        </el-form-item>
       </el-form>
+
+      <!-- YAML 编辑器 -->
+      <div v-if="editingMode" style="margin-bottom: 16px;">
+        <div style="margin-bottom: 8px; font-weight: 500;">模式配置 (YAML)</div>
+        <CodeEditor v-model="modeYamlContent" language="yaml" height="500px" :line-numbers="true" />
+      </div>
 
       <template #footer>
         <el-button @click="showModeDialog = false">取消</el-button>
@@ -1026,31 +1120,80 @@
     </el-dialog>
 
     <!-- Mode Rules 编辑对话框 -->
-    <el-dialog v-model="showModeRulesDialog" :title="`编辑 Rules - ${editingModeRules?.name || ''}`" width="900px"
+    <el-dialog v-model="showModeRulesDialog" :title="`编辑 Rules - ${editingModeRules?.name || ''}`" width="1000px"
       @close="resetModeRulesForm">
       <div v-if="editingModeRules">
         <el-alert title="Rules 文件" type="info" :closable="false" show-icon style="margin-bottom: 16px;">
           <template #default>
-            <p style="margin: 0; font-size: 13px;">
-              Rules 文件路径: <code>.user/.config/.roo/rules-{{ editingModeRules.slug }}/rules.md</code>
+            <p style="margin: 0; font-size: 13px; margin-bottom: 8px;">
+              Rules 目录: <code>{{ modeRulesDirectory || '未创建' }}</code>
+            </p>
+            <p style="margin: 0; font-size: 12px; color: var(--el-text-color-secondary);">
+              该模式可以有多个规则文件，所有文件都会被应用到 AI Agent
             </p>
           </template>
         </el-alert>
 
-        <el-form label-width="100px">
-          <el-form-item label="Rules 内容">
-            <el-input v-model="modeRulesContent" type="textarea" :rows="20" placeholder="输入该模式的 rules 内容..."
-              style="font-family: 'Courier New', monospace; font-size: 13px;" />
-            <div style="margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary);">
-              这里定义了该模式专用的规则和指令
+        <!-- 文件列表和编辑器布局 -->
+        <div style="display: flex; gap: 16px; height: 600px;">
+          <!-- 左侧：文件列表 -->
+          <div style="width: 250px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; font-size: 14px;">规则文件</span>
+              <el-button type="primary" size="small" @click="addNewRuleFile" :icon="Plus">
+                新建
+              </el-button>
             </div>
-          </el-form-item>
-        </el-form>
+
+            <div style="flex: 1; overflow-y: auto; border: 1px solid var(--el-border-color); border-radius: 4px;">
+              <div v-for="file in modeRuleFiles" :key="file.name" @click="selectRuleFile(file)"
+                :class="['rule-file-item', { active: currentRuleFile?.name === file.name }]">
+                <el-tooltip :content="file.name" placement="right">
+                  <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; cursor: pointer;">
+                    <span style="font-size: 13px;">{{ file.name }}</span>
+                    <el-button v-if="file.name !== 'mode.md'" type="danger" size="small" link
+                      @click.stop="deleteRuleFile(file)" :icon="Delete">
+                      删除
+                    </el-button>
+                  </div>
+                </el-tooltip>
+              </div>
+
+              <el-empty v-if="modeRuleFiles.length === 0" description="暂无规则文件" :image-size="60" />
+            </div>
+          </div>
+
+          <!-- 右侧：编辑器 -->
+          <div style="flex: 1; display: flex; flex-direction: column;">
+            <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <el-tooltip v-if="currentRuleFile" :content="currentRuleFile.name" placement="top">
+                <span
+                  style="font-weight: 600; font-size: 14px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">
+                  {{ currentRuleFile.name }}
+                </span>
+              </el-tooltip>
+              <span v-else style="font-weight: 600; font-size: 14px;">
+                请选择文件
+              </span>
+              <el-tag v-if="currentRuleFile?.name === 'mode.md'" type="info" size="small">
+                主规则文件
+              </el-tag>
+            </div>
+
+            <div v-if="currentRuleFile" ref="rulesVditorRef" class="rules-editor-container" style="flex: 1;"></div>
+            <div v-else
+              style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--el-text-color-secondary);">
+              请选择或创建一个规则文件
+            </div>
+          </div>
+        </div>
       </div>
 
       <template #footer>
         <el-button @click="showModeRulesDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveModeRules" :loading="saving">保存</el-button>
+        <el-button type="primary" @click="saveModeRules" :loading="saving"
+          :disabled="!currentRuleFile">保存当前文件</el-button>
       </template>
     </el-dialog>
 
@@ -1098,7 +1241,7 @@
 
     <!-- Market Dialog -->
     <MarketDialog v-model="marketDialogVisible" :workspace-id="workspaceId || ''" :initial-type="marketResourceType"
-      @closed="loadSettings" />
+      @closed="() => loadSettings(true)" />
   </el-drawer>
 </template>
 
@@ -1108,17 +1251,26 @@
 */
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Setting, Plus, Document, Refresh, Search, ShoppingCart } from '@element-plus/icons-vue';
+import * as yaml from 'js-yaml';
+import { Setting, Plus, Document, Refresh, Search, ShoppingCart, Edit, Delete, Loading } from '@element-plus/icons-vue';
 import { apiManager } from '@/services/api';
 import type { Skill } from '@/services/api';
+import { skillsApi } from '@/services/api/services/skills';
+import type { SkillFileTreeItem } from '@/services/api/services/skills';
 import MarketDialog from '@/components/market/MarketDialog.vue';
 import PluginConfigPanel from '@/components/workspace/PluginConfigPanel.vue';
+import CodeEditor from '@/components/editor/CodeEditor.vue';
+import FileTreeNode from './FileTreeNode.vue';
 import type { ResourceType } from '@/services/api/services/market';
+import Vditor from 'vditor';
+import 'vditor/dist/index.css';
+import { useThemeStore } from '@/stores/theme';
 
 const { t } = useI18n();
+const themeStore = useThemeStore();
 
 const props = defineProps<{
   modelValue: boolean;
@@ -1137,6 +1289,11 @@ const saving = ref(false);
 const settingsLoaded = ref(false); // 用于控制 tabs 渲染时机，避免首次打开不显示内容
 const testingProvider = ref(false);
 const providerTestResult = ref<{ success: boolean; supported: boolean; message: string } | null>(null);
+
+// Vditor refs for Rules editor
+const rulesVditorRef = ref<HTMLDivElement | null>(null);
+const rulesVditor = ref<Vditor | null>(null);
+const rulesVditorInitialized = ref(false);
 
 // 插件配置相关状态
 const pluginConfigDialogVisible = ref(false);
@@ -1235,10 +1392,6 @@ const workspaceConfig = ref({
     file_output: true,
     enable_performance_logging: true,
     sanitize_sensitive_data: true
-  },
-  monitoring: {
-    prometheus_enabled: true,
-    prometheus_port: 9090
   },
   analytics: {
     enabled: true,
@@ -1376,6 +1529,7 @@ const modeForm = ref({
   customInstructions: '',
   groups: []
 });
+const modeYamlContent = ref('');
 
 const modeList = computed(() => {
   return modeSettings.value.allModes || [];
@@ -1385,6 +1539,10 @@ const modeList = computed(() => {
 const showModeRulesDialog = ref(false);
 const editingModeRules = ref<unknown>(null);
 const modeRulesContent = ref('');
+const modeRulesPath = ref<string | null>(null);  // 规则文件的实际路径（已废弃）
+const modeRulesDirectory = ref<string | null>(null);  // 规则目录路径
+const modeRuleFiles = ref<Array<{ name: string, content: string }>>([]);  // 所有规则文件
+const currentRuleFile = ref<{ name: string, content: string } | null>(null);  // 当前选中的文件
 
 // MCP 服务器管理
 const showMcpDialog = ref(false);
@@ -1439,7 +1597,7 @@ watch(visible, (newVal) => {
   emit('update:modelValue', newVal);
 });
 
-const loadSettings = async () => {
+const loadSettings = async (forceReload: boolean = false) => {
   if (!props.workspaceId) return;
   settingsLoaded.value = false; // 开始加载时重置状态
   await Promise.all([
@@ -1449,11 +1607,11 @@ const loadSettings = async () => {
     loadSystemEnvironments(),
     loadUIContext(),
     loadLLMSettings(),
-    loadModeSettings(),
+    loadModeSettings(forceReload),
     loadMcpSettings(),
     loadAdvancedSettings(),
-    loadSkills(),
-    loadPlugins()
+    loadSkills(forceReload),
+    loadPlugins(forceReload)
   ]);
   settingsLoaded.value = true; // 加载完成后设置状态，确保 tabs 正确渲染
 };
@@ -1491,7 +1649,6 @@ const loadWorkspaceConfig = async () => {
         skills: { ...workspaceConfig.value.skills, ...response.config.skills },
         tools: { ...workspaceConfig.value.tools, ...response.config.tools },
         logging: { ...workspaceConfig.value.logging, ...response.config.logging },
-        monitoring: { ...workspaceConfig.value.monitoring, ...response.config.monitoring },
         analytics: { ...workspaceConfig.value.analytics, ...response.config.analytics }
       };
     }
@@ -1530,7 +1687,6 @@ const resetWorkspaceConfig = async () => {
         skills: { ...workspaceConfig.value.skills, ...response.config.skills },
         tools: { ...workspaceConfig.value.tools, ...response.config.tools },
         logging: { ...workspaceConfig.value.logging, ...response.config.logging },
-        monitoring: { ...workspaceConfig.value.monitoring, ...response.config.monitoring },
         analytics: { ...workspaceConfig.value.analytics, ...response.config.analytics }
       };
       ElMessage.success('配置已重置为默认值');
@@ -1792,11 +1948,11 @@ const editProvider = (provider: unknown) => {
     : '';
 
   showProviderDialog.value = true;
-  // 重置测试结果
+  // Reset test result
   providerTestResult.value = null;
 };
 
-// 测试 Provider 是否支持 Tool Call
+// Test provider Tool Call support
 const testProvider = async () => {
   if (!props.workspaceId) return;
   if (!providerForm.value.openAiModelId && providerForm.value.apiProvider !== 'ollama') {
@@ -1940,11 +2096,12 @@ const deleteProvider = async (providerName: string) => {
 
 // ==================== Mode Settings 管理方法 ====================
 
-const loadModeSettings = async () => {
+const loadModeSettings = async (forceReload: boolean = false) => {
   if (!props.workspaceId) return;
   try {
     // 获取所有模式（包括内置和自定义）
-    const response = await apiManager.getWorkspacesApi().getModes(props.workspaceId);
+    // forceReload: 是否强制重新加载（绕过缓存）
+    const response = await apiManager.getWorkspacesApi().getModes(props.workspaceId, forceReload);
     modeSettings.value.allModes = response.modes || [];
 
     // 保留 customModes 用于兼容旧代码
@@ -1989,28 +2146,67 @@ const viewModel = (mode: unknown) => {
 const editMode = (mode: unknown) => {
   editingMode.value = mode.slug;
   modeForm.value = { ...mode };
+
+  // 将模式配置转换为 YAML 格式
+  const modeConfig = {
+    slug: mode.slug,
+    name: mode.name,
+    description: mode.description,
+    roleDefinition: mode.role_definition || mode.roleDefinition || '',
+    whenToUse: mode.when_to_use || mode.whenToUse || '',
+    customInstructions: mode.custom_instructions || mode.customInstructions || '',
+    groups: mode.groups || []
+  };
+
+  try {
+    modeYamlContent.value = yaml.dump(modeConfig, {
+      indent: 2,
+      lineWidth: -1,  // 不限制行宽
+      noRefs: true,    // 不使用引用
+      sortKeys: false  // 保持原始顺序
+    });
+  } catch (error) {
+    console.error('Failed to convert mode to YAML:', error);
+    modeYamlContent.value = '# Error converting mode to YAML\n' + JSON.stringify(modeConfig, null, 2);
+  }
+
   showModeDialog.value = true;
 };
 
 const saveMode = async () => {
   if (!props.workspaceId) return;
 
-  // 基本验证
-  if (!modeForm.value.slug || !modeForm.value.name || !modeForm.value.description) {
-    ElMessage.warning('请填写必填字段');
-    return;
-  }
-
   saving.value = true;
   try {
     if (editingMode.value) {
-      await apiManager.getWorkspacesApi().updateMode(
-        props.workspaceId,
-        editingMode.value,
-        modeForm.value
-      );
-      ElMessage.success('模式更新成功');
+      // 编辑模式：从 YAML 解析配置
+      try {
+        const parsedConfig = yaml.load(modeYamlContent.value) as Record<string, unknown>;
+
+        // 验证必需字段
+        if (!parsedConfig.slug || !parsedConfig.name || !parsedConfig.description) {
+          ElMessage.warning('YAML 配置缺少必需字段 (slug, name, description)');
+          return;
+        }
+
+        await apiManager.getWorkspacesApi().updateMode(
+          props.workspaceId,
+          editingMode.value,
+          parsedConfig
+        );
+        ElMessage.success('模式更新成功');
+      } catch (error) {
+        ElMessage.error('YAML 解析失败: ' + (error as Error).message);
+        console.error('Failed to parse YAML:', error);
+        return;
+      }
     } else {
+      // 创建模式：使用表单数据
+      if (!modeForm.value.slug || !modeForm.value.name || !modeForm.value.description) {
+        ElMessage.warning('请填写必填字段');
+        return;
+      }
+
       await apiManager.getWorkspacesApi().createMode(
         props.workspaceId,
         modeForm.value
@@ -2043,13 +2239,27 @@ const deleteMode = async (modeSlug: string) => {
     );
 
     saving.value = true;
+
+    // 执行删除
     await apiManager.getWorkspacesApi().deleteMode(props.workspaceId, modeSlug);
+
+    // 清空本地模式列表以确保重新加载
+    modeSettings.value.allModes = [];
+    modeSettings.value.customModes = [];
+
+    // 添加短暂延迟确保文件系统操作完成
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 强制重新加载模式列表（绕过缓存）
+    await loadModeSettings(true);
+
     ElMessage.success('模式删除成功');
-    await loadModeSettings();
   } catch (error: unknown) {
     if (error !== 'cancel') {
       ElMessage.error(error.response?.data?.detail || '删除失败');
       console.error('Failed to delete mode:', error);
+      // 失败时也重新加载列表以确保状态一致
+      await loadModeSettings(true);
     }
   } finally {
     saving.value = false;
@@ -2066,6 +2276,7 @@ const resetModeForm = () => {
     customInstructions: '',
     groups: []
   };
+  modeYamlContent.value = '';
 };
 
 // Mode Rules 管理
@@ -2074,16 +2285,36 @@ const editModeRules = async (mode: unknown) => {
 
   editingModeRules.value = mode;
   modeRulesContent.value = '';
+  modeRulesPath.value = null;  // 重置路径
 
   saving.value = true;
   try {
     const response = await apiManager.getWorkspacesApi().getModeRules(props.workspaceId, mode.slug);
-    modeRulesContent.value = response.rules || '';
+    // response.rules 现在是一个字典 (Record<string, string>)
+    // 将字典转换为数组供 UI 使用
+    modeRuleFiles.value = Object.entries(response.rules || {}).map(([name, content]) => ({ name, content }));
+    modeRulesDirectory.value = response.directory || null;  // 修复：使用正确的变量名
+
+    // 如果有规则文件，默认选中第一个
+    if (modeRuleFiles.value.length > 0) {
+      currentRuleFile.value = modeRuleFiles.value[0];
+    }
+
     showModeRulesDialog.value = true;
+
+    // 初始化 Vditor
+    await nextTick();
+    initRulesVditor();
   } catch {
     // 如果 rules 文件不存在，使用空内容
-    modeRulesContent.value = '';
+    modeRuleFiles.value = [];
+    currentRuleFile.value = null;
+    modeRulesDirectory.value = null;  // 修复：使用正确的变量名
     showModeRulesDialog.value = true;
+
+    // 初始化 Vditor
+    await nextTick();
+    initRulesVditor();
   } finally {
     saving.value = false;
   }
@@ -2094,10 +2325,24 @@ const saveModeRules = async () => {
 
   saving.value = true;
   try {
+    // 从 Vditor 获取当前编辑的文件内容
+    const currentContent = rulesVditor.value ? rulesVditor.value.getValue() : '';
+
+    // 更新当前文件的内容
+    if (currentRuleFile.value) {
+      currentRuleFile.value.content = currentContent;
+    }
+
+    // 将 modeRuleFiles 数组转换为字典
+    const rulesDict: Record<string, string> = {};
+    modeRuleFiles.value.forEach(file => {
+      rulesDict[file.name] = file.content;
+    });
+
     await apiManager.getWorkspacesApi().updateModeRules(
       props.workspaceId,
       editingModeRules.value.slug,
-      modeRulesContent.value
+      rulesDict  // 传递字典而不是字符串
     );
     ElMessage.success('Rules 保存成功');
     showModeRulesDialog.value = false;
@@ -2108,9 +2353,114 @@ const saveModeRules = async () => {
   }
 };
 
+// Vditor 初始化函数
+const initRulesVditor = () => {
+  if (!rulesVditorRef.value) return;
+
+  // 获取当前文件内容
+  const currentContent = currentRuleFile.value?.content || '';
+
+  // 如果已经初始化过，只更新值
+  if (rulesVditorInitialized.value && rulesVditor.value) {
+    const currentValue = rulesVditor.value.getValue();
+    if (currentValue !== currentContent) {
+      rulesVditor.value.setValue(currentContent);
+    }
+    return;
+  }
+
+  // 首次初始化 - 使用 value 参数而不是在 after 中调用 setValue
+  rulesVditor.value = new Vditor(rulesVditorRef.value, {
+    theme: themeStore.theme === 'dark' ? 'dark' : 'classic',
+    mode: 'wysiwyg',
+    height: 500,
+    value: currentContent,  // 直接在初始化时传入值，避免 lute 未初始化问题
+    placeholder: '输入该模式的 rules 内容...',
+    cache: {
+      enable: false,
+    },
+    input: (value: string) => {
+      // 更新当前文件的内容
+      if (currentRuleFile.value) {
+        currentRuleFile.value.content = value;
+      }
+    },
+    after: () => {
+      rulesVditorInitialized.value = true;
+    },
+  });
+};
+
+// 选择规则文件
+const selectRuleFile = (file: { name: string; content: string }) => {
+  currentRuleFile.value = file;
+  if (rulesVditorInitialized.value && rulesVditor.value) {
+    rulesVditor.value.setValue(file.content);
+  }
+};
+
+// 添加新规则文件
+const addNewRuleFile = () => {
+  const fileName = prompt('请输入新规则文件的名称（将自动添加 .md 扩展名）:');
+  if (fileName && fileName.trim()) {
+    // 自动添加 .md 扩展名（如果用户没有输入）
+    let finalFileName = fileName.trim();
+    if (!finalFileName.endsWith('.md')) {
+      finalFileName = finalFileName + '.md';
+    }
+    const newFile = { name: finalFileName, content: '# New Rules\n\nAdd your rules here.' };
+    modeRuleFiles.value.push(newFile);
+    currentRuleFile.value = newFile;
+    if (rulesVditorInitialized.value && rulesVditor.value) {
+      rulesVditor.value.setValue(newFile.content);
+    }
+  }
+};
+
+// 删除规则文件
+const deleteRuleFile = (fileName: string) => {
+  if (modeRuleFiles.value.length <= 1) {
+    ElMessage.warning('至少需要保留一个规则文件');
+    return;
+  }
+
+  ElMessageBox.confirm(`确定要删除规则文件 "${fileName}" 吗？`, '确认删除', {
+    confirmButtonText: '删除',
+    cancelButtonText: '取消',
+    type: 'warning',
+  }).then(() => {
+    const index = modeRuleFiles.value.findIndex(f => f.name === fileName);
+    if (index > -1) {
+      modeRuleFiles.value.splice(index, 1);
+      // 如果删除的是当前文件，选中第一个
+      if (currentRuleFile.value?.name === fileName) {
+        currentRuleFile.value = modeRuleFiles.value[0] || null;
+        if (rulesVditorInitialized.value && rulesVditor.value && currentRuleFile.value) {
+          rulesVditor.value.setValue(currentRuleFile.value.content);
+        }
+      }
+      ElMessage.success('删除成功');
+    }
+  }).catch(() => {
+    // 用户取消
+  });
+};
+
+// 监听主题变化
+watch(() => themeStore.theme, (newTheme) => {
+  rulesVditor.value?.setTheme(newTheme === 'dark' ? 'dark' : 'classic');
+});
+
 const resetModeRulesForm = () => {
   editingModeRules.value = null;
   modeRulesContent.value = '';
+  modeRuleFiles.value = [];
+  currentRuleFile.value = null;
+  rulesVditorInitialized.value = false;
+  if (rulesVditor.value) {
+    rulesVditor.value.destroy();
+    rulesVditor.value = null;
+  }
 };
 
 // MCP 服务器管理
@@ -2251,6 +2601,37 @@ const skillsFilter = ref({
   search: ''
 });
 
+// 技能编辑相关变量
+const editSkillDialogVisible = ref(false);
+const editSkillForm = ref({
+  name: '',
+  description: '',
+  content: ''
+});
+const savingSkill = ref(false);
+const currentEditingSkill = ref<Skill | null>(null);
+
+// 新建技能相关变量
+const createSkillDialogVisible = ref(false);
+const createSkillForm = ref({
+  name: '',
+  description: '',
+  content: '',
+  scope: 'workspace'
+});
+const creatingSkill = ref(false);
+
+// 技能文件编辑器相关变量
+const showSkillEditorDialog = ref(false);
+const editingSkill = ref<Skill | null>(null);
+const skillFileTree = ref<SkillFileTreeItem[]>([]);
+const skillFileTreeLoading = ref(false);
+const currentSkillFile = ref<SkillFileTreeItem | null>(null);
+const skillVditorRef = ref<HTMLDivElement | null>(null);
+const skillVditor = ref<Vditor | null>(null);
+const skillVditorInitialized = ref(false);
+const savingSkillFile = ref(false);
+
 // 过滤后的 skills 列表
 const filteredSkills = computed(() => {
   let filtered = [...skillsList.value];
@@ -2277,7 +2658,7 @@ const filteredSkills = computed(() => {
   return filtered;
 });
 
-const loadSkills = async () => {
+const loadSkills = async (forceReload: boolean = false) => {
   if (!props.workspaceId) {
     ElMessage.warning(t('workspaceSettings.messages.selectWorkspace'));
     return;
@@ -2286,7 +2667,8 @@ const loadSkills = async () => {
   loadingSkills.value = true;
   try {
     const response = await apiManager.getSkillsApi().listSkills({
-      workspace_id: props.workspaceId
+      workspace_id: props.workspaceId,
+      force_reload: forceReload
     });
     skillsList.value = response.skills || [];
     ElMessage.success(t('workspaceSettings.skills.skillsLoaded', { count: skillsList.value.length }));
@@ -2300,6 +2682,305 @@ const loadSkills = async () => {
 
 const filterSkills = () => {
   // filteredSkills computed property 会自动更新
+};
+
+// 打开编辑技能对话框
+const openEditSkillDialog = async (skill: Skill) => {
+  currentEditingSkill.value = skill;
+  editSkillForm.value = {
+    name: skill.name,
+    description: skill.description,
+    content: ''
+  };
+
+  // 获取技能的完整内容
+  try {
+    const contentResponse = await skillsApi.getSkillContent(skill.name, {
+      workspace_id: props.workspaceId
+    });
+    editSkillForm.value.content = contentResponse.content || '';
+    editSkillDialogVisible.value = true;
+  } catch (error) {
+    ElMessage.error(t('workspaceSettings.skills.messages.loadContentFailed'));
+    console.error('Failed to load skill content:', error);
+  }
+};
+
+// 保存技能
+const saveSkill = async () => {
+  if (!currentEditingSkill.value || !props.workspaceId) {
+    return;
+  }
+
+  savingSkill.value = true;
+  try {
+    await skillsApi.updateSkill(
+      currentEditingSkill.value.name,
+      {
+        name: editSkillForm.value.name,
+        description: editSkillForm.value.description,
+        content: editSkillForm.value.content
+      },
+      { workspace_id: props.workspaceId }
+    );
+    ElMessage.success(t('workspaceSettings.skills.messages.saveSuccess'));
+    editSkillDialogVisible.value = false;
+    // 重新加载技能列表
+    await loadSkills();
+  } catch (error) {
+    ElMessage.error(t('workspaceSettings.skills.messages.saveFailed'));
+    console.error('Failed to save skill:', error);
+  } finally {
+    savingSkill.value = false;
+  }
+};
+
+// 删除技能
+const deleteSkill = async (skill: Skill) => {
+  if (!props.workspaceId) {
+    return;
+  }
+
+  try {
+    const response = await skillsApi.deleteSkill(skill.name, {
+      workspace_id: props.workspaceId
+    });
+
+    // 清空本地列表以确保重新加载
+    skillsList.value = [];
+
+    // 添加短暂延迟确保文件系统操作完成
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 重新加载技能列表
+    await loadSkills();
+
+    // 显示成功消息（如果有重复技能提示）
+    if (response.message && response.message.includes('Note:')) {
+      ElMessage.warning({
+        message: response.message,
+        duration: 5000
+      });
+    } else {
+      ElMessage.success(t('workspaceSettings.skills.messages.deleteSuccess'));
+    }
+  } catch (error) {
+    ElMessage.error(t('workspaceSettings.skills.messages.deleteFailed'));
+    console.error('Failed to delete skill:', error);
+    // 失败时也重新加载列表以确保状态一致
+    await loadSkills();
+  }
+};
+
+// 打开新建技能对话框
+const openCreateSkillDialog = () => {
+  createSkillForm.value = {
+    name: '',
+    description: '',
+    content: '',
+    scope: 'workspace'
+  };
+  createSkillDialogVisible.value = true;
+};
+
+// 创建技能
+const createSkill = async () => {
+  if (!createSkillForm.value.name || !props.workspaceId) {
+    ElMessage.warning(t('workspaceSettings.skills.messages.createNeedWorkspace'));
+    return;
+  }
+
+  creatingSkill.value = true;
+  try {
+    await skillsApi.createSkill(
+      {
+        name: createSkillForm.value.name,
+        description: createSkillForm.value.description,
+        content: createSkillForm.value.content,
+        scope: createSkillForm.value.scope
+      },
+      { workspace_id: props.workspaceId }
+    );
+    ElMessage.success(t('workspaceSettings.skills.messages.createSuccess'));
+    createSkillDialogVisible.value = false;
+    // 重新加载技能列表
+    await loadSkills();
+  } catch (error) {
+    ElMessage.error(t('workspaceSettings.skills.messages.createFailed'));
+    console.error('Failed to create skill:', error);
+  } finally {
+    creatingSkill.value = false;
+  }
+};
+
+// ==================== 技能文件编辑器相关方法 ====================
+
+// 初始化技能编辑器 Vditor
+const initSkillVditor = (initialContent: string = '') => {
+  // 如果已初始化，先销毁
+  if (skillVditor.value) {
+    skillVditor.value.destroy();
+    skillVditor.value = null;
+  }
+
+  // 确保 ref 元素存在
+  if (!skillVditorRef.value) {
+    console.error('Vditor ref element not found');
+    return;
+  }
+
+  skillVditor.value = new Vditor(skillVditorRef.value, {
+    theme: themeStore.theme === 'dark' ? 'dark' : 'classic',
+    mode: 'wysiwyg',
+    height: '100%',
+    value: initialContent,
+    placeholder: '输入文件内容...',
+    cache: {
+      enable: false,
+    },
+    input: (value: string) => {
+      // 实时更新内容到当前文件对象
+      if (currentSkillFile.value) {
+        currentSkillFile.value.content = value;
+      }
+    },
+    after: () => {
+      skillVditorInitialized.value = true;
+    }
+  });
+};
+
+// 打开技能编辑器对话框
+const openSkillEditorDialog = async (skill: Skill) => {
+  editingSkill.value = skill;
+  showSkillEditorDialog.value = true;
+  skillFileTree.value = [];
+  currentSkillFile.value = null;
+
+  // 加载文件树
+  await loadSkillFileTree();
+};
+
+// 加载技能文件树
+const loadSkillFileTree = async () => {
+  if (!editingSkill.value) return;
+
+  skillFileTreeLoading.value = true;
+  try {
+    const response = await skillsApi.getSkillFileTree(editingSkill.value.name, {
+      workspace_id: props.workspaceId || undefined
+    });
+    skillFileTree.value = response.tree || [];
+
+    // 默认选中 SKILL.md 文件
+    const skillFile = skillFileTree.value.find(item => item.name === 'SKILL.md');
+    if (skillFile) {
+      await handleSkillFileClick(skillFile);
+    }
+  } catch (error) {
+    console.error('Failed to load skill file tree:', error);
+    ElMessage.error(t('workspaceSettings.skills.editor.loadTreeFailed'));
+  } finally {
+    skillFileTreeLoading.value = false;
+  }
+};
+
+// 刷新技能文件树
+const refreshSkillFileTree = async () => {
+  await loadSkillFileTree();
+};
+
+// 处理文件点击
+const handleSkillFileClick = async (file: SkillFileTreeItem) => {
+  if (file.type === 'folder') return;
+
+  currentSkillFile.value = file;
+
+  // 加载文件内容
+  if (!editingSkill.value) return;
+
+  try {
+    const response = await skillsApi.getSkillFileContent(
+      editingSkill.value.name,
+      file.path,
+      { workspace_id: props.workspaceId || undefined }
+    );
+
+    // 等待 DOM 更新让元素渲染
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // 初始化或更新 Vditor
+    if (!skillVditor.value) {
+      initSkillVditor(response.content);
+    } else {
+      skillVditor.value.setValue(response.content);
+    }
+  } catch (error) {
+    console.error('Failed to load file content:', error);
+    ElMessage.error(t('workspaceSettings.skills.editor.loadContentFailed'));
+  }
+};
+
+// 保存当前文件
+const saveSkillFile = async () => {
+  if (!editingSkill.value || !currentSkillFile.value || !skillVditor.value) return;
+
+  savingSkillFile.value = true;
+  try {
+    const content = skillVditor.value.getValue();
+    await skillsApi.updateSkillFileContent(
+      editingSkill.value.name,
+      currentSkillFile.value.path,
+      content,
+      { workspace_id: props.workspaceId || undefined }
+    );
+    ElMessage.success(t('workspaceSettings.skills.editor.saveSuccess'));
+  } catch (error) {
+    console.error('Failed to save file:', error);
+    ElMessage.error(t('workspaceSettings.skills.editor.saveFailed'));
+  } finally {
+    savingSkillFile.value = false;
+  }
+};
+
+// 关闭技能编辑器对话框
+const closeSkillEditorDialog = () => {
+  // 销毁 Vditor 实例
+  if (skillVditor.value) {
+    skillVditor.value.destroy();
+    skillVditor.value = null;
+    skillVditorInitialized.value = false;
+  }
+
+  showSkillEditorDialog.value = false;
+  editingSkill.value = null;
+  skillFileTree.value = [];
+  currentSkillFile.value = null;
+};
+
+// ==================== Scope 辅助函数 ====================
+
+// Scope 显示名称映射
+const scopeDisplayNames: Record<string, string> = {
+  workspace: '工作区',
+  system: '系统',
+  user: '用户'
+};
+
+// Scope 标签类型映射
+const scopeTagTypes: Record<string, 'warning' | 'success' | 'info'> = {
+  workspace: 'warning',
+  system: 'info',
+  user: 'success'
+};
+
+const getScopeDisplayName = (scope: string) => {
+  return scopeDisplayNames[scope] || scope;
+};
+
+const getScopeTagType = (scope: string) => {
+  return scopeTagTypes[scope] || 'info';
 };
 
 // ==================== Provider 辅助函数 ====================
@@ -2381,7 +3062,7 @@ const handlePrivacyConfigChanged = (config: unknown) => {
   }
 };
 
-const loadPlugins = async () => {
+const loadPlugins = async (forceReload: boolean = false) => {
   if (!props.workspaceId) {
     ElMessage.warning(t('workspaceSettings.messages.selectWorkspace'));
     return;
@@ -2391,7 +3072,7 @@ const loadPlugins = async () => {
   try {
     // Use plugins API instead of market API
     const { pluginsApi } = await import('@/services/api/plugins');
-    const plugins = await pluginsApi.listPlugins(props.workspaceId);
+    const plugins = await pluginsApi.listPlugins(props.workspaceId, forceReload);
 
     // Transform plugins to match expected format
     pluginList.value = plugins.map(plugin => ({
@@ -2414,6 +3095,18 @@ const loadPlugins = async () => {
     loadingPlugins.value = false;
   }
 };
+
+// 组件卸载时清理 Vditor 实例
+onUnmounted(() => {
+  if (rulesVditor.value) {
+    rulesVditor.value.destroy();
+    rulesVditor.value = null;
+  }
+  if (skillVditor.value) {
+    skillVditor.value.destroy();
+    skillVditor.value = null;
+  }
+});
 </script>
 
 <style scoped>
@@ -2593,5 +3286,70 @@ const loadPlugins = async () => {
 
 .workspace-sub-tabs :deep(.el-tabs__active-bar) {
   display: none;
+}
+
+/* Rule file item styling */
+.rule-file-item {
+  border-bottom: 1px solid var(--el-border-color);
+  transition: background-color 0.2s;
+}
+
+.rule-file-item:hover {
+  background-color: var(--el-fill-color-light);
+}
+
+.rule-file-item.active {
+  background-color: var(--el-color-primary-light-9);
+  border-left: 3px solid var(--el-color-primary);
+}
+
+.rule-file-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+  display: inline-block;
+}
+
+/* Rules editor Vditor 样式 */
+.rules-editor-container {
+  width: 100%;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rules-editor-container :deep(.vditor) {
+  border: none;
+}
+
+.rules-editor-container :deep(.vditor-toolbar) {
+  border-bottom: 1px solid var(--el-border-color);
+  background-color: var(--el-bg-color);
+}
+
+.rules-editor-container :deep(.vditor-content) {
+  background-color: var(--el-bg-color);
+}
+
+/* Skill editor Vditor 样式 */
+.skill-editor-container {
+  width: 100%;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.skill-editor-container :deep(.vditor) {
+  border: none;
+}
+
+.skill-editor-container :deep(.vditor-toolbar) {
+  border-bottom: 1px solid var(--el-border-color);
+  background-color: var(--el-bg-color);
+}
+
+.skill-editor-container :deep(.vditor-content) {
+  background-color: var(--el-bg-color);
 }
 </style>

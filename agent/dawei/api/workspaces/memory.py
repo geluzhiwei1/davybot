@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from dawei.config import get_workspaces_root
 from dawei.memory.memory_graph import MemoryEntry, MemoryGraph, MemoryType
 
 # Router following the same pattern as files.py
@@ -114,7 +115,7 @@ def _get_memory_db_path(workspace_id: str) -> str:
     if workspace_path:
         return str(workspace_path / ".dawei" / "memory.db")
     # Fallback
-    workspaces_root = Path(os.getenv("WORKSPACES_ROOT", "./workspaces"))
+    workspaces_root = get_workspaces_root()
     return str(workspaces_root / workspace_id / ".dawei" / "memory.db")
 
 
@@ -139,8 +140,8 @@ def _get_workspace_path(workspace_id: str) -> Path | None:
         # Workspace file not found or invalid, fallback will handle
         pass
 
-    # Fallback: try ./workspaces/{workspace_id}
-    workspaces_root = Path(os.getenv("WORKSPACES_ROOT", "./workspaces"))
+    # Fallback: try {DAWEI_HOME}/{workspace_id}
+    workspaces_root = get_workspaces_root()
     fallback_path = workspaces_root / workspace_id
     if fallback_path.exists():
         return fallback_path

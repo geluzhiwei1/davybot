@@ -49,12 +49,8 @@ class StreamProcessor:
                     if data == "[DONE]":
                         break
 
-                    try:
-                        message = json.loads(data)
-                        yield message
-                    except json.JSONDecodeError as e:
-                        self.logger.warning(f"Failed to parse JSON from stream: {e}, data: {data}")
-                        continue
+                    message = json.loads(data)
+                    yield message
                 elif chunk_str:
                     self.logger.debug(f"Received non-JSON chunk: {chunk_str}")
 
@@ -91,12 +87,8 @@ class StreamProcessor:
                 if data == "[DONE]":
                     break
 
-                try:
-                    message = json.loads(data)
-                    yield message
-                except json.JSONDecodeError as e:
-                    self.logger.warning(f"Failed to parse JSON from HTTP stream: {e}, data: {data}")
-                    continue
+                message = json.loads(data)
+                yield message
             elif line_str:
                 self.logger.debug(f"Received non-JSON line: {line_str}")
 

@@ -62,16 +62,23 @@ class TaskGraphExecutionEngine:
         if user_workspace is None:
             raise ConfigurationError("user_workspace must be provided")
 
+        # 初始化logger（必须在最开始）
+        self.logger = get_logger(__name__)
+
         self._user_workspace = user_workspace
         self._message_processor = message_processor
         self._llm_service = llm_service
         self._tool_call_service = tool_call_service
-        self._event_bus = self._user_workspace.event_bus
+        # 🔧 修复：使用 Agent 的 event_bus
+        # 这样确保 ExecutionEngine、TaskNodeExecutor 和 Agent 使用同一个 event_bus
+        # WebSocket handler 订阅的是 Agent 的 event_bus，所以所有事件都必须发送到那里
+        if not agent:
+            raise ConfigurationError("agent must be provided for event_bus")
+        if not hasattr(agent, 'event_bus'):
+            raise ConfigurationError("agent must have event_bus attribute")
+        self._event_bus = agent.event_bus
         self._config = config
         self._agent = agent  # 保存agent引用
-
-        # 初始化其他属性
-        self.logger = get_logger(__name__)
 
         # 验证必要的服务是否可用
         if message_processor is None:
@@ -161,6 +168,7 @@ class TaskGraphExecutionEngine:
         await emit_typed_event(
             TaskEventType.TASK_COMPLETED,
             task_completed_data,
+            self._event_bus,
             task_id=task_id,
             source="task_graph_excutor",
         )

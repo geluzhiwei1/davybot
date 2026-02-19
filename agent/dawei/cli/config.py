@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from dawei.logg.logging import get_logger
 
@@ -55,7 +55,15 @@ class CLIConfig:
 
     def _load_env_vars(self):
         """加载环境变量"""
-        # 尝试从workspace目录加载.env
+        # 首先尝试 find_dotenv() 从当前目录查找
+        env_path = find_dotenv()
+        if env_path:
+            load_dotenv(env_path, override=True)
+            if self.verbose:
+                self._logger.info(f"Loaded environment variables from: {env_path}")
+            return  # 找到就直接返回
+
+        # 回退：尝试 workspace 和 cwd
         env_paths = [
             self._workspace_path / ".env",
             Path.cwd() / ".env",
@@ -63,7 +71,7 @@ class CLIConfig:
 
         for env_path in env_paths:
             if env_path.exists():
-                load_dotenv(env_path)
+                load_dotenv(env_path, override=True)
                 if self.verbose:
                     self._logger.info(f"Loaded environment variables from: {env_path}")
                 break

@@ -15,7 +15,8 @@ from dawei.agentic.pdca_context import (
     PDCAPhase,
     get_pdca_context_manager,
 )
-from dawei.core.events import CORE_EVENT_BUS, TaskEventType
+from dawei.core.events import TaskEventType, emit_typed_event
+from dawei.interfaces import IEventBus
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,15 @@ class PDCACycleManager:
     负责管理 PDCA 循环的状态流转和自动化决策
     """
 
-    def __init__(self):
+    def __init__(self, event_bus: IEventBus | None = None):
+        """初始化 PDCA 循环管理器
+
+        Args:
+            event_bus: 事件总线实例（可选，用于发布 PDCA 事件）
+        """
         self.context_manager = get_pdca_context_manager()
         self.domain_adapter = get_domain_adapter()
+        self.event_bus = event_bus
 
     async def start_cycle(
         self,
@@ -56,16 +63,15 @@ class PDCACycleManager:
             domain = self.domain_adapter.detect_domain(task_description)
             logger.info(f"Auto-detected domain: {domain.value}")
 
-            # Emit PDCA domain detected event
-            await CORE_EVENT_BUS.publish(
-                TaskEventType.PDCA_DOMAIN_DETECTED,
-                {
-                    "domain": domain.value,
-                    "task_description": task_description,
-                },
-                task_id=session_id,
-                source="pdca_manager",
-            )
+            # 发布领域检测事件
+            if self.event_bus:
+                await emit_typed_event(
+                    TaskEventType.PDCA_DOMAIN_DETECTED,
+                    {"domain": domain.value, "session_id": session_id},
+                    self.event_bus,
+                    session_id,
+                    "pdca_manager",
+                )
 
         # 创建循环
         cycle = self.context_manager.create_cycle(
@@ -78,20 +84,20 @@ class PDCACycleManager:
 
         logger.info(f"Started PDCA cycle: {cycle.cycle_id} for domain: {domain.value}")
 
-        # Emit PDCA cycle started event
-        await CORE_EVENT_BUS.publish(
-            TaskEventType.PDCA_CYCLE_STARTED,
-            {
-                "cycle_id": cycle.cycle_id,
-                "session_id": session_id,
-                "domain": domain.value,
-                "task_description": task_description,
-                "task_goals": task_goals,
-                "success_criteria": success_criteria,
-            },
-            task_id=cycle.cycle_id,
-            source="pdca_manager",
-        )
+        # 发布循环启动事件
+        if self.event_bus:
+            await emit_typed_event(
+                TaskEventType.PDCA_CYCLE_STARTED,
+                {
+                    "cycle_id": cycle.cycle_id,
+                    "domain": domain.value,
+                    "session_id": session_id,
+                    "task_description": task_description,
+                },
+                self.event_bus,
+                cycle.cycle_id,
+                "pdca_manager",
+            )
 
         return cycle
 
@@ -130,30 +136,30 @@ class PDCACycleManager:
             }
 
         # 推进阶段
-        try:
-            cycle.advance_to_phase(next_phase, phase_data)
+        cycle.advance_to_phase(next_phase, phase_data)
 
-            # 更新完成度
-            cycle.calculate_completion()
+        # 更新完成度
+        cycle.calculate_completion()
 
-            # 获取下一阶段的建议
-            suggestion = self._get_phase_suggestion(cycle, next_phase)
+        # 获取下一阶段的建议
+        suggestion = self._get_phase_suggestion(cycle, next_phase)
 
-            result = {
-                "status": "success",
-                "previous_phase": current_phase.value,
-                "current_phase": next_phase.value,
-                "cycle_count": cycle.cycle_count,
-                "suggestion": suggestion,
-                "completion_percentage": cycle.completion_percentage,
-            }
+        result = {
+            "status": "success",
+            "previous_phase": current_phase.value,
+            "current_phase": next_phase.value,
+            "cycle_count": cycle.cycle_count,
+            "suggestion": suggestion,
+            "completion_percentage": cycle.completion_percentage,
+        }
 
-            logger.info(
-                f"Advanced {cycle_id}: {current_phase.value} -> {next_phase.value}, cycle: {cycle.cycle_count}, completion: {cycle.completion_percentage:.1f}%",
-            )
+        logger.info(
+            f"Advanced {cycle_id}: {current_phase.value} -> {next_phase.value}, cycle: {cycle.cycle_count}, completion: {cycle.completion_percentage:.1f}%",
+        )
 
-            # Emit PDCA phase advanced event
-            await CORE_EVENT_BUS.publish(
+        # 发布阶段推进事件
+        if self.event_bus:
+            await emit_typed_event(
                 TaskEventType.PDCA_PHASE_ADVANCED,
                 {
                     "cycle_id": cycle_id,
@@ -163,15 +169,12 @@ class PDCACycleManager:
                     "completion_percentage": cycle.completion_percentage,
                     "suggestion": suggestion,
                 },
-                task_id=cycle_id,
-                source="pdca_manager",
+                self.event_bus,
+                cycle_id,
+                "pdca_manager",
             )
 
-            return result
-
-        except Exception as e:
-            logger.exception("Failed to advance phase: ")
-            return {"status": "error", "message": f"Failed to advance phase: {e!s}"}
+        return result
 
     def _determine_next_phase(
         self,
@@ -309,13 +312,23 @@ class PDCACycleManager:
 
         logger.info(f"Completed PDCA cycle: {cycle_id}")
 
-        # Emit PDCA cycle completed event
-        await CORE_EVENT_BUS.publish(
-            TaskEventType.PDCA_CYCLE_COMPLETED,
-            report,
-            task_id=cycle_id,
-            source="pdca_manager",
-        )
+        # 发布循环完成事件
+        if self.event_bus:
+            await emit_typed_event(
+                TaskEventType.PDCA_CYCLE_COMPLETED,
+                {
+                    "cycle_id": cycle_id,
+                    "domain": cycle.domain.value,
+                    "cycle_count": cycle.cycle_count,
+                    "summary": summary,
+                    "final_results": final_results,
+                    "artifacts": summary.get("artifacts", []),
+                    "issues": summary.get("issues", []),
+                },
+                self.event_bus,
+                cycle_id,
+                "pdca_manager",
+            )
 
         return report
 
@@ -359,9 +372,16 @@ class PDCACycleManager:
 _cycle_manager_instance = None
 
 
-def get_pdca_cycle_manager() -> PDCACycleManager:
-    """获取 PDCA 循环管理器单例"""
+def get_pdca_cycle_manager(event_bus: IEventBus | None = None) -> PDCACycleManager:
+    """获取 PDCA 循环管理器单例
+
+    Args:
+        event_bus: 事件总线实例（可选，仅在首次创建时使用）
+
+    Returns:
+        PDCACycleManager 实例
+    """
     global _cycle_manager_instance
     if _cycle_manager_instance is None:
-        _cycle_manager_instance = PDCACycleManager()
+        _cycle_manager_instance = PDCACycleManager(event_bus=event_bus)
     return _cycle_manager_instance

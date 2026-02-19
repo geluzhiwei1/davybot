@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from dawei.config import get_workspaces_root
 from dawei.config.settings import get_settings
 
 
@@ -14,14 +15,14 @@ class WorkspaceManager:
     """工作区UUID映射管理"""
 
     def __init__(self, settings):
-        # 从环境变量和配置中获取工作区根目录
-        workspaces_root = settings.app.workspaces_root
+        # 使用 DAWEI_HOME 作为工作区根目录
+        workspaces_root = Path(get_workspaces_root())
 
         # 构建工作区文件的完整路径
-        self.workspaces_file = Path(workspaces_root).resolve() / "workspaces.json"
+        self.workspaces_file = workspaces_root / "workspaces.json"
 
         # 确保工作区根目录存在
-        self.workspaces_root_path = Path(workspaces_root).resolve()
+        self.workspaces_root_path = workspaces_root.resolve()
         self.workspaces_root_path.mkdir(parents=True, exist_ok=True)
 
         self.workspaces_mapping = {}

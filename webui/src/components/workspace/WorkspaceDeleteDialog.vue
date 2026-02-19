@@ -36,7 +36,7 @@
         <li>工作区配置（.dawei 目录）</li>
         <li>对话历史</li>
         <li>任务图和检查点</li>
-        <li>工作区设置</li>
+        <li>{{ t('workspaceSettings.title') }}</li>
       </ul>
 
       <!-- 删除选项 -->
@@ -85,6 +85,9 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { workspaceService } from '@/services/workspace'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface Props {
   modelValue: boolean

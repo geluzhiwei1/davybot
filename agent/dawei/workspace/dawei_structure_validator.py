@@ -8,10 +8,13 @@ Follows Fast Fail principle - raises exceptions immediately on validation failur
 """
 
 import json
+import os
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from dawei.config import get_workspaces_root
 
 
 class DaweiStructureValidationError(Exception):
@@ -39,15 +42,9 @@ class DaweiStructureValidator:
     REQUIRED_DIRECTORIES = [
         "checkpoints",
         "conversations",
-        ".locks",
-        "persistence_failures",
-        "plan",
-        "plans",
         "scheduled_tasks",
-        "snapshots",
         "task_graphs",
         "task_nodes",
-        "tools",
     ]
 
     # Required fields in workspace.json
@@ -364,41 +361,111 @@ class DaweiStructureValidator:
         return result
 
 
-def validate_dawei_on_startup(workspaces_root: Path | None = None) -> None:
+def validate_dawei_on_startup(dawei_home: Path | None = None) -> None:
     """Validate .dawei structure during server startup.
 
     This function is designed to be called during server startup.
     It will log validation results and raise an exception if critical errors are found.
 
     Args:
-        workspaces_root: Path to workspaces root directory.
-            Defaults to WORKSPACES_ROOT env var or "./workspaces"
+        dawei_home: Path to DAWEI_HOME directory.
+            Defaults to DAWEI_HOME env var or "~/.dawei"
 
     Raises:
         DaweiStructureValidationError: If critical validation errors are found
 
     """
     import logging
-    import os
 
     logger = logging.getLogger(__name__)
 
-    # Get workspaces root
-    if workspaces_root is None:
-        workspaces_root = Path(os.getenv("WORKSPACES_ROOT", "./workspaces"))
+    # Get DAWEI_HOME
+    if dawei_home is None:
+        dawei_home = Path(get_workspaces_root())
 
     logger.info("=== Validating .dawei directory structure ===")
-    logger.info(f"Workspaces root: {workspaces_root}")
+    logger.info(f"DAWEI_HOME: {dawei_home}")
 
     try:
-        # Check if workspaces root exists
-        if not workspaces_root.exists():
-            logger.warning(f"Workspaces root does not exist: {workspaces_root}")
-            logger.info("Skipping .dawei validation (no workspaces yet)")
+        # Check if DAWEI_HOME exists
+        if not dawei_home.exists():
+            logger.warning(f"DAWEI_HOME does not exist: {dawei_home}")
+            logger.info("Skipping .dawei validation (no DAWEI_HOME yet)")
             return
 
-        # Validate all workspaces
-        result = DaweiStructureValidator.validate_all_workspaces(workspaces_root)
+        # Read workspaces.json to get workspace paths
+        workspaces_file = dawei_home / "workspaces.json"
+        if not workspaces_file.exists():
+            logger.warning(f"workspaces.json not found: {workspaces_file}")
+            logger.info("Skipping .dawei validation (no workspaces defined yet)")
+            return
+
+        # Parse workspaces.json
+        try:
+            with workspaces_file.open(encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise DaweiStructureValidationError(
+                f"Invalid workspaces.json format: {e}",
+                path=workspaces_file,
+            )
+
+        workspaces = data.get("workspaces", [])
+        logger.info(f"Found {len(workspaces)} workspace(s) in workspaces.json")
+
+        # Validate each workspace listed in workspaces.json
+        result = {
+            "total": len(workspaces),
+            "valid": 0,
+            "invalid": 0,
+            "errors": [],
+            "workspace_details": [],
+        }
+
+        for workspace in workspaces:
+            workspace_name = workspace.get("name", "unknown")
+            workspace_path = workspace.get("path", "")
+
+            if not workspace_path:
+                error = f"Workspace '{workspace_name}' has no path defined"
+                logger.error(f"  - {workspace_name}: {error}")
+                result["invalid"] += 1
+                result["errors"].append({"workspace": workspace_name, "error": error})
+                continue
+
+            # Resolve workspace path
+            ws_path = Path(workspace_path)
+            if not ws_path.is_absolute():
+                # If relative path, resolve relative to DAWEI_HOME
+                ws_path = dawei_home / ws_path
+            ws_path = ws_path.resolve()
+
+            dawei_path = ws_path / ".dawei"
+
+            workspace_detail = {
+                "workspace_name": workspace_name,
+                "path": str(ws_path),
+                "dawei_path": str(dawei_path),
+                "valid": False,
+                "error": None,
+                "warnings": [],
+            }
+
+            try:
+                # Validate this workspace
+                validation_result = DaweiStructureValidator.validate_dawei_structure(dawei_path)
+                workspace_detail["valid"] = True
+                workspace_detail["warnings"] = validation_result.get("warnings", [])
+                result["valid"] += 1
+                logger.info(f"  ✓ {workspace_name}: validated successfully")
+
+            except DaweiStructureValidationError as e:
+                workspace_detail["error"] = str(e)
+                result["invalid"] += 1
+                result["errors"].append({"workspace": workspace_name, "error": str(e)})
+                logger.error(f"  ✗ {workspace_name}: {e}")
+
+            result["workspace_details"].append(workspace_detail)
 
         # Log summary
         logger.info("Validation complete:")

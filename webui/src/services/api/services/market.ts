@@ -272,15 +272,18 @@ export class MarketApiService {
    *
    * @param type - Resource type filter
    * @param limit - Number of results
+   * @param skip - Number of results to skip (for pagination)
    * @returns Promise with featured resources
    */
   async getFeatured(
     type: ResourceType = 'skill',
-    limit: number = 10
+    limit: number = 10,
+    skip: number = 0
   ): Promise<FeaturedResponse> {
     const params = new URLSearchParams({
       type,
-      limit: limit.toString()
+      limit: limit.toString(),
+      skip: skip.toString()
     });
     return httpClient.get<FeaturedResponse>(`${this.basePath}/featured?${params}`);
   }

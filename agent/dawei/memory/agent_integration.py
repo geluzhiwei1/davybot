@@ -37,59 +37,51 @@ def setup_memory_system(agent: Agent) -> bool:
         True if memory system was initialized, False otherwise
 
     """
-    try:
-        if not is_memory_enabled(agent.user_workspace):
-            logger.info("Memory system is disabled")
-            return False
-
-        workspace_path = agent.user_workspace.absolute_path
-        memory_db = _get_memory_db_path(workspace_path)
-
-        # Initialize MemoryGraph
-        agent.memory_graph = MemoryGraph(memory_db, agent.event_bus)
-
-        # Initialize VirtualContextManager
-        agent.virtual_context = VirtualContextManager(
-            db_path=memory_db,
-            page_size=2000,
-            max_active_pages=5,
-        )
-
-        # Initialize MemoryGardener (optional, requires LLMProvider)
-        agent.memory_gardener = None
-        try:
-            if hasattr(agent, "execution_engine") and hasattr(
-                agent.execution_engine,
-                "llm_service",
-            ):
-                agent.memory_gardener = MemoryGardener(
-                    memory_graph=agent.memory_graph,
-                    llm_provider=agent.execution_engine.llm_service,
-                    event_bus=agent.event_bus,
-                    consolidation_interval=3600,  # 1 hour
-                    decay_rate=0.95,
-                    energy_threshold=0.2,
-                )
-
-                # Start gardener in background
-                asyncio.create_task(agent.memory_gardener.start())
-                logger.info("Memory Gardener started")
-        except Exception as e:
-            logger.warning(f"Failed to initialize MemoryGardener: {e}")
-
-        # Add memory-related methods to agent
-        agent._extract_memories_from_conversation = _extract_memories_from_conversation.__get__(
-            agent,
-            Agent,
-        )
-        agent._create_context_page = _create_context_page.__get__(agent, Agent)
-
-        logger.info("Memory system initialized")
-        return True
-
-    except Exception as e:
-        logger.error(f"Failed to setup memory system: {e}", exc_info=True)
+    if not is_memory_enabled(agent.user_workspace):
+        logger.info("Memory system is disabled")
         return False
+
+    workspace_path = agent.user_workspace.absolute_path
+    memory_db = _get_memory_db_path(workspace_path)
+
+    # Initialize MemoryGraph
+    agent.memory_graph = MemoryGraph(memory_db, agent.event_bus)
+
+    # Initialize VirtualContextManager
+    agent.virtual_context = VirtualContextManager(
+        db_path=memory_db,
+        page_size=2000,
+        max_active_pages=5,
+    )
+
+    # Initialize MemoryGardener (optional, requires LLMProvider)
+    agent.memory_gardener = None
+    if hasattr(agent, "execution_engine") and hasattr(
+        agent.execution_engine,
+        "llm_service",
+    ):
+        agent.memory_gardener = MemoryGardener(
+            memory_graph=agent.memory_graph,
+            llm_provider=agent.execution_engine.llm_service,
+            event_bus=agent.event_bus,
+            consolidation_interval=3600,  # 1 hour
+            decay_rate=0.95,
+            energy_threshold=0.2,
+        )
+
+        # Start gardener in background
+        asyncio.create_task(agent.memory_gardener.start())
+        logger.info("Memory Gardener started")
+
+    # Add memory-related methods to agent
+    agent._extract_memories_from_conversation = _extract_memories_from_conversation.__get__(
+        agent,
+        Agent,
+    )
+    agent._create_context_page = _create_context_page.__get__(agent, Agent)
+
+    logger.info("Memory system initialized")
+    return True
 
 
 async def _extract_memories_from_conversation(agent: Agent) -> list[MemoryEntry]:

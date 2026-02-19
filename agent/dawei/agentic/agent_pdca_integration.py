@@ -32,7 +32,7 @@ class AgentPDCAExtension:
 
         """
         self.agent = agent_instance
-        self.pdca_manager = get_pdca_cycle_manager()
+        self.pdca_manager = get_pdca_cycle_manager(event_bus=agent_instance.event_bus)
         self.domain_adapter = get_domain_adapter()
         self.current_cycle: PDCACycleContext | None = None
         self._pdca_enabled = True  # PDCA 功能开关

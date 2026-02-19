@@ -11,8 +11,10 @@
 """
 
 import logging
+import os
 from pathlib import Path
 
+from dawei.config import get_workspaces_root
 from dawei.tools.custom_base_tool import CustomBaseTool
 from dawei.tools.skill_manager import SkillManager
 
@@ -256,9 +258,9 @@ def create_skills_tools(
         skills工具列表
 
     """
-    # 如果没有提供roots，使用默认的global root
+    # 如果没有提供roots，使用默认的global root (DAWEI_HOME)
     if not skills_roots:
-        skills_roots = [Path.home() / ".dawei"]
+        skills_roots = [Path(get_workspaces_root())]
 
     skill_manager = SkillManager(skills_roots=skills_roots, current_mode=current_mode)
 

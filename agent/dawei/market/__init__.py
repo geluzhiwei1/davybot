@@ -7,11 +7,11 @@ Provides integration with davybot-market-cli for managing
 skills, agents, and plugins from the market.
 
 Usage:
-    from dawei.market import MarketClient, MarketInstaller
+    from dawei.market import CliWrapper, MarketInstaller
 
     # Search resources
-    client = MarketClient()
-    results = client.search("web scraping", resource_type="skill")
+    cli = CliWrapper()
+    results = cli.search_skills("web scraping")
 
     # Install resource
     installer = MarketInstaller(workspace="/path/to/workspace")
@@ -21,8 +21,7 @@ Usage:
 import sys
 from pathlib import Path
 
-from .cli_wrapper import CliWrapper
-from .client import MarketClient
+from .cli_wrapper import CliExecutionError, CliNotFoundError, CliWrapper
 from .installer import MarketInstaller
 from .models import (
     InstallationError,
@@ -49,10 +48,11 @@ MARKET_AVAILABLE = True  # Set to True since module exists
 
 __all__ = [
     "MARKET_AVAILABLE",
+    "CliExecutionError",
+    "CliNotFoundError",
     "CliWrapper",
     "InstallResult",
     "InstallationError",
-    "MarketClient",
     "MarketError",
     "MarketInstaller",
     "ResourceInfo",

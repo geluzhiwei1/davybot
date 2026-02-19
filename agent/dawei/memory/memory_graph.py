@@ -14,8 +14,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from dawei.core.events import CORE_EVENT_BUS
-
 logger = logging.getLogger(__name__)
 
 
@@ -137,7 +135,7 @@ class MemoryGraph:
     - Temporal facts (valid_start/valid_end)
     - Energy-based forgetting
     - Graph traversal for associative retrieval
-    - Event-driven updates via CORE_EVENT_BUS
+    - Event-driven updates via event_bus (NOTE: CORE_EVENT_BUS has been removed)
 
     Usage:
         graph = MemoryGraph(db_path="~/.dawei/memory.db")
@@ -151,13 +149,13 @@ class MemoryGraph:
 
         Args:
             db_path: Path to SQLite database file
-            event_bus: Event bus instance (defaults to CORE_EVENT_BUS)
+            event_bus: Event bus instance (NOTE: CORE_EVENT_BUS has been removed, defaults to None)
 
         """
         self.db_path = Path(db_path).expanduser().resolve()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.event_bus = event_bus or CORE_EVENT_BUS
+        self.event_bus = event_bus
         self.logger = logging.getLogger(__name__)
 
         # Initialize database
@@ -276,13 +274,14 @@ class MemoryGraph:
                 )
 
             # Emit event
-            try:
-                await self.event_bus.publish(
-                    "MEMORY_ENTRY_CREATED",
-                    {"memory_id": memory.id, "memory_type": memory.memory_type.value},
-                )
-            except Exception as e:
-                self.logger.warning(f"Failed to publish MEMORY_ENTRY_CREATED event: {e}")
+            if self.event_bus:
+                try:
+                    await self.event_bus.publish(
+                        "MEMORY_ENTRY_CREATED",
+                        {"memory_id": memory.id, "memory_type": memory.memory_type.value},
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to publish MEMORY_ENTRY_CREATED event: {e}")
 
             self.logger.info(f"Memory added: {memory.subject} {memory.predicate} {memory.object}")
             return memory.id
@@ -337,13 +336,14 @@ class MemoryGraph:
                     return False
 
             # Emit event
-            try:
-                await self.event_bus.publish(
-                    "MEMORY_ENTRY_UPDATED",
-                    {"memory_id": memory_id, "updates": list(updates.keys())},
-                )
-            except Exception as e:
-                self.logger.warning(f"Failed to publish MEMORY_ENTRY_UPDATED event: {e}")
+            if self.event_bus:
+                try:
+                    await self.event_bus.publish(
+                        "MEMORY_ENTRY_UPDATED",
+                        {"memory_id": memory_id, "updates": list(updates.keys())},
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to publish MEMORY_ENTRY_UPDATED event: {e}")
 
             self.logger.info(f"Memory updated: {memory_id}")
             return True
@@ -447,14 +447,15 @@ class MemoryGraph:
             memories = [self._row_to_memory(row) for row in rows]
 
             # Emit retrieval events
-            for mem in memories:
-                try:
-                    await self.event_bus.publish(
-                        "MEMORY_ENTRY_RETRIEVED",
-                        {"memory_id": mem.id, "access_count": mem.access_count + 1},
-                    )
-                except Exception:
-                    pass  # Don't fail on event errors
+            if self.event_bus:
+                for mem in memories:
+                    try:
+                        await self.event_bus.publish(
+                            "MEMORY_ENTRY_RETRIEVED",
+                            {"memory_id": mem.id, "access_count": mem.access_count + 1},
+                        )
+                    except Exception:
+                        pass  # Don't fail on event errors
 
             self.logger.info(f"Temporal query returned {len(memories)} memories")
             return memories

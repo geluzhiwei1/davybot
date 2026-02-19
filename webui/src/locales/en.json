@@ -44,6 +44,7 @@
   },
   "common": {
     "save": "Save",
+    "saveFailed": "Save failed",
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
@@ -250,9 +251,6 @@
       "fileOutput": "File Output",
       "performanceLogging": "Performance Logging",
       "sanitizeSensitiveData": "Sanitize Sensitive Data",
-      "monitoring": "Monitoring Configuration",
-      "prometheusEnabled": "Enable Prometheus",
-      "prometheusPort": "Prometheus Port",
       "analytics": "Analytics Configuration",
       "analyticsEnabled": "Enable Analytics",
       "retentionDays": "Data Retention Days",
@@ -352,6 +350,8 @@
       "availableSkills": "Available Skills",
       "marketInstall": "Market Install",
       "refreshList": "Refresh List",
+      "createSkill": "Create Skill",
+      "deleteConfirm": "Are you sure you want to delete skill \"{name}\"?",
       "filter": {
         "mode": "Filter Mode",
         "scope": "Filter Scope",
@@ -367,10 +367,45 @@
         "description": "Description",
         "category": "Category",
         "mode": "Mode",
-        "scope": "Scope"
+        "scope": "Scope",
+        "actions": "Actions"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "editDialog": {
+        "title": "Edit Skill",
+        "name": "Skill Name",
+        "description": "Description",
+        "content": "Content (Markdown)"
+      },
+      "createDialog": {
+        "title": "Create New Skill",
+        "name": "Skill Name",
+        "namePlaceholder": "Enter skill name",
+        "description": "Description",
+        "scope": "Scope",
+        "workspace": "Workspace",
+        "user": "User",
+        "content": "Content (Markdown)",
+        "create": "Create"
       },
       "noSkills": "No Skills found",
-      "skillsLoaded": "Loaded {count} skills"
+      "skillsLoaded": "Loaded {count} skills",
+      "editor": {
+        "files": "Files",
+        "refresh": "Refresh",
+        "noFiles": "No files",
+        "selectFile": "Select a file",
+        "selectFileHint": "Please select a file from the left to edit",
+        "mainFile": "Main File",
+        "save": "Save",
+        "loadTreeFailed": "Failed to load file tree",
+        "loadContentFailed": "Failed to load file content",
+        "saveSuccess": "File saved successfully",
+        "saveFailed": "Failed to save file"
+      }
     },
     "agents": {
       "title": "Custom Agent Management",
@@ -595,5 +630,95 @@
     "file.read_failed": "Failed to read file: {error}",
     "file.write_failed": "Failed to write file: {error}",
     "file.delete_failed": "Failed to delete file: {error}"
+  },
+  "sidePanel": {
+    "conversations": "Conversations",
+    "workspace": "Workspace",
+    "memory": "Memory",
+    "newConversation": "New Chat",
+    "deleteAll": "Delete All",
+    "deleteConversation": "Delete Conversation",
+    "noConversations": "No conversation history",
+    "fileTree": "File Tree",
+    "refresh": "Refresh",
+    "uploadFile": "Upload File",
+    "newFile": "New File",
+    "newDirectory": "New Directory",
+    "delete": "Delete",
+    "rename": "Rename",
+    "copy": "Copy",
+    "noFiles": "No files",
+    "unknown": "Unknown",
+    "loadFailed": "Load failed",
+    "switchWorkspace": "Switch Workspace",
+    "userSettings": "User Settings"
+  },
+  "topBar": {
+    "newConversation": "New Chat",
+    "unnamedConversation": "Unnamed Conversation",
+    "selectOrCreateConversation": "Please select or create a conversation",
+    "connected": "Connected",
+    "connecting": "Connecting",
+    "reconnecting": "Reconnecting",
+    "connectionError": "Connection Error",
+    "disconnected": "Disconnected",
+    "notConnected": "Not Connected"
+  },
+  "userSettings": {
+    "title": "User Settings",
+    "tabs": {
+      "profile": "Profile",
+      "preferences": "Preferences",
+      "shortcuts": "Shortcuts",
+      "about": "About"
+    },
+    "profile": {
+      "username": "Username",
+      "email": "Email",
+      "bio": "Bio",
+      "timezone": "Timezone",
+      "language": "Language",
+      "save": "Save Profile",
+      "refresh": "Refresh",
+      "saveSuccess": "Profile saved successfully",
+      "usernamePlaceholder": "Enter username",
+      "emailPlaceholder": "Enter email",
+      "bioPlaceholder": "Enter bio"
+    },
+    "preferences": {
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeAuto": "Auto",
+      "fontSize": "Font Size",
+      "messageDensity": "Message Density",
+      "densityComfortable": "Comfortable",
+      "densityCompact": "Compact",
+      "codeTheme": "Code Theme",
+      "notifications": "Enable Notifications",
+      "autoSave": "Auto Save",
+      "save": "Save Preferences",
+      "refresh": "Refresh",
+      "saveSuccess": "Preferences saved successfully"
+    },
+    "shortcuts": {
+      "customShortcut": "Custom Shortcuts",
+      "reset": "Reset to Default",
+      "resetSuccess": "Shortcuts reset to default",
+      "quickSearch": "Quick Search",
+      "newConversation": "New Conversation",
+      "toggleSidePanel": "Toggle Sidebar",
+      "save": "Save",
+      "openSettings": "Open Settings"
+    },
+    "about": {
+      "title": "Dawei",
+      "subtitle": "General AI Assistant",
+      "version": "Version",
+      "buildTime": "Build Time",
+      "vueVersion": "Vue Version",
+      "elementVersion": "Element Version",
+      "homepage": "Homepage"
+    }
   }
 }

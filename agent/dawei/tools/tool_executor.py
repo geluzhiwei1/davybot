@@ -18,6 +18,7 @@ from dawei.async_task.types import RetryPolicy, TaskDefinition, TaskStatus
 from dawei.core.error_handler import handle_errors
 from dawei.core.errors import (
     PermissionError,
+    ToolExecutionError,
     ToolNotFoundError,
     ToolSecurityError,
     ValidationError,
@@ -27,6 +28,7 @@ from dawei.entity.tool_event_data import ToolCallStartData
 from dawei.interfaces.tool_call_service import IToolCallService
 from dawei.logg.logging import log_performance
 from dawei.task_graph.task_node_data import TaskContext
+from dawei.agentic.file_snapshot_manager import SnapshotStrategy
 from dawei.tools.custom_base_tool import CustomBaseTool
 
 from .tool_manager import ToolManager
@@ -80,6 +82,7 @@ class ToolExecutor(IToolCallService):
         tool_manager: ToolManager,
         user_workspace: Optional["UserWorkspace"] = None,
         agent=None,
+        event_bus=None,
     ):
         """Initialize tool executor.
 
@@ -87,11 +90,13 @@ class ToolExecutor(IToolCallService):
             tool_manager: ToolManager instance
             user_workspace: UserWorkspace instance (optional, for security checks)
             agent: Agent instance (optional, for mode checking)
+            event_bus: Event bus instance for emitting tool events
 
         """
         self.tool_manager = tool_manager
         self.user_workspace = user_workspace
         self._agent = agent
+        self._event_bus = event_bus
         self.tools: dict[str, Tool] = {}
         self.logger = logging.getLogger(__name__)
         self._load_tools()
@@ -104,12 +109,23 @@ class ToolExecutor(IToolCallService):
         self._task_manager = AsyncTaskManager()
         self._active_tool_tasks: dict[str, str] = {}
 
-        # Set up task manager callbacks
-        self._task_manager.set_start_callback(self._on_tool_task_start)
-        self._task_manager.set_progress_callback(self._on_tool_task_progress)
-        self._task_manager.set_state_change_callback(self._on_tool_task_state_change)
-        self._task_manager.set_error_callback(self._on_tool_task_error)
-        self._task_manager.set_completion_callback(self._on_tool_task_completion)
+        # Note: Callbacks will be set up in async_initialize() method
+        self._callbacks_initialized = False
+
+    async def async_initialize(self) -> None:
+        """Async initialization for task manager callbacks.
+
+        This must be called after __init__ to properly set up async callbacks.
+        """
+        if not self._callbacks_initialized:
+            # Set up task manager callbacks (only set_start_callback is async)
+            await self._task_manager.set_start_callback(self._on_tool_task_start)
+            self._task_manager.set_progress_callback(self._on_tool_task_progress)
+            self._task_manager.set_state_change_callback(self._on_tool_task_state_change)
+            self._task_manager.set_error_callback(self._on_tool_task_error)
+            self._task_manager.set_completion_callback(self._on_tool_task_completion)
+            self._callbacks_initialized = True
+            self.logger.info("[TOOL_EXECUTOR] Task manager callbacks initialized")
 
     def _load_tools(self):
         """Load all tools from tool manager."""
@@ -618,6 +634,7 @@ class ToolExecutor(IToolCallService):
                 tool_call_id=tool_call_id,
                 task_id=task_id,
             ),
+            self._event_bus,  # 🔧 修复：添加 event_bus 参数
             task_id=task_id,
             source="tool_executor",
         )
@@ -753,6 +770,7 @@ class ToolExecutor(IToolCallService):
                     tool_call_id=tool_call_id,
                     task_id=task_id,
                 ),
+                self._event_bus,  # 🔧 修复：添加 event_bus 参数
                 task_id=task_id,
                 source="tool_executor",
             )
@@ -790,6 +808,7 @@ class ToolExecutor(IToolCallService):
                     tool_call_id=tool_call_id,
                     task_id=task_id,
                 ),
+                self._event_bus,  # 🔧 修复：添加 event_bus 参数
                 task_id=task_id,
                 source="tool_executor",
             )
@@ -874,6 +893,7 @@ class ToolExecutor(IToolCallService):
                         tool_call_id=tool_call_id,
                         task_id=task_progress.task_id,
                     ),
+                    self._event_bus,  # 🔧 修复：添加 event_bus 参数
                     task_id=task_progress.task_id,
                     source="tool_executor",
                 )
@@ -923,6 +943,7 @@ class ToolExecutor(IToolCallService):
                         tool_call_id=tool_call_id,
                         task_id=task_id,
                     ),
+                    self._event_bus,  # 🔧 修复：添加 event_bus 参数
                     task_id=task_id,
                     source="tool_executor",
                 )
@@ -979,6 +1000,7 @@ class ToolExecutor(IToolCallService):
                         tool_call_id=tool_call_id,
                         task_id=task_error.task_id,
                     ),
+                    self._event_bus,  # 🔧 修复：添加 event_bus 参数
                     task_id=task_error.task_id,
                     source="tool_executor",
                 )
@@ -1015,6 +1037,7 @@ class ToolExecutor(IToolCallService):
                             task_id=task_result.task_id,
                             execution_time=task_result.execution_time,
                         ),
+                        self._event_bus,  # 🔧 修复：添加 event_bus 参数
                         task_id=task_result.task_id,
                         source="tool_executor",
                     )
@@ -1155,7 +1178,7 @@ class ToolExecutor(IToolCallService):
             snapshot = self._agent.file_snapshot_manager.create_snapshot(
                 file_path=file_path,
                 reason=f"before_{tool_name}",
-                strategy="auto",
+                strategy=SnapshotStrategy.AUTO,
             )
 
             if snapshot:

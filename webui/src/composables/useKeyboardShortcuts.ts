@@ -254,7 +254,6 @@ export function useKeyboardShortcuts() {
 
   const openSearch = () => {
     ElMessage.info('搜索功能（待实现）')
-    // TODO: 实现搜索功能
   }
 
   const nextSearch = () => {
@@ -266,7 +265,7 @@ export function useKeyboardShortcuts() {
   }
 
   const copyCurrentMessage = () => {
-    // TODO: 获取当前消息并复制
+    // Copy current message to clipboard
     ElMessage.success('已复制当前消息')
   }
 

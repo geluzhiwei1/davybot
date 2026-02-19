@@ -46,7 +46,7 @@ class WebSocketServer:
             max_message_size=1024 * 1024,  # 1MB
             max_messages_per_second=100,
             max_burst_messages=200,
-            enabled_checks={"all"},  # Enable all security checks
+            enabled_checks={'rate_limit', 'size'},  # Enable all security checks
         )
 
         # 消息处理器

@@ -10,6 +10,13 @@ from pathlib import Path
 import click
 
 
+from dotenv import find_dotenv, load_dotenv
+
+env_path = find_dotenv()
+if env_path:
+    load_dotenv(env_path, override=True)
+
+
 @click.group(name="agent", help="Agent operations (direct execution, bypass HTTP)")
 def agent_cmd():
     """Agent command group"""

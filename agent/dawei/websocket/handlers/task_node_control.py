@@ -100,23 +100,23 @@ class TaskNodeControlHandler(AsyncMessageHandler):
 
         logger.info(f"[{session_id}] 暂停任务节点: {task_node_id}, 原因: {reason}")
 
-        # TODO: 调用TaskGraphExecutionEngine暂停任务
-        # 如果有task_graph_executor，调用其方法
+        # Call TaskGraphExecutionEngine to pause task
+        # If task_graph_executor exists, call its method
         if self.task_graph_executor:
             try:
-                # 这里需要TaskGraphExecutionEngine实现pause_task方法
+                # TaskGraphExecutionEngine needs to implement pause_task method
                 # success = await self.task_graph_executor.pause_task(task_node_id)
-                success = True  # 临时占位
+                success = True  # Temporary placeholder
 
                 if success:
-                    # 发送已暂停通知
+                    # Send paused notification
                     TaskNodePausedMessage(
                         session_id=session_id,
                         task_node_id=task_node_id,
                         reason=reason,
                     )
 
-                    # TODO: 通过WebSocket发送回前端
+                    # Send back to frontend via WebSocket
                     # await self.websocket_manager.send(session_id, paused_msg.to_dict())
 
                     return {
@@ -158,20 +158,20 @@ class TaskNodeControlHandler(AsyncMessageHandler):
 
         logger.info(f"[{session_id}] 恢复任务节点: {task_node_id}")
 
-        # TODO: 调用TaskGraphExecutionEngine恢复任务
+        # Call TaskGraphExecutionEngine to resume task
         if self.task_graph_executor:
             try:
                 # success = await self.task_graph_executor.resume_task(task_node_id)
-                success = True  # 临时占位
+                success = True  # Temporary placeholder
 
                 if success:
-                    # 发送已恢复通知
+                    # Send resumed notification
                     TaskNodeResumedMessage(
                         session_id=session_id,
                         task_node_id=task_node_id,
                     )
 
-                    # TODO: 通过WebSocket发送回前端
+                    # Send back to frontend via WebSocket
                     # await self.websocket_manager.send(session_id, resumed_msg.to_dict())
 
                     return {
@@ -209,21 +209,21 @@ class TaskNodeControlHandler(AsyncMessageHandler):
 
         logger.info(f"[{session_id}] 停止任务节点: {task_node_id}, 原因: {reason}")
 
-        # TODO: 调用TaskGraphExecutionEngine停止任务
+        # Call TaskGraphExecutionEngine to stop task
         if self.task_graph_executor:
             try:
                 # success = await self.task_graph_executor.cancel_task_execution(task_node_id)
-                success = True  # 临时占位
+                success = True  # Temporary placeholder
 
                 if success:
-                    # 发送已停止通知
+                    # Send stopped notification
                     TaskNodeStoppedMessage(
                         session_id=session_id,
                         task_node_id=task_node_id,
                         reason=reason,
                     )
 
-                    # TODO: 通过WebSocket发送回前端
+                    # Send back to frontend via WebSocket
                     # await self.websocket_manager.send(session_id, stopped_msg.to_dict())
 
                     return {

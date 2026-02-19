@@ -156,17 +156,24 @@ export const useMarketStore = defineStore('market', () => {
   };
 
   /**
-   * Load featured resources
+   * Load featured resources with pagination support
    */
-  const loadFeaturedResources = async (type: ResourceType, limit: number = 10) => {
+  const loadFeaturedResources = async (
+    type: ResourceType,
+    limit: number = 10,
+    skip: number = 0
+  ): Promise<{ success: boolean; total?: number } | null> => {
     try {
-      const response = await marketApi.getFeatured(type, limit);
+      const response = await marketApi.getFeatured(type, limit, skip);
       if (response.success) {
         featuredResources.value[type] = response.resources;
+        return { success: true, total: response.total };
       }
+      return null;
     } catch (err: unknown) {
       console.error('Failed to load featured resources:', err);
       ElMessage.error(`加载推荐资源失败: ${err.message}`);
+      return null;
     }
   };
 

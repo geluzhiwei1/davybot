@@ -17,23 +17,23 @@ from dawei.tools.custom_base_tool import CustomBaseTool
 try:
     from dawei.market import (
         CliWrapper,
+        CliExecutionError,
+        CliNotFoundError,
         InstallResult,
-        MarketClient,
         MarketError,
         MarketInstaller,
         ResourceType,
-        SearchResult,
     )
 
     MARKET_AVAILABLE = True
 except ImportError:
     MARKET_AVAILABLE = False
     # Create stubs for when market module is not available
-    MarketClient = None
     MarketInstaller = None
     CliWrapper = None
+    CliExecutionError = Exception
+    CliNotFoundError = Exception
     ResourceType = None
-    SearchResult = None
     InstallResult = None
     MarketError = Exception
 
@@ -64,7 +64,7 @@ class SkillSearchTool(CustomBaseTool):
     def __init__(self, workspace: str | None = None):
         super().__init__()
         self.workspace = workspace
-        self.client = MarketClient()
+        self.client = CliWrapper()
 
     @safe_tool_operation(
         "skill_search",
@@ -82,14 +82,15 @@ class SkillSearchTool(CustomBaseTool):
 
         """
         try:
-            results = self.client.search_skills(query, limit)
+            result = self.client.search_skills(query, limit)
+            results = result.get("results", [])
 
             return json.dumps(
                 {
                     "status": "success",
                     "query": query,
                     "total": len(results),
-                    "results": [r.to_dict() for r in results],
+                    "results": results,
                 },
                 indent=2,
             )
@@ -215,7 +216,7 @@ class AgentSearchTool(CustomBaseTool):
     def __init__(self, workspace: str | None = None):
         super().__init__()
         self.workspace = workspace
-        self.client = MarketClient()
+        self.client = CliWrapper()
 
     @safe_tool_operation(
         "agent_search",
@@ -233,14 +234,15 @@ class AgentSearchTool(CustomBaseTool):
 
         """
         try:
-            results = self.client.search_agents(query, limit)
+            result = self.client.search_agents(query, limit)
+            results = result.get("results", [])
 
             return json.dumps(
                 {
                     "status": "success",
                     "query": query,
                     "total": len(results),
-                    "results": [r.to_dict() for r in results],
+                    "results": results,
                 },
                 indent=2,
             )
@@ -410,7 +412,7 @@ class PluginSearchTool(CustomBaseTool):
     def __init__(self, workspace: str | None = None):
         super().__init__()
         self.workspace = workspace
-        self.client = MarketClient()
+        self.client = CliWrapper()
 
     @safe_tool_operation(
         "plugin_search",
@@ -429,11 +431,12 @@ class PluginSearchTool(CustomBaseTool):
 
         """
         try:
-            results = self.client.search_plugins(query, limit)
+            result = self.client.search_plugins(query, limit)
+            results = result.get("results", [])
 
             # Filter by type if specified
             if plugin_type:
-                results = [r for r in results if r.raw_data.get("type") == plugin_type]
+                results = [r for r in results if r.get("type") == plugin_type]
 
             return json.dumps(
                 {
@@ -441,7 +444,7 @@ class PluginSearchTool(CustomBaseTool):
                     "query": query,
                     "plugin_type": plugin_type,
                     "total": len(results),
-                    "results": [r.to_dict() for r in results],
+                    "results": results,
                 },
                 indent=2,
             )

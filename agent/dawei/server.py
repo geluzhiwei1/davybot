@@ -104,19 +104,14 @@ from .api.exception_handlers import register_exception_handlers
 from .websocket.handlers.chat import ConnectHandler
 from .websocket.ws_server import websocket_server
 
-try:
-    from .api import market
-
-    MARKET_AVAILABLE = True
-except ImportError:
-    market = None
-    MARKET_AVAILABLE = False
+from .api import market
+from .api import privacy
 
 # Load environment variables
 load_dotenv()
 
 
-def get_dawei_home() -> Path:
+def get_workspaces_root() -> Path:
     """Get the DAWEI_HOME directory path.
 
     Returns:
@@ -139,7 +134,7 @@ def record_server_start(host: str, port: int) -> None:
 
     """
     try:
-        dawei_home = get_dawei_home()
+        dawei_home = get_workspaces_root()
         dawei_home.mkdir(parents=True, exist_ok=True)
 
         server_start_file = dawei_home / "server.start"
@@ -344,17 +339,13 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     # Register unified exception handlers (must be after routers)
     register_exception_handlers(app)
 
-    # Debug market availability
-    print(
-        f"[Dawei Server] MARKET_AVAILABLE: {MARKET_AVAILABLE}, market module: {market is not None}",
-    )
+    # Market API
+    app.include_router(market.router)
+    print("[Dawei Server] ✓ Market API router registered")
 
-    # Market API (optional - if available)
-    if MARKET_AVAILABLE and market is not None:
-        app.include_router(market.router)
-        print("[Dawei Server] ✓ Market API router registered")
-    else:
-        print("[Dawei Server] ⚠ Market API not available (optional feature)")
+    # Privacy Configuration API
+    app.include_router(privacy.router)
+    print("[Dawei Server] ✓ Privacy Configuration API router registered")
 
     # ✅ Add monitoring endpoint for LLM API protection layer
     @app.get("/api/stats/llm")

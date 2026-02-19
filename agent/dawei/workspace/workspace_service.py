@@ -16,7 +16,6 @@ import logging
 from pathlib import Path
 from typing import ClassVar
 
-from dawei.core.events import CORE_EVENT_BUS
 from dawei.llm_api.llm_provider import LLMProvider
 from dawei.task_graph.persistence_manager import TaskGraphPersistenceManager
 from dawei.tools.tool_manager import ToolManager
@@ -99,7 +98,7 @@ class WorkspaceContext:
                 # 4. 初始化 TaskGraph 持久化管理器（关键修复点）
                 self.task_graph_persistence_manager = TaskGraphPersistenceManager(
                     workspace_path=self.absolute_path,
-                    event_bus=CORE_EVENT_BUS,
+                    event_bus=None,  # CORE_EVENT_BUS removed
                     debounce_seconds=1.0,
                 )
                 await self.task_graph_persistence_manager.start()

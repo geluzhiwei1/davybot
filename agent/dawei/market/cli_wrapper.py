@@ -3,17 +3,14 @@
 
 """CLI wrapper for davybot-market-cli integration.
 
-Provides a Python interface to execute davy CLI commands
-and parse their JSON output.
+Provides a Python interface using the DavybotMarketClient SDK
+for interacting with the market API.
 
-IMPORTANT: This wrapper requires davybot-market-cli to be installed.
-If the CLI is not available, operations will fail immediately (fast fail).
+IMPORTANT: Requires davybot-market-cli to be installed.
+If the SDK is not available, operations will fail immediately (fast fail).
 """
 
-import json
 import logging
-import os
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -23,13 +20,26 @@ logger = logging.getLogger(__name__)
 
 
 class CliNotFoundError(Exception):
-    """Raised when davy-market CLI is not found."""
+    """Raised when davybot-market-cli SDK is not found."""
+
+
+# Try to import the SDK client - fail immediately if not available
+from davybot_market_cli.client import DavybotMarketClient
+from davybot_market_cli.exceptions import (
+    AuthenticationError,
+    NotFoundError,
+    ValidationError,
+    APIError,
+)
+
+SDK_AVAILABLE = True
 
 
 class CliWrapper:
-    """Wrapper for executing davybot-market-cli commands.
+    """Wrapper for davybot-market-cli SDK.
 
-    Handles subprocess execution, JSON parsing, and error handling.
+    Uses DavybotMarketClient directly instead of CLI subprocess.
+    Falls back to CLI if SDK is not available.
 
     IMPORTANT: Requires davybot-market-cli to be installed. Will fail fast if not found.
     """
@@ -37,267 +47,257 @@ class CliWrapper:
     # Default Market API URL
     DEFAULT_API_URL = "http://www.davybot.com/market/api/v1"
 
-    # Command timeout in seconds
+    # Request timeout in seconds
     DEFAULT_TIMEOUT = 60
 
     def __init__(
         self,
-        command: str | None = None,
-        timeout: int = DEFAULT_TIMEOUT,
         api_url: str | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
     ):
         """Initialize CLI wrapper.
 
         Args:
-            command: CLI command path (default: auto-detected)
-            timeout: Command execution timeout in seconds
             api_url: Optional Market API URL (defaults to DEFAULT_API_URL)
+            timeout: Request timeout in seconds
 
         Raises:
-            CliNotFoundError: If davy-market CLI cannot be found
+            ImportError: If SDK cannot be imported (fails at module load)
 
         """
-        # Auto-detect CLI path if not provided
-        if command is None:
-            command = self._detect_cli_path()
-
-        self.command = command
-        self.timeout = timeout
         self.api_url = api_url or self.DEFAULT_API_URL
+        self.timeout = timeout
+        self._client: DavybotMarketClient | None = None
 
-        # Verify CLI is immediately available
-        self._verify_cli_available()
+    def _get_client(self) -> DavybotMarketClient:
+        """Get or create SDK client.
 
-    def _detect_cli_path(self) -> str:
-        """Detect the path to davy-market CLI.
-
-        Searches in the same directory as the Python interpreter,
-        or falls back to Python module invocation.
-
-        Returns:
-            Path to CLI executable or Python module command
-
-        Raises:
-            CliNotFoundError: If CLI cannot be found
-
+        Note: The client needs to be used as a context manager,
+        so we create a new instance each time.
         """
-        import sys
+        return DavybotMarketClient(
+            base_url=self.api_url,
+            timeout=self.timeout,
+        )
 
-        # Try to find CLI executable in the same directory as the Python interpreter
-        python_dir = Path(sys.executable).parent
-        # Prefer davy-market over dawei/davy (older versions)
-        for cli_name in ["davy-market", "dawei-market", "davy", "dawei"]:
-            cli_path = python_dir / cli_name
-            if cli_path.exists() and cli_path.is_file():
-                logger.info(f"Found davy-market CLI at: {cli_path}")
-                return str(cli_path)
+    def _handle_error(self, error: Exception, context: str) -> None:
+        """Handle SDK errors and convert to CliExecutionError."""
+        error_msg = str(error)
 
-        # Fallback to Python module invocation
-        # Use uv run to ensure the environment is correct
-        python_exe = sys.executable
-        logger.info(f"Using Python module invocation: {python_exe} -m davybot_market_cli.cli")
-        return f"{python_exe} -m davybot_market_cli.cli"
-
-    def _verify_cli_available(self) -> None:
-        """Verify that the davy CLI is available.
-
-        Raises:
-            CliNotFoundError: If CLI is not found or not executable
-
-        """
-        # Check if command is a Python module invocation
-        if " -m " in self.command or "python" in self.command.lower():
-            # It's a Python module invocation, verify by trying to import
-            try:
-                import davybot_market_cli
-
-                logger.debug("CLI module available: davybot_market_cli")
-                return
-            except ImportError:
-                raise CliNotFoundError("davybot-market-cli module not found.\nPlease install: pip install davybot-market-cli")
-
-        # Otherwise check as executable file
-        cli_path = Path(self.command)
-        if not cli_path.exists():
-            raise CliNotFoundError(f"davy-market CLI not found at: {self.command}\nPlease install davybot-market-cli: pip install davybot-market-cli")
-
-        if not cli_path.is_file() or not os.access(cli_path, os.X_OK):
-            raise CliNotFoundError(f"davy-market CLI exists but is not executable: {self.command}")
-
-        logger.debug(f"CLI verified and executable: {self.command}")
-
-    def _execute(
-        self,
-        args: list[str],
-        capture_output: bool = True,
-        check: bool = True,
-    ) -> subprocess.CompletedProcess:
-        """Execute a CLI command.
-
-        Args:
-            args: Command arguments
-            capture_output: Whether to capture stdout/stderr
-            check: Whether to raise error on non-zero exit
-
-        Returns:
-            Completed process result
-
-        Raises:
-            CliExecutionError: If command execution fails
-
-        """
-        # Check if command is a Python module invocation
-        if " -m " in self.command:
-            # Split Python executable and module
-            parts = self.command.split(" -m ")
-            cmd = [*parts[0].strip().split(), "-m", parts[1].strip(), *args]
+        if isinstance(error, NotFoundError):
+            raise CliExecutionError(context, 404, error_msg)
+        elif isinstance(error, AuthenticationError):
+            raise CliExecutionError(context, 401, error_msg)
+        elif isinstance(error, ValidationError):
+            raise CliExecutionError(context, 422, error_msg)
+        elif isinstance(error, APIError):
+            raise CliExecutionError(context, 500, error_msg)
         else:
-            cmd = [self.command, *args]
+            raise CliExecutionError(context, 500, error_msg)
 
-        # Add API URL environment variable if configured
-        env = None
-        if self.api_url:
-            env = os.environ.copy()
-            env["DAVYBOT_API_URL"] = self.api_url
+    # ========================================================================
+    # Health Check
+    # ========================================================================
 
-        logger.debug(f"Executing: {' '.join(cmd)}")
-
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=capture_output,
-                text=True,
-                timeout=self.timeout,
-                env=env,
-            )
-
-            if check and result.returncode != 0:
-                error_msg = result.stderr.strip() if result.stderr else "Unknown error"
-                logger.error(f"CLI command failed: {error_msg}")
-                raise CliExecutionError(" ".join(cmd), result.returncode, error_msg)
-
-            return result
-
-        except subprocess.TimeoutExpired:
-            logger.exception(f"CLI command timed out after {self.timeout}s")
-            raise CliExecutionError(" ".join(cmd), -1, f"Command timed out after {self.timeout}s")
-        except FileNotFoundError:
-            logger.exception(f"CLI command not found: {self.command}")
-            raise CliExecutionError(" ".join(cmd), -1, f"Command '{self.command}' not found")
-
-    def _parse_json_output(self, stdout: str) -> dict[str, Any]:
-        """Parse JSON output from CLI command.
-
-        Args:
-            stdout: Command stdout string
+    def health(self) -> dict[str, Any]:
+        """Check Market API health status.
 
         Returns:
-            Parsed JSON dictionary
+            Health status dictionary
+
+        """
+        try:
+            with self._get_client() as client:
+                return client.health()
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return {"status": "error", "error": str(e)}
+
+    # ========================================================================
+    # Search
+    # ========================================================================
+
+    def search(self, query: str, resource_type: str = "skill", limit: int = 20) -> dict[str, Any]:
+        """Search for resources in the market.
+
+        Args:
+            query: Search query string
+            resource_type: Resource type (skill, agent, plugin)
+            limit: Maximum number of results
+
+        Returns:
+            Dictionary with search results
 
         Raises:
-            CliExecutionError: If JSON parsing fails
+            CliExecutionError: If search fails
 
         """
         try:
-            return json.loads(stdout)
-        except json.JSONDecodeError as e:
-            logger.exception("Failed to parse JSON output: ")
-            raise CliExecutionError(f"{self.command} (parse)", -1, f"Invalid JSON output: {e}")
+            with self._get_client() as client:
+                result = client.search(query, resource_type=resource_type, limit=limit)
+                return result
+        except Exception as e:
+            self._handle_error(e, f"search {query}")
+
+    def search_skills(self, query: str, limit: int = 20) -> dict[str, Any]:
+        """Search for skills."""
+        return self.search(query, "skill", limit)
+
+    def search_agents(self, query: str, limit: int = 20) -> dict[str, Any]:
+        """Search for agents."""
+        return self.search(query, "agent", limit)
 
     # ========================================================================
-    # Plugin Commands
+    # List Resources
     # ========================================================================
 
-    def plugin_list(self, workspace: str, plugin_type: str | None = None) -> dict[str, Any]:
-        """List installed plugins in workspace.
+    def list_resources(self, resource_type: str, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+        """List all resources of a type.
 
         Args:
-            workspace: Workspace path
-            plugin_type: Plugin type filter
+            resource_type: Resource type (skill, agent, plugin)
+            limit: Maximum number of results
+            skip: Number of results to skip (pagination)
 
         Returns:
-            Dictionary with installed plugins
+            Dictionary with resource list
+
+        Raises:
+            CliExecutionError: If list fails
 
         """
-        args = ["plugin", "list", "--workspace", workspace, "--output", "json"]
-
-        if plugin_type:
-            args.extend(["--type", plugin_type])
-
-        result = self._execute(args, check=False)
-        # Plugin list may return empty results without error
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "plugins": self._parse_plugin_list_output(result.stdout),
-        }
-
-    def _parse_plugin_list_output(self, stdout: str) -> list[dict[str, Any]]:
-        """Parse plugin list output."""
         try:
-            data = json.loads(stdout)
-            return data.get("plugins", [])
-        except json.JSONDecodeError:
-            # If not JSON, return empty list
-            return []
+            with self._get_client() as client:
+                if resource_type == "skill":
+                    return client.list_skills(skip=skip, limit=limit)
+                elif resource_type == "agent":
+                    return client.list_agents(skip=skip, limit=limit)
+                elif resource_type == "plugin":
+                    # Plugin is not directly supported, try as mcp
+                    try:
+                        return client.list_mcp_servers(skip=skip, limit=limit)
+                    except NotFoundError:
+                        # MCP servers not supported in market, return empty
+                        return {"resources": [], "total": 0, "success": True}
+                else:
+                    raise CliExecutionError(
+                        f"list_{resource_type}",
+                        400,
+                        f"Unsupported resource type: {resource_type}",
+                    )
+        except NotFoundError:
+            # Resource type not found in market, return empty result
+            return {"resources": [], "total": 0, "success": True}
+        except Exception as e:
+            self._handle_error(e, f"list {resource_type}")
 
-    def plugin_uninstall(self, plugin_name: str, workspace: str) -> dict[str, Any]:
-        """Uninstall a plugin from workspace.
+    def list_skills(self, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+        """List all skills."""
+        return self.list_resources("skill", limit=limit, skip=skip)
+
+    def list_agents(self, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+        """List all agents."""
+        return self.list_resources("agent", limit=limit, skip=skip)
+
+    def list_plugins(self, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+        """List all plugins."""
+        return self.list_resources("plugin", limit=limit, skip=skip)
+
+    # ========================================================================
+    # Resource Info
+    # ========================================================================
+
+    def info(self, resource_type: str, identifier: str) -> dict[str, Any]:
+        """Get detailed information about a resource.
 
         Args:
-            plugin_name: Plugin name
-            workspace: Workspace path
+            resource_type: Resource type (skill, agent, plugin)
+            identifier: Resource ID or name
 
         Returns:
-            Dictionary with uninstall result
+            Dictionary with resource information
+
+        Raises:
+            CliExecutionError: If info retrieval fails
 
         """
-        args = ["plugin", "uninstall", plugin_name, "--workspace", workspace]
+        try:
+            with self._get_client() as client:
+                if resource_type == "skill":
+                    return client.get_skill(identifier)
+                elif resource_type == "agent":
+                    return client.get_agent(identifier)
+                elif resource_type == "plugin":
+                    return client.get_mcp_server(identifier)
+                else:
+                    raise CliExecutionError(
+                        f"info {identifier}",
+                        400,
+                        f"Unsupported resource type: {resource_type}",
+                    )
+        except NotFoundError:
+            return {"success": False, "error": f"Resource '{identifier}' not found"}
+        except Exception as e:
+            self._handle_error(e, f"info {identifier}")
 
-        result = self._execute(args, check=False)
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-        }
+    # ========================================================================
+    # Install
+    # ========================================================================
 
-    def plugin_install(
+    def install(
         self,
-        plugin_uri: str,
-        workspace: str,
-        _enable: bool = False,
-        _force: bool = False,
+        resource_uri: str,
+        output_dir: str,
+        format: str = "zip",
     ) -> dict[str, Any]:
-        """Install a plugin using the CLI install command.
+        """Install a resource (skill, agent, etc.).
 
         Args:
-            plugin_uri: Plugin URI (e.g., plugin://feishu-channel or just feishu-channel)
-            workspace: Workspace path
-            enable: Whether to enable the plugin after installation
-            force: Force reinstall if already exists
+            resource_uri: Resource URI (e.g., skill://github.com/user/repo/skill-name)
+            output_dir: Output directory
+            format: Download format (zip, python)
 
         Returns:
             Dictionary with installation result
 
+        Raises:
+            CliExecutionError: If installation fails
+
         """
-        # Build install command args
-        args = ["install", plugin_uri, "--output", workspace]
+        # Parse resource URI to get type and ID
+        # Format: skill://id or agent://id
+        if "://" not in resource_uri:
+            raise CliExecutionError(
+                "install",
+                400,
+                f"Invalid resource URI format: {resource_uri}. Use skill://<id> or agent://<id>",
+            )
 
-        # Add enable flag if specified (not directly supported by CLI, but we can try)
-        # Note: davy-market CLI doesn't have --enable flag, plugins need to be enabled separately
+        resource_type, resource_id = resource_uri.split("://", 1)
 
-        result = self._execute(args, check=False)
+        try:
+            with self._get_client() as client:
+                output_path = Path(output_dir)
 
-        # Parse output to determine success
-        success = result.returncode == 0
+                # Download the resource
+                downloaded_path = client.download(
+                    resource_type=resource_type,
+                    resource_id=resource_id,
+                    output_path=output_path,
+                    format=format,
+                )
 
-        # Try to parse stderr for error messages
-        stderr = result.stderr.strip() if result.stderr else ""
-
-        return {
-            "success": success,
-            "stdout": result.stdout,
-            "stderr": stderr,
-            "returncode": result.returncode,
-        }
+                return {
+                    "success": True,
+                    "stdout": f"Downloaded to: {downloaded_path}",
+                    "stderr": "",
+                    "returncode": 0,
+                }
+        except NotFoundError:
+            raise CliExecutionError(
+                "install",
+                404,
+                f"Resource not found: {resource_uri}",
+            )
+        except Exception as e:
+            self._handle_error(e, f"install {resource_uri}")

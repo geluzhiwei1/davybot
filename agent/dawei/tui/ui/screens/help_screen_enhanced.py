@@ -169,8 +169,8 @@ Refactor this code for better performance
 LITELLM_API_KEY=your_api_key
 LITELLM_MODEL=deepseek/deepseek-chat
 
-# Workspace
-WORKSPACES_ROOT=./workspaces
+# DAWEI Home (all workspace data root, default ~/.dawei)
+DAWEI_HOME=~/.dawei
 ```
 
 ---

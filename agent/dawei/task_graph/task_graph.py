@@ -71,9 +71,9 @@ class TaskGraph:
             raise ValidationError("task_id", task_id, "must be non-empty string")
 
         self.task_node_id = task_id
-        # 使用延迟导入避免循环导入
-        self.event_bus = event_bus
         self.logger = get_logger(__name__)
+
+        self._event_bus = event_bus
 
         # 核心组件
         self._root_node: TaskNode | None = None
@@ -81,6 +81,7 @@ class TaskGraph:
         # 延迟导入管理器以避免循环导入
         from .managers import ContextStore, StateManager, TodoManager
 
+        # 现在可以安全地访问 self.event_bus (property getter)
         self._todo_manager = TodoManager(event_bus=self.event_bus)
         self._state_manager = StateManager(event_bus=self.event_bus)
         self._context_store = ContextStore()
@@ -92,8 +93,26 @@ class TaskGraph:
         # 🔧 修复内存泄漏：追踪事件处理器ID以便后续清理
         self._handler_ids: list[str] = []
 
-        # 设置事件监听
+        if self._event_bus is None:
+            raise ValueError("event_bus is required for TaskGraph initialization")
+
         self._setup_event_listeners()
+
+    @property
+    def event_bus(self):
+        """获取 event_bus"""
+        return self._event_bus
+
+    @event_bus.setter
+    def event_bus(self, value):
+        """设置 event_bus，同时更新 managers 的 event_bus"""
+        self._event_bus = value
+
+        # 更新 managers 的 event_bus
+        if hasattr(self, '_todo_manager') and self._todo_manager is not None:
+            self._todo_manager.event_bus = value
+        if hasattr(self, '_state_manager') and self._state_manager is not None:
+            self._state_manager.event_bus = value
 
     def _setup_event_listeners(self):
         """设置事件监听器（纯强类型）"""
@@ -331,26 +350,28 @@ class TaskGraph:
 
             emit_typed_event = get_emit_typed_event()
             await emit_typed_event(
-                event_type=TaskEventType.TASK_STARTED,
-                data={
+                TaskEventType.TASK_STARTED,  # event_type
+                {  # data
                     "task_name": task_data.task_node_id,
                     "task_description": task_data.description,
                     "mode": task_data.mode,
                     "type": "root_task",
                 },
+                self.event_bus,  # 🔧 修复：添加 event_bus 参数
                 task_id=task_data.task_node_id,
                 source="task_graph",
             )
 
             # 🔥 新增：发送 TaskGraph 创建事件，触发持久化
             await emit_typed_event(
-                event_type=TaskEventType.TASK_GRAPH_CREATED,
-                data={
+                TaskEventType.TASK_GRAPH_CREATED,  # positional event_type
+                {  # positional data
                     "task_graph_id": self.task_node_id,
                     "root_task_id": task_data.task_node_id,
                     "mode": task_data.mode,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
+                self.event_bus,  # positional event_bus
                 task_id=self.task_node_id,
                 source="task_graph_persistence",
             )
@@ -425,27 +446,29 @@ class TaskGraph:
 
             emit_typed_event = get_emit_typed_event()
             await emit_typed_event(
-                event_type=TaskEventType.TASK_STARTED,
-                data={
+                TaskEventType.TASK_STARTED,  # positional event_type
+                {  # positional data
                     "task_name": task_data.task_node_id,
                     "task_description": task_data.description,
                     "mode": task_data.mode,
                     "type": "subtask",
                     "parent_id": parent_id,
                 },
+                self.event_bus,  # positional event_bus
                 task_id=task_data.task_node_id,
                 source="task_graph",
             )
 
             # 🔥 新增：发送 TaskGraph 更新事件，触发持久化
             await emit_typed_event(
-                event_type=TaskEventType.TASK_GRAPH_UPDATED,
-                data={
+                TaskEventType.TASK_GRAPH_UPDATED,  # positional event_type
+                {  # positional data
                     "task_graph_id": self.task_node_id,
                     "added_node_id": task_data.task_node_id,
                     "parent_id": parent_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
+                self.event_bus,  # positional event_bus
                 task_id=self.task_node_id,
                 source="task_graph_persistence",
             )
@@ -543,14 +566,15 @@ class TaskGraph:
 
             emit_typed_event = get_emit_typed_event()
             await emit_typed_event(
-                event_type=TaskEventType.TASK_GRAPH_UPDATED,
-                data={
+                TaskEventType.TASK_GRAPH_UPDATED,  # positional event_type
+                {  # positional data
                     "task_graph_id": self.task_node_id,
                     "updated_node_id": task_id,
                     "old_status": old_status.value if old_status else None,
                     "new_status": status.value,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
+                self.event_bus,  # positional event_bus
                 task_id=self.task_node_id,
                 source="task_graph_persistence",
             )
@@ -624,14 +648,15 @@ class TaskGraph:
 
             emit_typed_event = get_emit_typed_event()
             await emit_typed_event(
-                event_type=TaskEventType.TASK_COMPLETED,
-                data={
+                TaskEventType.TASK_COMPLETED,  # positional event_type
+                {  # positional data
                     "result": {"deleted": True, "task_id": task_id},
                     "duration": 0.0,
                     "success": True,
                     "task_id": task_id,
                     "source": "task_graph",
                 },
+                self.event_bus,  # positional event_bus
             )
 
             self.logger.info(f"Task deleted - task_id: {task_id}")
@@ -767,14 +792,15 @@ class TaskGraph:
 
             emit_typed_event = get_emit_typed_event()
             await emit_typed_event(
-                event_type=TaskEventType.CHECKPOINT_CREATED,
-                data={
+                TaskEventType.CHECKPOINT_CREATED,  # positional event_type
+                {  # positional data
                     "checkpoint_id": checkpoint_id,
                     "checkpoint_path": f"/checkpoints/{checkpoint_id}",
                     "checkpoint_size": len(str(checkpoint_data)),
                     "task_id": self.task_node_id,
                     "source": "task_graph",
                 },
+                self.event_bus,  # positional event_bus
             )
 
             self.logger.info(f"Created checkpoint: {checkpoint_id}")
@@ -821,14 +847,15 @@ class TaskGraph:
 
                 emit_typed_event = get_emit_typed_event()
                 await emit_typed_event(
-                    event_type=TaskEventType.CHECKPOINT_RESTORED,
-                    data={
+                    TaskEventType.CHECKPOINT_RESTORED,  # positional event_type
+                    {  # positional data
                         "checkpoint_id": checkpoint_data.get("checkpoint_id", "unknown"),
                         "checkpoint_path": f"/checkpoints/{checkpoint_data.get('checkpoint_id', 'unknown')}",
                         "restore_time": 0.0,
                         "task_id": self.task_node_id,
                         "source": "task_graph",
                     },
+                    self.event_bus,  # positional event_bus
                 )
 
                 self.logger.info(f"Restored from checkpoint for task graph: {self.task_node_id}")
@@ -1001,11 +1028,11 @@ class TaskGraph:
                 initial_mode=task_node.mode,
                 final_mode=task_node.mode,
                 mode_transitions=len(state_history),
-                skill_calls=0,  # TODO: 实现技能调用统计
-                mcp_requests=0,  # TODO: 实现MCP请求统计
+                skill_calls=0,  # Skill call statistics to be implemented
+                mcp_requests=0,  # MCP request statistics to be implemented
                 subtasks_created=subtasks_created,
-                tool_usage={},  # TODO: 实现工具使用统计
-                token_usage={},  # TODO: 实现token使用统计
+                tool_usage={},  # Tool usage statistics to be implemented
+                token_usage={},  # Token usage statistics to be implemented
             )
 
         except Exception as e:

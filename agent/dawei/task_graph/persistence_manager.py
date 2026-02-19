@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from dawei.core.events import CORE_EVENT_BUS, emit_typed_event
+from dawei.core.events import emit_typed_event  # 🔴 修复：删除 CORE_EVENT_BUS 导入
 from dawei.logg.logging import get_logger
 from dawei.workspace.persistence_manager import WorkspacePersistenceManager
 
@@ -48,12 +48,12 @@ class TaskGraphPersistenceManager:
 
         Args:
             workspace_path: 工作区路径
-            event_bus: 事件总线（默认使用 CORE_EVENT_BUS）
+            event_bus: 事件总线（可选，允许为 None，稍后通过 property setter 设置）
             debounce_seconds: 防抖时间（秒），相同资源在此时间内只保存一次
 
         """
         self.workspace_path = Path(workspace_path)
-        self.event_bus = event_bus or CORE_EVENT_BUS
+        self._event_bus = event_bus  # 🔧 修复：允许 None，稍后设置
         self.persistence_manager = WorkspacePersistenceManager(str(self.workspace_path))
         self.logger = get_logger(__name__)
 
@@ -70,6 +70,21 @@ class TaskGraphPersistenceManager:
 
         # 运行状态
         self._started = False
+        self._event_listeners_registered = False  # 🔴 新增：追踪是否已注册监听器
+
+    @property
+    def event_bus(self):
+        """获取 event_bus"""
+        return self._event_bus
+
+    @event_bus.setter
+    def event_bus(self, value):
+        """设置 event_bus 并注册监听器（如果已启动）"""
+        self._event_bus = value
+
+        # 如果管理器已启动且 event_bus 不为 None，立即注册监听器
+        if self._started and value is not None and not self._event_listeners_registered:
+            self._setup_event_listeners()
 
     async def start(self):
         """启动持久化服务"""
@@ -78,8 +93,11 @@ class TaskGraphPersistenceManager:
             return
 
         try:
-            # 注册事件监听器
-            self._setup_event_listeners()
+            # 🔧 修复：只在 event_bus 不为 None 时注册监听器
+            if self._event_bus is not None:
+                self._setup_event_listeners()
+            else:
+                self.logger.info("Event bus is None, listeners will be registered when event_bus is set")
 
             # 启动后台保存任务
             self._save_task = asyncio.create_task(self._save_loop())
@@ -97,15 +115,21 @@ class TaskGraphPersistenceManager:
         """设置事件监听器"""
         from dawei.core.events import TaskEventType
 
+        # 🔧 修复：检查 event_bus 是否可用
+        if self._event_bus is None:
+            self.logger.warning("Cannot register event listeners: event_bus is None")
+            return
+
         # 监听任务图创建事件
-        self.event_bus.add_handler(TaskEventType.TASK_GRAPH_CREATED, self._on_task_graph_created)
+        self._event_bus.add_handler(TaskEventType.TASK_GRAPH_CREATED, self._on_task_graph_created)
 
         # 监听任务图更新事件
-        self.event_bus.add_handler(TaskEventType.TASK_GRAPH_UPDATED, self._on_task_graph_updated)
+        self._event_bus.add_handler(TaskEventType.TASK_GRAPH_UPDATED, self._on_task_graph_updated)
 
         # 监听任务状态变化事件（触发整个任务图保存）
-        self.event_bus.add_handler(TaskEventType.STATE_CHANGED, self._on_state_changed)
+        self._event_bus.add_handler(TaskEventType.STATE_CHANGED, self._on_state_changed)
 
+        self._event_listeners_registered = True  # 🔴 新增：标记已注册
         self.logger.debug("Event listeners registered")
 
     async def _on_task_graph_created(self, event: Any):
@@ -253,6 +277,7 @@ class TaskGraphPersistenceManager:
                     "task_graph_id": task_graph_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
+                self.event_bus,  # 🔧 修复：添加 event_bus 参数
                 task_id=task_graph_id,
             )
 

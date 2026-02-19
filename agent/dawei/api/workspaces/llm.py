@@ -8,6 +8,7 @@ LLM提供商和配置管理
 
 import json
 import logging
+import os
 import uuid
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from dawei.config import get_workspaces_root
 from dawei.workspace.user_workspace import UserWorkspace
 
 logger = logging.getLogger(__name__)
@@ -553,15 +555,12 @@ async def delete_llm_provider(
         await workspace.initialize()
 
     try:
-        from pathlib import Path as PathlibPath
-        import os
-
         # 首先尝试从工作区级配置中删除
         settings_file = workspace.user_config_dir / "settings.json"
 
         if not settings_file.exists():
             # 如果工作区配置不存在，尝试用户级配置
-            user_settings_file = PathlibPath.home() / ".dawei" / "configs" / "settings.json"
+            user_settings_file = Path(get_workspaces_root()) / "configs" / "settings.json"
             if not user_settings_file.exists():
                 raise HTTPException(status_code=404, detail="Settings file not found")
             settings_file = user_settings_file
@@ -578,7 +577,7 @@ async def delete_llm_provider(
                 pass
             else:
                 # 工作区配置中没有，尝试用户级配置
-                user_settings_file = PathlibPath.home() / ".dawei" / "configs" / "settings.json"
+                user_settings_file = Path(get_workspaces_root()) / "configs" / "settings.json"
                 if user_settings_file.exists():
                     settings_file = user_settings_file
                     with Path(settings_file).open(encoding="utf-8") as f:

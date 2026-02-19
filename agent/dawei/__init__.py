@@ -11,6 +11,20 @@ Provides core functionality for the AI agent system:
 - Conversation management
 """
 
+from pathlib import Path
+from dotenv import find_dotenv, load_dotenv
+
+# Priority: CWD > find_dotenv()
+cwd_env = Path.cwd() / ".env"
+if cwd_env.exists():
+    env_path = str(cwd_env)
+else:
+    env_path = find_dotenv()
+
+if env_path:
+    load_dotenv(env_path, override=True)
+    # Note: We don't print here to avoid output before CLI is ready
+
 # 版本信息
 __version__ = "1.0.0"
 __author__ = "Dawei Team"

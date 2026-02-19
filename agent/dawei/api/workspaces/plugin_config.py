@@ -65,7 +65,7 @@ class PluginConfigResponse(BaseModel):
     """插件配置响应"""
 
     success: bool = Field(..., description="是否成功")
-    schema: dict[str, Any] | None = Field(None, description="配置 Schema")
+    config_schema: dict[str, Any] | None = Field(None, description="配置 Schema")
     config: dict[str, Any] = Field(..., description="当前配置值")
     existing_config: dict[str, Any] | None = Field(None, description="已存在的配置值（与config相同）")
     form_config: dict[str, Any] | None = Field(None, description="前端表单配置")
@@ -202,7 +202,7 @@ async def get_plugin_schema(
             plugin_info = list_response.plugins[plugin_id]
             return PluginConfigResponse(
                 success=True,
-                schema=plugin_info.get("schema"),
+                config_schema=plugin_info.get("schema"),
                 config=plugin_info.get("config", {}),
                 existing_config=plugin_info.get("config", {}),  # 添加此行
                 form_config=plugin_info.get("form_config"),
@@ -216,7 +216,7 @@ async def get_plugin_schema(
                 plugin_info = list_response.plugins[plugin_name]
                 return PluginConfigResponse(
                     success=True,
-                    schema=plugin_info.get("schema"),
+                    config_schema=plugin_info.get("schema"),
                     config=plugin_info.get("config", {}),
                     existing_config=plugin_info.get("config", {}),  # 添加此行
                     form_config=plugin_info.get("form_config"),
@@ -268,7 +268,7 @@ async def get_plugin_config(
 
         return PluginConfigResponse(
             success=True,
-            schema=plugin_info.get("schema"),
+            config_schema=plugin_info.get("schema"),
             config=settings,
             existing_config=settings,
             form_config=plugin_info.get("form_config"),
@@ -343,7 +343,7 @@ async def update_plugin_config(
 
         return PluginConfigResponse(
             success=True,
-            schema=schema,
+            config_schema=schema,
             config=request.config,
             existing_config=request.config,
             form_config=plugin_info.get("form_config"),
@@ -412,7 +412,7 @@ async def reset_plugin_config(
 
         return PluginConfigResponse(
             success=True,
-            schema=schema,
+            config_schema=schema,
             config=defaults,
             form_config=plugin_info.get("form_config"),
             message="Configuration reset to defaults",

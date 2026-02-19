@@ -15,6 +15,19 @@ export interface Skill {
   scope?: string;
   icon: string;
   category?: string;
+  path?: string; // 技能文件路径
+}
+
+/**
+ * 技能完整内容响应
+ */
+export interface SkillContent {
+  name: string;
+  description: string;
+  content: string;
+  path?: string;
+  mode?: string;
+  scope?: string;
 }
 
 /**
@@ -32,6 +45,45 @@ export interface SkillSearchResponse {
   query: string;
   results: Skill[];
   total: number;
+}
+
+/**
+ * 技能删除响应
+ */
+export interface SkillDeleteResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * 技能文件树项
+ */
+export interface SkillFileTreeItem {
+  name: string;
+  path: string;
+  type: 'file' | 'folder';
+  level: number;
+  children: SkillFileTreeItem[];
+  content?: string; // 文件内容（用于编辑器）
+}
+
+/**
+ * 技能文件树响应
+ */
+export interface SkillFileTreeResponse {
+  name: string;
+  path: string;
+  tree: SkillFileTreeItem[];
+}
+
+/**
+ * 技能文件内容响应
+ */
+export interface SkillFileContentResponse {
+  name: string;
+  path: string;
+  content: string;
+  size: number;
 }
 
 // Skills API 服务类
@@ -75,6 +127,113 @@ export class SkillsApiService {
     }
   ): Promise<Skill> {
     return await httpClient.get<Skill>(`${this.baseUrl}/skill/${skillName}`, params);
+  }
+
+  /**
+   * 获取技能的完整内容（包括SKILL.md全文）
+   */
+  async getSkillContent(
+    skillName: string,
+    params?: {
+      workspace_id?: string;
+    }
+  ): Promise<SkillContent> {
+    return await httpClient.get<SkillContent>(`${this.baseUrl}/skill/${skillName}/content`, params);
+  }
+
+  /**
+   * 删除指定技能
+   */
+  async deleteSkill(
+    skillName: string,
+    params?: {
+      workspace_id?: string;
+    }
+  ): Promise<SkillDeleteResponse> {
+    return await httpClient.delete<SkillDeleteResponse>(`${this.baseUrl}/skill/${skillName}`, { params });
+  }
+
+  /**
+   * 更新指定技能
+   */
+  async updateSkill(
+    skillName: string,
+    data: {
+      name?: string;
+      description?: string;
+      content?: string;
+    },
+    params?: {
+      workspace_id?: string;
+    }
+  ): Promise<Skill> {
+    return await httpClient.put<Skill>(`${this.baseUrl}/skill/${skillName}`, data, { params });
+  }
+
+  /**
+   * 创建新技能
+   */
+  async createSkill(
+    data: {
+      name: string;
+      description?: string;
+      content?: string;
+      scope?: string;
+    },
+    params?: {
+      workspace_id?: string;
+    }
+  ): Promise<Skill> {
+    return await httpClient.post<Skill>(`${this.baseUrl}/skill`, data, { params });
+  }
+
+  /**
+   * 获取技能的文件树结构
+   */
+  async getSkillFileTree(
+    skillName: string,
+    params?: {
+      workspace_id?: string;
+    }
+  ): Promise<SkillFileTreeResponse> {
+    return await httpClient.get<SkillFileTreeResponse>(
+      `${this.baseUrl}/skill/${skillName}/tree`,
+      params
+    );
+  }
+
+  /**
+   * 获取技能文件的详细内容
+   */
+  async getSkillFileContent(
+    skillName: string,
+    filePath: string,
+    params?: {
+      workspace_id?: string;
+    }
+  ): Promise<SkillFileContentResponse> {
+    return await httpClient.get<SkillFileContentResponse>(
+      `${this.baseUrl}/skill/${skillName}/file`,
+      { file_path: filePath, ...params }
+    );
+  }
+
+  /**
+   * 更新技能文件内容
+   */
+  async updateSkillFileContent(
+    skillName: string,
+    filePath: string,
+    content: string,
+    params?: {
+      workspace_id?: string;
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    return await httpClient.put<{ success: boolean; message: string }>(
+      `${this.baseUrl}/skill/${skillName}/file`,
+      { content },
+      { params: { file_path: filePath, ...params } }
+    );
   }
 }
 

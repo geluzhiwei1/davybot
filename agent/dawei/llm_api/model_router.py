@@ -8,11 +8,14 @@
 
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+
+from dawei.config import get_workspaces_root
 
 # ============================================================================
 # 任务类型枚举
@@ -521,7 +524,7 @@ def load_model_router_config(workspace_path: Path | str) -> RouterConfig:
 
     config_paths = [
         workspace_path / ".dawei" / "model_router.json",
-        Path.home() / ".dawei" / "model_router.json",
+        Path(get_workspaces_root()) / "model_router.json",
         Path("/etc/dawei/model_router.json"),
     ]
 

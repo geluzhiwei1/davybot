@@ -15,7 +15,8 @@ from typing import Any
 
 from dawei.agentic.agent import Agent
 from dawei.agentic.agent_pdca_integration import add_pdca_to_agent
-from dawei.core.events import CORE_EVENT_BUS, TaskEvent, TaskEventType
+# from dawei.core.events import CORE_EVENT_BUS, TaskEvent, TaskEventType  # REMOVED: CORE_EVENT_BUS deleted
+from dawei.core.events import TaskEvent, TaskEventType
 from dawei.core.exceptions import (
     AgentInitializationError,
     ConfigurationError,
@@ -140,7 +141,9 @@ class AgentBridge:
             raise AgentInitializationError(f"Agent initialization failed: {e}")
 
     async def subscribe_to_events(self) -> None:
-        """Subscribe to CORE_EVENT_BUS events
+        """Subscribe to Agent events
+
+        NOTE: CORE_EVENT_BUS has been removed - this function now uses agent.event_bus
 
         Subscribes to all relevant event types and forwards them
         to the UI update queue.
@@ -171,6 +174,12 @@ class AgentBridge:
             TaskEventType.PDCA_DOMAIN_DETECTED,
         ]
 
+        # NOTE: CORE_EVENT_BUS has been removed - using agent.event_bus instead
+        agent_event_bus = self.agent.event_bus if self.agent else None
+        if not agent_event_bus:
+            logger.error("[AGENT_BRIDGE] Agent event bus not available - cannot subscribe to events")
+            raise RuntimeError("Agent event bus not available")
+
         try:
             for event_type in event_types:
                 # ✅ 修复：使用内部async函数正确捕获event_type
@@ -178,7 +187,8 @@ class AgentBridge:
                 async def async_handler(event, et=event_type):
                     await self._forward_event(et, event)
 
-                handler_id = CORE_EVENT_BUS.on(
+                # Use agent's event bus instead of CORE_EVENT_BUS
+                handler_id = agent_event_bus.on(
                     event_type.value,
                     async_handler,  # ✅ 正确的async handler
                 )
@@ -190,15 +200,15 @@ class AgentBridge:
             logger.error(f"Invalid event type referenced: {e}", exc_info=True)
             # Clean up any partial subscriptions
             self._cleanup_event_handlers()
-            raise EventSystemError(f"Invalid event type in subscription: {e}")
+            raise RuntimeError(f"Invalid event type in subscription: {e}")
         except AttributeError as e:
-            logger.error(f"CORE_EVENT_BUS not properly initialized: {e}", exc_info=True)
+            logger.error(f"Event bus not properly initialized: {e}", exc_info=True)
             self._cleanup_event_handlers()
-            raise EventSystemError("Event system not available")
+            raise RuntimeError("Event system not available")
         except Exception as e:
             logger.error(f"Unexpected error during event subscription: {e}", exc_info=True)
             self._cleanup_event_handlers()
-            raise EventSystemError(f"Event subscription failed: {e}")
+            raise RuntimeError(f"Event subscription failed: {e}")
 
     async def _forward_event(self, event_type: TaskEventType, event: TaskEvent) -> None:
         """Forward event to UI queue
@@ -272,10 +282,15 @@ class AgentBridge:
 
     def _cleanup_event_handlers(self) -> None:
         """Cleanup event handlers to prevent memory leaks"""
+        agent_event_bus = self.agent.event_bus if self.agent else None
+
         for event_type, handler_id in self._event_handlers.items():
             try:
-                CORE_EVENT_BUS.off(event_type.value, handler_id)
-                logger.debug(f"Unsubscribed from event: {event_type.value}")
+                if agent_event_bus:
+                    agent_event_bus.off(event_type.value, handler_id)
+                    logger.debug(f"Unsubscribed from event: {event_type.value}")
+                else:
+                    logger.warning(f"Cannot unsubscribe from {event_type.value}: agent event bus not available")
             except KeyError as e:
                 logger.warning(f"Event handler not found for cleanup: {e}")
             except Exception as e:

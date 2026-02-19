@@ -1,25 +1,13 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <div class="file-content-area">
-    <el-tabs
-      v-if="hasFiles"
-      :model-value="activeFileId || ''"
-      type="card"
-      class="file-tabs"
-      closable
-      @tab-remove="closeFile"
-      @tab-change="handleTabChange"
-    >
-      <el-tab-pane
-        v-for="file in files"
-        :key="file.id"
-        :label="file.name"
-        :name="file.id"
-      >
+    <el-tabs v-if="hasFiles" :model-value="activeFileId || ''" type="card" class="file-tabs" closable
+      @tab-remove="closeFile" @tab-change="handleTabChange">
+      <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
         <template #label>
           <span class="tab-label">
             <el-icon>
@@ -45,11 +33,7 @@
               <span>预览</span>
             </template>
             <div class="html-preview-wrapper">
-              <HTMLViewer
-                :model-value="activeFile.content"
-                :filename="activeFile.name"
-                class="html-viewer-wrapper"
-              />
+              <HTMLViewer :model-value="activeFile.content" :filename="activeFile.name" class="html-viewer-wrapper" />
             </div>
           </el-tab-pane>
           <el-tab-pane name="edit">
@@ -57,133 +41,70 @@
               <span>编辑</span>
             </template>
             <div class="html-edit-wrapper">
-              <NativeCodeMirror
-                v-model="editableContent"
-                :file-path="activeFile.name"
-                :theme="editorTheme"
-                :line-numbers="true"
-                :bracket-matching="true"
-                :close-brackets="true"
-                :search="true"
-                language="html"
-                class="code-editor-wrapper"
-                @change="handleContentChange"
-              />
+              <NativeCodeMirror v-model="editableContent" :file-path="activeFile.name" :theme="editorTheme"
+                :line-numbers="true" :bracket-matching="true" :close-brackets="true" :search="true" language="html"
+                class="code-editor-wrapper" @change="handleContentChange" />
             </div>
           </el-tab-pane>
         </el-tabs>
 
         <!-- HTML 编辑模式下的保存按钮 -->
         <div v-if="isHTMLFile(activeFile) && htmlActiveTab === 'edit'" class="floating-save-button">
-          <el-button
-            @click="handleSave"
-            :loading="isSaving"
-            type="success"
-            size="small"
-          >
+          <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
             保存
           </el-button>
         </div>
 
         <!-- Markdown 文件的保存按钮 -->
         <div v-if="isMarkdownFile(activeFile)" class="toolbar-simple">
-          <el-button
-            @click="handleSave"
-            :loading="isSaving"
-            :disabled="!isContentModified"
-            type="success"
-            size="small"
-          >
+          <el-button @click="handleSave" :loading="isSaving" :disabled="!isContentModified" type="success" size="small">
             保存
           </el-button>
         </div>
 
         <!-- 其他文件类型的保存按钮 -->
-        <div v-if="!isHTMLFile(activeFile) && !isMarkdownFile(activeFile) && (isTextFile(activeFile) || isCodeFile(activeFile))" class="toolbar-simple">
-          <el-button
-            @click="handleSave"
-            :loading="isSaving"
-            type="success"
-            size="small"
-          >
+        <div
+          v-if="!isHTMLFile(activeFile) && !isMarkdownFile(activeFile) && (isTextFile(activeFile) || isCodeFile(activeFile))"
+          class="toolbar-simple">
+          <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
             保存
           </el-button>
         </div>
 
         <div v-show="isMarkdownFile(activeFile)" ref="vditorRef" class="editor-container"></div>
-        <ImageViewer
-          v-if="imageFiles.length > 0"
-          :images="allImageFiles"
-          :initial-index="currentImageIndex"
-          :visible="imageViewerVisible"
-          @update:visible="imageViewerVisible = $event"
-        />
+        <ImageViewer v-if="imageFiles.length > 0" :images="allImageFiles" :initial-index="currentImageIndex"
+          :visible="imageViewerVisible" @update:visible="imageViewerVisible = $event" />
         <div v-show="isImageFile(activeFile)" class="image-preview-container">
-          <el-image
-            :src="activeFile.content"
-            :alt="activeFile.name"
-            fit="contain"
-            class="image-preview"
-            style="cursor: pointer;"
-            @click="openImageViewer"
-          />
+          <el-image :src="activeFile.content" :alt="activeFile.name" fit="contain" class="image-preview"
+            style="cursor: pointer;" @click="openImageViewer" />
           <div class="open-viewer-overlay" @click="openImageViewer">
-            <el-icon :size="16"><ZoomIn /></el-icon>
+            <el-icon :size="16">
+              <ZoomIn />
+            </el-icon>
             <span>打开查看器</span>
             <span v-if="allImageFiles.length > 1" class="image-hint">
               ({{ currentImageIndex + 1 }} / {{ allImageFiles.length }})
             </span>
           </div>
         </div>
-        <video
-          v-show="isVideoFile(activeFile)"
-          :src="activeFile.content"
-          controls
-          class="media-preview"
-        >
+        <video v-show="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview">
           您的浏览器不支持视频播放。
         </video>
-        <audio
-          v-show="isAudioFile(activeFile)"
-          :src="activeFile.content"
-          controls
-          class="media-preview"
-        >
+        <audio v-show="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview">
           您的浏览器不支持音频播放。
         </audio>
-        <NativeCodeMirror
-          v-show="isCodeFile(activeFile) && !isHTMLFile(activeFile)"
-          v-model="editableContent"
-          :file-path="activeFile.name"
-          :theme="editorTheme"
-          :line-numbers="true"
-          :bracket-matching="true"
-          :close-brackets="true"
-          :search="true"
-          class="code-editor-wrapper"
-          @change="handleContentChange"
-        />
-        <CSVEditor
-          v-show="isCSVFile(activeFile)"
-          v-model="editableContent"
-          class="csv-editor-wrapper"
-          @change="handleContentChange"
-        />
-        <PDFViewer
-          v-if="activeFile && isPDFFile(activeFile)"
-          v-model="activeFile.content"
-          :filename="activeFile.name"
-          class="pdf-viewer-wrapper"
-        />
-        <el-input
-          v-show="isTextFile(activeFile)"
-          v-model="editableContent"
-          type="textarea"
-          class="text-editor"
-          :autosize="{ minRows: 10 }"
-          @input="handleContentChange"
-        />
-        <pre v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isTextFile(activeFile)" class="readonly-content"><code>{{ activeFile.content }}</code></pre>
+        <NativeCodeMirror v-show="isCodeFile(activeFile) && !isHTMLFile(activeFile)" v-model="editableContent"
+          :file-path="activeFile.name" :theme="editorTheme" :line-numbers="true" :bracket-matching="true"
+          :close-brackets="true" :search="true" class="code-editor-wrapper" @change="handleContentChange" />
+        <CSVEditor v-show="isCSVFile(activeFile)" v-model="editableContent" class="csv-editor-wrapper"
+          @change="handleContentChange" />
+        <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content" :filename="activeFile.name"
+          class="pdf-viewer-wrapper" />
+        <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
+          :autosize="{ minRows: 10 }" @input="handleContentChange" />
+        <pre
+          v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isTextFile(activeFile)"
+          class="readonly-content"><code>{{ activeFile.content }}</code></pre>
       </div>
       <el-empty v-else description="没有打开的文件" />
     </el-card>
@@ -191,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { useThemeStore } from '@/stores/theme'
@@ -236,6 +157,19 @@ const editableContent = ref('')
 const vditorRef = ref<HTMLDivElement | null>(null)
 const vditor = ref<Vditor | null>(null)
 const vditorInitialized = ref(false)
+
+// ✅ 暴露刷新方法给父组件
+const refreshAllFiles = () => {
+  // 触发父组件重新加载所有已打开文件的内容
+  props.files.forEach(file => {
+    emit('update-file-content', file.id, file.content)
+  })
+}
+
+// ✅ 暴露方法供父组件调用
+defineExpose({
+  refreshAllFiles
+})
 
 // Image viewer state
 const imageViewerVisible = ref(false)
@@ -484,7 +418,7 @@ watch(activeFile, (newFile, oldFile) => {
       })
     }
   }
-}, { immediate: false })
+}, { immediate: true })
 
 // 监听 activeFile.content 变化，同步到 editableContent
 watch(() => activeFile.value?.content, (newContent) => {

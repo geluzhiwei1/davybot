@@ -16,7 +16,6 @@ from dawei.core.error_handler import handle_errors
 from dawei.core.errors import (
     ConfigurationError,
 )
-from dawei.core.events import CORE_EVENT_BUS
 from dawei.core.metrics import increment_counter
 from dawei.core.utils import validate_and_create_config
 from dawei.entity.task_types import TaskStatus, TaskSummary, TokenUsage, ToolUsage
@@ -35,15 +34,6 @@ from .cost_tracker import CostTracker
 from .file_reference import FileReferenceParser, PathResolver
 from .file_snapshot_manager import FileSnapshotManager
 from .task_graph_excutor import TaskGraphExecutionEngine
-
-# ============================================================================
-# Memory System Support
-# ============================================================================
-
-
-# ============================================================================
-# Configuration Helpers
-# ============================================================================
 
 
 def is_memory_enabled(user_workspace) -> bool:
@@ -89,10 +79,15 @@ class Agent:
         # 基本属性
         self.user_workspace = user_workspace
         self.execution_engine = execution_engine
-        self.event_bus = CORE_EVENT_BUS
 
         # 日志记录器（必须在使用前初始化）
         self.logger = get_logger(__name__)
+
+        from dawei.core.events import SimpleEventBus
+        self.event_bus = SimpleEventBus()
+        self.logger.info(
+            f"[AGENT] Agent created own event_bus (id={id(self.event_bus)})"
+        )
 
         # 【关键】设置execution_engine的agent引用，用于暂停检查
         if hasattr(execution_engine, "_agent"):
@@ -259,25 +254,44 @@ class Agent:
                 tool_manager=ToolManager(workspace_path=user_workspace.absolute_path),
             )
 
+            # Initialize task manager callbacks (must be done before setting user workspace)
+            await tool_call_service.async_initialize()
+
             # 设置工具执行器的工作区
             await tool_call_service.set_user_workspace(user_workspace)
 
+            logger.info("[AGENT_CREATE] Creating Agent instance (first, to get event_bus)...")
+            # 🔧 修复：先创建 Agent 实例(获取 event_bus)
+            agent = cls(user_workspace, None, config_obj)
+
+            logger.info("[AGENT_CREATE] Creating TaskGraph for workspace...")
+            # 🔧 修复：创建 TaskGraph 并使用 Agent 的 event_bus
+            from dawei.task_graph.task_graph import TaskGraph
+            task_id = user_workspace.workspace_info.id if user_workspace.workspace_info else "default-task"
+            user_workspace.task_graph = TaskGraph(
+                task_id=task_id,
+                event_bus=agent.event_bus  # 使用 Agent 的 event_bus
+            )
+
             logger.info("[AGENT_CREATE] Creating execution engine...")
-            # 创建执行引擎
+            # 创建执行引擎,传入 agent
             execution_engine = TaskGraphExecutionEngine(
                 user_workspace=user_workspace,
                 message_processor=message_processor,
                 llm_service=llm_service,
                 tool_call_service=tool_call_service,
                 config=config_obj,
+                agent=agent,  # 🔧 修复：传入 agent
             )
 
-            logger.info("[AGENT_CREATE] Creating Agent instance...")
-            # 创建 Agent 实例
-            agent = cls(user_workspace, execution_engine, config_obj)
+            # 🔧 修复：设置 Agent 的 execution_engine
+            agent.execution_engine = execution_engine
 
             # 【新增】设置 ToolExecutor 的 agent 引用（用于权限检查）
             tool_call_service._agent = agent
+
+            # 设置 event_bus（用于发送工具事件）
+            tool_call_service._event_bus = agent.event_bus
 
             logger.info("[AGENT_CREATE] Agent created successfully")
             return agent
@@ -458,7 +472,7 @@ class Agent:
             f"Selected model: {model_selection.model} (reason: {model_selection.reason}, task: {model_selection.task_type.value})",
         )
 
-        # 【新增】Plan Mode: 将 plan_workflow 添加到 user_workspace 临时上下文
+        # Plan Mode: Attach plan_workflow to user_workspace context
         if self.plan_workflow is not None:
             self.user_workspace._plan_workflow = self.plan_workflow
             self.logger.debug("Plan workflow attached to user_workspace context")
@@ -470,11 +484,17 @@ class Agent:
         await self.execution_engine.execute_task_graph()
 
         # 【新增】执行完成后自动提取记忆
+        # Fast fail: only catch expected errors, let unknown errors propagate
         if self.memory_graph is not None and not self.memory_degraded:
             try:
                 await self._extract_memories_after_execution()
+            except (ConnectionError, TimeoutError, OSError) as e:
+                # Expected errors: network issues, timeouts, etc.
+                self.logger.warning(f"Memory extraction failed due to connectivity issue: {e}")
             except Exception as e:
-                self.logger.warning(f"Failed to extract memories after execution: {e}")
+                # Unexpected errors should fail fast - log as error
+                self.logger.error(f"Memory extraction failed unexpectedly: {e}", exc_info=True)
+                raise
 
         return
 
@@ -511,7 +531,7 @@ class Agent:
 
         # 使用 LLM 提取结构化记忆
         try:
-            llm_service = self.execution_engine.llm_service
+            llm_service = self.execution_engine._llm_service
 
             extraction_prompt = f"""从以下对话中提取结构化事实。
 
@@ -531,19 +551,23 @@ class Agent:
 
 提取的事实："""
 
-            response = await llm_service.generate(
-                messages=[{"role": "user", "content": extraction_prompt}],
+            # Convert dict format to LLMMessage format
+            from dawei.entity.lm_messages import UserMessage
+            llm_messages = [UserMessage(role="user", content=extraction_prompt)]
+
+            response = await llm_service.process_message(
+                messages=llm_messages,
                 max_tokens=500,
                 temperature=0.3,
             )
 
-            if not response or not response.content:
+            if not response or not response.get("content"):
                 return
 
             # 解析并存储记忆
             from dawei.memory.memory_graph import MemoryEntry, MemoryType
 
-            for line in response.content.strip().split("\n"):
+            for line in response["content"].strip().split("\n"):
                 line = line.strip()
                 if not line or line.startswith("-"):
                     line = line.lstrip("-").strip()
@@ -588,9 +612,14 @@ class Agent:
 
             self.logger.info(f"Memory extraction completed for conversation {conversation.id}")
 
+        except (ConnectionError, TimeoutError, OSError) as e:
+            # Expected: network/connectivity issues - fall back to simple extraction
+            self.logger.warning(f"LLM unavailable for memory extraction, using fallback: {e}")
+            await self._extract_memories_simple()
         except Exception as e:
-            self.logger.warning(f"LLM-based memory extraction failed: {e}")
-            # 降级使用简单的模式匹配提取
+            # Unexpected: should fail fast - log as error with stack trace
+            self.logger.error(f"LLM-based memory extraction failed unexpectedly: {e}", exc_info=True)
+            # Still fall back to simple extraction but surface the error
             await self._extract_memories_simple()
 
     async def _extract_memories_simple(self) -> None:
@@ -790,21 +819,21 @@ class Agent:
             任务摘要
 
         """
-        # TaskGraphExecutionEngine 需要通过任务图获取任务信息
-        task = None  # 暂时设为None，需要更复杂的逻辑
+        # TaskGraphExecutionEngine needs to get task info through task graph
+        task = None  # Requires more complex logic
         mode_history = await self.get_mode_history(task_id)
 
-        # 计算创建的子任务数量
-        subtasks_created = 0  # TODO: 实现子任务统计
+        # Calculate number of subtasks created
+        subtasks_created = 0  # Subtask statistics to be implemented
 
         return TaskSummary(
             task_id=task_id,
-            instance_id="",  # TODO: 从配置获取
+            instance_id="",  # To be retrieved from configuration
             initial_mode=task.mode if task else "",
             final_mode=task.mode if task else "",
             mode_transitions=len(mode_history),
-            skill_calls=0,  # TODO: 实现技能调用统计
-            mcp_requests=0,  # TODO: 实现MCP请求统计
+            skill_calls=0,  # Skill call statistics to be implemented
+            mcp_requests=0,  # MCP request statistics to be implemented
             subtasks_created=subtasks_created,
             tool_usage={name: {"attempts": usage.attempts, "failures": usage.failures} for name, usage in self.tool_usage.items()},
             token_usage={
@@ -827,22 +856,22 @@ class Agent:
             任务统计信息
 
         """
-        # TaskGraphExecutionEngine 需要通过任务图获取任务信息
-        task = None  # 暂时设为None，需要更复杂的逻辑
+        # TaskGraphExecutionEngine needs to get task info through task graph
+        task = None  # Requires more complex logic
         current_mode = await self.get_current_mode(task_id)
         mode_history = await self.get_mode_history(task_id)
 
-        # 从执行引擎获取执行状态
+        # Get execution status from execution engine
         execution_status = await self.execution_engine.get_task_execution_status(task_id)
 
-        # 简化消息计数逻辑
+        # Simplify message counting logic
         messages_count = 0
         if hasattr(self.user_workspace, "current_conversation") and self.user_workspace.current_conversation and hasattr(self.user_workspace.current_conversation, "messages"):
             messages_count = len(self.user_workspace.current_conversation.messages)
 
         return {
             "task_id": task_id,
-            "instance_id": "",  # TODO: 从配置获取
+            "instance_id": "",  # To be retrieved from configuration
             "status": (await self.get_task_status(task_id)).value,
             "initial_mode": task.mode if task else "",
             "current_mode": current_mode,
@@ -939,6 +968,8 @@ class Agent:
 
         self.logger.info("Agent cleaned up successfully", context={"component": "agent"})
         increment_counter("agent.cleanup", tags={"status": "success"})
+
+        return True  # ✅ Return True to indicate successful cleanup
 
     async def stop(self) -> str:
         """停止Agent执行

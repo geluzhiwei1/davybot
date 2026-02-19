@@ -387,6 +387,15 @@ export const useTaskStore = defineStore('task', () => {
     window.dispatchEvent(new CustomEvent('task-node-complete', {
       detail: nodeComplete
     }))
+
+    // ✅ 自动刷新：触发文件树和已打开文件的内容刷新
+    logger.debug('[TaskStore] Task node completed, triggering auto-refresh for workspace files')
+    window.dispatchEvent(new CustomEvent('task-node-complete-refresh', {
+      detail: {
+        workspaceId: workspaceId,
+        taskNodeId: nodeComplete.task_node_id
+      }
+    }))
   }
 
   // --- 返回store接口 ---

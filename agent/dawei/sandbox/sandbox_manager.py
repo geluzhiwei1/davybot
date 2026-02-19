@@ -45,26 +45,26 @@ class SandboxConfig:
     cpu_quota: int = 100000  # CPU配额（100000 = 1个CPU）
     cpu_period: int = 100000  # CPU周期
     pids_limit: int = 100  # 进程数限制
-    timeout: int = 30  # 执行超时（秒）
-    network_disabled: bool = True  # 禁用网络
-    read_only_root: bool = True  # 只读根文件系统
-    tmpfs_size: str = "100m"  # 临时文件系统大小
+    timeout: int = 30  # Execution timeout (seconds)
+    network_disabled: bool = True  # Disable network
+    read_only_root: bool = True  # Read-only root filesystem
+    tmpfs_size: str = "100m"  # Temporary filesystem size
 
-    # 工作区挂载配置
-    workspace_mount_mode: str = "ro"  # ro = 只读, rw = 读写
+    # Workspace mount configuration
+    workspace_mount_mode: str = "ro"  # ro = read-only, rw = read-write
 
 
 class SandboxManager:
-    """Docker沙箱管理器"""
+    """Docker sandbox manager"""
 
     def __init__(self, config: SandboxConfig | None = None):
         self.config = config or SandboxConfig()
 
         try:
             self.client = docker.from_env()
-            # 测试连接
+            # Test connection
             self.client.ping()
-            logger.info("[SANDBOX] Docker连接成功")
+            logger.info("[SANDBOX] Docker connection successful")
         except docker.errors.DockerException as e:
             logger.exception("[SANDBOX] Docker连接失败: ")
             raise DockerConnectionError(f"Docker daemon不可用: {e}")
@@ -95,11 +95,11 @@ class SandboxManager:
         temp_mount = None
 
         try:
-            # 1. 准备挂载点
-            # 创建临时挂载点以支持可能的写操作
+            # 1. Prepare mount point
+            # Create temporary mount point to support potential write operations
             temp_mount = tempfile.mkdtemp(prefix="sandbox_mount_")
 
-            # 2. 验证路径安全性 - 修复异常1: 路径不存在或不可访问
+            # 2. Validate path security - Fix exception 1: Path doesn't exist or is inaccessible
             if not workspace_path.exists():
                 raise ConfigurationError(f"工作区路径不存在: {workspace_path}")
 
@@ -285,15 +285,15 @@ class SandboxManager:
             }
 
         finally:
-            # 清理临时挂载点 - 修复异常5: 临时目录清理失败
-            # LEGITIMATE TOLERANCE: 清理失败不应影响命令执行结果
+            # Clean up temporary mount point - Fix exception 5: Temporary directory cleanup failed
+            # LEGITIMATE TOLERANCE: Cleanup failure should not affect command execution result
             if temp_mount and Path(temp_mount).exists():
                 try:
                     max_retries = 3
                     for attempt in range(max_retries):
                         try:
                             shutil.rmtree(temp_mount)
-                            logger.debug(f"[SANDBOX] 清理临时挂载点: {temp_mount}")
+                            logger.debug(f"[SANDBOX] Cleaned up temporary mount point: {temp_mount}")
                             break
                         except PermissionError as pe:
                             if attempt == max_retries - 1:
@@ -343,31 +343,31 @@ class SandboxManager:
             # 确保日志目录存在且有正确的权限
             try:
                 audit_log_path.parent.mkdir(exist_ok=True, mode=0o755)
-                logger.debug(f"[SANDBOX] 日志目录创建/确认: {audit_log_path.parent}")
+                logger.debug(f"[SANDBOX] Log directory created/confirmed: {audit_log_path.parent}")
             except (PermissionError, OSError) as dir_error:
-                # 如果无法创建标准日志目录，使用临时目录
+                # If standard log directory cannot be created, use temporary directory
                 temp_log_dir = Path(tempfile.gettempdir()) / "dawei_logs" / "sandbox"
                 try:
                     temp_log_dir.mkdir(exist_ok=True, mode=0o755)
                 except (PermissionError, OSError):
-                    # 临时目录也无法创建，使用系统临时目录
+                    # If temporary directory also cannot be created, use system temp directory
                     temp_log_dir = Path(tempfile.gettempdir())
-                    logger.warning(f"[SANDBOX] 使用系统临时目录: {temp_log_dir}")
+                    logger.warning(f"[SANDBOX] Using system temp directory: {temp_log_dir}")
                 audit_log_path = temp_log_dir / "sandbox_audit.log"
                 logger.warning(
-                    f"[SANDBOX] 使用备用日志目录: {audit_log_path} (原目录错误: {dir_error})",
+                    f"[SANDBOX] Using fallback log directory: {audit_log_path} (original directory error: {dir_error})",
                 )
 
-            # 写入日志文件，使用追加模式确保数据不丢失
+            # Write to log file, using append mode to ensure no data loss
             with Path(audit_log_path, "a").open(encoding="utf-8") as f:
                 f.write(json.dumps(log_entry) + "\n")
 
-            logger.debug(f"[SANDBOX] 审计日志已写入: {audit_log_path}")
+            logger.debug(f"[SANDBOX] Audit log written: {audit_log_path}")
 
         except (PermissionError, OSError) as pe:
-            # 文件系统错误（权限、磁盘空间等）
-            logger.exception(f"[SANDBOX] 审计日志文件系统错误: {pe}")
-            # 尝试写入系统临时目录作为最后的尝试（跨平台兼容）
+            # File system error (permissions, disk space, etc.)
+            logger.exception(f"[SANDBOX] Audit log file system error: {pe}")
+            # Try writing to system temp directory as final attempt (cross-platform compatible)
             try:
                 temp_dir = tempfile.gettempdir()
                 temp_audit_path = Path(temp_dir) / "sandbox_audit.log"

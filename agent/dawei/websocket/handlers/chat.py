@@ -1252,9 +1252,14 @@ class ChatHandler(AsyncMessageHandler):
 
         await self.update_session_data(session_id, data={"current_task_id": None})
 
-        # 清理 Agent 实例
+        # 🔴 关键修复：清理 Agent 实例
         if task_id in self._active_agents:
             del self._active_agents[task_id]
+
+        logger.info(
+            f"[CHAT_HANDLER] Skipping agent.cleanup() to avoid disrupting active handlers. "
+            f"Agent {task_id} will be garbage collected naturally."
+        )
 
         # 🔧 修复：清理事件处理器，防止内存泄漏和重复处理
         await self._cleanup_event_handlers(task_id, agent)
@@ -1267,22 +1272,36 @@ class ChatHandler(AsyncMessageHandler):
             agent: Agent实例（可选，如果不提供则尝试从_active_agents获取）
 
         """
-        handler_ids = self._task_event_handler_ids.pop(task_id, None)
+        # 🔴 关键修复：弹出完整的任务信息
+        task_info = self._task_event_handler_ids.pop(task_id, None)
 
-        if not handler_ids:
+        if not task_info:
             logger.debug(f"[EVENT_HANDLER] ✅ Task {task_id} handlers already cleaned up or never registered")
             return
+
+        # 提取 handler_ids 和 event_bus
+        handler_ids = task_info.get('handler_ids', {})
+        saved_event_bus_id = task_info.get('event_bus_id')
+        saved_event_bus = task_info.get('event_bus')
 
         logger.info(
             f"[EVENT_HANDLER] 🧹 Cleaning up {len(handler_ids)} event handlers for task {task_id}",
         )
 
         # 获取事件总线
-        event_bus = None
-        if agent:
-            event_bus = agent.event_bus
-        elif task_id in self._active_agents:
-            event_bus = self._active_agents[task_id].event_bus
+        event_bus = saved_event_bus
+
+        # 验证：如果保存的 event_bus 和当前 agent 的 event_bus 不同，记录警告
+        if agent and hasattr(agent, 'event_bus'):
+            current_event_bus_id = id(agent.event_bus)
+            if current_event_bus_id != saved_event_bus_id:
+                logger.error(
+                    f"[EVENT_HANDLER] ❌ CRITICAL: Event bus mismatch!\n"
+                    f"  - Saved event_bus_id: {saved_event_bus_id}\n"
+                    f"  - Current agent event_bus_id: {current_event_bus_id}\n"
+                    f"  - This means the agent was recreated or replaced!\n"
+                    f"  - Using saved event_bus reference for cleanup.",
+                )
 
         if not event_bus:
             logger.warning(
@@ -1294,11 +1313,14 @@ class ChatHandler(AsyncMessageHandler):
         # 移除所有事件处理器
         removed_count = 0
         already_removed_count = 0
+
         for event_type_value, handler_id in handler_ids.items():
             try:
                 # 将字符串转换为TaskEventType枚举
                 event_type = TaskEventType(event_type_value)
+
                 success = event_bus.remove_handler(event_type, handler_id)
+
                 if success:
                     removed_count += 1
                     logger.debug(
@@ -1679,6 +1701,7 @@ class ChatHandler(AsyncMessageHandler):
                     # 🔧 修复：CONTENT_STREAM 事件只发送 StreamContentMessage，不发送 LLMApiResponseMessage
                     # 原因：LLMApiResponseMessage 应该只在真正的 LLM API 事件中发送
                     # StreamContentMessage 已经负责流式内容的显示，发送 LLMApiResponseMessage 会导致前端重复处理内容
+
                     # 从 event_data 字典构建消息
                     websocket_msg = StreamContentMessage.from_event_data(
                         event_data,
@@ -1939,6 +1962,10 @@ class ChatHandler(AsyncMessageHandler):
             )
             return
 
+        # 🔧 简化：由于每个UserWorkspace现在使用独立的event_bus，
+        # 不再需要强制清理其他任务的handler
+        # 旧任务会随着UserWorkspace的释放而自动清理
+
         # 🔧 修复：保存事件处理器ID映射，用于清理
         handler_ids = {}
 
@@ -1952,8 +1979,13 @@ class ChatHandler(AsyncMessageHandler):
             except Exception as e:
                 logger.error(f"订阅事件 {event_type} 时出错: {e}", exc_info=True)
 
-        # 保存handler ID映射
-        self._task_event_handler_ids[task_id] = handler_ids
+        # 🔴 关键修复：保存完整的任务信息（handler_ids + event_bus 引用）
+        self._task_event_handler_ids[task_id] = {
+            'handler_ids': handler_ids,
+            'event_bus_id': id(event_bus),
+            'event_bus': event_bus,  # 保存引用，确保清理时使用同一个 event_bus
+        }
+
         logger.info(
             f"[EVENT_HANDLER] ✅ Successfully registered {len(handler_ids)} event handlers for task {task_id}. Total active handlers: {len(self._task_event_handler_ids)}",
         )

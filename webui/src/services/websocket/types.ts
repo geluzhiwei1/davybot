@@ -82,7 +82,7 @@ export enum MessageType {
   TASK_NODE_STOP = 'task_node_stop',
   TASK_NODE_STOPPED = 'task_node_stopped',
 
-  // TODO系统
+  // Todo system
   TODO_UPDATE = 'todo_update',
   TODO_CREATED = 'todo_created',
   TODO_UPDATED = 'todo_updated',
@@ -278,7 +278,7 @@ export interface TaskNodeCompletePayload {
   metadata?: Record<string, unknown>
 }
 
-// TODO更新
+// Todo update
 export interface TodoUpdatePayload {
   task_node_id: string
   todos: Array<{
@@ -290,7 +290,7 @@ export interface TodoUpdatePayload {
   }>
 }
 
-// TODO创建
+// Todo created
 export interface TodoCreatedPayload {
   todo_id: string
   task_node_id: string
@@ -299,7 +299,7 @@ export interface TodoCreatedPayload {
   task_description?: string
 }
 
-// TODO更新详情
+// Todo updated details
 export interface TodoUpdatedPayload {
   todo_id: string
   task_node_id: string
@@ -308,13 +308,13 @@ export interface TodoUpdatedPayload {
   priority?: string
 }
 
-// TODO删除
+// Todo deleted
 export interface TodoDeletedPayload {
   todo_id: string
   task_node_id: string
 }
 
-// 批量TODO更新
+// Batch todo update
 export interface TodoBatchUpdatedPayload {
   task_node_id: string
   todo_ids: string[]
@@ -426,7 +426,7 @@ export type MessagePayloadMap = {
   [MessageType.TASK_NODE_RESUMED]: TaskNodeStateChangePayload
   [MessageType.TASK_NODE_STOPPED]: TaskNodeStateChangePayload
 
-  // TODO系统相关
+  // Todo system related
   [MessageType.TODO_UPDATE]: TodoUpdatePayload
   [MessageType.TODO_CREATED]: TodoCreatedPayload
   [MessageType.TODO_UPDATED]: TodoUpdatedPayload

@@ -3,10 +3,14 @@
 
 import inspect
 import logging
+import os
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, get_type_hints
 
 from pydantic import BaseModel
+
+from dawei.config import get_workspaces_root
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -255,19 +259,20 @@ class CustomToolProvider(ToolProvider):
                     skills_roots = []
                     ws_path = Path(self.workspace_path)
 
-                    # Level 1: Workspace
-                    ws_roo_skills = ws_path / ".dawei" / "configs" / "skills"
-                    logger.info(f"[Skills] Loading skills from workspace: {ws_roo_skills}")
-                    if ws_roo_skills.exists() and any(ws_roo_skills.iterdir()):
+                    # Level 1: Workspace (优先级最高)
+                    ws_skills_dir = ws_path / ".dawei" / "skills"
+                    logger.info(f"[Skills] Checking workspace skills: {ws_skills_dir}")
+                    if ws_skills_dir.exists() and any(ws_skills_dir.iterdir()):
                         skills_roots.append(ws_path)
-                        logger.info(f"[Skills] Found workspace skills: {ws_roo_skills}")
+                        logger.info(f"[Skills] ✓ Found workspace skills at: {ws_skills_dir}")
 
-                    # Level 2: Global user
-                    global_roo = Path.home() / ".dawei" / "configs" / "skills"
-                    logger.info(f"[Skills] Loading skills from global: {global_roo}")
-                    if global_roo.exists() and any(global_roo.iterdir()):
-                        skills_roots.append(Path.home())
-                        logger.info(f"[Skills] Found global skills: {global_roo}")
+                    # Level 2: Global user (DAWEI_HOME)
+                    dawei_home = Path(get_workspaces_root())
+                    global_skills_dir = dawei_home / "skills"
+                    logger.info(f"[Skills] Checking global skills: {global_skills_dir}")
+                    if global_skills_dir.exists() and any(global_skills_dir.iterdir()):
+                        skills_roots.append(dawei_home)
+                        logger.info(f"[Skills] ✓ Found global skills at: {global_skills_dir}")
 
                     if skills_roots:
                         # Create skills tools

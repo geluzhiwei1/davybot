@@ -304,7 +304,7 @@ async function clearCompleted() {
 // 任务控制操作
 async function handlePause(task: ParallelTaskInfo) {
   try {
-    // TODO: 调用后端API暂停任务
+    // Backend API integration needed for pause functionality
     ElMessage.success(`任务 ${task.taskId} 已暂停`)
   } catch (error: unknown) {
     ElMessage.error(`暂停失败: ${error.message}`)
@@ -313,7 +313,7 @@ async function handlePause(task: ParallelTaskInfo) {
 
 async function handleResume(task: ParallelTaskInfo) {
   try {
-    // TODO: 调用后端API恢复任务
+    // Backend API integration needed for resume functionality
     ElMessage.success(`任务 ${task.taskId} 已恢复`)
   } catch (error: unknown) {
     ElMessage.error(`恢复失败: ${error.message}`)
@@ -332,10 +332,10 @@ async function handleStop(task: ParallelTaskInfo) {
       }
     )
 
-    // TODO: 调用后端API停止任务
+    // Backend API integration needed for stop functionality
     ElMessage.success(`任务 ${task.taskId} 已停止`)
   } catch {
-    // 用户取消
+    // User cancelled
   }
 }
 </script>

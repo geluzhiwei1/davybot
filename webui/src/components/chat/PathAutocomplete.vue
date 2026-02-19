@@ -39,7 +39,12 @@
           </div>
         </div>
 
-        <div v-if="filteredItems.length === 0" class="menu-empty">
+        <div v-if="isLoading" class="menu-loading">
+          <span class="loading-icon">⏳</span>
+          <span class="loading-text">加载中...</span>
+        </div>
+
+        <div v-else-if="filteredItems.length === 0" class="menu-empty">
           <span class="empty-icon">📭</span>
           <span class="empty-text">没有找到匹配的文件</span>
         </div>
@@ -51,6 +56,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { debounce } from 'lodash-es';
+import { useWorkspaceStore } from '@/stores/workspace';
+import { workspacesApi } from '@/services/api/services/workspaces';
+import type { FileTreeNode } from '@/services/api/types';
 
 // ============================================================================
 // 类型定义
@@ -82,12 +90,14 @@ const props = withDefaults(defineProps<PathAutocompleteProps>(), {
 // 状态管理
 // ============================================================================
 
+const workspaceStore = useWorkspaceStore();
 const showMenu = ref(false);
 const items = ref<PathItem[]>([]);
 const selectedIndex = ref(0);
 const searchQuery = ref('');
 const currentPosition = ref({ x: 0, y: 0 });
 const containerRef = ref<HTMLElement>();
+const isLoading = ref(false);
 
 // ============================================================================
 // 计算属性
@@ -125,36 +135,54 @@ const filteredItems = computed(() => {
  * 获取工作区文件列表
  */
 async function fetchWorkspaceFiles(): Promise<void> {
-  try {
-    // TODO: 实现真实的文件系统 API 调用
-    // 这里需要后端提供一个 API 端点来列出工作区文件
-    // const response = await fetch('/api/files/list');
-    // const data = await response.json();
+  if (!workspaceStore.currentWorkspaceId) {
+    console.warn('No workspace selected');
+    items.value = [];
+    return;
+  }
 
-    // 模拟数据（开发测试用）
-    items.value = [
-      { name: 'src', path: '/src', displayPath: 'src/', type: 'folder', depth: 0 },
-      { name: 'components', path: '/src/components', displayPath: 'src/components/', type: 'folder', depth: 1 },
-      { name: 'ChatInput.vue', path: '/src/components/ChatInput.vue', displayPath: 'src/components/ChatInput.vue', type: 'file', depth: 2 },
-      { name: 'services', path: '/src/services', displayPath: 'src/services/', type: 'folder', depth: 1 },
-      { name: 'api.ts', path: '/src/services/api.ts', displayPath: 'src/services/api.ts', type: 'file', depth: 2 },
-      { name: 'patent_agent.py', path: '/patent_agent.py', displayPath: 'patent_agent.py', type: 'file', depth: 0 },
-      { name: 'context_manager.py', path: '/context_manager.py', displayPath: 'context_manager.py', type: 'file', depth: 0 },
-      { name: 'README.md', path: '/README.md', displayPath: 'README.md', type: 'file', depth: 0 },
-    ];
+  isLoading.value = true;
+
+  try {
+    // 使用真实的 API 获取文件树
+    const fileTree = await workspacesApi.getFileTree(
+      workspaceStore.currentWorkspaceId,
+      {
+        path: '.', // 从工作区根目录开始
+        recursive: true, // 递归获取所有文件
+        includeHidden: false, // 不包含隐藏文件
+        maxDepth: 3 // 最大深度为 3
+      }
+    );
+
+    // 将文件树转换为扁平化的路径列表
+    const pathItems: PathItem[] = [];
+    const flattenTree = (nodes: FileTreeNode[], depth: number = 0) => {
+      for (const node of nodes) {
+        const isDirectory = node.is_directory || node.type === 'directory';
+        pathItems.push({
+          name: node.name,
+          path: node.path,
+          displayPath: node.path,
+          type: isDirectory ? 'folder' : 'file',
+          depth
+        });
+
+        // 递归处理子节点
+        if (isDirectory && node.children && node.children.length > 0) {
+          flattenTree(node.children, depth + 1);
+        }
+      }
+    };
+
+    flattenTree(fileTree);
+    items.value = pathItems;
   } catch (error) {
     console.error('Failed to fetch workspace files:', error);
     items.value = [];
+  } finally {
+    isLoading.value = false;
   }
-}
-
-/**
- * 递归搜索目录
- */
- 
-async function searchDirectory(_path: string): Promise<PathItem[]> {
-  // TODO: 实现真实的目录搜索 API
-  return [];
 }
 
 // ============================================================================
@@ -287,9 +315,9 @@ async function checkTrigger(text: string, cursorPosition: number): Promise<boole
 
   // 显示菜单
   if (!showMenu.value) {
-    // 初次显示，加载文件列表
-    await fetchWorkspaceFiles();
     showMenuAt(rect.left, rect.bottom + 5);
+    // 初次显示，加载文件列表（不等待，异步加载）
+    fetchWorkspaceFiles();
   }
 
   // 更新搜索查询
@@ -433,6 +461,34 @@ defineExpose({
 
 .empty-text {
   font-size: 13px;
+}
+
+.menu-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  color: var(--el-text-color-placeholder);
+}
+
+.loading-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.loading-text {
+  font-size: 13px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* 动画 */

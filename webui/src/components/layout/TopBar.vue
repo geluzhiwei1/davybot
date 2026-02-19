@@ -42,6 +42,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
 import { useChatStore } from '@/stores/chat';
 import { useWorkspaceStore } from '@/stores/workspace';
 import { ElHeader, ElButton, ElTag } from 'element-plus';
@@ -59,20 +60,21 @@ withDefaults(defineProps<Props>(), {
 
 const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
+const { t } = useI18n();
 const { connectionStatus } = storeToRefs(chatStore);
 const { currentConversation, isTempConversation } = storeToRefs(workspaceStore);
 
-const agentName = ref('大微');
+const agentName = ref('Dawei');
 
 // 计算当前会话标题
 const conversationTitle = computed(() => {
   if (isTempConversation.value) {
-    return '新对话';
+    return t('topBar.newConversation');
   }
   if (currentConversation.value) {
-    return currentConversation.value.title || currentConversation.value.name || '未命名会话';
+    return currentConversation.value.title || currentConversation.value.name || t('topBar.unnamedConversation');
   }
-  return '请选择或创建会话';
+  return t('topBar.selectOrCreateConversation');
 });
 
 const statusType = computed(() => {
@@ -92,13 +94,13 @@ const statusDotClass = computed(() => {
 
 const statusText = computed(() => {
   const map = {
-    connected: '已连接',
-    connecting: '连接中',
-    reconnecting: '重连中',
-    error: '连接错误',
-    disconnected: '已断开',
+    connected: t('topBar.connected'),
+    connecting: t('topBar.connecting'),
+    reconnecting: t('topBar.reconnecting'),
+    error: t('topBar.connectionError'),
+    disconnected: t('topBar.disconnected'),
   };
-  return map[connectionStatus.value] || '未连接';
+  return map[connectionStatus.value] || t('topBar.notConnected');
 });
 </script>
 

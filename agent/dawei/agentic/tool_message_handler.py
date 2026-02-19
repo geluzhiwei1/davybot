@@ -76,6 +76,7 @@ class ToolMessageHandle:
                 await emit_typed_event(
                     TaskEventType.TOOL_CALLS_DETECTED,
                     stream_message,
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="stream_message",
                 )
@@ -188,6 +189,7 @@ class ToolMessageHandle:
                         "tool_input": {"raw_arguments": arguments_str},
                         "tool_call_id": tool_call_id,
                     },
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_execution",
                 )
@@ -201,6 +203,7 @@ class ToolMessageHandle:
                         "is_error": True,
                         "tool_call_id": tool_call_id,
                     },
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_execution",
                 )
@@ -212,6 +215,7 @@ class ToolMessageHandle:
                         "error": f"Failed to parse tool arguments for {function_name}: {e}",
                         "details": {"raw_arguments": arguments_str},
                     },
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_execution",
                 )
@@ -233,6 +237,7 @@ class ToolMessageHandle:
                     "tool_input": arguments,
                     "tool_call_id": tool_call_id,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="tool_execution",
             )
@@ -274,6 +279,7 @@ class ToolMessageHandle:
                     "progress_percentage": 100,
                     "tool_call_id": tool_call_id,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="tool_execution",
             )
@@ -291,6 +297,7 @@ class ToolMessageHandle:
                     "is_error": False,
                     "tool_call_id": tool_call_id,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="tool_execution",
             )
@@ -365,6 +372,7 @@ class ToolMessageHandle:
                 "is_error": True,
                 "tool_call_id": tool_call_id,
             },
+            self._event_bus,
             task_id=self.task_node.task_node_id,
             source="tool_execution",
         )
@@ -411,6 +419,7 @@ class ToolMessageHandle:
                 "is_error": True,
                 "tool_call_id": tool_call_id,
             },
+            self._event_bus,
             task_id=self.task_node.task_node_id,
             source="tool_execution",
         )
@@ -424,6 +433,7 @@ class ToolMessageHandle:
                     "traceback": traceback.format_exc(),
                 },
             },
+            self._event_bus,
             task_id=self.task_node.task_node_id,
             source="tool_execution",
         )
@@ -453,7 +463,23 @@ class ToolMessageHandle:
             question = arguments.get("question", "")
             suggestions = arguments.get("follow_up", [])
 
-            self.logger.info(f"Ask followup question: {question[:50]}...")
+            # 🔍 验证 suggestions 参数
+            if not suggestions:
+                self.logger.warning(
+                    f"[FOLLOWUP_DEBUG] ⚠️ 'follow_up' parameter is missing or empty! "
+                    f"This will cause 'suggestions 为空或未定义' error in frontend. "
+                    f"Available keys in arguments: {list(arguments.keys())}"
+                )
+            elif len(suggestions) < 2:
+                self.logger.warning(
+                    f"[FOLLOWUP_DEBUG] ⚠️ 'follow_up' has only {len(suggestions)} suggestion(s). "
+                    f"Expected 2-4 suggestions. This may cause display issues."
+                )
+            elif len(suggestions) > 4:
+                self.logger.warning(
+                    f"[FOLLOWUP_DEBUG] ⚠️ 'follow_up' has {len(suggestions)} suggestions. "
+                    f"Expected 2-4 suggestions. Only first 4 will be used."
+                )
 
             # 发送工具调用开始事件
             await emit_typed_event(
@@ -463,6 +489,7 @@ class ToolMessageHandle:
                     "tool_input": arguments,
                     "tool_call_id": tool_call_id,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="tool_message_handler",
             )
@@ -484,9 +511,12 @@ class ToolMessageHandle:
                 cleaned = suggestion.replace("<suggest>", "").replace("</suggest>", "").strip()
                 cleaned_suggestions.append(cleaned)
 
-            self.logger.info(
-                f"Sending followup question: session_id={session_id}, question={question[:50]}..., suggestions={cleaned_suggestions}",
-            )
+            if not cleaned_suggestions:
+                self.logger.error(
+                    f"[FOLLOWUP_DEBUG] ❌ CRITICAL: cleaned_suggestions is empty! "
+                    f"This WILL cause 'suggestions 为空或未定义' error in frontend! "
+                    f"Original suggestions were: {suggestions}"
+                )
 
             # 发送追问问题事件（在 event_data 中包含 session_id）
             await emit_typed_event(
@@ -497,6 +527,7 @@ class ToolMessageHandle:
                     "suggestions": cleaned_suggestions,  # 使用清理后的建议
                     "tool_call_id": tool_call_id,
                 },
+                self._event_bus,
                 task_id=self.task_node.task_node_id,
                 source="tool_message_handler",
             )
@@ -534,6 +565,7 @@ class ToolMessageHandle:
                         "is_error": False,
                         "tool_call_id": tool_call_id,
                     },
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_message_handler",
                 )
@@ -560,6 +592,7 @@ class ToolMessageHandle:
                         "is_error": True,
                         "tool_call_id": tool_call_id,
                     },
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_message_handler",
                 )
@@ -583,6 +616,7 @@ class ToolMessageHandle:
                         "is_error": True,
                         "tool_call_id": tool_call_id,
                     },
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_message_handler",
                 )
@@ -618,6 +652,7 @@ class ToolMessageHandle:
                         "is_error": True,
                         "tool_call_id": tool_call_id,
                     },
+                    self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_message_handler",
                 )
@@ -727,6 +762,7 @@ class ToolMessageHandle:
                     "surface_type": result.get("surface_type", "custom"),
                     "task_id": task_id,
                 },
+                self._event_bus,
                 task_id=task_id,
                 source="tool_message_handler",
             )

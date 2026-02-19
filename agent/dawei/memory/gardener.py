@@ -12,7 +12,6 @@ import sqlite3
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
-from dawei.core.events import CORE_EVENT_BUS
 from dawei.llm_api.llm_provider import LLMProvider
 
 from .memory_graph import MemoryEntry, MemoryGraph, MemoryType
@@ -54,7 +53,7 @@ class MemoryGardener:
         Args:
             memory_graph: MemoryGraph instance to maintain
             llm_provider: LLM provider for consolidation (optional)
-            event_bus: Event bus instance (defaults to CORE_EVENT_BUS)
+            event_bus: Event bus instance (NOTE: CORE_EVENT_BUS has been removed, defaults to None)
             consolidation_interval: Seconds between consolidation runs
             decay_rate: Energy decay rate per run
             energy_threshold: Threshold for archiving low-energy memories
@@ -63,7 +62,7 @@ class MemoryGardener:
         """
         self.memory_graph = memory_graph
         self.llm_provider = llm_provider
-        self.event_bus = event_bus or CORE_EVENT_BUS
+        self.event_bus = event_bus  # Don't default to CORE_EVENT_BUS
         self.consolidation_interval = consolidation_interval
         self.decay_rate = decay_rate
         self.energy_threshold = energy_threshold
@@ -185,10 +184,11 @@ class MemoryGardener:
 
                 try:
                     # Emit consolidation start event
-                    await self.event_bus.publish(
-                        "MEMORY_CONSOLIDATION_STARTED",
-                        {"subject": subject, "count": len(memories)},
-                    )
+                    if self.event_bus:
+                        await self.event_bus.publish(
+                            "MEMORY_CONSOLIDATION_STARTED",
+                            {"subject": subject, "count": len(memories)},
+                        )
 
                     # Use LLM to generate consolidated strategy
                     strategy = await self._generate_consolidation_strategy(subject, memories)
@@ -199,14 +199,15 @@ class MemoryGardener:
                         consolidated_count += 1
 
                         # Emit consolidation complete event
-                        await self.event_bus.publish(
-                            "MEMORY_CONSOLIDATION_COMPLETED",
-                            {
-                                "subject": subject,
-                                "strategy_id": strategy.id,
-                                "consolidated_from": [m.id for m in memories],
-                            },
-                        )
+                        if self.event_bus:
+                            await self.event_bus.publish(
+                                "MEMORY_CONSOLIDATION_COMPLETED",
+                                {
+                                    "subject": subject,
+                                    "strategy_id": strategy.id,
+                                    "consolidated_from": [m.id for m in memories],
+                                },
+                            )
 
                 except Exception:
                     self.logger.exception("Consolidation failed for {subject}: ")
@@ -301,7 +302,8 @@ AVOIDS: [things to avoid based on the data]"""
 
             if archived > 0:
                 # Emit archive event
-                await self.event_bus.publish("MEMORY_ENTRY_ARCHIVED", {"count": archived})
+                if self.event_bus:
+                    await self.event_bus.publish("MEMORY_ENTRY_ARCHIVED", {"count": archived})
 
                 self.logger.info(f"Archived {archived} expired memories")
 
@@ -319,10 +321,11 @@ AVOIDS: [things to avoid based on the data]"""
 
         """
         try:
-            await self.event_bus.publish(
-                "MEMORY_CONSOLIDATION_STARTED",
-                {"subject": subject or "all", "manual": True},
-            )
+            if self.event_bus:
+                await self.event_bus.publish(
+                    "MEMORY_CONSOLIDATION_STARTED",
+                    {"subject": subject or "all", "manual": True},
+                )
 
             strategies_created = 0
 
@@ -338,10 +341,11 @@ AVOIDS: [things to avoid based on the data]"""
                 # Consolidate all (reuse existing logic)
                 await self._consolidate_memories()
 
-            await self.event_bus.publish(
-                "MEMORY_CONSOLIDATION_COMPLETED",
-                {"strategies_created": strategies_created},
-            )
+            if self.event_bus:
+                await self.event_bus.publish(
+                    "MEMORY_CONSOLIDATION_COMPLETED",
+                    {"strategies_created": strategies_created},
+                )
 
             return {"success": True, "strategies_created": strategies_created}
 

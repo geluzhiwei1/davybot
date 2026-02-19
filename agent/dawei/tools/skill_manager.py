@@ -123,30 +123,23 @@ class SkillManager:
         for priority, root in enumerate(self.skills_roots):
             logger.debug(f"Scanning skills root (priority {priority}): {root}")
 
-            # 1. 通用的 .dawei/configs/skills/
-            generic_skills_dir = root / ".dawei" / "configs" / "skills"
-            if generic_skills_dir.exists() and generic_skills_dir.is_dir():
-                # 根据优先级确定scope
-                if priority == 0:
-                    scope = "workspace"
-                elif priority == len(self.skills_roots) - 1:
-                    scope = "user"
-                else:
-                    scope = "system"
+            # 根据优先级确定scope
+            if priority == 0:
+                scope = "workspace"
+            elif priority == len(self.skills_roots) - 1:
+                scope = "user"
+            else:
+                scope = "system"
 
-                self._discover_skills_in_dir(generic_skills_dir, mode=None, scope=scope)
+            # 1. 通用的 .dawei/skills/ (市场安装的技能)
+            market_skills_dir = root / ".dawei" / "skills"
+            if market_skills_dir.exists() and market_skills_dir.is_dir():
+                self._discover_skills_in_dir(market_skills_dir, mode=None, scope=scope)
 
-            # 2. Mode-specific .dawei/configs/skills-{mode}/
+            # 2. Mode-specific .dawei/skills-{mode}/
             if self.current_mode:
-                mode_skills_dir = root / ".dawei" / "configs" / f"skills-{self.current_mode}"
+                mode_skills_dir = root / ".dawei" / f"skills-{self.current_mode}"
                 if mode_skills_dir.exists() and mode_skills_dir.is_dir():
-                    if priority == 0:
-                        scope = "workspace"
-                    elif priority == len(self.skills_roots) - 1:
-                        scope = "user"
-                    else:
-                        scope = "system"
-
                     self._discover_skills_in_dir(
                         mode_skills_dir,
                         mode=self.current_mode,
@@ -176,9 +169,14 @@ class SkillManager:
 
                 # 解析frontmatter
                 name, description = self._parse_frontmatter(skill_file)
-                if not name or not description:
-                    logger.warning(f"Invalid frontmatter in {skill_file}")
+                if not name:
+                    logger.warning(f"Invalid frontmatter (missing name) in {skill_file}")
                     continue
+
+                # 允许空的 description，使用默认值
+                if not description:
+                    description = f"{name} skill"
+                    logger.debug(f"Empty description for {name}, using default")
 
                 # 验证name匹配目录名
                 if name != skill_path.name:

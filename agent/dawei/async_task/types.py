@@ -11,12 +11,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-try:
+if TYPE_CHECKING:
     from .interfaces import ITaskContext
-except ImportError:
-    ITaskContext = None  # type: ignore
+else:
+    ITaskContext = None
 
 
 class TaskStatus(Enum):
@@ -317,7 +317,7 @@ class TaskProgress:
 # 类型别名定义
 TaskExecutor = Callable[..., Awaitable[Any]]
 
-StartCallback = Callable[[str, ITaskContext], Awaitable[None]]
+StartCallback = Callable[[str, "ITaskContext"], Awaitable[None]]
 ProgressCallback = Callable[[TaskProgress], Awaitable[None]]
 StateChangeCallback = Callable[[str, TaskStatus, TaskStatus], Awaitable[None]]
 ErrorCallback = Callable[[TaskError], Awaitable[None]]

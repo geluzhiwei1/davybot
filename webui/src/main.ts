@@ -34,13 +34,7 @@ app.component('el-radio', ElRadio)
 app.component('el-radio-group', ElRadioGroup)
 app.component('el-radio-button', ElRadioButton)
 
-// 1. 初始化全局错误捕获
-// 暂时禁用errorHandler以避免循环错误
-// console.log('[Main] Initializing global error handler...')
-// errorHandler.init()
 
-// 2. 设置 Vue 错误处理器
-// errorHandler.setupVueErrorHandler(app)
 
 // 3. 注册所有 Element Plus 图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
@@ -58,34 +52,12 @@ import { useThemeStore } from './stores/themeStore'
 const themeStore = useThemeStore()
 themeStore.initializeTheme()
 
-// 注册WebSocket消息路由
-// import { registerTodoWebSocketRoutes } from '@/stores/todoStore'
-// registerTodoWebSocketRoutes()
 
-// 开发环境：暴露store用于E2E测试
-// 注释掉因为 e2e 目录不存在
-// if (import.meta.env.DEV) {
-//   import('./e2e/test-setup')
-// }
 
 // 挂载应用
 app.mount('#app')
 
-// ==================== 应用启动后检查 ====================
-// 暂时禁用崩溃报告检查
-// window.addEventListener('load', () => {
-//   const crashReports = errorHandler.getCrashReports()
-//   const unreported = errorHandler.getUnreportedCrashes()
-//
-//   if (crashReports.length > 0) {
-//     console.warn(`[Main] Found ${crashReports.length} crash report(s) from previous session`)
-//     console.log(`[Main] - Reported: ${crashReports.length - unreported.length}`)
-//     console.log(`[Main] - Unreported: ${unreported.length}`)
-//
-//     // 将崩溃报告信息存储到 window 对象，供 App.vue 使用
-//     (window as unknown).__CRASH_REPORTS__ = crashReports
-//   }
-// })
+
 
 // ==================== 应用退出前清理 ====================
 window.addEventListener('beforeunload', () => {

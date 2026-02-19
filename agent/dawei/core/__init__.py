@@ -24,7 +24,7 @@ from .errors import (
     ValidationError,
     WebSocketError,
 )
-from .events import CORE_EVENT_BUS, SimpleEventBus, TaskEvent, TaskEventType
+from .events import SimpleEventBus, TaskEvent, TaskEventType  # 🔴 修复：移除 CORE_EVENT_BUS 导入
 
 # from .structured_logger import get_logger, log_performance, StructuredLogger  # 已移除
 from .metrics import increment_counter, set_gauge, timer
@@ -41,7 +41,6 @@ __all__ = [
     "IEventBus",
     "TaskEventType",
     "TaskEvent",
-    "CORE_EVENT_BUS",
     "WebSocketError",
     "ValidationError",
     "ToolNotFoundError",
@@ -50,9 +49,6 @@ __all__ = [
     "handle_errors",
     "ErrorHandler",
     "ErrorContext",
-    # "get_logger",  # 已移至 dawei.logg.logging
-    # "log_performance",  # 已移至 dawei.logg.logging
-    # "StructuredLogger",  # 已移至 dawei.logg.logging
     "increment_counter",
     "set_gauge",
     "timer",
