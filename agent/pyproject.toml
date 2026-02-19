@@ -1,6 +1,6 @@
 [project]
 name = "davybot"
-version = "0.1.0"
+version = "0.1.1"
 description = "Dawei AI Assistant - Server Package (Backend + Frontend)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -32,8 +32,9 @@ dependencies = [
     "textual>=7.5.0",
     "jsonschema>=4.20.0",
     "click>=8.1.0",
-    "davybot-market-cli>=0.1.0",
+    "davybot-market-cli>=0.1.1",
     "python-dotenv",
+    "python-frontmatter",
 ]
 
 [project.optional-dependencies]
@@ -75,9 +76,6 @@ Repository = "https://github.com/geluzhiwei1/davybot.git"
 [project.scripts]
 # Main CLI entry point (unified command)
 dawei = "dawei.cli.dawei:main"
-
-# Legacy command (deprecated, use 'dawei server' instead)
-dawei-server = "dawei.server:main"
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
