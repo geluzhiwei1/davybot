@@ -18,10 +18,28 @@ from pathlib import Path
 
 # 强制 UTF-8 编码（解决 Windows 控制台编码问题）
 if sys.platform == "win32":
-    if hasattr(sys.stdout, "buffer"):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "buffer"):
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    # Helper function to get the underlying binary stream
+    def _get_binary_stream(stream):
+        if hasattr(stream, "buffer"):
+            return stream.buffer
+        elif hasattr(stream, "raw"):
+            return stream.raw
+        else:
+            return stream
+
+    # Wrap stdout if needed
+    if hasattr(sys.stdout, "buffer") or hasattr(sys.stdout, "raw"):
+        try:
+            sys.stdout = io.TextIOWrapper(_get_binary_stream(sys.stdout), encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass  # Use default if wrapping fails
+
+    # Wrap stderr if needed
+    if hasattr(sys.stderr, "buffer") or hasattr(sys.stderr, "raw"):
+        try:
+            sys.stderr = io.TextIOWrapper(_get_binary_stream(sys.stderr), encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass  # Use default if wrapping fails
 
 # 共享的 UTF-8 流（避免重复创建文件描述符）
 _shared_utf8_stream = None

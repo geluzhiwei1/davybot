@@ -125,9 +125,7 @@ class LoggingConfig(BaseSettings):
 
         # 打印路径信息用于调试
         dawei_home = get_workspaces_root()
-        print(f"[LoggingConfig] DAWEI_HOME: {dawei_home}")
-        print(f"[LoggingConfig] Log directory: {self.dir}")
-        print(f"[LoggingConfig] LLM log directory: {self.llm_dir}")
+        print(f"DAWEI_HOME: {dawei_home}")
 
     @field_validator("sensitive_fields", mode="before")
     @classmethod
