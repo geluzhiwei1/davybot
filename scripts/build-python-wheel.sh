@@ -82,12 +82,19 @@ if [ -d "dist" ]; then
     done
 fi
 
+# 获取并显示版本号
+echo ""
+echo -e "${BLUE}📌 版本信息:${NC}"
+VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='.'))" 2>/dev/null || echo "N/A")
+echo "版本号: ${VERSION}"
+echo ""
+
 echo ""
 echo -e "${GREEN}✅ Python Wheel 包构建成功！${NC}"
 echo ""
 echo "安装与使用:"
-echo "  1. 安装: pip install dist/dawei_server-*.whl"
-echo "  2. 启动: dawei-server"
+echo "  1. 安装: pip install dist/davybot-*.whl"
+echo "  2. 启动: dawei"
 echo "  3. 访问: http://localhost:8465/app"
 echo ""
 echo "前端路径: http://localhost:8465/app/"
