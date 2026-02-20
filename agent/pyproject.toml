@@ -1,6 +1,6 @@
 [project]
 name = "davybot"
-version = "0.1.2"
+version = "0.1.3"
 description = "Dawei AI Assistant - Server Package (Backend + Frontend)"
 readme = "README.md"
 requires-python = ">=3.12"
