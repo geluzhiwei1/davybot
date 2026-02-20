@@ -1,6 +1,6 @@
 [project]
 name = "davybot"
-version = "0.1.3"
+dynamic = ["version"]
 description = "Dawei AI Assistant - Server Package (Backend + Frontend)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -78,7 +78,7 @@ Repository = "https://github.com/geluzhiwei1/davybot.git"
 dawei = "dawei.cli.dawei:main"
 
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=68.0", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -96,10 +96,6 @@ version_scheme = "release-branch-semver"
 fallback_version = "0.1.3"
 # Search parent directories for git repository
 search_parent_directories = true
-# Normalized package name for SETUPTOOLS_SCM_PRETEND_VERSION_FOR_* env var
-normalized = true
-# Root directory relative to pyproject.toml (parent directory)
-root = ".."
 
 [tool.setuptools.packages.find]
 where = ["."]

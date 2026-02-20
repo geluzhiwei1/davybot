@@ -72,13 +72,13 @@ jobs:
       - name: Get version from setuptools_scm
         id: version
         run: |
-          # Get version from setuptools_scm
-          # Run from repository root to ensure .git directory is found
+          # Get version from setuptools_scm for GitHub Release naming
+          # setuptools_scm will automatically detect version during build
           VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version())")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Detected version: ${VERSION}"
 
-          # If manual version input is provided, use it instead
+          # If manual version input is provided, use it instead (for GitHub Release)
           if [ -n "${{ github.event.inputs.version }}" ]; then
             echo "Using manual version: ${{ github.event.inputs.version }}"
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
@@ -88,8 +88,8 @@ jobs:
         working-directory: ./agent
         run: |
           rm -rf dist/ build/ *.egg-info
-          # Set root to parent directory so setuptools_scm can find .git
-          export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT=${{ steps.version.outputs.version }}
+          # setuptools_scm will automatically detect version from git tags
+          # No need to set SETUPTOOLS_SCM_PRETEND_VERSION_* anymore
           python3 -m build
 
       - name: Publish distribution to PyPI
@@ -106,7 +106,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh release create '${{ github.event.inputs.version }}' \
+          gh release create '${{ steps.version.outputs.version }}' \
             --repo '${{ github.repository }}' \
-            --notes "Release ${{ github.event.inputs.version }}" \
+            --notes "Release ${{ steps.version.outputs.version }}" \
             agent/dist/*
