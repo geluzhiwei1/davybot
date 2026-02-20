@@ -85,7 +85,6 @@ build-backend = "setuptools.build_meta"
 package-data = {dawei = ["*.yaml", "*.yml", "**/*.yaml", "**/*.yml", "**/*.j2", "**/*.jinja2", "**/*.md", "json/**/*.json", "frontend/**/*"]}
 include-package-data = true
 
-<<<<<<< HEAD
 # setuptools_scm configuration for automatic versioning
 [tool.setuptools_scm]
 # Write version to a file for runtime access
@@ -97,9 +96,11 @@ version_scheme = "release-branch-semver"
 fallback_version = "0.1.3"
 # Search parent directories for git repository
 search_parent_directories = true
+# Normalized package name for SETUPTOOLS_SCM_PRETEND_VERSION_FOR_* env var
+normalized = true
+# Root directory relative to pyproject.toml (parent directory)
+root = ".."
 
-=======
->>>>>>> parent of a8d3e80 (auto version)
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["dawei*"]

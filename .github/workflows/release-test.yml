@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.0.0)'
-        required: true
+        description: 'Version to release (e.g., v1.0.0). Leave empty to auto-detect from git tag'
+        required: false
         type: string
 
 permissions:
@@ -67,12 +67,29 @@ jobs:
         working-directory: ./agent
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install build
+          python3 -m pip install build setuptools_scm
+
+      - name: Get version from setuptools_scm
+        id: version
+        run: |
+          # Get version from setuptools_scm
+          # Run from repository root to ensure .git directory is found
+          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version())")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Detected version: ${VERSION}"
+
+          # If manual version input is provided, use it instead
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "Using manual version: ${{ github.event.inputs.version }}"
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build wheel
         working-directory: ./agent
         run: |
           rm -rf dist/ build/ *.egg-info
+          # Set root to parent directory so setuptools_scm can find .git
+          export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT=${{ steps.version.outputs.version }}
           python3 -m build
 
       - name: Copy wheel to root dist
