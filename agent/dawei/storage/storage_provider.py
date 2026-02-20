@@ -141,9 +141,9 @@ class StorageProvider:
 
         """
         if cls._system_storage is None:
-            from dawei.config import get_workspaces_root
+            from dawei.config import get_dawei_home
 
-            dawei_home = get_workspaces_root()
+            dawei_home = get_dawei_home()
 
             logger.info(f"Creating system_storage with root_dir: {dawei_home}")
             cls._system_storage = LocalFileSystemStorage(root_dir=str(dawei_home))

@@ -20,7 +20,7 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dawei.config import get_workspaces_root
+from dawei.config import get_dawei_home
 from dawei.conversation.conversation import Conversation, create_conversation
 # from dawei.core.events import CORE_EVENT_BUS  # REMOVED: CORE_EVENT_BUS deleted
 from dawei.entity.llm_config import LLMConfig
@@ -693,7 +693,7 @@ class UserWorkspace:
 
             # ===== Level 2: Global User级别 =====
             # 2.1 {DAWEI_HOME}/skills/
-            dawei_home = get_workspaces_root()
+            dawei_home = get_dawei_home()
             global_dawei_configs = dawei_home 
             global_skills_dir = global_dawei_configs / "skills"
             if global_skills_dir.exists() and any(global_skills_dir.iterdir()):

@@ -10,7 +10,7 @@ from typing import Any, get_type_hints
 
 from pydantic import BaseModel
 
-from dawei.config import get_workspaces_root
+from dawei.config import get_dawei_home
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -248,50 +248,56 @@ class CustomToolProvider(ToolProvider):
 
             tools = list(unique_tools.values())
 
-            # Load skills tools if workspace_path is provided
-            if self.workspace_path:
-                try:
-                    from pathlib import Path
+            # Load skills tools - always available as builtin tools
+            try:
+                from pathlib import Path
 
-                    from .custom_tools.skills_tool import create_skills_tools
+                from .custom_tools.skills_tool import create_skills_tools
 
-                    # Build skills_roots with workspace and global paths
-                    skills_roots = []
+                # Build skills_roots with workspace and global paths
+                skills_roots = []
+                dawei_home = Path(get_dawei_home())
+
+                # Level 1: Workspace (优先级最高) - if workspace_path provided
+                if self.workspace_path:
                     ws_path = Path(self.workspace_path)
-
-                    # Level 1: Workspace (优先级最高)
                     ws_skills_dir = ws_path / ".dawei" / "skills"
                     logger.info(f"[Skills] Checking workspace skills: {ws_skills_dir}")
                     if ws_skills_dir.exists() and any(ws_skills_dir.iterdir()):
                         skills_roots.append(ws_path)
                         logger.info(f"[Skills] ✓ Found workspace skills at: {ws_skills_dir}")
 
-                    # Level 2: Global user (DAWEI_HOME)
-                    dawei_home = Path(get_workspaces_root())
-                    global_skills_dir = dawei_home / "skills"
-                    logger.info(f"[Skills] Checking global skills: {global_skills_dir}")
-                    if global_skills_dir.exists() and any(global_skills_dir.iterdir()):
-                        skills_roots.append(dawei_home)
-                        logger.info(f"[Skills] ✓ Found global skills at: {global_skills_dir}")
+                # Level 2: Global user (DAWEI_HOME) - always included
+                global_skills_dir = dawei_home / "skills"
+                logger.info(f"[Skills] Checking global skills: {global_skills_dir}")
+                if global_skills_dir.exists() and any(global_skills_dir.iterdir()):
+                    skills_roots.append(dawei_home)
+                    logger.info(f"[Skills] ✓ Found global skills at: {global_skills_dir}")
 
-                    if skills_roots:
-                        # Create skills tools
-                        skills_tools = create_skills_tools(skills_roots)
-                        for skill_tool in skills_tools:
-                            tool_dict = {
-                                "name": skill_tool.name,
-                                "description": skill_tool.description,
-                                "parameters": {},  # Skills tools use their own parameter parsing
-                                "callable": skill_tool,
-                                "original_tool": skill_tool,
-                            }
-                            tools.append(tool_dict)
-                            logger.info(f"Successfully loaded skills tool: {skill_tool.name}")
+                # Always create skills tools, even if skills_roots is empty
+                # This allows list_skills to work as a discovery tool
+                if not skills_roots:
+                    # Use global home as default root for SkillManager
+                    skills_roots = [dawei_home]
+                    logger.info(f"[Skills] No skills found, using default root: {dawei_home}")
 
-                except ImportError as e:
-                    logger.warning(f"Failed to import skills_tool module: {e}")
-                except Exception:
-                    logger.exception("Error loading skills tools: ")
+                # Create skills tools (always available)
+                skills_tools = create_skills_tools(skills_roots)
+                for skill_tool in skills_tools:
+                    tool_dict = {
+                        "name": skill_tool.name,
+                        "description": skill_tool.description,
+                        "parameters": {},  # Skills tools use their own parameter parsing
+                        "callable": skill_tool,
+                        "original_tool": skill_tool,
+                    }
+                    tools.append(tool_dict)
+                    logger.info(f"Successfully loaded skills tool: {skill_tool.name}")
+
+            except ImportError as e:
+                logger.warning(f"Failed to import skills_tool module: {e}")
+            except Exception:
+                logger.exception("Error loading skills tools: ")
 
         except ImportError:
             logger.exception("Failed to import custom tools package: ")

@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dawei.config.logging_config import LoggingConfig, get_config
 from dawei.core import local_context
 from dawei.core.error_handler import handle_errors
 from dawei.core.errors import LLMError, ValidationError
@@ -154,6 +155,11 @@ class OpenaiCompatibleClient(BaseClient):
             (request_log_file, response_log_file): 日志文件路径元组
 
         """
+        # 检查是否启用 HTTP 日志记录
+        log_config = get_config()
+        if not log_config.enable_llm_api_http_logging:
+            return None, None
+
         if not workspace_path:
             return None, None
 
@@ -418,8 +424,6 @@ class OpenaiCompatibleClient(BaseClient):
         """估算文本的令牌数量（不使用tiktoken）"""
         if not text:
             return 0
-        # 使用简单的字符数估算：平均4个字符约等于1个token
-        # 这是一个粗略的估算，对于中文可能不太准确，但足够用于基本的token限制
         return len(text) // 4
 
     def get_num_tokens_from_messages(self, messages: list[dict[str, Any]]) -> int:
@@ -452,34 +456,8 @@ class OpenaiCompatibleClient(BaseClient):
 
         params["messages"] = serialized_messages
 
-        # if params.get("top_p") == 1.0:
-        #     del params["top_p"]
-        # if params.get("frequency_penalty") == 0.0:
-        #     del params["frequency_penalty"]
-        # if params.get("presence_penalty") == 0.0:
-        #     del params["presence_penalty"]
-
         params["stream"] = True
         params["tool_stream"] = True
-
-        # # 添加 reasoning_effort
-        # if self.reasoning_effort is not None:
-        #     params["reasoning_effort"] = self.reasoning_effort
-
-        # 自动调整 max_tokens
-        # if self.max_context_tokens and params.get("max_tokens") is None:
-        #     prompt_tokens = self.get_num_tokens_from_messages(openai_messages)
-        #     available_tokens = self.max_context_tokens - prompt_tokens
-
-        #     available_tokens -= 100  # Buffer
-
-        #     if self.max_output_tokens:
-        #         params["max_tokens"] = min(available_tokens, self.max_output_tokens)
-        #     else:
-        #         params["max_tokens"] = max(256, available_tokens)
-
-        #     if params["max_tokens"] <= 0:
-        #         raise ValueError("Prompt is too long, not enough tokens for generation.")
 
         return params
 

@@ -12,8 +12,11 @@ from typing import Any
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
 
+# 导入统一的日志配置
+from dawei.config.logging_config import LoggingConfig
 
-def get_workspaces_root() -> str:
+
+def get_dawei_home() -> str:
     """从环境变量获取DAWEI_HOME，默认值为 ~/.dawei
     此函数需要在load_dotenv()之后调用
 
@@ -22,9 +25,9 @@ def get_workspaces_root() -> str:
 
     """
     # 从环境变量获取，如果不存在则使用默认值 ~/.dawei
-    workspaces_root = os.environ.get("DAWEI_HOME", "~/.dawei")
+    dawei_home = os.environ.get("DAWEI_HOME", "~/.dawei")
     # 展开波浪号并转换为绝对路径
-    return str(Path(workspaces_root).expanduser().resolve())
+    return str(Path(dawei_home).expanduser().resolve())
 
 
 class DatabaseConfig(BaseSettings):
@@ -32,7 +35,7 @@ class DatabaseConfig(BaseSettings):
 
     model_config = ConfigDict(
         env_prefix="DB_",
-        env_file=[".env", "services/agent-api/.env"],
+        env_file=[".env"],
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
@@ -53,7 +56,7 @@ class RedisConfig(BaseSettings):
 
     model_config = ConfigDict(
         env_prefix="REDIS_",
-        env_file=[".env", "services/agent-api/.env"],
+        env_file=[".env"],
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
@@ -576,28 +579,8 @@ class StorageConfig(BaseSettings):
 
 # ============================================================================
 # Logging Configuration
+# 导入自 dawei.config.logging_config.LoggingConfig
 # ============================================================================
-
-
-class LoggingConfig(BaseSettings):
-    """日志配置"""
-
-    model_config = ConfigDict(
-        env_prefix="LOG_",
-        env_file=[".env", "services/agent-api/.env"],
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="allow",
-    )
-
-    level: str = Field(default="INFO")
-    enable_performance_logging: bool = Field(default=True)
-    enable_telemetry: bool = Field(default=True)
-    log_file: str = Field(default="logs/dawei.log")
-    max_file_size_mb: int = Field(default=10)
-    backup_count: int = Field(default=5)
-    console_output: bool = Field(default=True)
-
 
 class AppConfig(BaseSettings):
     """应用主配置"""
@@ -625,7 +608,7 @@ class AppConfig(BaseSettings):
 
     # 工作目录配置
     # workspaces_root 直接从环境变量获取，默认为 ~/.dawei
-    workspaces_root: str = Field(default_factory=get_workspaces_root)
+    workspaces_root: str = Field(default_factory=get_dawei_home)
 
     def __init__(self, **data):
         """初始化配置"""

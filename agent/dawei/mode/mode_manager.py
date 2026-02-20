@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from dawei.config import get_workspaces_root
+from dawei.config import get_dawei_home
 from dawei.entity.mode import ModeConfig
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ class ModeConfigLoader:
 
     def load_user_modes(self) -> dict[str, ModeConfig]:
         """加载用户级模式配置"""
-        user_config_dir = Path(get_workspaces_root()) / "agents"
+        user_config_dir = Path(get_dawei_home()) / "agents"
         return self._load_modes_from_directory(user_config_dir, "user")
 
     def load_workspace_modes(self, workspace_path: str) -> dict[str, ModeConfig]:
@@ -405,7 +405,7 @@ class ModeManager:
 
         # 确定配置目录
         if level == "user":
-            config_dir = Path(get_workspaces_root()) / "agents"
+            config_dir = Path(get_dawei_home()) / "agents"
         else:  # workspace
             if not self.workspace_path:
                 raise ValueError("Workspace path not set for workspace-level mode deletion")
@@ -556,7 +556,7 @@ class ModeManager:
 
         # 确定配置目录
         if level == "user":
-            config_dir = Path(get_workspaces_root()) / "agents"
+            config_dir = Path(get_dawei_home()) / "agents"
         else:  # workspace
             if not self.workspace_path:
                 raise ValueError("Workspace path not set for workspace-level mode update")
@@ -645,7 +645,7 @@ class ModeManager:
 
         # 确定配置目录
         if level == "user":
-            config_dir = Path(get_workspaces_root()) / "agents"
+            config_dir = Path(get_dawei_home()) / "agents"
         else:  # workspace
             if not self.workspace_path:
                 raise ValueError("Workspace path not set for workspace-level mode update")
@@ -741,7 +741,7 @@ class ModeManager:
                         search_paths.append(agent_dir / rules_dir_name / rules_file_name)
 
         # 2. 用户级别的 agents 目录
-        user_agents = Path(get_workspaces_root()) / "agents"
+        user_agents = Path(get_dawei_home()) / "agents"
         search_paths.append(user_agents / rules_dir_name / rules_file_name)
         # 用户级别的市场包
         if user_agents.exists():
@@ -789,7 +789,7 @@ class ModeManager:
                         search_dirs.append(agent_dir / rules_dir_name)
 
         # 2. 用户级别的 agents 目录
-        user_agents = Path(get_workspaces_root()) / "agents"
+        user_agents = Path(get_dawei_home()) / "agents"
         search_dirs.append(user_agents / rules_dir_name)
         # 用户级别的市场包
         if user_agents.exists():

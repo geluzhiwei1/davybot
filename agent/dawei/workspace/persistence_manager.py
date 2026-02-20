@@ -105,16 +105,23 @@ class WorkspacePersistenceManager:
             workspace_path: workspace根目录
 
         """
+        from dawei.config import get_dawei_home
+
         self.workspace_path = Path(workspace_path)
         self.persistence_dir = self.workspace_path / ".dawei"
         self.lock_dir = self.persistence_dir / ".locks"
 
-        # 各类资源的存储目录
-        self.conversations_dir = self.persistence_dir / "conversations"
+        # 全局目录（在 DAWEI_HOME 下）
+        dawei_home = Path(get_dawei_home())
+        self.checkpoints_dir = dawei_home / "checkpoints"
+        self.sessions_dir = dawei_home / "sessions"  # 全局会话目录
+
+        # 工作区特定目录（在 workspace/.dawei 下）
         self.task_graphs_dir = self.persistence_dir / "task_graphs"
         self.task_nodes_dir = self.persistence_dir / "task_nodes"
-        self.checkpoints_dir = self.persistence_dir / "checkpoints"
         self.scheduled_tasks_dir = self.persistence_dir / "scheduled_tasks"
+        # 向后兼容：保留 conversations_dir 指向工作区级别（旧数据）
+        self.conversations_dir = self.persistence_dir / "conversations"
 
         # 资源锁，防止并发保存
         self._resource_lock = ResourceLock()
@@ -124,23 +131,35 @@ class WorkspacePersistenceManager:
 
     def _ensure_directories(self):
         """确保所有必要的目录存在"""
-        directories = [
-            self.persistence_dir,
-            self.lock_dir,
-            self.conversations_dir,
-            self.task_graphs_dir,
-            self.task_nodes_dir,
+        # 全局目录（DAWEI_HOME）
+        global_dirs = [
             self.checkpoints_dir,
+            self.sessions_dir,
         ]
 
-        for directory in directories:
+        # 工作区特定目录
+        workspace_dirs = [
+            self.persistence_dir,
+            self.lock_dir,
+            self.task_graphs_dir,
+            self.task_nodes_dir,
+            self.conversations_dir,  # 向后兼容
+        ]
+
+        # 创建所有目录
+        all_dirs = global_dirs + workspace_dirs
+        for directory in all_dirs:
             directory.mkdir(parents=True, exist_ok=True)
 
         # 确保scheduled_tasks目录存在
         self.scheduled_tasks_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(
-            f"[PERSISTENCE] Workspace persistence directories initialized at {self.persistence_dir}",
+            f"[PERSISTENCE] Workspace persistence directories initialized",
+            extra={
+                "global_dirs": [str(d) for d in global_dirs],
+                "workspace_dir": str(self.persistence_dir),
+            },
         )
 
     # ==================== 通用持久化方法 ====================
@@ -442,10 +461,10 @@ class WorkspacePersistenceManager:
     def _get_resource_dir(self, resource_type: ResourceType) -> Path:
         """获取资源类型对应的目录"""
         dir_map = {
-            ResourceType.CONVERSATION: self.conversations_dir,
+            ResourceType.CONVERSATION: self.sessions_dir,  # 使用全局 sessions 目录
             ResourceType.TASK_GRAPH: self.task_graphs_dir,
             ResourceType.TASK_NODE: self.task_nodes_dir,
-            ResourceType.CHECKPOINT: self.checkpoints_dir,
+            ResourceType.CHECKPOINT: self.checkpoints_dir,  # 使用全局 checkpoints 目录
             ResourceType.WORKSPACE_SETTINGS: self.persistence_dir,
             ResourceType.WORKSPACE_INFO: self.persistence_dir,
             ResourceType.SCHEDULED_TASK: self.scheduled_tasks_dir,

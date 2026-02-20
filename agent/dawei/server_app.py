@@ -122,7 +122,7 @@ if cwd_env.exists():
     load_dotenv(cwd_env, override=True)
 
 
-def get_workspaces_root() -> Path:
+def get_dawei_home() -> Path:
     """Get the DAWEI_HOME directory path.
 
     Returns:
@@ -137,7 +137,7 @@ def get_workspaces_root() -> Path:
 def record_server_start(host: str, port: int) -> None:
     """Record server startup parameters to DAWEI_HOME/server.start file."""
     try:
-        dawei_home = get_workspaces_root()
+        dawei_home = get_dawei_home()
         dawei_home.mkdir(parents=True, exist_ok=True)
 
         server_start_file = dawei_home / "server.start"
@@ -165,6 +165,17 @@ def record_server_start(host: str, port: int) -> None:
 async def lifespan(app: FastAPI):
     """FastAPI lifespan context manager for startup and shutdown events."""
     # Startup
+    # Create global DAWEI_HOME directories
+    try:
+        dawei_home = get_dawei_home()
+        global_dirs = ["checkpoints", "sessions", "logs", "configs"]
+        for dir_name in global_dirs:
+            dir_path = dawei_home / dir_name
+            dir_path.mkdir(parents=True, exist_ok=True)
+        print(f"[Dawei Server] ✓ Global directories created at {dawei_home}")
+    except Exception as e:
+        print(f"[Dawei Server] ⚠ Failed to create global directories: {e}")
+
     await websocket_server.initialize()
 
     # Validate .dawei directory structure
@@ -206,7 +217,8 @@ async def lifespan(app: FastAPI):
         from dawei.memory.database import init_memory_database
         print("[Dawei Server] ✓ DaweiMem memory system is enabled")
 
-        workspaces_root = Path(os.getenv("WORKSPACES_ROOT", "./workspaces"))
+        dawei_home = Path(os.getenv("DAWEI_HOME", "~/.dawei")).expanduser()
+        workspaces_root = dawei_home 
 
         if workspaces_root.exists():
             initialized_count = 0
@@ -342,7 +354,8 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     async def get_memory_system_stats():
         """Get DaweiMem memory system statistics"""
         try:
-            workspaces_root = Path(os.getenv("WORKSPACES_ROOT", "./workspaces"))
+            dawei_home = Path(os.getenv("DAWEI_HOME", "~/.dawei")).expanduser()
+            workspaces_root = dawei_home
 
             if not workspaces_root.exists():
                 return {

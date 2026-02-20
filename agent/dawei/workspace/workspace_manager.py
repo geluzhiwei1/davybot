@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dawei.config import get_workspaces_root
+from dawei.config import get_dawei_home
 from dawei.config.settings import get_settings
 
 
@@ -16,7 +16,7 @@ class WorkspaceManager:
 
     def __init__(self, settings):
         # 使用 DAWEI_HOME 作为工作区根目录
-        workspaces_root = Path(get_workspaces_root())
+        workspaces_root = Path(get_dawei_home())
 
         # 构建工作区文件的完整路径
         self.workspaces_file = workspaces_root / "workspaces.json"

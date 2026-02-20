@@ -15,7 +15,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from dawei.config import get_workspaces_root
+from dawei.config import get_dawei_home
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class PrivacyConfigResponse(BaseModel):
 
 def get_privacy_config_path() -> Path:
     """获取隐私配置文件路径"""
-    dawei_home = Path(get_workspaces_root()).expanduser()
+    dawei_home = Path(get_dawei_home()).expanduser()
     privacy_dir = dawei_home / "privacy"
     privacy_dir.mkdir(parents=True, exist_ok=True)
     return privacy_dir / "privacy_config.json"

@@ -81,34 +81,6 @@ class ModeRulesResponse(BaseModel):
     directory: str | None = None  # 规则目录路径
 
 
-# --- 核心Workspace CRUD操作 ---
-# 注意：GET /workspaces 和 GET /workspaces/{id}/info 已移至 crud.py
-# 这里保留注释以说明路由已迁移
-
-# @router.get("/workspaces")
-# async def get_workspaces():
-#     """Get all available workspaces."""
-#     workspaces = workspace_manager.get_all_workspaces()
-#     active_workspaces = [w for w in workspaces if w.get('is_active', True)]
-#     return {
-#         "success": True,
-#         "workspaces": active_workspaces
-#     }
-
-
-# @router.get("/workspaces/{workspace_id}/info")
-# async def get_workspace_info(workspace_id: str):
-#     """Get detailed information about a specific workspace by ID."""
-#     workspace = workspace_manager.get_workspace_by_id(workspace_id)
-#     if not workspace:
-#         raise HTTPException(status_code=404, detail=f"Workspace with ID {workspace_id} not found")
-#
-#     return {
-#         "success": True,
-#         "workspace": workspace
-#     }
-
-
 @router.get("/{workspace_id}/files")
 async def get_workspace_files_or_content(
     workspace_id: str,

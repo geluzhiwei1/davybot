@@ -15,7 +15,7 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
-def get_workspaces_root() -> Path:
+def get_dawei_home() -> Path:
     """获取 DAWEI_HOME 路径
 
     Returns:
@@ -33,7 +33,7 @@ def get_log_dir() -> Path:
         Path: 日志目录的绝对路径（DAWEI_HOME/logs）
 
     """
-    return Path(get_workspaces_root()) / "logs"
+    return Path(get_dawei_home()) / "logs"
 
 
 class LoggingConfig(BaseSettings):
@@ -86,6 +86,12 @@ class LoggingConfig(BaseSettings):
     enable_performance_logging: bool = Field(default=True)
     slow_query_threshold_ms: float = Field(default=1000.0)
 
+    # 遥测配置 (兼容性字段)
+    enable_telemetry: bool = Field(default=True)
+
+    # LLM API HTTP 日志配置 (记录 LLM API 请求/响应)
+    enable_llm_api_http_logging: bool = Field(default=False)
+
     # 安全配置
     sanitize_sensitive_data: bool = Field(default=True)
     sensitive_fields: list[str] = Field(default_factory=lambda: ["api_key", "password", "secret", "credential"])
@@ -124,7 +130,7 @@ class LoggingConfig(BaseSettings):
         Path(self.llm_dir).mkdir(parents=True, exist_ok=True)
 
         # 打印路径信息用于调试
-        dawei_home = get_workspaces_root()
+        dawei_home = get_dawei_home()
         print(f"DAWEI_HOME: {dawei_home}")
 
     @field_validator("sensitive_fields", mode="before")
@@ -143,6 +149,7 @@ class LoggingConfig(BaseSettings):
         "structured_logging",
         "enable_performance_logging",
         "sanitize_sensitive_data",
+        "enable_llm_api_http_logging",
         mode="before",
     )
     @classmethod

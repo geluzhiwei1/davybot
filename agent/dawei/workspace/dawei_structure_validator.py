@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from dawei.config import get_workspaces_root
+from dawei.config import get_dawei_home
 
 
 class DaweiStructureValidationError(Exception):
@@ -39,9 +39,8 @@ class DaweiStructureValidator:
     """Validator for .dawei directory structure and file formats."""
 
     # Required subdirectories in .dawei/
+    # 注意：checkpoints 和 sessions 已移到全局 DAWEI_HOME 级别
     REQUIRED_DIRECTORIES = [
-        "checkpoints",
-        "conversations",
         "scheduled_tasks",
         "task_graphs",
         "task_nodes",
@@ -381,7 +380,7 @@ def validate_dawei_on_startup(dawei_home: Path | None = None) -> None:
 
     # Get DAWEI_HOME
     if dawei_home is None:
-        dawei_home = Path(get_workspaces_root())
+        dawei_home = Path(get_dawei_home())
 
     logger.info("=== Validating .dawei directory structure ===")
     logger.info(f"DAWEI_HOME: {dawei_home}")
