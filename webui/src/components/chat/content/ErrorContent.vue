@@ -37,6 +37,7 @@
 import { computed, onMounted } from 'vue'
 import { ElAlert } from 'element-plus'
 import type { ErrorContentBlock } from '@/types/websocket'
+import { logger } from '@/utils/logger'
 
 const props = defineProps<{
   block: ErrorContentBlock
@@ -94,8 +95,8 @@ const hasDetails = computed(() => {
 
 // 添加调试日志（仅在开发模式）
 onMounted(() => {
-  if (import.meta.env.DEV) {
-    console.debug('ErrorContent component mounted with block:', props.block)
+  if (import.meta.env.DEV && import.meta.env.VITE_DEBUG === 'true') {
+    logger.debug('ErrorContent component mounted with block:', props.block)
   }
 })
 

@@ -273,7 +273,6 @@ const handleTaskCompleteRefresh = async (event: unknown) => {
 
   // 只刷新当前工作区的文件树
   if (customEvent.detail.workspaceId === props.workspaceId) {
-    console.log('[SidePanel] Auto-refreshing file tree after task completion')
     await loadFiles()
     // 刷新 el-tree 组件的节点
     if (fileTreeRef.value) {

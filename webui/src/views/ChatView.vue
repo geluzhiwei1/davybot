@@ -533,8 +533,6 @@ const handleTaskCompleteRefresh = async (event: Event) => {
 
   // 只刷新当前工作区的文件
   if (customEvent.detail.workspaceId === chatStore.workspaceId) {
-    console.log('[ChatView] Auto-refreshing open files after task completion')
-
     // 重新加载所有已打开文件的内容
     const filesToRefresh = [...openFiles.value]
     for (const file of filesToRefresh) {
@@ -546,7 +544,6 @@ const handleTaskCompleteRefresh = async (event: Event) => {
         const fileIndex = openFiles.value.findIndex(f => (f as { id: string }).id === fileInfo.path)
         if (fileIndex !== -1) {
           (openFiles.value[fileIndex] as { content: string; type: string }).content = content
-          console.log(`[ChatView] Refreshed file: ${fileInfo.name}`)
         }
       } catch (error) {
         console.error(`[ChatView] Failed to refresh file ${(file as { name: string }).name}:`, error)
@@ -582,18 +579,6 @@ watch(() => route.params.workspaceId, async (newWorkspaceId) => {
 
 // 处理追问问题
 function handleFollowupQuestion(message: FollowupQuestionMessage) {
-  // 🔍 详细日志：记录前端收到的 FollowupQuestionMessage
-  console.log('[FOLLOWUP_DEBUG] Frontend received FollowupQuestionMessage:', {
-    fullMessage: message,
-    question: message.question,
-    suggestions: message.suggestions,
-    suggestionsLength: message.suggestions?.length || 0,
-    suggestionsType: typeof message.suggestions,
-    toolCallId: message.tool_call_id,
-    taskId: message.task_id,
-    allKeys: Object.keys(message)
-  });
-
   // 更新追问数据
   followupData.value = {
     question: message.question,
@@ -601,8 +586,6 @@ function handleFollowupQuestion(message: FollowupQuestionMessage) {
     toolCallId: message.tool_call_id,
     taskId: message.task_id
   };
-
-  console.log('[FOLLOWUP_DEBUG] followupData.value after update:', followupData.value);
 
   // 显示对话框
   showFollowupDialog.value = true;

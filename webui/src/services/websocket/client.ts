@@ -480,7 +480,7 @@ export class WebSocketClient {
 
       // 调试日志：追踪每条消息（忽略心跳消息以减少日志噪音）
       if (message.type !== 'ws_heartbeat') {
-        console.debug('[WebSocket] Sent:', message.type, message.id)
+        logger.debug('[WebSocket] Sent:', message.type, message.id)
       }
     } catch {
       logger.error('[WebSocket] Failed to send message:', error)
@@ -500,7 +500,7 @@ export class WebSocketClient {
     this.messageQueue.push(message)
     // 调试日志：追踪每条消息（忽略心跳消息以减少日志噪音）
     if (message.type !== 'ws_heartbeat') {
-      console.debug('[WebSocket] Queued message:', message.type)
+      logger.debug('[WebSocket] Queued message:', message.type)
     }
   }
 

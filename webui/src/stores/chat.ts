@@ -426,7 +426,6 @@ export const useChatStore = defineStore('chat', () => {
   ) => {
     return (message: WebSocketMessage) => {
       try {
-        console.debug(`[${handlerName}] Processing message:`, message)
         handler(message)
       } catch (error) {
         logger.error(`[${handlerName}] Error processing message:`, error)
@@ -583,6 +582,11 @@ export const useChatStore = defineStore('chat', () => {
     const messageId = reasoningMessage.message_id
     const content = reasoningMessage.content || ''
 
+    // 【DEBUG】记录接收到的流式推理内容
+    if (content) {
+      logger.warn('[STREAM_REASONING] 接收到内容:', content.substring(0, 50))
+    }
+
     if (!messageId) {
       logger.warn('[CHAT_STORE] Stream reasoning missing message_id, using fallback')
       // 由于streamBuffers是私有的，我们需要通过messageStore的方法访问
@@ -613,6 +617,10 @@ export const useChatStore = defineStore('chat', () => {
     if (reasoningBlock) {
       // 创建新的reasoning block对象以确保响应式更新
       const newReasoning = reasoningBlock.reasoning + content
+      // 【DEBUG】记录拼接后的内容
+      if (content.length > 0 && content.length < 20) {
+        logger.warn('[STREAM_REASONING] 拼接内容。当前长度:', newReasoning.length, '新增:', content)
+      }
       const newContent = chatMessage.content.map(block =>
         block === reasoningBlock
           ? { ...block, reasoning: newReasoning }
@@ -623,6 +631,8 @@ export const useChatStore = defineStore('chat', () => {
       // 只有当内容非空时才创建推理块
       const trimmedContent = content.trim()
       if (trimmedContent) {
+        // 【DEBUG】记录首次创建推理块
+        logger.warn('[STREAM_REASONING] 首次创建推理块，内容:', content.substring(0, 50))
         const newContent = [...chatMessage.content, {
           type: ContentType.REASONING,
           reasoning: content
@@ -661,6 +671,16 @@ export const useChatStore = defineStore('chat', () => {
   } => {
     const contentMessage = message as unknown
 
+    // 🔍 Debug: 打印完整的WebSocket消息
+    logger.debug('[extractStreamContentInfo] Raw WebSocket message:', {
+      type: message.type,
+      keys: Object.keys(message),
+      task_id: contentMessage.task_id,
+      message_id: contentMessage.message_id,
+      content_length: contentMessage.content?.length,
+      fullMessage: JSON.stringify(message, null, 2)
+    })
+
     // Strict validation: task_id must exist
     if (!contentMessage.task_id) {
       const error = new Error('StreamContent message missing task_id')
@@ -675,12 +695,20 @@ export const useChatStore = defineStore('chat', () => {
       throw error
     }
 
-    return {
+    const result = {
       taskId: contentMessage.task_id,
       sessionId: message.session_id,
       content: contentMessage.content || '',
       messageId: contentMessage.message_id
     }
+
+    logger.debug('[extractStreamContentInfo] Extracted:', {
+      taskId: result.taskId,
+      messageId: result.messageId,
+      hasMessageId: !!result.messageId
+    })
+
+    return result
   }
 
   /**
@@ -690,7 +718,8 @@ export const useChatStore = defineStore('chat', () => {
     messageBubbleId: string,
     taskId: string,
     sessionId: string,
-    workspaceId: string
+    workspaceId: string,
+    llmMessageId?: string  // ✅ 新增：LLM message_id参数
   ): ChatMessage => {
     let chatMessage = messageStore.getMessageById(messageBubbleId)
 
@@ -704,13 +733,15 @@ export const useChatStore = defineStore('chat', () => {
         taskId: taskId,
         sessionId: sessionId,
         workspaceId: workspaceId,
-        messageId: messageBubbleId !== `msg_${taskId}` ? messageBubbleId : undefined
+        messageId: llmMessageId || messageBubbleId  // ✅ 优先使用LLM message_id，否则fallback到bubble ID
       }
 
       logger.debug('Creating new message', {
         messageBubbleId,
         taskId,
-        workspaceId
+        workspaceId,
+        llmMessageId,  // ✅ 记录LLM message_id
+        finalMessageId: llmMessageId || messageBubbleId  // ✅ 记录最终设置的messageId
       })
 
       try {
@@ -802,9 +833,10 @@ export const useChatStore = defineStore('chat', () => {
 
     logger.debug('Processing stream content:', {
       taskId,
-      messageId,
-      wsMessageId: message.id,
-      contentLength: content?.length
+      messageId,  // ✅ LLM message_id from WebSocket
+      wsMessageId: message.id,  // WebSocket protocol message id
+      contentLength: content?.length,
+      hasMessageId: !!messageId  // ✅ Debug: 是否有LLM message_id
     })
 
     // Resolve workspace
@@ -829,13 +861,16 @@ export const useChatStore = defineStore('chat', () => {
         messageBubbleId,
         taskId,
         sessionId,
-        workspaceId
+        workspaceId,
+        messageId  // ✅ 传递LLM message_id
       )
 
       logger.debug('Found existing message:', {
         messageBubbleId,
-        messageId,
-        contentLength: chatMessage.content.length
+        llmMessageId: messageId,  // ✅ LLM message_id
+        chatMessageId: chatMessage.messageId,  // ✅ ChatMessage.messageId当前值
+        contentLength: chatMessage.content.length,
+        idMatch: chatMessage.messageId === messageId  // ✅ Debug: ID是否匹配
       })
 
       // Update message content
@@ -1061,6 +1096,11 @@ export const useChatStore = defineStore('chat', () => {
     // 处理推理内容
     if (completeMessage.reasoning_content) {
       logger.debug('处理 reasoning_content:', completeMessage.reasoning_content)
+
+      // 【调查】记录原始内容的前100个字符
+      const preview = completeMessage.reasoning_content.substring(0, 100)
+      logger.warn('[DEBUG] reasoning_content 原始内容预览:', preview)
+
       const reasoningBlock = chatMessage.content.find(
         c => c.type === ContentType.REASONING
       )

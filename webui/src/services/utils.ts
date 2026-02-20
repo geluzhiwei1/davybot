@@ -311,22 +311,22 @@ export function createError(
   return error;
 }
 
-// 日志工具
+// 日志工具 (注意: 这是一个遗留的logger,新代码应使用 @/utils/logger)
 export const logger = {
   debug: (message: string, ...args: unknown[]): void => {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV && import.meta.env.VITE_DEBUG === 'true') {
       console.debug(`[WebSocket Debug] ${message}`, ...args);
     }
   },
-  
+
   info: (message: string, ...args: unknown[]): void => {
     console.info(`[WebSocket Info] ${message}`, ...args);
   },
-  
+
   warn: (message: string, ...args: unknown[]): void => {
     console.warn(`[WebSocket Warning] ${message}`, ...args);
   },
-  
+
   error: (message: string, ...args: unknown[]): void => {
     console.error(`[WebSocket Error] ${message}`, ...args);
   }

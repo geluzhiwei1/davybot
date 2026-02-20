@@ -106,6 +106,7 @@
                       v-if="contentBlock.type === ContentType.TEXT"
                       :block="contentBlock"
                       :is-streaming="isMessageStreaming(message)"
+                      :messageId="message.id"
                     />
                     <ErrorContent v-else-if="contentBlock.type === ContentType.ERROR" :block="contentBlock"
                       :key="`error-${contentBlock.type}`" />
@@ -133,6 +134,15 @@
                   <el-icon :class="{ 'rotate-180': isMessageExpanded(message.id, 'assistant') }">
                     <ArrowDown />
                   </el-icon>
+                </el-button>
+                <!-- Markdown/纯文本切换按钮 -->
+                <el-button
+                  size="small"
+                  circle
+                  @click="toggleMarkdownMode(message.id)"
+                  :title="getMessageModeTitle(message.id)"
+                >
+                  {{ getMessageModeIcon(message.id) }}
                 </el-button>
               </div>
             </div>
@@ -176,7 +186,7 @@
               <el-collapse-transition>
                 <div v-show="isToolExpanded(message.id)" class="tool-message-content">
                   <div v-for="(contentBlock, index) in message.content" :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
-                    <TextContent name="textContent" v-if="contentBlock.type === ContentType.TEXT" :block="contentBlock" />
+                    <TextContent name="textContent" v-if="contentBlock.type === ContentType.TEXT" :block="contentBlock" :messageId="message.id" />
                     <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{ (contentBlock as unknown).text }}</div>
                     <ToolCallContent name="toolContent" v-else-if="contentBlock.type === ContentType.TOOL_CALL" :block="contentBlock"
                       :key="contentBlock.toolCall?.tool_call_id" />
@@ -208,7 +218,7 @@
                 <div v-show="isMessageExpanded(message.id, 'system')" class="system-message-content">
                   <div v-for="(contentBlock, index) in message.content" :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
                     <ErrorContent v-if="contentBlock.type === ContentType.ERROR" :block="contentBlock" />
-                    <TextContent v-else-if="contentBlock.type === ContentType.TEXT" :block="contentBlock" />
+                    <TextContent v-else-if="contentBlock.type === ContentType.TEXT" :block="contentBlock" :messageId="message.id" />
                     <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{ (contentBlock as unknown).text }}</div>
                     <UnknownContent v-else :block="contentBlock" />
                   </div>
@@ -261,6 +271,7 @@ import { ref, watch, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useChatStore } from '@/stores/chat';
 import { useWorkspaceStore } from '@/stores/workspace';
+import { useMarkdownSettingsStore } from '@/stores/markdownSettings';
 import { ContentType, type ChatMessage } from '@/types/websocket';
 import { ElScrollbar, ElAvatar, ElButton, ElMessage, ElCollapseTransition } from 'element-plus';
 import { DocumentCopy, ArrowDown } from '@element-plus/icons-vue';
@@ -276,6 +287,7 @@ import UnknownContent from '../chat/content/UnknownContent.vue';
 
 const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
+const settingsStore = useMarkdownSettingsStore();
 const { messages } = storeToRefs(chatStore);
 
 const scrollbarRef = ref<InstanceType<typeof ElScrollbar>>();
@@ -426,6 +438,21 @@ const getUserMessageSummary = (message: ChatMessage) => {
     return preview + (text.text?.length > 50 ? '...' : '')
   }
   return '用户消息'
+}
+
+// Markdown/纯文本模式切换相关方法
+const toggleMarkdownMode = (messageId: string) => {
+  settingsStore.toggleMessageMode(messageId)
+}
+
+const getMessageModeIcon = (messageId: string) => {
+  const mode = settingsStore.getMessageMode(messageId)
+  return mode === 'markdown' ? '📝' : '📄'
+}
+
+const getMessageModeTitle = (messageId: string) => {
+  const mode = settingsStore.getMessageMode(messageId)
+  return mode === 'markdown' ? '切换到纯文本' : '切换到 Markdown'
 }
 
 // ============================================================================

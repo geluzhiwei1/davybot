@@ -243,12 +243,20 @@ class TaskNodeExecutionEngine:
             # 【关键修复】为新的消息流生成message_id
             if self._current_message_id is None:
                 self._message_counter += 1
-                import uuid
 
-                self._current_message_id = f"msg_{self.task_node.task_node_id}_{self._message_counter}_{uuid.uuid4().hex[:8]}"
-                self.logger.info(
-                    f"[MESSAGE_ID] Generated new message_id for reasoning: {self._current_message_id}",
-                )
+                # ✅ 优先使用LLM API返回的message_id，如果没有才生成
+                if stream_message.id:
+                    self._current_message_id = stream_message.id
+                    self.logger.info(
+                        f"[MESSAGE_ID] Using LLM API message_id: {self._current_message_id}",
+                    )
+                else:
+                    # Fallback: 生成临时ID (向后兼容)
+                    import uuid
+                    self._current_message_id = f"msg_{self.task_node.task_node_id}_{self._message_counter}_{uuid.uuid4().hex[:8]}"
+                    self.logger.warning(
+                        f"[MESSAGE_ID] LLM API did not provide message_id, using generated: {self._current_message_id}",
+                    )
 
             # 发送事件时附带message_id
             await emit_typed_event(
@@ -292,12 +300,20 @@ class TaskNodeExecutionEngine:
             # 【关键修复】为新的消息流生成message_id
             if self._current_message_id is None:
                 self._message_counter += 1
-                import uuid
 
-                self._current_message_id = f"msg_{self.task_node.task_node_id}_{self._message_counter}_{uuid.uuid4().hex[:8]}"
-                self.logger.info(
-                    f"[MESSAGE_ID] Generated new message_id for content: {self._current_message_id}",
-                )
+                # ✅ 优先使用LLM API返回的message_id，如果没有才生成
+                if stream_message.id:
+                    self._current_message_id = stream_message.id
+                    self.logger.info(
+                        f"[MESSAGE_ID] Using LLM API message_id: {self._current_message_id}",
+                    )
+                else:
+                    # Fallback: 生成临时ID (向后兼容)
+                    import uuid
+                    self._current_message_id = f"msg_{self.task_node.task_node_id}_{self._message_counter}_{uuid.uuid4().hex[:8]}"
+                    self.logger.warning(
+                        f"[MESSAGE_ID] LLM API did not provide message_id, using generated: {self._current_message_id}",
+                    )
 
             # 内容消息直接处理，不需要缓冲器
 

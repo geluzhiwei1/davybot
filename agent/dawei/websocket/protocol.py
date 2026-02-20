@@ -377,7 +377,7 @@ class StreamReasoningMessage(BaseWebSocketMessage):
         return cls(
             session_id=session_id,
             task_id=task_id,
-            message_id=None,  # 将由事件数据提供
+            message_id=stream_msg.id,  # ✅ Use LLM API's message_id
             content=stream_msg.content,
             user_message_id=stream_msg.user_message_id,
         )
@@ -428,7 +428,7 @@ class StreamContentMessage(BaseWebSocketMessage):
         return cls(
             session_id=session_id,
             task_id=task_id,
-            message_id=None,  # Will be provided by event data
+            message_id=stream_msg.id,  # ✅ Use LLM API's message_id
             content=stream_msg.content,
             user_message_id=stream_msg.user_message_id,
         )
@@ -441,11 +441,12 @@ class StreamContentMessage(BaseWebSocketMessage):
         task_id: str,
     ) -> "StreamContentMessage":
         """从事件数据创建消息"""
+        message_id = event_data.get("message_id")
         return cls(
             session_id=session_id,
             task_id=task_id,
             task_node_id=event_data.get("task_node_id"),  # 🔧 添加 task_node_id
-            message_id=event_data.get("message_id"),
+            message_id=message_id,
             content=event_data.get("content", ""),
         )
 

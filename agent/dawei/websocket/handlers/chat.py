@@ -1698,10 +1698,6 @@ class ChatHandler(AsyncMessageHandler):
                         )
                         await self.send_message(session_id, llm_api_message)
 
-                    # 🔧 修复：CONTENT_STREAM 事件只发送 StreamContentMessage，不发送 LLMApiResponseMessage
-                    # 原因：LLMApiResponseMessage 应该只在真正的 LLM API 事件中发送
-                    # StreamContentMessage 已经负责流式内容的显示，发送 LLMApiResponseMessage 会导致前端重复处理内容
-
                     # 从 event_data 字典构建消息
                     websocket_msg = StreamContentMessage.from_event_data(
                         event_data,

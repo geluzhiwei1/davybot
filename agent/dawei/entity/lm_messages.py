@@ -90,6 +90,7 @@ class ToolCall(BaseModel):
 class BaseLLMMessage(BaseModel, ABC):
     """LLM消息基类,定义所有消息类型的通用接口"""
 
+    id: str | None = Field(None, description="消息唯一标识符(可选)")
     role: MessageRole = Field(..., description="消息角色")
     content: str | list[ContentBlock] | None = Field(
         None,
@@ -122,6 +123,10 @@ class BaseLLMMessage(BaseModel, ABC):
             "role": self.role.value if hasattr(self.role, "value") else str(self.role),
             "timestamp": self.timestamp.isoformat(),
         }
+
+        # ✅ 添加id字段 (用于前端Markdown切换等UI功能)
+        if self.id:
+            result["id"] = self.id
 
         # 处理内容
         if isinstance(self.content, str):
@@ -162,15 +167,18 @@ class BaseLLMMessage(BaseModel, ABC):
         except ValueError:
             raise ValueError(f"不支持的消息角色: {role_value}")
 
+        # ✅ 提取id字段 (传递给子类)
+        message_id = data.get("id")
+
         # 根据角色创建相应的消息类型
         if role == MessageRole.USER:
-            return UserMessage.from_openai_format(data)
+            return UserMessage.from_openai_format(data, message_id=message_id)
         if role == MessageRole.ASSISTANT:
-            return AssistantMessage.from_openai_format(data)
+            return AssistantMessage.from_openai_format(data, message_id=message_id)
         if role == MessageRole.SYSTEM:
-            return SystemMessage.from_openai_format(data)
+            return SystemMessage.from_openai_format(data, message_id=message_id)
         if role == MessageRole.TOOL:
-            return ToolMessage.from_openai_format(data)
+            return ToolMessage.from_openai_format(data, message_id=message_id)
         raise ValueError(f"不支持的消息角色: {role}")
 
 
@@ -189,7 +197,7 @@ class SystemMessage(BaseLLMMessage):
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any]) -> "SystemMessage":
+    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "SystemMessage":
         """从 OpenAI 格式创建实例"""
         content = data.get("content", "")
 
@@ -203,6 +211,7 @@ class SystemMessage(BaseLLMMessage):
                 pass  # 使用默认时间
 
         return cls(
+            id=message_id,  # ✅ 添加id参数
             role=MessageRole.SYSTEM,
             content=content,
             name=data.get("name"),
@@ -225,7 +234,7 @@ class UserMessage(BaseLLMMessage):
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any]) -> "UserMessage":
+    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "UserMessage":
         """从 OpenAI 格式创建实例"""
         content = data.get("content", "")
 
@@ -241,6 +250,7 @@ class UserMessage(BaseLLMMessage):
         # 如果内容是字符串,保持原样
         if isinstance(content, str):
             return cls(
+                id=message_id,  # ✅ 添加id参数
                 role=MessageRole.USER,
                 content=content,
                 name=data.get("name"),
@@ -279,6 +289,7 @@ class UserMessage(BaseLLMMessage):
                     )
 
             return cls(
+                id=message_id,  # ✅ 添加id参数
                 role=MessageRole.USER,
                 content=content_blocks,
                 name=data.get("name"),
@@ -302,7 +313,7 @@ class AssistantMessage(BaseLLMMessage):
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any]) -> "AssistantMessage":
+    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "AssistantMessage":
         """从 OpenAI 格式创建实例"""
         content = data.get("content", "")
 
@@ -339,6 +350,7 @@ class AssistantMessage(BaseLLMMessage):
                 )
 
         return cls(
+            id=message_id,  # ✅ 添加id参数
             role=MessageRole.ASSISTANT,
             content=content,
             tool_calls=tool_calls,
@@ -361,7 +373,7 @@ class ToolMessage(BaseLLMMessage):
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any]) -> "ToolMessage":
+    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "ToolMessage":
         """从 OpenAI 格式创建实例"""
         # 处理时间戳
         timestamp = datetime.now(UTC)
@@ -373,6 +385,7 @@ class ToolMessage(BaseLLMMessage):
                 pass  # 使用默认时间
 
         return cls(
+            id=message_id,  # ✅ 添加id参数
             role=MessageRole.TOOL,
             content=data.get("content", ""),
             tool_call_id=data.get("tool_call_id", ""),

@@ -35,8 +35,6 @@ onMounted(() => {
     ;(window as unknown).e2eReady = true
     storeReady.value = true
 
-    console.log('[E2E Test Page] Store exposed successfully')
-
     // 监听变化
     store.$subscribe(() => {
       stats.value = { ...store.stats }

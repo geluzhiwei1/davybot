@@ -649,12 +649,14 @@ export const useMessageStore = defineStore('messages', () => {
 
     let message = currentMessages.find(m => m.role === MessageRole.ASSISTANT && m.taskId === taskId)
     if (!message) {
+      const msgId = uuidv4()
       message = {
-        id: uuidv4(),
+        id: msgId,
         role: MessageRole.ASSISTANT,
         timestamp: new Date().toISOString(),
         content: [],
         taskId: taskId,
+        messageId: msgId  // ✅ 设置messageId
       }
       workspaceMessages.value.set(targetWorkspaceId, [...currentMessages, message])
     }
@@ -966,7 +968,9 @@ export const useMessageStore = defineStore('messages', () => {
           role: messageRole,
           timestamp,
           content: contentBlocks,
-          taskId: backendMsg.task_id
+          taskId: backendMsg.task_id,
+          sessionId: backendMsg.session_id,
+          messageId: backendMsg.id  // ✅ 使用后端消息的id作为messageId（用于Markdown/纯文本切换）
         }
       }
 
@@ -983,7 +987,9 @@ export const useMessageStore = defineStore('messages', () => {
         role: messageRole,
         timestamp,
         content: contentBlocks,
-        taskId: backendMsg.task_id
+        taskId: backendMsg.task_id,
+        sessionId: backendMsg.session_id,
+        messageId: backendMsg.id  // ✅ 使用后端消息的id作为messageId（用于Markdown/纯文本切换）
       }
     } catch (error) {
       logger.error('[convertBackendMessage] Error converting message:', error, backendMsg)
@@ -1065,7 +1071,6 @@ export const useMessageStore = defineStore('messages', () => {
   ) => {
     return (message: WebSocketMessage) => {
       try {
-        console.debug(`[${handlerName}] Processing message:`, message)
         handler(message)
       } catch (error) {
         logger.error(`[${handlerName}] Error processing message:`, error)

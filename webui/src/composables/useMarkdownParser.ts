@@ -4,16 +4,27 @@
  */
 
 /**
- * 纯文本显示解析器
+ * Markdown/纯文本 解析器
  *
- * 不使用markdown解析，直接将文本转换为HTML显示
+ * 支持 Markdown 和纯文本两种模式
  * 特性：
- * 1. 懒加载：只在元素可见时解析
- * 2. 缓存：避免重复解析相同内容
- * 3. 空闲时解析：使用 requestIdleCallback 在浏览器空闲时解析
+ * 1. 双模式渲染：Markdown 纯文本
+ * 2. 懒加载：只在元素可见时解析
+ * 3. 双缓存：两种模式独立缓存
+ * 4. 空闲时解析：使用 requestIdleCallback 在浏览器空闲时解析
  */
 
 import { ref, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import MarkdownIt from 'markdown-it'
+import type { MarkdownMode } from '@/stores/markdownSettings'
+
+// 初始化 Markdown-it
+const md = new MarkdownIt({
+  html: true,        // 允许 HTML 标签
+  linkify: true,     // 自动转换 URL 为链接
+  typographer: true, // 启用排版优化
+  breaks: true       // 转换换行符为 <br>
+})
 
 // LRU 缓存实现
 class TextCache {
@@ -21,7 +32,7 @@ class TextCache {
   private maxSize: number
   private ttl: number // 5分钟缓存
 
-  constructor(maxSize = 100, ttl = 5 * 60 * 1000) {
+  constructor(maxSize = 200, ttl = 5 * 60 * 1000) {
     this.cache = new Map()
     this.maxSize = maxSize
     this.ttl = ttl
@@ -62,11 +73,12 @@ class TextCache {
   }
 }
 
-// 全局缓存实例
-const textCache = new TextCache(200, 5 * 60 * 1000)
+// 两个独立的缓存实例
+const markdownCache = new TextCache(200, 5 * 60 * 1000)
+const plainTextCache = new TextCache(200, 5 * 60 * 1000)
 
 /**
- * 纯文本解析 Hook
+ * Markdown/纯文本 解析 Hook
  *
  * @param elementRef - 元素引用
  * @param text - 文本内容
@@ -78,11 +90,13 @@ export function useMarkdownParser(
   options: {
     immediate?: boolean // 是否立即解析（默认为 false，等待可见）
     parseOnIdle?: boolean // 是否在空闲时解析（默认 true）
+    mode?: Ref<MarkdownMode> // 渲染模式（新增）
   } = {}
 ) {
   const {
     immediate = false,
-    parseOnIdle = true
+    parseOnIdle = true,
+    mode = ref<MarkdownMode>('plain')
   } = options
 
   const renderedHtml = ref<string>('')
@@ -94,24 +108,31 @@ export function useMarkdownParser(
   let timeoutId: ReturnType<typeof setTimeout> | null = null
 
   /**
-   * 解析文本为HTML（直接返回原文本）
+   * 解析文本为 HTML
    */
   const parseMarkdown = async (text: string): Promise<string> => {
-    // 检查缓存
-    const cached = textCache.get(text)
+    // 根据模式选择缓存
+    const cache = mode.value === 'markdown' ? markdownCache : plainTextCache
+    const cached = cache.get(text)
     if (cached) {
       return cached
     }
 
-    // 解码Unicode转义序列
-    const decodedText = text.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
-      return String.fromCharCode(parseInt(hex, 16))
-    })
+    let result: string
 
-    // 不做任何处理，直接返回原文本
+    if (mode.value === 'markdown') {
+      // Markdown 模式：使用 markdown-it 解析
+      result = md.render(text)
+    } else {
+      // 纯文本模式：仅解码 Unicode 转义序列
+      result = text.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+        return String.fromCharCode(parseInt(hex, 16))
+      })
+    }
+
     // 缓存结果
-    textCache.set(text, decodedText)
-    return decodedText
+    cache.set(text, result)
+    return result
   }
 
   /**
@@ -146,8 +167,6 @@ export function useMarkdownParser(
    * 执行解析
    */
   const doParse = async () => {
-    if (isParsing.value || isParsed.value) return
-
     const markdownText = typeof text === 'string' ? text : text.value
     if (!markdownText) return
 
@@ -197,7 +216,7 @@ export function useMarkdownParser(
   }
 
   /**
-   * 重新解析（当文本变化时）
+   * 重新解析（当文本或模式变化时）
    */
   const reparse = async () => {
     isParsed.value = false
@@ -238,6 +257,15 @@ export function useMarkdownParser(
         doParse()
       }
     )
+
+    // Watch for mode changes and re-parse
+    watch(
+      mode,
+      () => {
+        isParsed.value = false
+        doParse()
+      }
+    )
   })
 
   onUnmounted(() => {
@@ -257,7 +285,8 @@ export function useMarkdownParser(
  * 清除所有文本缓存
  */
 export function clearMarkdownCache() {
-  textCache.clear()
+  markdownCache.clear()
+  plainTextCache.clear()
 }
 
 /**
@@ -265,8 +294,15 @@ export function clearMarkdownCache() {
  */
 export function getMarkdownCacheStats() {
   return {
-    size: textCache.size,
-    maxSize: 200,
-    ttl: 5 * 60 * 1000
+    markdown: {
+      size: markdownCache.size,
+      maxSize: 200,
+      ttl: 5 * 60 * 1000
+    },
+    plain: {
+      size: plainTextCache.size,
+      maxSize: 200,
+      ttl: 5 * 60 * 1000
+    }
   }
 }

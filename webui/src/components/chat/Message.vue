@@ -30,6 +30,7 @@
         <component
           :is="getComponentForBlock(block.type)"
           :block="block as unknown"
+          :message-id="message.messageId || message.id"
           @content-action="handleContentAction"
         />
       </div>
@@ -39,6 +40,7 @@
         <component
           :is="getComponentForBlock(block.type)"
           :block="block as unknown"
+          :message-id="message.messageId || message.id"
           @content-action="handleContentAction"
         />
       </div>
@@ -55,6 +57,7 @@
             :is="getComponentForBlock(block.type)"
             :block="block as unknown"
             :is-streaming="isStreaming && block.type === 'text'"
+            :message-id="message.messageId || message.id"
             @content-action="handleContentAction"
           />
         </div>
@@ -87,10 +90,11 @@
 
 
 
-import { defineAsyncComponent, provide } from 'vue'
+import { defineAsyncComponent, provide, computed } from 'vue'
 import type { PropType } from 'vue'
 import { type ChatMessage, ContentType, MessageRole, type SimpleTextContentBlock } from '@/types/websocket'
 import { formatTimestamp } from '@/utils/formatters'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   message: {
@@ -106,6 +110,16 @@ const props = defineProps({
 const emit = defineEmits<{
   contentAction: [action: string, data: unknown]
 }>()
+
+// ✅ Debug: Log message ID structure
+logger.debug('[Message.vue] Received message:', {
+  uiId: props.message.id,  // Frontend UI id
+  messageId: props.message.messageId,  // LLM message_id
+  role: props.message.role,
+  taskId: props.message.taskId,
+  sessionId: props.message.sessionId,
+  hasMessageId: !!props.message.messageId  // Debug check
+})
 
 // Collect all images from this message
 const messageImages = computed(() => {
@@ -128,6 +142,7 @@ const componentMap = {
   [ContentType.VIDEO]: () => import('./content/VideoContent.vue'),
   [ContentType.FILE]: () => import('./content/FileContent.vue'),
   [ContentType.THINKING]: () => import('./content/ThinkingContent.vue'),
+  [ContentType.REASONING]: () => import('./content/ReasoningContent.vue'),
   [ContentType.TOOL_CALL]: () => import('./content/ToolCallContent.vue'),
   [ContentType.TOOL_RESULT]: () => import('./content/ToolResultContent.vue'),
   [ContentType.TOOL_EXECUTION]: () => import('./content/ToolExecutionContent.vue'),
