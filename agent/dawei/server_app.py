@@ -89,7 +89,10 @@ from dawei.api import market
 from dawei.api import privacy
 
 # Load environment variables
-load_dotenv()
+cwd_env = Path(".env")
+
+if cwd_env.exists():
+    load_dotenv(cwd_env, override=True)
 
 
 def get_workspaces_root() -> Path:
