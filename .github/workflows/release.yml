@@ -72,24 +72,39 @@ jobs:
       - name: Get version from setuptools_scm
         id: version
         run: |
-          # Get version from setuptools_scm for GitHub Release naming
-          # setuptools_scm will automatically detect version during build
-          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version())")
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Detected version: ${VERSION}"
-
-          # If manual version input is provided, use it instead (for GitHub Release)
+          # If manual version input is provided, use it directly
           if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "Using manual version: ${{ github.event.inputs.version }}"
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Using manual version: ${VERSION}"
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "use_manual=true" >> $GITHUB_OUTPUT
+          else
+            # Auto-detect version from setuptools_scm
+            cd agent
+            VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='../..', relative_to='pyproject.toml'))")
+            echo "Detected version: ${VERSION}"
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "use_manual=false" >> $GITHUB_OUTPUT
+
+            # Validate version format (should not contain git hash like +g7093f5e57)
+            if [[ "$VERSION" =~ \+g[0-9a-f]+ ]]; then
+              echo "ERROR: Version contains git hash which is not PyPI compatible: $VERSION"
+              echo "The local_scheme = 'no-local-version' setting should prevent this"
+              exit 1
+            fi
           fi
 
       - name: Build wheel
         working-directory: ./agent
         run: |
           rm -rf dist/ build/ *.egg-info
-          # setuptools_scm will automatically detect version from git tags
-          # No need to set SETUPTOOLS_SCM_PRETEND_VERSION_* anymore
+          # If manual version is provided, use SETUPTOOLS_SCM_PRETEND_VERSION to override
+          if [ "${{ steps.version.outputs.use_manual }}" = "true" ]; then
+            export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT="${{ steps.version.outputs.version }}"
+            echo "Building with manual version: ${{ steps.version.outputs.version }}"
+          else
+            echo "Building with auto-detected version from setuptools_scm"
+          fi
           python3 -m build
 
       - name: Publish distribution to PyPI
