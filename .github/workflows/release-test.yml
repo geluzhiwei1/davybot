@@ -70,6 +70,11 @@ jobs:
           rm -rf dist/ build/ *.egg-info
           python3 -m build
 
+      - name: Copy wheel to root dist
+        run: |
+          mkdir -p dist
+          cp -r agent/dist/* dist/
+
       - name: Publish distribution to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
