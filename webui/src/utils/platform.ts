@@ -16,9 +16,6 @@ export enum Platform {
  * Detect if the app is running in Tauri environment
  */
 export function isTauri(): boolean {
-  // Check if __TAURI__ is truthy (injected by Tauri at runtime)
-  // In vite.config.ts, __TAURI__ is set to false, so we need to check if it's truthy, not just defined
-  // @ts-expect-error - __TAURI__ is injected by Tauri
   return typeof window !== 'undefined' && window.__TAURI__ === true
 }
 

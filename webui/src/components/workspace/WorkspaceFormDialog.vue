@@ -22,8 +22,8 @@
           </template>
         </el-input>
         <div class="form-tip">
-          工作区的完整路径，将在此路径下创建 .dawei 配置目录
-          <el-tag v-if="!isTauri" type="info" size="small" style="margin-left: 8px">
+          工作区的完整路径，将在此路径下创建 .dawei 配置目录<br />
+          <el-tag v-if="!isTauri()" type="warning" size="small" style="margin-left: 8px">
             Web 模式：请手动输入路径
           </el-tag>
         </div>

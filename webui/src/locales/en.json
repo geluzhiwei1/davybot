@@ -720,5 +720,24 @@
       "elementVersion": "Element Version",
       "homepage": "Homepage"
     }
+  },
+  "workspaces": {
+    "title": "Select Your",
+    "workspace": "Workspace",
+    "platformName": "Dawei AI Platform",
+    "description": "Manage and access your workspaces, start your AI agent collaboration journey",
+    "myWorkspaces": "My Workspaces",
+    "workspaceCount": "{count} workspaces",
+    "createWorkspace": "Create Workspace",
+    "enter": "Enter",
+    "edit": "Edit",
+    "delete": "Delete",
+    "noWorkspaces": "No Workspaces",
+    "noWorkspacesDesc": "Create your first workspace to get started",
+    "loading": "Loading workspaces...",
+    "createdSuccess": "Workspace created successfully",
+    "updatedSuccess": "Workspace updated successfully",
+    "deletedSuccess": "Workspace deleted successfully",
+    "loadFailed": "Failed to load workspaces"
   }
 }

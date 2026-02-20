@@ -724,5 +724,24 @@
       "elementVersion": "Element版本",
       "homepage": "主页"
     }
+  },
+  "workspaces": {
+    "title": "选择您的",
+    "workspace": "工作区",
+    "platformName": "Dawei智能体平台",
+    "description": "管理和访问您的工作区，开始AI智能体协作之旅",
+    "myWorkspaces": "我的工作区",
+    "workspaceCount": "{count} 个工作区",
+    "createWorkspace": "创建工作区",
+    "enter": "进入",
+    "edit": "编辑",
+    "delete": "删除",
+    "noWorkspaces": "暂无工作区",
+    "noWorkspacesDesc": "创建您的第一个工作区开始使用",
+    "loading": "加载工作区中...",
+    "createdSuccess": "工作区创建成功",
+    "updatedSuccess": "工作区更新成功",
+    "deletedSuccess": "工作区删除成功",
+    "loadFailed": "加载工作区列表失败"
   }
 }

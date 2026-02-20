@@ -1,26 +1,17 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <div class="language-selector-wrapper">
     <el-dropdown trigger="click" @command="selectLanguage" @visible-change="handleDropdownVisible">
-      <el-button
-        class="language-selector-btn"
-        :title="`当前语言: ${currentLanguageLabel} - 点击切换`"
-        :icon="ChatDotRound"
-        text
-        circle
-      />
+      <el-button class="language-selector-btn" :title="`当前语言: ${currentLanguageLabel} - 点击切换`" :icon="ChatDotRound" text
+        circle />
       <template #dropdown>
         <el-dropdown-menu>
-          <el-dropdown-item
-            v-for="lang in languages"
-            :key="lang.value"
-            :command="lang.value"
-            :class="{ 'is-selected': currentLanguage === lang.value }"
-          >
+          <el-dropdown-item v-for="lang in languages" :key="lang.value" :command="lang.value"
+            :class="{ 'is-selected': currentLanguage === lang.value }">
             <div class="lang-item-content">
               <span class="lang-label">{{ lang.label }}</span>
               <el-icon v-if="currentLanguage === lang.value" class="check-icon">

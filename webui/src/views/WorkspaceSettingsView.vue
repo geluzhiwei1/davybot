@@ -9,7 +9,10 @@
       <template #header>
         <div class="card-header">
           <h2>{{ t('workspaceSettings.title') }}</h2>
-          <el-button type="primary" @click="goBack">返回</el-button>
+          <div class="header-actions">
+            <LanguageSelector />
+            <el-button type="primary" @click="goBack">返回</el-button>
+          </div>
         </div>
       </template>
 
@@ -143,6 +146,7 @@ import { apiManager } from '@/services/api';
 import { logger } from '@/utils/logger';
 import type { UserUIEnvironments, UserUIContext } from '@/services/api/types';
 import { useI18n } from 'vue-i18n';
+import LanguageSelector from '@/components/LanguageSelector.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -305,6 +309,12 @@ const goBack = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .card-header h2 {

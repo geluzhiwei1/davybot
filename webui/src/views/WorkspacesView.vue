@@ -10,33 +10,38 @@
       <div class="hero-content">
         <div class="hero-badge">
           <span class="badge-dot"></span>
-          <span>Dawei智能体平台</span>
+          <span>{{ t('workspaces.platformName') }}</span>
         </div>
         <h1 class="hero-title">
-          选择您的
-          <span class="text-gradient">工作区</span>
+          {{ t('workspaces.title') }}
+          <span class="text-gradient">{{ t('workspaces.workspace') }}</span>
         </h1>
         <p class="hero-description">
-          管理和访问您的工作区，开始AI智能体协作之旅
+          {{ t('workspaces.description') }}
         </p>
+      </div>
+
+      <!-- 语言选择器 -->
+      <div class="language-selector-wrapper">
+        <LanguageSelector />
       </div>
     </div>
 
     <!-- Tool Bar -->
     <div class="toolbar-section">
       <div class="toolbar-left">
-        <h2>我的工作区</h2>
-        <span class="workspace-count">{{ workspaces.length }} 个工作区</span>
+        <h2>{{ t('workspaces.myWorkspaces') }}</h2>
+        <span class="workspace-count">{{ t('workspaces.workspaceCount', { count: workspaces.length }) }}</span>
       </div>
       <div class="toolbar-right">
         <el-button type="primary" :icon="Plus" @click="showCreateDialog">
-          创建工作区
+          {{ t('workspaces.createWorkspace') }}
         </el-button>
       </div>
     </div>
 
     <!-- Workspaces Grid -->
-    <div class="workspaces-container" v-loading="isLoading" element-loading-text="加载工作区中...">
+    <div class="workspaces-container" v-loading="isLoading" :element-loading-text="t('workspaces.loading')">
       <transition-group name="workspace-card" tag="div" class="workspaces-grid">
         <div
           v-for="(workspace, index) in workspaces"
@@ -79,7 +84,7 @@
                 size="small"
                 class="action-btn enter-btn"
               >
-                进入
+                {{ t('workspaces.enter') }}
               </el-button>
               <el-button
                 :icon="Edit"
@@ -87,7 +92,7 @@
                 size="small"
                 class="action-btn edit-btn"
               >
-                编辑
+                {{ t('workspaces.edit') }}
               </el-button>
               <el-button
                 type="danger"
@@ -96,7 +101,7 @@
                 size="small"
                 class="action-btn delete-btn"
               >
-                删除
+                {{ t('workspaces.delete') }}
               </el-button>
             </div>
           </div>
@@ -109,10 +114,10 @@
           <div class="empty-icon">
             <el-icon :size="64"><FolderOpened /></el-icon>
           </div>
-          <h3>暂无工作区</h3>
-          <p>创建您的第一个工作区开始使用</p>
+          <h3>{{ t('workspaces.noWorkspaces') }}</h3>
+          <p>{{ t('workspaces.noWorkspacesDesc') }}</p>
           <el-button type="primary" size="large" :icon="Plus" @click="showCreateDialog">
-            创建工作区
+            {{ t('workspaces.createWorkspace') }}
           </el-button>
         </div>
       </transition>
@@ -141,7 +146,11 @@ import { ElMessage } from 'element-plus';
 import { OfficeBuilding, Calendar, ArrowRight, FolderOpened, Plus, Edit, Delete } from '@element-plus/icons-vue';
 import WorkspaceFormDialog from '@/components/workspace/WorkspaceFormDialog.vue';
 import WorkspaceDeleteDialog from '@/components/workspace/WorkspaceDeleteDialog.vue';
+import LanguageSelector from '@/components/LanguageSelector.vue';
 import { workspaceService } from '@/services/workspace';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 interface Workspace {
   id: string;
@@ -191,7 +200,7 @@ const loadWorkspaces = async () => {
     }
   } catch (error) {
     console.error('Failed to fetch workspaces:', error);
-    ElMessage.error('加载工作区列表失败');
+    ElMessage.error(t('workspaces.loadFailed'));
     workspaces.value = [];
   } finally {
     isLoading.value = false;
@@ -219,19 +228,19 @@ const showDeleteDialogFn = (workspace: Workspace) => {
 // 工作区创建完成
 const handleWorkspaceCreated = async () => {
   await loadWorkspaces();
-  ElMessage.success('工作区创建成功');
+  ElMessage.success(t('workspaces.createdSuccess'));
 };
 
 // 工作区更新完成
 const handleWorkspaceUpdated = async () => {
   await loadWorkspaces();
-  ElMessage.success('工作区更新成功');
+  ElMessage.success(t('workspaces.updatedSuccess'));
 };
 
 // 工作区删除完成
 const handleWorkspaceDeleted = async () => {
   // 先显示成功消息
-  ElMessage.success('工作区删除成功');
+  ElMessage.success(t('workspaces.deletedSuccess'));
   // 然后刷新列表
   await loadWorkspaces();
 };
@@ -289,9 +298,17 @@ onMounted(() => {
    HERO SECTION
    ==================== */
 .hero-section {
+  position: relative;
   text-align: center;
   margin-bottom: var(--spacing-3xl);
   animation: fadeInUp 0.8s var(--ease-out);
+}
+
+.language-selector-wrapper {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin-top: -8px;
 }
 
 .hero-badge {
