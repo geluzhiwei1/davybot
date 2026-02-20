@@ -6,15 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.0.0). Leave empty to auto-detect from git tag'
-        required: false
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
         type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.version || 'auto' }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.version }}
   cancel-in-progress: false
 
 jobs:
@@ -29,8 +29,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for setuptools_scm
 
       # ========== Frontend Build ==========
       - name: Setup pnpm
@@ -69,6 +67,7 @@ jobs:
         working-directory: ./agent
         run: |
           python3 -m pip install --upgrade pip
+<<<<<<< HEAD
           python3 -m pip install build setuptools_scm
 
       - name: Get version from setuptools_scm
@@ -89,6 +88,9 @@ jobs:
             echo "Using manual version: ${{ github.event.inputs.version }}"
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           fi
+=======
+          python3 -m pip install build
+>>>>>>> parent of a8d3e80 (auto version)
 
       - name: Build wheel
         working-directory: ./agent
@@ -110,20 +112,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh release create '${{ steps.version.outputs.version }}' \
+          gh release create '${{ github.event.inputs.version }}' \
             --repo '${{ github.repository }}' \
-            --notes "Release ${{ steps.version.outputs.version }}" \
+            --notes "Release ${{ github.event.inputs.version }}" \
             agent/dist/*
-          
-      - name: Create git tag if not exists
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${{ steps.version.outputs.version }}"
-          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
-          fi
