@@ -6,15 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.0.0)'
-        required: true
+        description: 'Version to release (e.g., v1.0.0). Leave empty to auto-detect from git tag'
+        required: false
         type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.version }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.version || 'auto' }}
   cancel-in-progress: false
 
 jobs:
@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for setuptools_scm
 
       # ========== Frontend Build ==========
       - name: Setup pnpm
@@ -67,7 +69,22 @@ jobs:
         working-directory: ./agent
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install build
+          python3 -m pip install build setuptools_scm
+
+      - name: Get version from setuptools_scm
+        id: version
+        working-directory: ./agent
+        run: |
+          # Get version from setuptools_scm
+          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='..', relative_to=__file__))")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Detected version: ${VERSION}"
+          
+          # If manual version input is provided, use it instead
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "Using manual version: ${{ github.event.inputs.version }}"
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build wheel
         working-directory: ./agent
@@ -89,7 +106,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh release create '${{ github.event.inputs.version }}' \
+          gh release create '${{ steps.version.outputs.version }}' \
             --repo '${{ github.repository }}' \
-            --notes "Release ${{ github.event.inputs.version }}" \
+            --notes "Release ${{ steps.version.outputs.version }}" \
             agent/dist/*
+          
+      - name: Create git tag if not exists
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.version }}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
