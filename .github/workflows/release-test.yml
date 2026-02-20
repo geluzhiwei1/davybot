@@ -1,0 +1,78 @@
+name: Release to TestPyPI
+
+# 自动发布到 TestPyPI（推送 tag 时触发）
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    name: Build & Publish to TestPyPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ========== Frontend Build ==========
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Install frontend dependencies
+        working-directory: ./webui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: ./webui
+        run: pnpm build-only
+
+      # ========== Backend Build ==========
+      - name: Copy frontend to agent
+        run: |
+          mkdir -p agent/dawei/frontend
+          rm -rf agent/dawei/frontend/*
+          cp -r webui/dist/* agent/dawei/frontend/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        working-directory: ./agent
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install build
+
+      - name: Build wheel
+        working-directory: ./agent
+        run: |
+          rm -rf dist/ build/ *.egg-info
+          python3 -m build
+
+      - name: Publish distribution to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
