@@ -67,30 +67,7 @@ jobs:
         working-directory: ./agent
         run: |
           python3 -m pip install --upgrade pip
-<<<<<<< HEAD
-          python3 -m pip install build setuptools_scm
-
-      - name: Get version from setuptools_scm
-        id: version
-        working-directory: ./agent
-        run: |
-          # Get version from setuptools_scm
-<<<<<<< HEAD
-          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(relative_to='pyproject.toml'))")
-=======
-          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='..', relative_to=__file__))")
->>>>>>> parent of 9d83d20 (auto version)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Detected version: ${VERSION}"
-          
-          # If manual version input is provided, use it instead
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "Using manual version: ${{ github.event.inputs.version }}"
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          fi
-=======
           python3 -m pip install build
->>>>>>> parent of a8d3e80 (auto version)
 
       - name: Build wheel
         working-directory: ./agent
