@@ -1,6 +1,26 @@
 
 # Dawei AI Personal Assistant
 
+# Quick Installation
+
+## pip
+
+```bash
+# Install
+pip install davybot
+# or
+pip install -i https://pypi.org/simple/ davybot
+
+# Start
+dawei server start
+# or
+python -m dawei.cli.dawei server start
+
+# Access
+http://localhost:8465/app
+
+```
+
 # Web UI
 
 ![Main Interface](asserts/web-ui/main.png)

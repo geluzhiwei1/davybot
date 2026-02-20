@@ -9,6 +9,8 @@
 ``` bash
 # 安装
 pip install davybot
+# 或者
+pip install -i https://pypi.org/simple/ davybot
 
 # 启动
 dawei server start
