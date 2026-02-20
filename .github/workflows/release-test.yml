@@ -76,7 +76,7 @@ jobs:
         working-directory: ./agent
         run: |
           # Get version from setuptools_scm
-          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='.'))")
+          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(relative_to='pyproject.toml'))")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Detected version: ${VERSION}"
           
