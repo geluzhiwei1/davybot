@@ -101,14 +101,13 @@ class SkillManager:
     def discover_skills(self, force: bool = False) -> None:
         """发现所有skills（只读取frontmatter）
 
-        支持三级加载机制：
-        - UserWorkspace级别
-        - System级别
-        - Current User级别
+        支持多级加载机制：
+        - Workspace级别 (最高优先级)
+        - User级别 (DAWEI_HOME)
 
         每个级别都尝试：
-        - .dawei/configs/skills/
-        - .dawei/configs/skills-{mode}/
+        - .dawei/skills/ (市场安装的技能)
+        - .dawei/skills-{mode}/ (模式特定的技能)
 
         Args:
             force: 是否强制重新发现

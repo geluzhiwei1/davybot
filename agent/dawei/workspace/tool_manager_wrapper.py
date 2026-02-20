@@ -84,8 +84,9 @@ class WorkspaceToolManager:
 
         # 记录 MCP 配置统计信息
         stats = self.mcp_tool_manager.get_statistics()
+        by_source = stats.get('by_source_level', {})
         logger.info(
-            f"MCP configurations loaded: {stats['total_servers']} total, system: {stats['by_source_level']['system']}, user: {stats['by_source_level']['user']}, workspace: {stats['by_source_level']['workspace']}",
+            f"MCP configurations loaded: {stats['total_servers']} total, system: {by_source.get('system', 0)}, user: {by_source.get('user', 0)}, workspace: {by_source.get('workspace', 0)}",
         )
 
         # 记录覆盖信息

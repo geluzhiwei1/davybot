@@ -14,6 +14,7 @@ from dawei.agentic.checkpoint_manager import (
     CheckpointType,
     IntelligentCheckpointManager,
 )
+from dawei.config import get_dawei_home
 from dawei.core.errors import CheckpointError, LLMError
 from dawei.core.events import TaskEventType, emit_typed_event
 from dawei.entity.lm_messages import (
@@ -695,8 +696,8 @@ class TaskNodeExecutionEngine:
             TaskEventType.CHECKPOINT_CREATED,
             {
                 "checkpoint_id": checkpoint_id,
-                # 使用 WorkspacePersistenceManager 的路径
-                "checkpoint_path": f"/.dawei/checkpoints/{checkpoint_id}",
+                # 使用全局 checkpoints 目录路径
+                "checkpoint_path": f"{get_dawei_home()}/checkpoints/{checkpoint_id}",
                 "message_count": len(conversation_messages),
                 "task_count": len(task_graph_data.get("nodes", {})),
             },
@@ -910,8 +911,8 @@ class TaskNodeExecutionEngine:
                     TaskEventType.CHECKPOINT_CREATED,
                     {
                         "checkpoint_id": f"checkpoint_{task_node.task_node_id}_{int(current_time)}",
-                        # 使用 WorkspacePersistenceManager 的路径
-                        "checkpoint_path": f"/.dawei/checkpoints/{task_node.task_node_id}",
+                        # 使用全局 checkpoints 目录路径
+                        "checkpoint_path": f"{get_dawei_home()}/checkpoints/{task_node.task_node_id}",
                         "checkpoint_size": len(str(state)),
                     },
                     self._event_bus,

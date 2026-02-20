@@ -244,15 +244,31 @@ class Agent:
         from dawei.prompts import EnhancedSystemBuilder
         from dawei.tools.tool_executor import ToolExecutor
         from dawei.tools.tool_manager import ToolManager
+        from dawei.workspace.tool_manager_wrapper import WorkspaceToolManager
 
         try:
             logger.info("[AGENT_CREATE] Creating base services...")
             # 创建基础服务
             message_processor = EnhancedSystemBuilder(user_workspace=user_workspace)
             llm_service = LLMProvider(workspace_path=user_workspace.absolute_path)
+
+            # 【修复】使用 WorkspaceToolManager 而不是 ToolManager
+            # WorkspaceToolManager 会初始化 Skills 工具
+            workspace_tool_manager = WorkspaceToolManager(workspace_path=user_workspace.absolute_path)
+            await workspace_tool_manager.initialize()
+
+            # 创建 ToolManager 传递给 ToolExecutor (向后兼容)
+            tool_manager = ToolManager(workspace_path=user_workspace.absolute_path)
+
             tool_call_service = ToolExecutor(
-                tool_manager=ToolManager(workspace_path=user_workspace.absolute_path),
+                tool_manager=tool_manager,
             )
+
+            # 【新增】将 WorkspaceToolManager 的 skills 工具添加到 ToolExecutor
+            if workspace_tool_manager._skills_tools:
+                for skill_tool in workspace_tool_manager._skills_tools:
+                    tool_call_service.tools[skill_tool.name] = skill_tool
+                    logger.info(f"[AGENT_CREATE] Loaded skill tool: {skill_tool.name}")
 
             # Initialize task manager callbacks (must be done before setting user workspace)
             await tool_call_service.async_initialize()

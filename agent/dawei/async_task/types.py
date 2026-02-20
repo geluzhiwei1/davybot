@@ -339,7 +339,7 @@ class AsyncTaskManagerConfig:
     cleanup_interval: int = 60  # 60秒
     enable_metrics: bool = True
     enable_checkpoints: bool = True
-    checkpoint_storage_path: str = "checkpoints"
+    checkpoint_storage_path: str = ""  # 空字符串表示使用默认全局路径
 
 
 @dataclass

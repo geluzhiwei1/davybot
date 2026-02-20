@@ -67,7 +67,7 @@ class TUIConfig:
 
         Priority:
             1. Workspace settings: {workspace}/.dawei/settings.json
-            2. User settings: ~/.dawei/configs/settings.json
+            2. User settings: ~/.dawei/settings.json
             3. Fallback: "glm"
 
         """
@@ -84,7 +84,7 @@ class TUIConfig:
                     return current_llm
 
             # Try user settings (DAWEI_HOME)
-            user_settings_file = Path(get_dawei_home()) / "configs" / "settings.json"
+            user_settings_file = Path(get_dawei_home()) / "settings.json"
             if user_settings_file.exists():
                 with Path(user_settings_file).open() as f:
                     settings = json.load(f)

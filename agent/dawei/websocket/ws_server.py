@@ -31,10 +31,12 @@ class WebSocketServer:
 
     def __init__(self):
         """初始化WebSocket服务器"""
-        # 创建存储实例 - 使用当前工作目录下的 .sessions 文件夹
         from pathlib import Path
 
-        session_root = str(Path.cwd() / ".sessions")
+        # 使用 get_dawei_home 获取标准路径
+        from dawei.config import get_dawei_home
+
+        session_root = str(Path(get_dawei_home()) / "sessions")
         self.storage = LocalFileSystemStorage(root_dir=session_root)
 
         self.websocket_manager = WebSocketManager()

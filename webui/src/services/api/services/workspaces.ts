@@ -721,6 +721,7 @@ export class WorkspacesApiService {
       rateLimitSeconds?: number;
       consecutiveMistakeLimit?: number;
       enableReasoningEffort?: boolean;
+      saveLocation?: 'user' | 'workspace';  // 新增：保存位置
     }
   ): Promise<{
     success: boolean;
@@ -729,6 +730,7 @@ export class WorkspacesApiService {
       name: string;
       id: string;
       config: unknown;
+      location?: string;  // 新增：返回保存位置
     };
   }> {
     try {
@@ -839,6 +841,49 @@ export class WorkspacesApiService {
         success: boolean;
         message: string;
       }>(`${this.baseUrl}/${workspaceId}/llm-providers/${providerName}`);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // ==================== Configuration Reload API ====================
+
+  // 重新加载工作区配置
+  async reloadWorkspaceConfig(
+    workspaceId: string,
+    configType: 'all' | 'skills' | 'modes' | 'tools' = 'all',
+    force: boolean = true
+  ): Promise<{
+    success: boolean;
+    message: string;
+    details: {
+      skills?: string | number;
+      skills_count?: number;
+      modes?: string | number;
+      modes_count?: number;
+      tools?: string | number;
+      tools_count?: number;
+    };
+  }> {
+    try {
+      return await httpClient.post<{
+        success: boolean;
+        message: string;
+        details: {
+          skills?: string | number;
+          skills_count?: number;
+          modes?: string | number;
+          modes_count?: number;
+          tools?: string | number;
+          tools_count?: number;
+        };
+      }>(
+        `${this.baseUrl}/${workspaceId}/reload-config`,
+        {
+          config_type: configType,
+          force
+        }
+      );
     } catch (error) {
       throw this.handleError(error);
     }
@@ -1399,7 +1444,8 @@ export const {
   getPluginConfig,
   updatePluginConfig,
   enablePlugin,
-  disablePlugin
+  disablePlugin,
+  reloadWorkspaceConfig
 } = {
   getWorkspaces: workspacesApi.getWorkspaces.bind(workspacesApi),
   getWorkspaceInfo: workspacesApi.getWorkspaceInfo.bind(workspacesApi),
@@ -1456,5 +1502,6 @@ export const {
   getPluginConfig: workspacesApi.getPluginConfig.bind(workspacesApi),
   updatePluginConfig: workspacesApi.updatePluginConfig.bind(workspacesApi),
   enablePlugin: workspacesApi.enablePlugin.bind(workspacesApi),
-  disablePlugin: workspacesApi.disablePlugin.bind(workspacesApi)
+  disablePlugin: workspacesApi.disablePlugin.bind(workspacesApi),
+  reloadWorkspaceConfig: workspacesApi.reloadWorkspaceConfig.bind(workspacesApi)
 };

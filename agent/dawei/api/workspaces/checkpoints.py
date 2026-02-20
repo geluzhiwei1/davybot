@@ -99,11 +99,16 @@ async def create_task_checkpoint(
         if not checkpoint_manager:
             raise HTTPException(status_code=501, detail=error_detail("checkpoint.not_available"))
 
-        # 创建检查点
-        checkpoint_id = await checkpoint_manager.create_checkpoint(
+        checkpoint_id = await checkpoint_manager.create_checkpoint_compat(
             task_id=task_id,
             description=description or f"Checkpoint for task {task_id}",
         )
+
+        if not checkpoint_id:
+            raise HTTPException(
+                status_code=501,
+                detail="Checkpoint creation via API requires full state data. Use agent execution to create checkpoints automatically."
+            )
 
         logger.info(f"Created checkpoint {checkpoint_id} for task {task_id}")
 
@@ -159,8 +164,8 @@ async def restore_task_checkpoint(workspace_id: str, task_id: str, checkpoint_id
         if not checkpoint_manager:
             raise HTTPException(status_code=501, detail=error_detail("checkpoint.not_available"))
 
-        # 恢复检查点
-        success = await checkpoint_manager.restore_checkpoint(
+        # 恢复检查点 - 使用兼容接口
+        success = await checkpoint_manager.restore_checkpoint_compat(
             task_id=task_id,
             checkpoint_id=checkpoint_id,
         )

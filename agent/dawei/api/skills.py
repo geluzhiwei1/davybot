@@ -95,24 +95,22 @@ async def list_skills(
                 raise ValueError(f"workspace_path cannot be None or empty (workspace_id={workspace_id})")
 
             # 3. 如果工作区路径存在，添加工作区根目录
-            # SkillManager 会在根目录后自动追加 .dawei/configs/skills
+            # SkillManager 会自动搜索 .dawei/skills/
             if workspace_path:
                 workspace_root = Path(workspace_path)
                 if workspace_root.exists():
-                    # 插入工作区根目录（SkillManager会自动搜索 .dawei/configs/skills）
+                    # 插入工作区根目录（SkillManager会自动搜索 .dawei/skills）
                     skills_roots.insert(0, workspace_root)
                     logger.info(
                         f"[SKILLS API] Added workspace root: {workspace_root} (workspace_id={workspace_id})",
                     )
 
                     # 检查预期的技能目录是否存在
-                    workspace_dawei = workspace_root / ".dawei"
-                    market_skills_dir = workspace_dawei / "skills"
-                    config_skills_dir = workspace_dawei / "configs" / "skills"
+                    market_skills_dir = workspace_root / ".dawei" / "skills"
 
-                    if not market_skills_dir.exists() and not config_skills_dir.exists():
-                        logger.warning(
-                            f"[SKILLS API] No skills directory found in workspace: {workspace_dawei}",
+                    if not market_skills_dir.exists():
+                        logger.info(
+                            f"[SKILLS API] No skills directory found in workspace: {market_skills_dir}",
                         )
                 else:
                     logger.warning(

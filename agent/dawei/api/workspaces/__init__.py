@@ -11,6 +11,7 @@ from fastapi import APIRouter
 # 导入记忆系统API
 from . import memory as memory_api
 from .checkpoints import router as checkpoints_router
+from .config_reload import router as config_reload_router
 
 # 导入各子模块的路由器
 from .config import router as config_router
@@ -34,6 +35,7 @@ router.include_router(files_router)
 router.include_router(llm_router)
 router.include_router(graphs_router)
 router.include_router(checkpoints_router)
+router.include_router(config_reload_router)  # 新增:配置重新加载 API
 router.include_router(config_router)
 router.include_router(ui_settings_router)
 router.include_router(crud_router)

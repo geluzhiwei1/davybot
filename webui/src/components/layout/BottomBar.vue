@@ -49,6 +49,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <el-button @click="refreshConfig" :loading="refreshing" :icon="Refresh" circle title="重新加载Agent和LLM配置" />
     </div>
 
     <div class="right-controls">
@@ -62,7 +63,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useChatStore } from '@/stores/chat';
 import { ElFooter, ElDropdown, ElDropdownMenu, ElDropdownItem, ElButton, ElIcon, ElMessage } from 'element-plus';
-import { ArrowDown, Cpu } from '@element-plus/icons-vue';
+import { ArrowDown, Cpu, Refresh } from '@element-plus/icons-vue';
 import { workspacesApi } from '@/services/api';
 import { httpClient } from '@/services/api/http';
 
@@ -126,52 +127,67 @@ const getModeDisplayName = (mode: Mode): string => {
 };
 const currentLLM = ref<LLM | null>(null);
 const llms = ref<LLM[]>([]);
+const refreshing = ref(false);
 const route = useRoute();
 const chatStore = useChatStore();
 
-onMounted(async () => {
-  const workspaceId = route.params.workspaceId as string;
+// 获取工作区ID的辅助函数
+const getWorkspaceId = (): string => {
+  return route.params.workspaceId as string;
+};
+
+// 获取Modes配置
+const fetchModes = async (forceReload = false) => {
+  const workspaceId = getWorkspaceId();
   if (!workspaceId) {
     console.error('Workspace ID is not available in the route.');
     return;
   }
 
-  const fetchModes = async () => {
-    try {
-      const data = await httpClient.get<{ success: boolean; modes: Mode[] }>(
-        `/workspaces/${workspaceId}/modes`
-      );
-      if (data.success && Array.isArray(data.modes)) {
-        modes.value = data.modes;
-        currentMode.value = data.modes.find((m: Mode) => m.is_default) || data.modes[0];
-        // 同步到chatStore
-        if (currentMode.value) {
-          chatStore.uiContext.currentMode = currentMode.value.slug;
-        }
+  try {
+    const reloadParam = forceReload ? '?reload=true' : '';
+    const data = await httpClient.get<{ success: boolean; modes: Mode[] }>(
+      `/workspaces/${workspaceId}/modes${reloadParam}`
+    );
+    if (data.success && Array.isArray(data.modes)) {
+      modes.value = data.modes;
+      currentMode.value = data.modes.find((m: Mode) => m.is_default) || data.modes[0];
+      // 同步到chatStore
+      if (currentMode.value) {
+        chatStore.uiContext.currentMode = currentMode.value.slug;
       }
-    } catch (error) {
-      console.error('Error fetching modes:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching modes:', error);
+  }
+};
 
-  const fetchLLMs = async () => {
-    try {
-      const data = await httpClient.get<{ success: boolean; models: LLM[] }>(
-        `/workspaces/${workspaceId}/llms`
-      );
-      if (data.success && Array.isArray(data.models)) {
-        llms.value = data.models;
-        currentLLM.value = data.models[0];
-        // 同步到chatStore
-        if (currentLLM.value) {
-          chatStore.uiContext.currentLlmId = currentLLM.value.llm_id;
-        }
+// 获取LLMs配置
+const fetchLLMs = async () => {
+  const workspaceId = getWorkspaceId();
+  if (!workspaceId) {
+    console.error('Workspace ID is not available in the route.');
+    return;
+  }
+
+  try {
+    const data = await httpClient.get<{ success: boolean; models: LLM[] }>(
+      `/workspaces/${workspaceId}/llms`
+    );
+    if (data.success && Array.isArray(data.models)) {
+      llms.value = data.models;
+      currentLLM.value = data.models[0];
+      // 同步到chatStore
+      if (currentLLM.value) {
+        chatStore.uiContext.currentLlmId = currentLLM.value.llm_id;
       }
-    } catch (error) {
-      console.error('Error fetching LLMs:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching LLMs:', error);
+  }
+};
 
+onMounted(async () => {
   await Promise.all([fetchModes(), fetchLLMs()]);
 });
 
@@ -211,6 +227,28 @@ const selectLLM = async (llm: LLM) => {
   } catch (error) {
     console.error('Error updating LLM:', error);
     ElMessage.error('更新LLM时发生网络错误');
+  }
+};
+
+const refreshConfig = async () => {
+  if (refreshing.value) return;
+
+  refreshing.value = true;
+  try {
+    const workspaceId = route.params.workspaceId as string;
+    if (!workspaceId) {
+      ElMessage.error('工作区ID不存在');
+      return;
+    }
+
+    // 重新获取Modes和LLMs (强制重新加载)
+    await Promise.all([fetchModes(true), fetchLLMs()]);
+    ElMessage.success('配置已刷新');
+  } catch (error) {
+    console.error('Error refreshing config:', error);
+    ElMessage.error('刷新配置时发生错误');
+  } finally {
+    refreshing.value = false;
   }
 };
 </script>

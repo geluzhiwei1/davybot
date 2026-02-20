@@ -437,6 +437,128 @@ class IntelligentCheckpointManager:
         """设置最大检查点数量"""
         self._max_checkpoints = max_checkpoints
 
+    # ==================== API 兼容方法 ====================
+    # 以下方法为 API 层提供兼容接口
+
+    async def create_checkpoint_compat(self, task_id: str, description: str | None = None) -> str | None:
+        """创建任务检查点（API 兼容接口）
+
+        Args:
+            task_id: 任务 ID
+            description: 检查点描述（未使用，仅为接口兼容）
+
+        Returns:
+            检查点 ID，如果创建失败则返回 None
+
+        Note:
+            此方法为 API 兼容接口。
+            实际的检查点创建应该包含完整的 state 数据。
+            由于 API 层没有传递 state，这里返回 None（不创建检查点）。
+
+        """
+        # API 层调用时没有 state 数据，无法创建有效的检查点
+        # 记录警告并返回 None
+        self.logger.warning(
+            f"create_checkpoint_compat called for task {task_id} without state data. "
+            "Checkpoint creation skipped. Use create_checkpoint(task_id, state, ...) instead."
+        )
+        return None
+
+    async def get_checkpoints(self, task_id: str) -> list[dict[str, Any]]:
+        """获取任务的所有检查点（API 兼容接口）
+
+        Args:
+            task_id: 任务 ID
+
+        Returns:
+            检查点列表，包含检查点的元数据信息
+
+        """
+        # 首先从内存缓存获取
+        checkpoint_list = []
+
+        # 从内存中获取
+        for cp_id, cp in self._checkpoints.items():
+            if cp.metadata.task_id == task_id:
+                checkpoint_list.append({
+                    "checkpoint_id": cp.metadata.checkpoint_id,
+                    "task_id": cp.metadata.task_id,
+                    "checkpoint_type": cp.metadata.checkpoint_type.value,
+                    "created_at": cp.metadata.created_at.isoformat(),
+                    "size_bytes": cp.metadata.size_bytes,
+                    "checksum": cp.metadata.checksum,
+                    "tags": cp.metadata.tags,
+                    "parent_checkpoint_id": cp.metadata.parent_checkpoint_id,
+                })
+
+        # 如果内存中没有，从磁盘加载所有检查点
+        if not checkpoint_list:
+            all_checkpoints = await self.persistence_manager.list_checkpoints()
+            for cp_dict in all_checkpoints:
+                if cp_dict.get("metadata", {}).get("task_id") == task_id:
+                    metadata = cp_dict["metadata"]
+                    checkpoint_list.append({
+                        "checkpoint_id": metadata["checkpoint_id"],
+                        "task_id": metadata["task_id"],
+                        "checkpoint_type": metadata["checkpoint_type"],
+                        "created_at": metadata["created_at"],
+                        "size_bytes": metadata["size_bytes"],
+                        "checksum": metadata["checksum"],
+                        "tags": metadata["tags"],
+                        "parent_checkpoint_id": metadata.get("parent_checkpoint_id"),
+                    })
+
+        # 按时间倒序排序
+        checkpoint_list.sort(key=lambda x: x["created_at"], reverse=True)
+        return checkpoint_list
+
+    async def get_checkpoint(self, checkpoint_id: str) -> dict[str, Any] | None:
+        """获取检查点详细信息（API 兼容接口）
+
+        Args:
+            checkpoint_id: 检查点 ID
+
+        Returns:
+            检查点数据字典，如果不存在则返回 None
+
+        """
+        # 使用 restore_checkpoint 获取检查点数据
+        checkpoint_data = await self.restore_checkpoint(checkpoint_id)
+
+        if not checkpoint_data:
+            return None
+
+        # 转换为字典格式
+        return {
+            "checkpoint_id": checkpoint_data.metadata.checkpoint_id,
+            "task_id": checkpoint_data.metadata.task_id,
+            "checkpoint_type": checkpoint_data.metadata.checkpoint_type.value,
+            "created_at": checkpoint_data.metadata.created_at.isoformat(),
+            "size_bytes": checkpoint_data.metadata.size_bytes,
+            "checksum": checkpoint_data.metadata.checksum,
+            "tags": checkpoint_data.metadata.tags,
+            "parent_checkpoint_id": checkpoint_data.metadata.parent_checkpoint_id,
+            "state": checkpoint_data.state,
+            "diff_from_previous": checkpoint_data.diff_from_previous,
+            "compressed": checkpoint_data.compressed,
+        }
+
+    async def restore_checkpoint_compat(self, task_id: str, checkpoint_id: str) -> bool:
+        """从检查点恢复任务（API 兼容接口）
+
+        Args:
+            task_id: 任务 ID（未使用，仅为接口兼容）
+            checkpoint_id: 检查点 ID
+
+        Returns:
+            是否恢复成功
+
+        """
+        checkpoint_data = await self.restore_checkpoint(checkpoint_id)
+        return checkpoint_data is not None
+
+    # ==================== 私有辅助方法 ====================
+
     def _generate_checkpoint_id(self, task_id: str, checkpoint_type: CheckpointType) -> str:
         """生成检查点ID"""
         self._checkpoint_counter += 1

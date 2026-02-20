@@ -14,7 +14,7 @@
     @close="handleClose"
     @closed="handleClosed">
     <div class="market-dialog-content">
-      <MarketBrowsePanel v-if="visible" :workspace-id="workspaceId" :initial-type="activeType" />
+      <MarketBrowsePanel v-if="visible" :workspace-id="workspaceId" :initial-type="activeType" @installed="handleInstalled" />
     </div>
 
     <template #footer>
@@ -41,6 +41,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
   (e: 'closed'): void;
+  (e: 'installed', type: ResourceType): void;
 }>();
 
 const visible = ref(props.modelValue);
@@ -61,6 +62,10 @@ const handleClose = () => {
 
 const handleClosed = () => {
   emit('closed');
+};
+
+const handleInstalled = (type: ResourceType) => {
+  emit('installed', type);
 };
 
 // Watch for external changes

@@ -871,6 +871,16 @@
           </div>
         </el-form-item>
 
+        <el-form-item label="保存位置" required v-if="editingProvider === null">
+          <el-radio-group v-model="providerForm.saveLocation">
+            <el-radio value="user">用户级（默认）</el-radio>
+            <el-radio value="workspace">工作区级</el-radio>
+          </el-radio-group>
+          <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+            用户级配置对所有工作区可用，工作区级配置仅对当前工作区有效
+          </div>
+        </el-form-item>
+
         <el-form-item label="API 类型" required>
           <el-select v-model="providerForm.apiProvider" placeholder="选择 API 类型" style="width: 100%"
             @change="onApiProviderChange" filterable>
@@ -998,7 +1008,7 @@
             </el-tag>
           </span>
           <el-button @click="showProviderDialog = false">取消</el-button>
-          <el-button type="primary" @click="saveProvider" :loading="saving" :disabled="!providerTestResult?.supported">
+          <el-button type="primary" @click="saveProvider" :loading="saving">
             保存
           </el-button>
         </div>
@@ -1241,7 +1251,7 @@
 
     <!-- Market Dialog -->
     <MarketDialog v-model="marketDialogVisible" :workspace-id="workspaceId || ''" :initial-type="marketResourceType"
-      @closed="() => loadSettings(true)" />
+      @closed="() => loadSettings(true)" @installed="handleResourceInstalled" />
   </el-drawer>
 </template>
 
@@ -1449,7 +1459,8 @@ const providerForm = ref({
   fuzzyMatchThreshold: 1,
   rateLimitSeconds: 0,
   consecutiveMistakeLimit: 3,
-  enableReasoningEffort: true
+  enableReasoningEffort: true,
+  saveLocation: 'user' as 'user' | 'workspace'  // 新增：保存位置
 });
 
 // Provider 列表 - 合并用户级和工作区级配置
@@ -1824,7 +1835,8 @@ const showCreateProviderDialog = () => {
     fuzzyMatchThreshold: 1,
     rateLimitSeconds: 0,
     consecutiveMistakeLimit: 3,
-    enableReasoningEffort: true
+    enableReasoningEffort: true,
+    saveLocation: 'user' as 'user' | 'workspace'  // 默认保存到用户级
   };
   customHeadersText.value = '';
   showProviderDialog.value = true;
@@ -2040,15 +2052,16 @@ const saveProvider = async () => {
     };
 
     if (editingProvider.value) {
-      // 更新现有 Provider
+      // 更新现有 Provider（编辑时不包含 saveLocation）
+      const { saveLocation, ...updateData } = providerData;
       await apiManager.getWorkspacesApi().updateLLMProvider(
         props.workspaceId,
         editingProvider.value,
-        providerData
+        updateData
       );
       ElMessage.success('Provider 更新成功');
     } else {
-      // 创建新 Provider
+      // 创建新 Provider（包含 saveLocation）
       await apiManager.getWorkspacesApi().createLLMProvider(
         props.workspaceId,
         providerData
@@ -2346,6 +2359,8 @@ const saveModeRules = async () => {
     );
     ElMessage.success('Rules 保存成功');
     showModeRulesDialog.value = false;
+    // 立即刷新模式列表,使更改生效
+    await loadModeSettings(true);
   } catch (error: unknown) {
     ElMessage.error('保存 Rules 失败: ' + (error.message || '未知错误'));
   } finally {
@@ -3052,6 +3067,57 @@ const openMarketDialog = (type: ResourceType) => {
   }
   marketResourceType.value = type;
   marketDialogVisible.value = true;
+};
+
+/**
+ * 处理资源安装成功事件
+ * 根据资源类型立即刷新对应的列表,并调用后端API重新加载配置
+ */
+const handleResourceInstalled = async (type: ResourceType) => {
+  if (!props.workspaceId) {
+    return;
+  }
+
+  try {
+    // 调用后端 API 重新加载配置
+    const workspacesApi = apiManager.getWorkspacesApi();
+    const result = await workspacesApi.reloadWorkspaceConfig(
+      props.workspaceId,
+      type === 'plugin' ? 'tools' : type,  // plugin 对应 tools 配置
+      true  // 强制重新加载
+    );
+
+    if (result.success) {
+      console.log('[WorkspaceSettings] Config reload result:', result);
+    }
+  } catch (error) {
+    console.error('[WorkspaceSettings] Failed to reload config:', error);
+    // 即使重新加载失败,也继续刷新前端列表
+  }
+
+  // 根据安装的资源类型,刷新对应的列表
+  switch (type) {
+    case 'skill':
+      // 立即刷新技能列表
+      await loadSkills(true);
+      break;
+    case 'agent':
+      // 立即刷新智能体列表
+      await loadModeSettings(true);
+      break;
+    case 'plugin':
+      // 立即刷新插件列表
+      await loadPlugins(true);
+      break;
+  }
+
+  // 显示提示消息
+  const typeNames = {
+    skill: '技能',
+    agent: '智能体',
+    plugin: '插件'
+  };
+  ElMessage.success(`${typeNames[type]}已安装并立即生效`);
 };
 
 // ==================== Plugins 管理方法 ====================

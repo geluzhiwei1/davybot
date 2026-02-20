@@ -54,6 +54,36 @@ class ModeConfigLoader:
             return self._cache.get(cache_key)
         return None
 
+    def clear_cache(self, level: str | None = None, path: str | None = None) -> None:
+        """清除模式缓存
+
+        Args:
+            level: 配置级别 ("builtin", "user", "workspace", None = 清除所有)
+            path: 路径 (None = 清除所有)
+
+        Examples:
+            >>> # 清除所有缓存
+            >>> loader.clear_cache()
+            >>> # 清除工作区级缓存
+            >>> loader.clear_cache(level="workspace", path="/path/to/workspace")
+            >>> # 清除用户级缓存
+            >>> loader.clear_cache(level="user")
+        """
+        if level is None and path is None:
+            # 清除所有缓存
+            self._cache.clear()
+            self._cache_timestamps.clear()
+            logger.info("All mode cache cleared")
+        else:
+            # 清除特定缓存
+            cache_key = self._get_cache_key(level, path)
+            if cache_key in self._cache:
+                del self._cache[cache_key]
+                del self._cache_timestamps[cache_key]
+                logger.info(f"Mode cache cleared: level={level}, path={path}")
+            else:
+                logger.debug(f"No cache found for: level={level}, path={path}")
+
     def _load_modes_from_directory(self, config_dir: Path, level: str) -> dict[str, ModeConfig]:
         """通用的模式加载函数，从指定目录加载模式配置
 
@@ -340,6 +370,16 @@ class ModeManager:
         self.loader.clear_cache()
         self._load_all_configs()
         logger.info("All mode configurations reloaded")
+
+    async def load_all_modes(self):
+        """异步重新加载所有模式配置（供 API 调用）
+
+        这个方法与 reload_configs() 相同,但是异步的,
+        便于在异步 API 端点中调用。
+        """
+        self.loader.clear_cache()
+        self._load_all_configs()
+        logger.info("All mode configurations reloaded (async)")
 
     def get_config_sources(self, mode_slug: str) -> dict[str, bool]:
         """获取模式配置来源信息"""

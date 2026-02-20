@@ -481,13 +481,18 @@ class TaskContext(ITaskContext):
 class SimpleCheckpointService(ICheckpointService):
     """简单的检查点服务实现（基于文件系统）"""
 
-    def __init__(self, storage_path: str = "checkpoints"):
+    def __init__(self, storage_path: str = ""):
         """初始化检查点服务
 
         Args:
-            storage_path: 存储路径
+            storage_path: 存储路径（空字符串表示使用默认全局路径 ~/.dawei/checkpoints）
 
         """
+        # 使用默认全局路径
+        if not storage_path:
+            from dawei.config import get_dawei_home
+            storage_path = str(get_dawei_home()) + "/checkpoints"
+
         self.storage_path = Path(storage_path)
         self._logger = get_logger(__name__)
 

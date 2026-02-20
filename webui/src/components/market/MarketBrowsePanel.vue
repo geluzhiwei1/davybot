@@ -151,6 +151,10 @@ const props = withDefaults(defineProps<Props>(), {
   initialType: 'skill'
 });
 
+const emit = defineEmits<{
+  (e: 'installed', type: ResourceType): void;
+}>();
+
 const marketStore = useMarketStore();
 
 const activeType = ref<ResourceType>(props.initialType);
@@ -228,6 +232,8 @@ const handleInstall = async (resource: SearchResult) => {
 
   if (result) {
     ElMessage.success(`安装 ${resource.name} 成功`);
+    // 触发 installed 事件,通知父组件立即刷新
+    emit('installed', resource.type);
   }
 };
 
@@ -250,6 +256,8 @@ const handleForceInstall = async (resource: SearchResult) => {
 
     if (result) {
       ElMessage.success(`强制重装 ${resource.name} 成功`);
+      // 触发 installed 事件,通知父组件立即刷新
+      emit('installed', resource.type);
     }
   } catch {
     // User cancelled

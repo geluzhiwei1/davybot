@@ -55,6 +55,7 @@ class LLMProviderCreate(BaseModel):
     rateLimitSeconds: int | None = Field(0, description="速率限制秒数")
     consecutiveMistakeLimit: int | None = Field(3, description="连续错误限制")
     enableReasoningEffort: bool | None = Field(True, description="启用推理强度")
+    saveLocation: str | None = Field("user", description="保存位置: user 或 workspace")
 
 
 # --- 依赖注入 ---
@@ -91,16 +92,26 @@ async def get_workspace_llms(workspace: UserWorkspace = Depends(get_user_workspa
 
     logger.info(f"Getting all LLM configs for workspace: {workspace.absolute_path}")
 
-    llm_configs = workspace.get_all_llm_configs()
+    # 每次都重新创建LLMProvider，确保获取最新配置
+    from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
 
-    if not llm_configs:
+    llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
+    await llm_config_manager.initialize()
+    llm_provider = llm_config_manager.llm_provider
+
+    # 获取所有配置（合并用户级和工作区级）
+    all_configs = llm_provider.get_all_configs()
+
+    if not all_configs:
         logger.warning("No LLM configurations found in workspace")
         return {"success": True, "models": []}
 
     models_list = []
-    for config_name, config_data in llm_configs.items():
-        # config_data 是 LLMConfig 对象，需要访问其属性
-        model_id = config_data.model_id if hasattr(config_data, "model_id") else None
+    for config_name, config_data in all_configs.items():
+        # config_data 是 LLMProviderConfig 对象，model_id 在 config.config.model_id
+        model_id = None
+        if hasattr(config_data, "config") and hasattr(config_data.config, "model_id"):
+            model_id = config_data.config.model_id
 
         if model_id:
             models_list.append({"llm_id": config_name, "model_id": model_id})
@@ -123,15 +134,12 @@ async def get_workspace_llm_settings_all_levels(
         await workspace.initialize()
 
     try:
-        # 直接使用 user_workspace 已有的 llm_manager（包含多级加载逻辑）
-        llm_provider = workspace.llm_manager
-        if not llm_provider:
-            from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
+        # 每次都重新创建LLMProvider，确保获取最新配置
+        from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
 
-            llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
-            await llm_config_manager.initialize()
-            llm_provider = llm_config_manager.llm_provider
-            workspace.llm_manager = llm_provider
+        llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
+        await llm_config_manager.initialize()
+        llm_provider = llm_config_manager.llm_provider
 
         # 获取带来源信息的所有配置
         configs_with_source = llm_provider.get_all_configs_with_source()
@@ -147,32 +155,33 @@ async def get_workspace_llm_settings_all_levels(
 async def get_workspace_llm_settings(
     workspace: UserWorkspace = Depends(get_user_workspace),
 ):
-    """获取工作区的 LLM 配置设置 (从 settings.json 读取)"""
+    """获取工作区的 LLM 配置设置（合并用户级和工作区级）"""
     if not workspace.is_initialized():
         await workspace.initialize()
 
     try:
-        settings_file = workspace.user_config_dir / "settings.json"
-        if not settings_file.exists():
-            return {
-                "success": True,
-                "settings": {
-                    "currentApiConfigName": None,
-                    "allConfigs": {},
-                    "modeApiConfigs": {},
-                },
-            }
+        # 每次都重新创建LLMProvider，确保获取最新配置
+        from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
 
-        with Path(settings_file).open(encoding="utf-8") as f:
-            settings = json.load(f)
+        llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
+        await llm_config_manager.initialize()
+        llm_provider = llm_config_manager.llm_provider
 
-        # 提取 LLM 相关的配置信息
-        provider_profiles = settings.get("providerProfiles", {})
-        current_config_name = provider_profiles.get("currentApiConfigName", "")
+        # 获取带来源信息的所有配置
+        configs_with_source = llm_provider.get_all_configs_with_source()
+
+        # 获取当前配置名称
+        current_config_name = configs_with_source.get("current_config")
+
+        # 合并所有配置（用户级+工作区级）
+        all_configs = {}
+        for config in configs_with_source.get("user", []):
+            all_configs[config["name"]] = config["config"]["config"]
+        for config in configs_with_source.get("workspace", []):
+            all_configs[config["name"]] = config["config"]["config"]
 
         # 获取当前配置的详细信息
         current_config = None
-        all_configs = provider_profiles.get("apiConfigs", {})
         if current_config_name and current_config_name in all_configs:
             current_config = all_configs.get(current_config_name)
 
@@ -182,7 +191,7 @@ async def get_workspace_llm_settings(
                 "currentApiConfigName": current_config_name,
                 "currentConfig": current_config,
                 "allConfigs": all_configs,
-                "modeApiConfigs": provider_profiles.get("modeApiConfigs", {}),
+                "modeApiConfigs": configs_with_source.get("mode_configs", {}),
             },
         }
     except Exception as e:
@@ -226,6 +235,9 @@ async def update_workspace_llm_settings(
         with settings_file.open("w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
 
+        # 清除工作区的llm_manager缓存，强制重新加载配置
+        workspace.llm_manager = None
+
         logger.info(f"Updated LLM settings for workspace: {workspace.absolute_path}")
 
         return {
@@ -246,12 +258,25 @@ async def create_llm_provider(
     provider_data: LLMProviderCreate,
     workspace: UserWorkspace = Depends(get_user_workspace),
 ):
-    """创建新的 LLM Provider 配置"""
+    """创建新的 LLM Provider 配置
+
+    根据 saveLocation 参数决定保存到用户级还是工作区级配置：
+    - user: 保存到 ~/.dawei/settings.json
+    - workspace: 保存到 {workspace}/.dawei/settings.json
+    """
     if not workspace.is_initialized():
         await workspace.initialize()
 
     try:
-        settings_file = workspace.user_config_dir / "settings.json"
+        # 根据 saveLocation 决定保存位置
+        save_location = provider_data.saveLocation or "user"
+        
+        if save_location == "user":
+            # 保存到用户级配置
+            settings_file = Path(get_dawei_home()) / "settings.json"
+        else:
+            # 保存到工作区级配置
+            settings_file = workspace.user_config_dir / "settings.json"
 
         # 读取现有配置
         if settings_file.exists():
@@ -259,6 +284,8 @@ async def create_llm_provider(
                 settings = json.load(f)
         else:
             settings = {"providerProfiles": {"apiConfigs": {}, "modeApiConfigs": {}}}
+            # 确保目录存在
+            settings_file.parent.mkdir(parents=True, exist_ok=True)
 
         provider_profiles = settings.setdefault("providerProfiles", {})
         api_configs = provider_profiles.setdefault("apiConfigs", {})
@@ -267,7 +294,7 @@ async def create_llm_provider(
         if provider_data.name in api_configs:
             raise HTTPException(
                 status_code=400,
-                detail=f"Provider '{provider_data.name}' already exists",
+                detail=f"Provider '{provider_data.name}' already exists in {save_location}-level config",
             )
 
         # 创建新的 provider 配置
@@ -306,6 +333,10 @@ async def create_llm_provider(
             if provider_data.ollamaApiKey:
                 provider_config["ollamaApiKey"] = provider_data.ollamaApiKey
 
+        # 如果当前没有 currentApiConfigName，则设置为即将创建的 provider
+        if "currentApiConfigName" not in provider_profiles or not provider_profiles.get("currentApiConfigName"):
+            provider_profiles["currentApiConfigName"] = provider_data.name
+
         # 保存配置
         api_configs[provider_data.name] = provider_config
         provider_profiles["apiConfigs"] = api_configs
@@ -314,15 +345,20 @@ async def create_llm_provider(
         with settings_file.open("w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Created LLM provider: {provider_data.name}")
+        # 清除工作区的llm_manager缓存，强制重新加载配置
+        workspace.llm_manager = None
+
+        location_name = "用户级" if save_location == "user" else "工作区级"
+        logger.info(f"Created LLM provider '{provider_data.name}' at {location_name} config: {settings_file}")
 
         return {
             "success": True,
-            "message": f"LLM provider '{provider_data.name}' created successfully",
+            "message": f"LLM provider '{provider_data.name}' created successfully at {location_name} level",
             "provider": {
                 "name": provider_data.name,
                 "id": provider_id,
                 "config": provider_config,
+                "location": save_location,
             },
         }
     except HTTPException:
@@ -401,6 +437,9 @@ async def update_llm_provider(
 
         with settings_file.open("w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
+
+        # 清除工作区的llm_manager缓存，强制重新加载配置
+        workspace.llm_manager = None
 
         logger.info(f"Updated LLM provider: {provider_name}")
 
@@ -555,39 +594,40 @@ async def delete_llm_provider(
         await workspace.initialize()
 
     try:
-        # 首先尝试从工作区级配置中删除
-        settings_file = workspace.user_config_dir / "settings.json"
+        # 确定 provider 在哪个配置文件中
+        workspace_settings_file = workspace.user_config_dir / "settings.json"
+        user_settings_file = Path(get_dawei_home()) / "settings.json"
 
-        if not settings_file.exists():
-            # 如果工作区配置不存在，尝试用户级配置
-            user_settings_file = Path(get_dawei_home()) / "configs" / "settings.json"
-            if not user_settings_file.exists():
-                raise HTTPException(status_code=404, detail="Settings file not found")
-            settings_file = user_settings_file
-        else:
-            # 先检查工作区配置是否存在该 provider
-            with Path(settings_file).open(encoding="utf-8") as f:
-                settings = json.load(f)
+        # 查找 provider：先工作区，后用户级
+        settings_file = None
+        source = None
 
-            provider_profiles = settings.get("providerProfiles", {})
-            api_configs = provider_profiles.get("apiConfigs", {})
+        # 检查工作区级配置
+        if workspace_settings_file.exists():
+            with workspace_settings_file.open(encoding="utf-8") as f:
+                workspace_settings = json.load(f)
+            workspace_api_configs = workspace_settings.get("providerProfiles", {}).get("apiConfigs", {})
+            if provider_name in workspace_api_configs:
+                settings_file = workspace_settings_file
+                settings = workspace_settings
+                source = "workspace"
 
-            if provider_name in api_configs:
-                # 在工作区配置中找到，直接删除
-                pass
-            else:
-                # 工作区配置中没有，尝试用户级配置
-                user_settings_file = Path(get_dawei_home()) / "configs" / "settings.json"
-                if user_settings_file.exists():
-                    settings_file = user_settings_file
-                    with Path(settings_file).open(encoding="utf-8") as f:
-                        settings = json.load(f)
-                    provider_profiles = settings.get("providerProfiles", {})
-                    api_configs = provider_profiles.get("apiConfigs", {})
+        # 如果工作区级没找到，检查用户级配置
+        if not settings_file and user_settings_file.exists():
+            with user_settings_file.open(encoding="utf-8") as f:
+                user_settings = json.load(f)
+            user_api_configs = user_settings.get("providerProfiles", {}).get("apiConfigs", {})
+            if provider_name in user_api_configs:
+                settings_file = user_settings_file
+                settings = user_settings
+                source = "user"
 
-        # 检查 provider 是否存在
-        if provider_name not in api_configs:
+        # 如果都没找到，报错
+        if not settings_file:
             raise HTTPException(status_code=404, detail=f"Provider '{provider_name}' not found")
+
+        provider_profiles = settings.get("providerProfiles", {})
+        api_configs = provider_profiles.get("apiConfigs", {})
 
         # 在删除前获取 provider 的 id
         deleted_provider_id = api_configs[provider_name].get("id")
@@ -612,6 +652,9 @@ async def delete_llm_provider(
 
         with settings_file.open("w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
+
+        # 清除工作区的llm_manager缓存，强制重新加载配置
+        workspace.llm_manager = None
 
         logger.info(f"Deleted LLM provider: {provider_name} from {settings_file}")
 
