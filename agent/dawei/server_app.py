@@ -43,8 +43,17 @@ class UTF8StreamHandler(logging.StreamHandler):
 
         if sys.platform == "win32":
             if _shared_utf8_stream is None:
+                # Get the underlying binary stream (handle both .buffer and .raw attributes)
+                if hasattr(sys.stderr, "buffer"):
+                    binary_stream = sys.stderr.buffer
+                elif hasattr(sys.stderr, "raw"):
+                    binary_stream = sys.stderr.raw
+                else:
+                    # Fallback: use sys.stderr directly
+                    binary_stream = sys.stderr
+
                 _shared_utf8_stream = io.TextIOWrapper(
-                    sys.stderr.buffer,
+                    binary_stream,
                     encoding="utf-8",
                     errors="replace",
                     line_buffering=True,
