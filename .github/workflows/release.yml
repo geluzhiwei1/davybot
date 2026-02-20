@@ -76,7 +76,11 @@ jobs:
         working-directory: ./agent
         run: |
           # Get version from setuptools_scm
+<<<<<<< HEAD
           VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(relative_to='pyproject.toml'))")
+=======
+          VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='..', relative_to=__file__))")
+>>>>>>> parent of 9d83d20 (auto version)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Detected version: ${VERSION}"
           
