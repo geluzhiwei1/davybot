@@ -219,7 +219,7 @@ def register_exception_handlers(app) -> None:
 
     Usage:
         from dawei.api.exception_handlers import register_exception_handlers
-        from dawei.server import create_app
+        from dawei.server_app import create_app
 
         app = create_app(...)
         register_exception_handlers(app)

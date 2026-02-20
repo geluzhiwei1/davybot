@@ -154,7 +154,7 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill)
 
         import uvicorn
 
-        from dawei.server import create_app, main
+        from dawei.server_app import create_app
 
         # Set super mode environment variable
         if super_mode:

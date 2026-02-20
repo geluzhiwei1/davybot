@@ -80,6 +80,7 @@
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",
     "element-plus": "^2.11.9",
+    "js-yaml": "^4.1.1",
     "markdown-it": "^14.1.1",
     "marked": "^17.0.1",
     "papaparse": "^5.5.3",

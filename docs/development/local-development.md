@@ -8,16 +8,26 @@ cd agent
 # Install dependencies (using UV)
 uv pip install -e . -i https://mirrors.aliyun.com/pypi/simple/
 
-# Run development server (auto-reload)
-uv run python -m dawei.server
-# Or directly with uvicorn
-uv run uvicorn dawei.server:app --host 0.0.0.0 --port 8465 --reload
+# Start FastAPI server (with auto-reload)
+dawei server start --reload
+
+# Alternative: Using python -m (if dawei command is not found)
+python -m dawei.cli.dawei server start --reload
+
+# Start with custom host and port
+dawei server start --host 0.0.0.0 --port 8465
+
+# Check server status
+dawei server status
+
+# Stop the server
+dawei server stop
 
 # Run TUI (Text User Interface)
-dawei tui --workspace ./my-workspace    # Start TUI
-dawei agent run ./my-workspace "msg"   # Run agent directly
-dawei server start                     # Start FastAPI server
-dawei server status                     # Check server status
+dawei tui --workspace ./my-workspace
+
+# Run agent directly
+dawei agent run ./my-workspace "Create hello world"
 
 # Run tests
 pytest                              # Run all tests

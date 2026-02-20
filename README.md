@@ -1,6 +1,25 @@
 
 # 大微-AI个人助手
 
+
+# 快速安装
+
+## pip
+
+``` bash
+# 安装
+pip install davybot
+
+# 启动
+dawei server start
+# 或者 
+python -m dawei.cli.dawei server start
+
+# 访问
+http://localhost:8465/app
+
+```
+
 # Web UI
 
 ![主界面](asserts/web-ui/main.png)
