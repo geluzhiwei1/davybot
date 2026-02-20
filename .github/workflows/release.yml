@@ -12,7 +12,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.version }}
@@ -81,7 +80,9 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: agent/dist/
           skip-existing: true
+          trusted-publishing: none
 
       # ========== Create GitHub Release ==========
       - name: Create GitHub Release
