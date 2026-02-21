@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <div class="pdf-viewer-container">
@@ -10,12 +10,16 @@
       <div class="toolbar-left">
         <el-button-group>
           <el-button size="small" :disabled="currentPage <= 1" @click="prevPage">
-            <el-icon><ArrowLeft /></el-icon>
+            <el-icon>
+              <ArrowLeft />
+            </el-icon>
             上一页
           </el-button>
           <el-button size="small" :disabled="currentPage >= numPages" @click="nextPage">
             下一页
-            <el-icon><ArrowRight /></el-icon>
+            <el-icon>
+              <ArrowRight />
+            </el-icon>
           </el-button>
         </el-button-group>
 
@@ -58,20 +62,10 @@
 
     <!-- PDF 显示区域 - 使用浏览器原生 PDF 查看器 -->
     <div class="pdf-content">
-      <iframe
-        v-if="src && !error"
-        :src="iframeSrc"
-        class="pdf-iframe"
-        type="application/pdf"
-        frameborder="0"
-      ></iframe>
+      <iframe v-if="src && !error" :src="iframeSrc" class="pdf-iframe" type="application/pdf" frameborder="0"></iframe>
 
       <!-- 错误提示 -->
-      <el-empty
-        v-if="error"
-        description="PDF 加载失败"
-        :image-size="100"
-      >
+      <el-empty v-if="error" description="PDF 加载失败" :image-size="100">
         <el-button type="primary" @click="reloadPDF">重新加载</el-button>
       </el-empty>
     </div>
@@ -137,9 +131,9 @@ const loadPDF = async () => {
 
   // 安全检查：通过文件名检测HTML文件
   if (props.filename && (
-      props.filename.toLowerCase().endsWith('.html') ||
-      props.filename.toLowerCase().endsWith('.htm') ||
-      props.filename.toLowerCase().endsWith('.xhtml')
+    props.filename.toLowerCase().endsWith('.html') ||
+    props.filename.toLowerCase().endsWith('.htm') ||
+    props.filename.toLowerCase().endsWith('.xhtml')
   )) {
     console.error('[PDFViewer] ERROR: HTML file detected by filename:', props.filename)
     error.value = true
@@ -151,10 +145,10 @@ const loadPDF = async () => {
   try {
     // 安全检查：拒绝加载HTML内容
     if (props.modelValue && (
-        props.modelValue.trim().startsWith('<!DOCTYPE html>') ||
-        props.modelValue.trim().startsWith('<html') ||
-        props.modelValue.includes('<html') ||
-        props.modelValue.includes('<body')
+      props.modelValue.trim().startsWith('<!DOCTYPE html>') ||
+      props.modelValue.trim().startsWith('<html') ||
+      props.modelValue.includes('<html') ||
+      props.modelValue.includes('<body')
     )) {
       console.error('[PDFViewer] ERROR: HTML content detected, refusing to load as PDF')
       error.value = true
@@ -165,6 +159,7 @@ const loadPDF = async () => {
 
     // 直接使用 PDF 源（浏览器原生查看器会处理）
     src.value = props.modelValue
+    console.log('[PDFViewer] PDF source set successfully:', src.value?.substring(0, 50))
 
   } catch (err: unknown) {
     console.error('[PDFViewer] Load error:', err)
@@ -220,7 +215,7 @@ const reloadPDF = () => {
 // 监听 props 变化
 watch(() => props.modelValue, () => {
   loadPDF()
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -269,7 +264,8 @@ watch(() => props.modelValue, () => {
   display: flex;
   justify-content: center;
   padding: 0;
-  background-color: #525659; /* 经典 PDF 阅读器背景色 */
+  background-color: #525659;
+  /* 经典 PDF 阅读器背景色 */
   position: relative;
 }
 

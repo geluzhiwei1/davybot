@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <el-aside :width="collapsed ? '57px' : '400px'" class="side-panel">
@@ -9,29 +9,25 @@
       <div v-if="!collapsed" class="content-area">
         <!-- 侧边栏切换按钮 -->
         <div class="sidebar-tabs">
-          <button
-            :class="['tab-button', { active: activeTab === 'conversations' }]"
-            @click="activeTab = 'conversations'"
-            data-testid="conversations-tab"
-          >
-            <el-icon><ChatDotRound /></el-icon>
+          <button :class="['tab-button', { active: activeTab === 'conversations' }]"
+            @click="activeTab = 'conversations'" data-testid="conversations-tab">
+            <el-icon>
+              <ChatDotRound />
+            </el-icon>
             <span>{{ t('sidePanel.conversations') }}</span>
           </button>
-          <button
-            :class="['tab-button', { active: activeTab === 'files' }]"
-            @click="activeTab = 'files'"
-            data-testid="files-tab"
-          >
-            <el-icon><Folder /></el-icon>
+          <button :class="['tab-button', { active: activeTab === 'files' }]" @click="activeTab = 'files'"
+            data-testid="files-tab">
+            <el-icon>
+              <Folder />
+            </el-icon>
             <span>{{ t('sidePanel.workspace') }}</span>
           </button>
-          <button
-            v-if="!memoryPanelDisabled"
-            :class="['tab-button', { active: activeTab === 'memory' }]"
-            @click="activeTab = 'memory'"
-            data-testid="memory-tab"
-          >
-            <el-icon><Connection /></el-icon>
+          <button v-if="!memoryPanelDisabled" :class="['tab-button', { active: activeTab === 'memory' }]"
+            @click="activeTab = 'memory'" data-testid="memory-tab">
+            <el-icon>
+              <Connection />
+            </el-icon>
             <span>{{ t('sidePanel.memory') }}</span>
           </button>
         </div>
@@ -40,32 +36,29 @@
         <div v-show="activeTab === 'conversations'" class="tab-panel">
           <div class="panel-content">
             <div class="conversation-actions">
-              <el-button type="primary" :icon="Plus" @click="handleNewChat" class="flex-1" size="small">{{ t('sidePanel.newConversation') }}</el-button>
-              <el-button type="danger" :icon="Delete" @click="handleDeleteAllConversations" class="flex-1" size="small">{{ t('sidePanel.deleteAll') }}</el-button>
+              <el-button type="primary" :icon="Plus" @click="handleNewChat" class="flex-1" size="small">{{
+                t('sidePanel.newConversation') }}</el-button>
+              <el-button type="danger" :icon="Delete" @click="handleDeleteAllConversations" class="flex-1"
+                size="small">{{ t('sidePanel.deleteAll') }}</el-button>
             </div>
             <el-scrollbar>
-              <el-menu :default-active="activeConversationId" @select="handleSelectConversation" v-loading="loading" class="conversation-menu">
-                <el-menu-item v-for="conv in conversations" :key="conv.id" :index="conv.id" class="conversation-menu-item">
+              <el-menu :default-active="activeConversationId" @select="handleSelectConversation" v-loading="loading"
+                class="conversation-menu">
+                <el-menu-item v-for="conv in conversations" :key="conv.id" :index="conv.id"
+                  class="conversation-menu-item">
                   <div class="conversation-item">
                     <div class="conv-content">
                       <span class="conv-title">{{ conv.title }}</span>
                       <span class="conv-date">{{ formatDate(conv.lastUpdated) }}</span>
                       <span class="conv-id">ID: {{ conv.id }}</span>
                     </div>
-                    <el-button
-                      :icon="Delete"
-                      type="danger"
-                      text
-                      circle
-                      size="small"
-                      class="conv-delete-btn"
-                      @click.stop="handleDeleteConversation(conv)"
-                      :title="t('sidePanel.deleteConversation')"
-                    />
+                    <el-button :icon="Delete" type="danger" text circle size="small" class="conv-delete-btn"
+                      @click.stop="handleDeleteConversation(conv)" :title="t('sidePanel.deleteConversation')" />
                   </div>
                 </el-menu-item>
               </el-menu>
-              <el-empty v-if="!loading && conversations.length === 0" :description="t('sidePanel.noConversations')" :image-size="60" />
+              <el-empty v-if="!loading && conversations.length === 0" :description="t('sidePanel.noConversations')"
+                :image-size="60" />
             </el-scrollbar>
           </div>
         </div>
@@ -96,41 +89,29 @@
                         </el-tooltip>
                       </div>
                     </div>
-                    <el-tree
-                      ref="fileTreeRef"
-                      :data="nestedFileTree"
-                      :props="defaultProps"
-                      node-key="path"
-                      lazy
-                      :load="loadTreeNode"
-                      @node-click="handleTreeNodeClick"
-                      @node-contextmenu="handleNodeContextMenu"
-                      :expand-on-click-node="false"
-                      :highlight-current="true"
-                    >
+                    <el-tree ref="fileTreeRef" :data="nestedFileTree" :props="defaultProps" node-key="path" lazy
+                      :load="loadTreeNode" @node-click="handleTreeNodeClick" @node-contextmenu="handleNodeContextMenu"
+                      :expand-on-click-node="false" :highlight-current="true">
                       <template #default="{ node, data }">
                         <span class="custom-tree-node">
                           <span class="tree-node-label">
-                            <el-icon v-if="data.is_directory || data.type === 'directory'"><Folder /></el-icon>
-                            <el-icon v-else><Document /></el-icon>
+                            <el-icon v-if="data.is_directory || data.type === 'directory'">
+                              <Folder />
+                            </el-icon>
+                            <el-icon v-else>
+                              <Document />
+                            </el-icon>
                             {{ node.label }}
                           </span>
                           <span class="tree-node-actions">
-                            <el-button
-                              :icon="Delete"
-                              type="danger"
-                              text
-                              circle
-                              size="small"
-                              class="node-delete-btn"
-                              @click.stop="handleQuickDelete(data)"
-                              :title="t('sidePanel.delete')"
-                            />
+                            <el-button :icon="Delete" type="danger" text circle size="small" class="node-delete-btn"
+                              @click.stop="handleQuickDelete(data)" :title="t('sidePanel.delete')" />
                           </span>
                         </span>
                       </template>
                     </el-tree>
-                    <el-empty v-if="nestedFileTree.length === 0" :description="t('sidePanel.noFiles')" :image-size="40" />
+                    <el-empty v-if="nestedFileTree.length === 0" :description="t('sidePanel.noFiles')"
+                      :image-size="40" />
                   </div>
                 </div>
               </div>
@@ -140,11 +121,7 @@
 
         <!-- 记忆面板 -->
         <div v-if="!memoryPanelDisabled" v-show="activeTab === 'memory'" class="tab-panel">
-          <MemoryBrowser
-            v-if="workspaceId"
-            :workspace-id="workspaceId"
-            @select-memory="handleSelectMemory"
-          />
+          <MemoryBrowser v-if="workspaceId" :workspace-id="workspaceId" @select-memory="handleSelectMemory" />
         </div>
       </div>
     </div>
@@ -153,41 +130,42 @@
     <UserSettingsDrawer v-model="isUserSettingsVisible" />
 
     <!-- 文件上传对话框 -->
-    <FileUploadDialog
-      v-model="isUploadDialogVisible"
-      :workspace-id="workspaceId"
-      parent-path=""
-      parent-name=""
-      @success="handleUploadSuccess"
-    />
+    <FileUploadDialog v-model="isUploadDialogVisible" :workspace-id="workspaceId" parent-path="" parent-name=""
+      @success="handleUploadSuccess" />
 
     <!-- 文件右键菜单 -->
     <teleport to="body">
-      <div
-        v-if="contextMenuVisible"
-        class="context-menu"
-        :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
-        @click.stop
-      >
+      <div v-if="contextMenuVisible" class="context-menu"
+        :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }" @click.stop>
         <div class="context-menu-item" @click="handleCreateFile(selectedFileNode)">
-          <el-icon><Document /></el-icon>
+          <el-icon>
+            <Document />
+          </el-icon>
           <span>{{ t('sidePanel.newFile') }}</span>
         </div>
         <div class="context-menu-item" @click="handleCreateDirectory(selectedFileNode)">
-          <el-icon><FolderAdd /></el-icon>
+          <el-icon>
+            <FolderAdd />
+          </el-icon>
           <span>{{ t('sidePanel.newDirectory') }}</span>
         </div>
         <div v-if="selectedFileNode" class="context-menu-divider"></div>
         <div v-if="selectedFileNode" class="context-menu-item" @click="handleRename">
-          <el-icon><Edit /></el-icon>
+          <el-icon>
+            <Edit />
+          </el-icon>
           <span>{{ t('sidePanel.rename') }}</span>
         </div>
         <div v-if="selectedFileNode" class="context-menu-item" @click="handleCopy">
-          <el-icon><CopyDocument /></el-icon>
+          <el-icon>
+            <CopyDocument />
+          </el-icon>
           <span>{{ t('sidePanel.copy') }}</span>
         </div>
         <div v-if="selectedFileNode" class="context-menu-item danger" @click="handleDelete">
-          <el-icon><Delete /></el-icon>
+          <el-icon>
+            <Delete />
+          </el-icon>
           <span>{{ t('sidePanel.delete') }}</span>
         </div>
       </div>
@@ -201,6 +179,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useChatStore } from '@/stores/chat';
+import { useWorkspaceStore } from '@/stores/workspace';
 import { apiManager } from '@/services/api';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import {
@@ -212,6 +191,7 @@ import FileUploadDialog from '@/components/FileUploadDialog.vue';
 import MemoryBrowser from './MemoryBrowser.vue';
 
 const chatStore = useChatStore();
+const workspaceStore = useWorkspaceStore();
 const { t } = useI18n();
 
 
@@ -269,7 +249,7 @@ onUnmounted(() => {
 
 // ✅ 处理任务完成后的自动刷新
 const handleTaskCompleteRefresh = async (event: unknown) => {
-  const customEvent = event as CustomEvent<{workspaceId: string; taskNodeId: string}>
+  const customEvent = event as CustomEvent<{ workspaceId: string; taskNodeId: string }>
 
   // 只刷新当前工作区的文件树
   if (customEvent.detail.workspaceId === props.workspaceId) {
@@ -346,8 +326,19 @@ const loadConversations = async () => {
   try {
     const convs = await apiManager.getWorkspacesApi().getConversations(props.workspaceId);
     conversations.value = convs?.items || [];
+
     if (conversations.value.length > 0 && !activeConversationId.value) {
-      activeConversationId.value = conversations.value[0].id;
+      // 按更新时间排序，选择最新的会话
+      const sortedConversations = [...conversations.value].sort((a: any, b: any) => {
+        const dateA = new Date(a.updated_at || a.created_at || 0);
+        const dateB = new Date(b.updated_at || b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      const latestConversation = sortedConversations[0] as any;
+      activeConversationId.value = latestConversation.id;
+
+      await chatStore.loadConversation(latestConversation.id);
+
     }
   } catch (e) {
     console.error('Failed to load conversations:', e);
@@ -1212,6 +1203,7 @@ defineExpose({
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);

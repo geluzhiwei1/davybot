@@ -506,7 +506,7 @@ class WorkspacePersistenceManager:
             conversation_id,
             conversation_data,
             timestamp=timestamp,
-            use_timestamp=True,
+            use_timestamp=False,  # 改为 False，不使用时间戳前缀
         )
 
     async def load_conversation(self, conversation_id: str) -> dict[str, Any] | None:

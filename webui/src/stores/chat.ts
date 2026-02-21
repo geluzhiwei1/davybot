@@ -241,7 +241,7 @@ export const useChatStore = defineStore('chat', () => {
     if (currentWorkspaceId.value) {
       metadata.workspaceId = currentWorkspaceId.value
     }
-    if (currentConversationId.value && !isTempConversation.value) {
+    if (currentConversationId.value) {
       metadata.conversationId = currentConversationId.value
     }
 

@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <el-container class="chat-container">
@@ -48,18 +48,13 @@
     </el-aside>
 
     <!-- 左侧面板拖动分隔条 -->
-    <ResizerBar
-      v-if="!isSidePanelCollapsed"
-      :panel-ref="{ width: sidePanelWidth }"
-      :min-width="100"
-      storage-key="dawei-sidepanel-width"
-      @resize="sidePanelWidth = $event"
-    />
+    <ResizerBar v-if="!isSidePanelCollapsed" :panel-ref="{ width: sidePanelWidth }" :min-width="100"
+      storage-key="dawei-sidepanel-width" @resize="sidePanelWidth = $event" />
 
     <el-container v-show="!isChatPanelCollapsed" class="main-content">
       <el-header height="auto">
-        <TopBar :is-side-panel-collapsed="isChatPanelCollapsed"
-          @open-settings="handleOpenSettings" @toggle-side-panel="toggleChatPanel" />
+        <TopBar :is-side-panel-collapsed="isChatPanelCollapsed" @open-settings="handleOpenSettings"
+          @toggle-side-panel="toggleChatPanel" />
       </el-header>
       <el-main>
         <!-- Agents 下拉监控面板 -->
@@ -78,26 +73,17 @@
     </el-container>
 
     <!-- 主内容区和右侧面板之间的拖动分隔条 -->
-    <ResizerBar
-      v-if="isRightPanelVisible && !isChatPanelCollapsed"
-      :panel-ref="{ width: rightPanelWidth }"
-      :min-width="100"
-      storage-key="dawei-rightpanel-width"
-      position="right"
-      @resize="rightPanelWidth = $event"
-    />
+    <ResizerBar v-if="isRightPanelVisible && !isChatPanelCollapsed" :panel-ref="{ width: rightPanelWidth }"
+      :min-width="100" storage-key="dawei-rightpanel-width" position="right" @resize="rightPanelWidth = $event" />
 
     <el-aside v-if="isRightPanelVisible" class="right-panel" :width="rightPanelWidth + 'px'">
-      <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId" @close-file="handleCloseFile"
-        @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
+      <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId"
+        @close-file="handleCloseFile" @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
         @update-file-content="updateFileContent" />
     </el-aside>
 
-    <WorkspaceSettingsDrawer
-      v-model="isSettingsDrawerVisible"
-      :workspace-id="chatStore.workspaceId"
-      :initial-tab="initialSettingsTab"
-    />
+    <WorkspaceSettingsDrawer v-model="isSettingsDrawerVisible" :workspace-id="chatStore.workspaceId"
+      :initial-tab="initialSettingsTab" />
 
     <!-- 追问问题对话框 -->
     <FollowupQuestionDialog v-model:visible="showFollowupDialog" :question="followupData.question"
@@ -377,6 +363,7 @@ const fetchFileContent = async (node: { path: string; name: string; is_directory
 };
 
 const handleOpenFile = async (fileInfo: { path: string; name: string; is_directory?: boolean }) => {
+
   // 检查文件是否已经打开
   const existingFile = openFiles.value.find(f => f.id === fileInfo.path);
 
@@ -529,7 +516,7 @@ onUnmounted(() => {
 const fileContentAreaRef = ref<unknown>(null)
 
 const handleTaskCompleteRefresh = async (event: Event) => {
-  const customEvent = event as CustomEvent<{workspaceId: string; taskNodeId: string}>
+  const customEvent = event as CustomEvent<{ workspaceId: string; taskNodeId: string }>
 
   // 只刷新当前工作区的文件
   if (customEvent.detail.workspaceId === chatStore.workspaceId) {
@@ -756,7 +743,8 @@ async function handleFollowupResponse(toolCallId: string, response: string) {
   display: flex;
   flex-direction: column;
   background: #ffffff !important;
-  padding: 0 !important; /* 移除内边距 */
+  padding: 0 !important;
+  /* 移除内边距 */
 }
 
 /* 平滑滚动 */

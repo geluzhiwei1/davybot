@@ -110,7 +110,7 @@ async def _extract_memories_from_conversation(agent: Agent) -> list[MemoryEntry]
 
         # Format messages for LLM
         messages_text = "\n".join(
-            [f"{msg.role.value}: {msg.content}" for msg in recent_messages if hasattr(msg, "content") and msg.content],
+            [f"{str(msg.role)}: {msg.content}" for msg in recent_messages if hasattr(msg, "content") and msg.content],
         )
 
         if not messages_text.strip():

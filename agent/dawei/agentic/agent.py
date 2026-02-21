@@ -540,7 +540,7 @@ class Agent:
         recent_messages = messages[-10:]  # 最多取最近10条
 
         # 格式化为文本
-        messages_text = "\n".join([f"{msg.role.value}: {msg.content[:500] if hasattr(msg, 'content') and msg.content else ''}" for msg in recent_messages if hasattr(msg, "content") and msg.content])
+        messages_text = "\n".join([f"{str(msg.role)}: {msg.content[:500] if hasattr(msg, 'content') and msg.content else ''}" for msg in recent_messages if hasattr(msg, "content") and msg.content])
 
         if not messages_text.strip():
             return
@@ -673,7 +673,7 @@ class Agent:
                 continue
 
             content = msg.content
-            if msg.role.value != "user":
+            if str(msg.role) != "user":
                 continue
 
             for pattern, (subject, predicate, mem_type) in patterns.items():

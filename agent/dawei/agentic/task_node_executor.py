@@ -349,6 +349,13 @@ class TaskNodeExecutionEngine:
             处理结果
 
         """
+        # 🔧 FIX: 检查是否用户请求停止（在处理消息前）
+        if self._agent and self._agent.is_stop_requested():
+            self.logger.info(
+                f"Task {self.task_node.task_node_id} stop requested, raising CancelledError to interrupt LLM",
+            )
+            raise asyncio.CancelledError("Stop requested by user")
+
         # 根据任务类型动态计算超时
         llm_timeout, tool_execution_timeout = self._get_timeout_for_task(
             llm_timeout=llm_timeout,
@@ -418,6 +425,13 @@ class TaskNodeExecutionEngine:
 
         async def stream_callback(stream_message: StreamMessages) -> None:
             """流式回调函数，处理工具消息和事件转换"""
+            # 🔧 FIX: 在每个流式消息处理时检查停止标志
+            if self._agent and self._agent.is_stop_requested():
+                self.logger.info(
+                    f"Task {self.task_node.task_node_id} stop requested during streaming, raising CancelledError",
+                )
+                raise asyncio.CancelledError("Stop requested by user during streaming")
+
             await self.stream_message_to_event(stream_message)
             if isinstance(stream_message, CompleteMessage):
                 # 工具执行使用独立的超时控制
@@ -487,6 +501,13 @@ class TaskNodeExecutionEngine:
                     },
                 )
             raise
+
+        except asyncio.CancelledError:
+            # 🔧 FIX: 用户请求停止 - 正常的停止流程,不是错误
+            self.logger.info(f"Task {self.task_node.task_node_id} was cancelled due to stop request")
+            # 设置任务状态为ABORTED
+            self.task_node.update_status(TaskStatus.ABORTED)
+            raise  # 重新抛出以让上层处理
 
         finally:
             # 保存 checkpoint
@@ -754,6 +775,14 @@ class TaskNodeExecutionEngine:
                 )
                 break
 
+            # 🔧 FIX: 检查是否用户请求停止
+            if self._agent and self._agent.is_stop_requested():
+                self.logger.info(
+                    f"Task {self.task_node.task_node_id} stop requested by user, setting status to ABORTED",
+                )
+                self.task_node.update_status(TaskStatus.ABORTED)
+                break
+
             await self.process_message()
 
             if not await self._should_continue_execution():
@@ -832,9 +861,7 @@ class TaskNodeExecutionEngine:
                             return False  # 已经调用了attempt_completion，不再继续
 
                 elif hasattr(msg, "role"):  # 是个assistant，但是没有tool call
-                    role_value = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
-
-                    if role_value in [MessageRole.ASSISTANT]:
+                    if str(msg.role) == str(MessageRole.ASSISTANT):
                         # should complete ?
                         return False
             return True

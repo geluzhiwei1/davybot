@@ -381,8 +381,9 @@ class ChatHandler(AsyncMessageHandler):
         """
         conversation_id = user_message.metadata.get("conversationId")
         if not conversation_id:
-            logger.info("[CHAT_HANDLER] No conversationId provided, creating new conversation")
-            # 创建新会话
+            if user_workspace.current_conversation:
+                return
+
             from dawei.conversation.conversation import Conversation
 
             user_workspace.current_conversation = Conversation()
@@ -407,13 +408,18 @@ class ChatHandler(AsyncMessageHandler):
                 user_workspace.current_conversation = conversation
                 logger.info(f"[CHAT_HANDLER] Successfully loaded conversation {conversation_id}")
             else:
-                logger.warning(
-                    f"[CHAT_HANDLER] Conversation {conversation_id} not found, creating new one",
-                )
-                # 创建新会话
-                from dawei.conversation.conversation import Conversation
+                # 🔧 修复：会话找不到时，优先复用current_conversation
+                if user_workspace.current_conversation:
+                    logger.warning(
+                        f"[CHAT_HANDLER] Conversation {conversation_id} not found, reusing current conversation: {user_workspace.current_conversation.id}",
+                    )
+                else:
+                    logger.warning(
+                        f"[CHAT_HANDLER] Conversation {conversation_id} not found and no current conversation, creating new one",
+                    )
+                    from dawei.conversation.conversation import Conversation
 
-                user_workspace.current_conversation = Conversation()
+                    user_workspace.current_conversation = Conversation()
 
         except FileNotFoundError as e:
             logger.error(f"[CHAT_HANDLER] Conversation history not found: {e}", exc_info=True)
