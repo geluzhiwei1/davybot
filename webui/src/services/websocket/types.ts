@@ -246,6 +246,7 @@ export interface AgentCompletePayload {
   total_duration_ms: number
   tasks_completed: number
   tools_used: string[]
+  conversation_id?: string  // 会话ID（用于新建会话时返回给前端）
   metadata?: Record<string, unknown>
 }
 

@@ -230,10 +230,10 @@ export const useChatStore = defineStore('chat', () => {
     }
     messageStore.addMessage(userMessage, workspaceStore.currentWorkspaceId)
 
-        logger.debug('isThinking.value BEFORE:', isThinking.value)
+    logger.debug('isThinking.value BEFORE:', isThinking.value)
     agentStore.setThinking(true)
     logger.debug('isThinking.value AFTER:', isThinking.value)
-        messageStore.setThinking('')
+    messageStore.setThinking('')
     messageStore.clearStreamingContent()
 
     // 构建metadata
@@ -492,9 +492,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const handleConnect = (message: WebSocketMessage) => {
-    
+
     if (message.type !== MessageType.CONNECT) {
-            return
+      return
     }
 
     const connectMessage = message as unknown
@@ -505,14 +505,14 @@ export const useChatStore = defineStore('chat', () => {
       const error = new Error('[handleConnect] ❌ FATAL: CONNECT message missing session_id')
       logger.error('[ConnectionStore] Error:', error.message)
       logger.error('[handleConnect] 🔍 Full message for diagnosis:', connectMessage)
-            throw error  // ← FastFail: 立即失败
+      throw error  // ← FastFail: 立即失败
     }
 
     const workspaceId = workspaceStore.currentWorkspaceId
     if (!workspaceId) {
       const error = new Error('[handleConnect] ❌ FATAL: No current workspace_id in workspaceStore')
       logger.error('[ConnectionStore] Error:', error.message)
-            throw error  // ← FastFail: 立即失败
+      throw error  // ← FastFail: 立即失败
     }
 
     // ✅ 同步客户端的 session_id（关键步骤）
@@ -522,7 +522,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!wsClient) {
         const error = new Error(`[handleConnect] ❌ FATAL: No WebSocket client found for workspace: ${workspaceId}`)
         logger.error('[ConnectionStore] Error:', error.message)
-                throw error  // ← FastFail: 立即失败
+        throw error  // ← FastFail: 立即失败
       }
 
       const frontendSessionId = wsClient._sessionId?.value
@@ -564,10 +564,10 @@ export const useChatStore = defineStore('chat', () => {
     } catch (syncError) {
       const error = new Error(`[handleConnect] ❌ FATAL: Failed to sync session_id: ${syncError.message}`)
       logger.error('[ConnectionStore] Error:', error.message, syncError)
-            throw error  // ← FastFail: session_id 同步失败，立即终止
+      throw error  // ← FastFail: session_id 同步失败，立即终止
     }
 
-      }
+  }
 
   const handleStreamReasoning = (message: WebSocketMessage) => {
     if (message.type !== MessageType.STREAM_REASONING) return
@@ -595,19 +595,22 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
-    let chatMessage = messageStore.getMessageById(messageId)
+    const reasoningBubbleId = `${messageId}_reasoning`
+
+    let chatMessage = messageStore.getMessageById(reasoningBubbleId)
 
     if (!chatMessage) {
       chatMessage = {
-        id: messageId,
+        id: reasoningBubbleId,
         role: MessageRole.ASSISTANT,
         timestamp: new Date().toISOString(),
         content: [],
         taskId: taskId,
-        sessionId: reasoningMessage.session_id,  // 添加 session_id
+        sessionId: reasoningMessage.session_id,
+        messageId: messageId,  // 保存原始的LLM message_id
       }
       messageStore.addMessage(chatMessage)
-      logger.debug(`[CHAT_STORE] Created new message for stream reasoning: messageId=${messageId}, taskId=${taskId}`)
+      logger.debug(`[CHAT_STORE] Created reasoning bubble: ${reasoningBubbleId}, messageId=${messageId}`)
     }
 
     const reasoningBlock = chatMessage.content.find(
@@ -626,7 +629,7 @@ export const useChatStore = defineStore('chat', () => {
           ? { ...block, reasoning: newReasoning }
           : block
       )
-      messageStore.updateMessage(messageId, { content: newContent })
+      messageStore.updateMessage(reasoningBubbleId, { content: newContent })
     } else {
       // 只有当内容非空时才创建推理块
       const trimmedContent = content.trim()
@@ -637,7 +640,7 @@ export const useChatStore = defineStore('chat', () => {
           type: ContentType.REASONING,
           reasoning: content
         }]
-        messageStore.updateMessage(messageId, { content: newContent })
+        messageStore.updateMessage(reasoningBubbleId, { content: newContent })
       }
     }
 
@@ -888,7 +891,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const handleStreamToolCall = (message: WebSocketMessage) => {
-        logger.debug('[handleStreamToolCall] Received message:', message)
+    logger.debug('[handleStreamToolCall] Received message:', message)
     if (message.type !== MessageType.STREAM_TOOL_CALL) {
       logger.warn('[handleStreamToolCall] Message type mismatch:', message.type)
       return
@@ -1034,10 +1037,10 @@ export const useChatStore = defineStore('chat', () => {
     // 触发响应式更新（shallowRef需要手动触发）
     messageStore.triggerMessagesUpdate()
 
-      }
+  }
 
   const handleStreamComplete = async (message: WebSocketMessage) => {
-        logger.debug('isThinking.value BEFORE:', isThinking.value)
+    logger.debug('isThinking.value BEFORE:', isThinking.value)
     logger.debug('收到 stream_complete 消息:', message)
     if (message.type !== MessageType.STREAM_COMPLETE) return
     const completeMessage = message as unknown
@@ -1189,7 +1192,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     logger.debug('✅ stream_complete 处理完成')
-      }
+  }
 
   const handleToolCallStart = (message: WebSocketMessage) => {
     if (message.type !== MessageType.TOOL_CALL_START) return
@@ -1371,7 +1374,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const handleFollowupQuestion = (message: WebSocketMessage) => {
-        logger.debug('收到追问问题消息:', message)
+    logger.debug('收到追问问题消息:', message)
     window.dispatchEvent(new CustomEvent('followup-question', {
       detail: message
     }))

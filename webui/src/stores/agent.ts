@@ -168,7 +168,12 @@ export const useAgentStore = defineStore('agent', () => {
   }
 
   /**
-   * 停止Agent
+   * 停止Agent（仅更新本地状态，不发送消息）
+   *
+   * ⚠️ WARNING: 此方法只更新本地状态，不会向后端发送停止信号！
+   * 如果需要停止后端Agent，请使用 stopAgentAsync() 方法。
+   *
+   * @deprecated 建议使用 stopAgentAsync() 以确保前后端状态同步
    */
   const stopAgent = (): void => {
     const workspaceId = getCurrentWorkspaceId()

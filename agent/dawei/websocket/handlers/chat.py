@@ -381,7 +381,14 @@ class ChatHandler(AsyncMessageHandler):
         """
         conversation_id = user_message.metadata.get("conversationId")
         if not conversation_id:
-            logger.info("[CHAT_HANDLER] No conversationId provided, will create new conversation")
+            logger.info("[CHAT_HANDLER] No conversationId provided, creating new conversation")
+            # 创建新会话
+            from dawei.conversation.conversation import Conversation
+
+            user_workspace.current_conversation = Conversation()
+            logger.info(
+                f"[CHAT_HANDLER] Created new conversation with ID: {user_workspace.current_conversation.id}"
+            )
             return
 
         logger.info(f"[CHAT_HANDLER] Loading existing conversation: {conversation_id}")
@@ -401,8 +408,12 @@ class ChatHandler(AsyncMessageHandler):
                 logger.info(f"[CHAT_HANDLER] Successfully loaded conversation {conversation_id}")
             else:
                 logger.warning(
-                    f"[CHAT_HANDLER] Conversation {conversation_id} not found, will create new one",
+                    f"[CHAT_HANDLER] Conversation {conversation_id} not found, creating new one",
                 )
+                # 创建新会话
+                from dawei.conversation.conversation import Conversation
+
+                user_workspace.current_conversation = Conversation()
 
         except FileNotFoundError as e:
             logger.error(f"[CHAT_HANDLER] Conversation history not found: {e}", exc_info=True)
@@ -1422,7 +1433,7 @@ class ChatHandler(AsyncMessageHandler):
             self._active_agents[task_id] = agent
 
             # 9. 设置事件转发
-            await self._setup_event_forwarding(agent, session_id, task_id)
+            await self._setup_event_forwarding(agent, session_id, task_id, user_workspace)
 
             # 10. 启动任务
             await self.update_session_data(session_id, data={"current_task_id": task_id})
@@ -1455,8 +1466,15 @@ class ChatHandler(AsyncMessageHandler):
             # 清理资源
             await self._cleanup_agent_task(session_id, task_id, user_workspace, agent)
 
-    async def _setup_event_forwarding(self, agent: Agent, session_id: str, task_id: str):
-        """为 Agent 设置事件监听器，将任务事件转发到 WebSocket 客户端。"""
+    async def _setup_event_forwarding(self, agent: Agent, session_id: str, task_id: str, user_workspace: UserWorkspace):
+        """为 Agent 设置事件监听器，将任务事件转发到 WebSocket 客户端。
+
+        Args:
+            agent: Agent 实例
+            session_id: WebSocket 会话ID
+            task_id: 任务ID
+            user_workspace: 用户工作区（用于获取 conversation_id）
+        """
         # LLM API 状态追踪
         llm_api_active = False
         current_llm_provider = None
@@ -1522,6 +1540,12 @@ class ChatHandler(AsyncMessageHandler):
                     # 使用默认60秒作为任务执行时间
                     total_duration_ms = 60000  # 默认60秒
 
+                    # 获取当前会话ID（如果存在）
+                    conversation_id = None
+                    if user_workspace and user_workspace.current_conversation:
+                        conversation_id = user_workspace.current_conversation.id
+                        logger.info(f"[CHAT_HANDLER] Including conversation_id in AGENT_COMPLETE: {conversation_id}")
+
                     agent_complete_message = AgentCompleteMessage(
                         session_id=session_id,
                         task_id=task_id,
@@ -1529,6 +1553,7 @@ class ChatHandler(AsyncMessageHandler):
                         total_duration_ms=total_duration_ms,
                         tasks_completed=1,  # 可以从实际统计数据中获取
                         tools_used=[],  # 可以从实际统计数据中获取
+                        conversation_id=conversation_id,
                         metadata={},
                     )
                     await self.send_message(session_id, agent_complete_message)

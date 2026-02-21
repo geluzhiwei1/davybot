@@ -329,14 +329,11 @@ class TaskGraphExecutionEngine:
                         f"Task {task_node_id} timeout on attempt {attempt + 1}/{max_retries + 1}, retrying in {delay:.1f}s...",
                     )
 
-                    # 等待后重试，使用更长的超时
                     await asyncio.sleep(delay)
 
                     # 重新创建executor以避免状态污染
                     executor = self._get_or_create_executor(current_task, task_node_id)
 
-                    # 下次重试时使用更长的超时时间（1.5倍递增）
-                    # 注意：这里需要将超时信息传递给executor
                     continue
                 # 重试次数用尽，记录错误并返回失败状态
                 self.logger.exception(
@@ -344,9 +341,9 @@ class TaskGraphExecutionEngine:
                 )
                 return TaskStatus.FAILED
 
-            except (TimeoutError, OSError, RuntimeError):
-                # 其他错误不重试，直接抛出
+            except (TimeoutError, OSError, RuntimeError) as e:
                 self.logger.exception(f"Task {task_node_id} encountered unexpected error: ")
+                await self._emit_error_event(task_node_id, e, "unexpected error")
                 raise
 
         # 🔧 修复：不管当前状态如何，都要检查是否有子任务或子图需要处理
@@ -437,6 +434,56 @@ class TaskGraphExecutionEngine:
         await self._update_task_status(task_node_id, TaskStatus.ABORTED)
         raise  # 重新抛出让上层处理
 
+    async def _emit_error_event(
+        self,
+        task_node_id: str,
+        error: Exception,
+        error_category: str = "error",
+    ):
+        """发送错误事件到前端
+
+        Args:
+            task_node_id: 任务节点ID
+            error: 异常对象
+            error_category: 错误分类描述
+
+        """
+        from dawei.core.events import TaskEventType, emit_typed_event
+
+        error_message = str(error)
+        error_class = type(error).__name__
+
+        # 针对特定错误类型提供更友好的错误消息
+        user_friendly_message = error_message
+        if "Cannot connect to host" in error_message or "Network is unreachable" in error_message:
+            user_friendly_message = "无法连接到LLM服务，请检查网络连接和API配置。"
+        elif "429" in error_message or "insufficient balance" in error_message:
+            user_friendly_message = "LLM API账户余额不足或调用次数超限。"
+        elif "500" in error_message:
+            user_friendly_message = "LLM服务暂时不可用，请稍后重试。"
+        elif "timeout" in error_message.lower():
+            user_friendly_message = "请求超时，请检查网络连接或稍后重试。"
+
+        # 构建错误事件数据
+        error_data = {
+            "error_type": error_class,
+            "message": user_friendly_message,
+            "details": {
+                "task_node_id": task_node_id,
+                "original_error": error_message,
+                "error_category": error_category,
+            },
+        }
+
+        # 发送错误事件
+        await emit_typed_event(
+            TaskEventType.ERROR_OCCURRED,
+            error_data,
+            self._event_bus,
+            task_id=task_node_id,
+            source="task_graph_executor",
+        )
+
     async def _handle_task_error(
         self,
         task_node_id: str,
@@ -458,6 +505,10 @@ class TaskGraphExecutionEngine:
             f"{error_type.capitalize()} executing task {task_node_id}: {error}",
             exc_info=True,
         )
+
+        # 发送错误事件到前端
+        await self._emit_error_event(task_node_id, error, error_type)
+
         await self._update_task_status(task_node_id, TaskStatus.FAILED)
         return TaskStatus.FAILED
 

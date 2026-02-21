@@ -698,20 +698,6 @@ class OpenAICompatibleParser(StreamChunkParser):
                     ),
                 )
 
-                # 【关键修复】如果还没有content，也创建ContentMessage以确保assistant气泡能显示
-                # 这是为了处理GLM等模型将所有文本放在reasoning_content中的情况
-                if not self.content:
-                    self.content += reasoning_delta
-                    messages.append(
-                        ContentMessage(
-                            user_message_id=local_context.get_message_id(),
-                            content=reasoning_delta,
-                            id=chunk_id,
-                            created=chunk_created,
-                            object=chunk_object,
-                            model=chunk_model,
-                        ),
-                    )
             # 记录被过滤的空推理内容（便于调试）
             elif reasoning_delta:
                 logger.debug(f"Filtered empty reasoning content: {reasoning_delta!r}")

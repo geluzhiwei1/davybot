@@ -461,7 +461,7 @@ class WorkspacePersistenceManager:
     def _get_resource_dir(self, resource_type: ResourceType) -> Path:
         """获取资源类型对应的目录"""
         dir_map = {
-            ResourceType.CONVERSATION: self.sessions_dir,  # 使用全局 sessions 目录
+            ResourceType.CONVERSATION: self.conversations_dir,  # 使用工作区 conversations 目录
             ResourceType.TASK_GRAPH: self.task_graphs_dir,
             ResourceType.TASK_NODE: self.task_nodes_dir,
             ResourceType.CHECKPOINT: self.checkpoints_dir,  # 使用全局 checkpoints 目录

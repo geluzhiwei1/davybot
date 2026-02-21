@@ -64,8 +64,14 @@ def load_conversation_file(file_path: Path) -> dict[str, Any]:
 
 
 @router.get("")
-async def get_workspace_conversations(workspace_id: str):
-    """Get conversations from a workspace."""
+async def get_workspace_conversations(
+    workspace_id: str,
+    page: int = 1,
+    limit: int = 50,
+    sortBy: str = "updatedAt",
+    sortOrder: str = "desc",
+):
+    """Get conversations from a workspace with pagination support."""
     chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
 
     conversation_files = list(chat_history_dir.glob("*.json"))
@@ -76,7 +82,18 @@ async def get_workspace_conversations(workspace_id: str):
         if conversation:
             conversations.append(conversation)
 
-    conversations.sort(key=lambda x: x["lastUpdated"], reverse=True)
+    # Sort conversations
+    reverse_order = sortOrder == "desc"
+    conversations.sort(key=lambda x: x["lastUpdated"], reverse=reverse_order)
+
+    # Pagination
+    total = len(conversations)
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+
+    # Apply pagination
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    paginated_conversations = conversations[start_idx:end_idx]
 
     workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
     workspace_name = workspace_info.get("name") if workspace_info else "default"
@@ -84,8 +101,11 @@ async def get_workspace_conversations(workspace_id: str):
     return {
         "success": True,
         "workspace_name": workspace_name,
-        "conversations": conversations,
-        "count": len(conversations),
+        "conversations": paginated_conversations,
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "totalPages": total_pages,
     }
 
 

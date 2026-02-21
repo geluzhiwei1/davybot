@@ -1072,6 +1072,7 @@ class AgentCompleteMessage(BaseWebSocketMessage):
     total_duration_ms: int = Field(..., description="总耗时（毫秒）")
     tasks_completed: int = Field(0, description="完成任务数")
     tools_used: list[str] = Field(default_factory=list, description="使用的工具列表")
+    conversation_id: str | None = Field(None, description="会话ID（用于新建会话时返回给前端）")
     metadata: dict[str, Any] | None = Field(None, description="其他元数据")
 
     def to_dict(self) -> dict[str, Any]:

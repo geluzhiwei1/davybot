@@ -104,11 +104,14 @@ const handleStopAgent = async () => {
   const activeTasks = parallelTasksStore.activeTasks
 
   if (activeTasks.length === 0) {
-    if (agentStatus.value.isActive) {
+    if (agentStatus.value.isActive && currentTaskId.value) {
+      await chatStore.stopAgent(currentTaskId.value)
+    } else if (agentStatus.value.isActive) {
+      console.warn('[UserOperationArea] Agent处于活跃状态但没有taskId，强制清理状态')
       agentStore.stopAgent()
       parallelTasksStore.clearAllTasks()
     } else {
-      console.warn('没有活跃任务可停止')
+      console.warn('[UserOperationArea] 没有活跃任务可停止')
     }
     return
   }
