@@ -151,7 +151,6 @@ export const useChatStore = defineStore('chat', () => {
   const initializeConnection = () => {
     // 防止重复初始化
     if (isConnectionInitialized) {
-      logger.debug('[CHAT_STORE] Connection already initialized, skipping')
       return
     }
     isConnectionInitialized = true
@@ -163,6 +162,7 @@ export const useChatStore = defineStore('chat', () => {
       [MessageType.ASSISTANT_MESSAGE]: handleAssistantMessage,
       [MessageType.SYSTEM_MESSAGE]: handleSystemMessage,
       [MessageType.CONNECT]: handleConnect,
+      [MessageType.CONVERSATION_INFO]: handleConversationInfo,
 
       // 任务节点管理
       [MessageType.TASK_NODE_START]: taskStore.handleTaskNodeStart,
@@ -230,9 +230,7 @@ export const useChatStore = defineStore('chat', () => {
     }
     messageStore.addMessage(userMessage, workspaceStore.currentWorkspaceId)
 
-    logger.debug('isThinking.value BEFORE:', isThinking.value)
     agentStore.setThinking(true)
-    logger.debug('isThinking.value AFTER:', isThinking.value)
     messageStore.setThinking('')
     messageStore.clearStreamingContent()
 
@@ -287,9 +285,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     try {
-      logger.debug('[CHAT_STORE] Sending WebSocket message:', message)
       await connectionStore.send(message)
-      logger.debug('[CHAT_STORE] Message sent successfully')
     } catch (error) {
       logger.error('[CHAT_STORE] Failed to send WebSocket message:', error)
       throw error
@@ -1061,25 +1057,19 @@ export const useChatStore = defineStore('chat', () => {
       }
     }
 
-    // 处理临时会话转正
-    if (completeMessage.conversation_id && isTempConversation.value) {
-      logger.debug(`[CHAT_STORE] 收到后端创建的新会话ID: ${completeMessage.conversation_id}`)
-      logger.debug(`[CHAT_STORE] 之前的临时会话ID: ${currentConversationId.value}`)
+    // 🔥 处理 conversation_id 更新(来自 STREAM_COMPLETE)
+    // 注意: 主要的 conversation_id 更新来自 CONVERSATION_INFO 消息
+    // 这里只是作为双重保障
+    if (completeMessage.conversation_id && currentConversationId.value !== completeMessage.conversation_id) {
+      logger.debug(`[CHAT_STORE] STREAM_COMPLETE: 更新 conversation_id: ${currentConversationId.value} -> ${completeMessage.conversation_id}`)
 
-      if (typeof window !== 'undefined' && (window as unknown).updateTempConversation) {
-        (window as unknown).updateTempConversation(currentConversationId.value, completeMessage.conversation_id)
-      }
-
-      // 更新 workspaceStore 的会话状态
       const workspaceStore = useWorkspaceStore()
       workspaceStore.setConversation(completeMessage.conversation_id)
 
-      // 重新加载会话列表以包含新创建的会话
+      // 重新加载会话列表
       if (workspaceId.value) {
         await workspaceStore.loadConversations(workspaceId.value)
       }
-
-      logger.debug(`[CHAT_STORE] 临时会话已转正为: ${completeMessage.conversation_id}`)
     }
 
     // 刷新缓冲区
@@ -1564,9 +1554,20 @@ export const useChatStore = defineStore('chat', () => {
     if (message.type !== MessageType.TASK_NODE_PROGRESS) return
     const progressMessage = message as unknown
 
-    // ✅ 任务进度不在对话框中显示，由状态栏通过 parallelTasks store 自动处理
-    // 进度信息已通过 globalRouter 的 handleTaskNodeProgress 处理
-    // ServerStatusIndicator 组件会监听并显示在状态栏
+  }
+
+  /**
+   * 处理会话信息消息 - 更新conversation_id
+   */
+  const handleConversationInfo = (message: WebSocketMessage) => {
+    if (message.type !== MessageType.CONVERSATION_INFO) return
+    const convInfoMessage = message as ConversationInfoMessage
+
+    // 立即更新 currentConversationId
+    const workspaceStore = useWorkspaceStore()
+    if (workspaceStore.currentConversationId !== convInfoMessage.conversation_id) {
+      workspaceStore.setConversation(convInfoMessage.conversation_id)
+    }
   }
 
   const handleError = (message: WebSocketMessage) => {

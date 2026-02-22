@@ -53,6 +53,7 @@ class MessageType(StrEnum):
     USER_MESSAGE = "user_message"
     ASSISTANT_MESSAGE = "assistant_message"
     SYSTEM_MESSAGE = "system_message"
+    CONVERSATION_INFO = "conversation_info"  # 会话信息(包含conversation_id)
 
     # ==================== 任务节点管理（Task Graph级别）====================
     TASK_NODE_START = "task_node_start"  # 任务节点开始执行
@@ -298,6 +299,24 @@ class SystemWebSocketMessage(BaseWebSocketMessage):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SystemWebSocketMessage":
+        """从字典创建实例"""
+        return cls(**data)
+
+
+class ConversationInfoMessage(BaseWebSocketMessage):
+    """会话信息消息,用于向前端同步conversation_id"""
+
+    type: MessageType = MessageType.CONVERSATION_INFO
+    conversation_id: str = Field(..., description="会话ID")
+    title: str | None = Field(None, description="会话标题")
+    created_at: str | None = Field(None, description="创建时间(ISO格式)")
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return self.to_websocket_format()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ConversationInfoMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -567,6 +586,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
     finish_reason: str | None = Field(None, description="完成原因")
     usage: dict[str, Any] | None = Field(None, description="使用统计")
     user_message_id: str | None = Field(None, description="用户消息ID")
+    conversation_id: str | None = Field(None, description="会话ID")
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
@@ -600,6 +620,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
             finish_reason=data.get("finish_reason"),
             usage=data.get("usage"),
             user_message_id=data.get("user_message_id"),
+            conversation_id=data.get("conversation_id"),
         )
 
     @classmethod
@@ -608,6 +629,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
         stream_msg: CompleteMessage,
         session_id: str,
         task_id: str,
+        conversation_id: str | None = None,
     ) -> "StreamCompleteMessage":
         """从流式消息创建WebSocket消息"""
         return cls(
@@ -620,6 +642,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
             finish_reason=stream_msg.finish_reason,
             usage=stream_msg.usage,
             user_message_id=stream_msg.user_message_id,
+            conversation_id=conversation_id,
         )
 
     @classmethod
@@ -628,6 +651,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
         event_data: dict[str, Any],
         session_id: str,
         task_id: str,
+        conversation_id: str | None = None,
     ) -> "StreamCompleteMessage":
         """从事件数据创建消息"""
         return cls(
@@ -640,6 +664,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
             tool_calls=[],  # Tool calls handled separately
             finish_reason=event_data.get("finish_reason"),
             usage=event_data.get("usage"),
+            conversation_id=conversation_id,
         )
 
 
@@ -1504,6 +1529,8 @@ WebSocketMessage = Union[
     ModeSwitchedMessage,
     # 上下文管理（
     ContextUpdateMessage,
+    # 会话信息
+    ConversationInfoMessage,
     # PDCA 循环管理
     PDACycleStartMessage,
     PDCAStatusUpdateMessage,
@@ -1558,6 +1585,7 @@ class MessageValidator:
         MessageType.USER_MESSAGE: UserWebSocketMessage,
         MessageType.ASSISTANT_MESSAGE: AssistantWebSocketMessage,
         MessageType.SYSTEM_MESSAGE: SystemWebSocketMessage,
+        MessageType.CONVERSATION_INFO: ConversationInfoMessage,
         # 任务节点管理
         MessageType.TASK_NODE_START: TaskNodeStartMessage,
         MessageType.TASK_NODE_PROGRESS: TaskNodeProgressMessage,

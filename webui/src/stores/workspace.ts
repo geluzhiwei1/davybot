@@ -170,7 +170,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       conversationList.value = response.conversations || response.items || []
 
       // 如果有会话列表且当前没有选中会话，自动选择最近的一次对话
-      if (conversationList.value.length > 0) {
+      if (conversationList.value.length > 0 && !currentConversationId.value) {
         const sortedConversations = [...conversationList.value].sort((a, b) => {
           const dateA = new Date(a.updated_at || a.created_at || 0)
           const dateB = new Date(b.updated_at || b.created_at || 0)

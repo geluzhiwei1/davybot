@@ -25,6 +25,7 @@ export enum MessageType {
   USER_MESSAGE = 'user_message',
   ASSISTANT_MESSAGE = 'assistant_message',
   SYSTEM_MESSAGE = 'system_message',
+  CONVERSATION_INFO = 'conversation_info',
 
   // 任务节点管理
   TASK_NODE_START = 'task_node_start',
@@ -135,6 +136,14 @@ export interface AssistantMessage extends BaseMessage {
     thinking?: unknown[];
     toolCalls?: unknown[];
   };
+}
+
+// 会话信息消息
+export interface ConversationInfoMessage extends BaseMessage {
+  type: MessageType.CONVERSATION_INFO;
+  conversation_id: string;
+  title?: string;
+  created_at?: string;
 }
 
 // 工具调用
@@ -273,6 +282,7 @@ export type WebSocketMessage =
   | HeartbeatMessage
   | UserMessage
   | AssistantMessage
+  | ConversationInfoMessage
   // 任务节点管理
   | TaskNodeStartMessage
   | TaskNodeProgressMessage

@@ -21,6 +21,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 
+def _auto_detect_workspace_id(workspace_id: str | None, caller_name: str = "API") -> str | None:
+    """自动检测活跃的工作区ID（如果未提供）
+
+    Args:
+        workspace_id: 用户提供的 workspace_id（可能为 None）
+        caller_name: 调用者名称（用于日志）
+
+    Returns:
+        检测到的 workspace_id 或原始值
+
+    """
+    if not workspace_id:
+        active_workspace = workspace_manager.get_active_workspace()
+        if active_workspace:
+            detected_id = active_workspace.get("id")
+            logger.info(f"[SKILLS API] {caller_name}: Auto-detected active workspace: {detected_id}")
+            return detected_id
+    return workspace_id
+
+
 class SkillResponse(BaseModel):
     """技能响应模型"""
 
@@ -81,7 +101,10 @@ async def list_skills(
         dawei_home = Path(get_dawei_home())
         skills_roots = [dawei_home]
 
-        # 如果提供了workspace_id，尝试获取工作区路径
+        # 自动检测 workspace_id（如果未提供）
+        workspace_id = _auto_detect_workspace_id(workspace_id, "list_skills")
+
+        # 如果提供了workspace_id（或自动检测到），尝试获取工作区路径
         if workspace_id:
             workspace_path = None
 
@@ -179,7 +202,10 @@ async def search_skills(
         # 构建skills_roots，始终包含全局user目录（与list_skills保持一致）
         skills_roots = [Path(get_dawei_home())]  # 全局user目录 (DAWEI_HOME)
 
-        # 如果提供了workspace_id，从workspace_manager获取workspace路径
+        # 自动检测 workspace_id（如果未提供）
+        workspace_id = _auto_detect_workspace_id(workspace_id, "search_skills")
+
+        # 如果提供了workspace_id（或自动检测到），从workspace_manager获取workspace路径
         if workspace_id:
             workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
 
@@ -254,7 +280,10 @@ async def get_skill(
         # 构建skills_roots，始终包含全局user目录（与list_skills保持一致）
         skills_roots = [Path(get_dawei_home())]  # 全局user目录 (DAWEI_HOME)
 
-        # 如果提供了workspace_id，从workspace_manager获取workspace路径
+        # 自动检测 workspace_id（如果未提供）
+        workspace_id = _auto_detect_workspace_id(workspace_id, "get_skill")
+
+        # 如果提供了workspace_id（或自动检测到），从workspace_manager获取workspace路径
         if workspace_id:
             workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
 
@@ -563,6 +592,9 @@ async def get_skill_content(
     try:
         # 构建skills_roots
         skills_roots = [Path(get_dawei_home())]
+
+        # 自动检测 workspace_id（如果未提供）
+        workspace_id = _auto_detect_workspace_id(workspace_id, "get_skill_content")
 
         if workspace_id:
             workspace_info = workspace_manager.get_workspace_by_id(workspace_id)

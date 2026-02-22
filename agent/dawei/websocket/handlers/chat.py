@@ -341,7 +341,6 @@ class ChatHandler(AsyncMessageHandler):
         from dawei.entity.system_info import UserUIContext
 
         ui_context_data = user_message.user_ui_context
-        logger.info(f"[CHAT_HANDLER] Updating user_ui_context with: {ui_context_data}")
 
         try:
             # 创建UserUIContext对象
@@ -354,7 +353,6 @@ class ChatHandler(AsyncMessageHandler):
             await user_workspace.persistence_manager.save_workspace_settings(
                 user_workspace.workspace_info.to_dict(),
             )
-            logger.info("[CHAT_HANDLER] Successfully updated and persisted user_ui_context")
 
         except ValueError as e:
             logger.error(f"[CHAT_HANDLER] Invalid UI context data: {e}", exc_info=True)
@@ -392,7 +390,6 @@ class ChatHandler(AsyncMessageHandler):
             )
             return
 
-        logger.info(f"[CHAT_HANDLER] Loading existing conversation: {conversation_id}")
 
         try:
             # 尝试从历史记录中加载会话
@@ -406,10 +403,17 @@ class ChatHandler(AsyncMessageHandler):
             conversation = await conv_manager.get_by_id(conversation_id)
             if conversation:
                 user_workspace.current_conversation = conversation
-                logger.info(f"[CHAT_HANDLER] Successfully loaded conversation {conversation_id}")
             else:
-                # 🔧 修复：会话找不到时，优先复用current_conversation
-                if user_workspace.current_conversation:
+                # 🔧 修复：会话找不到时，检查是否是当前内存中的会话
+                if (
+                    user_workspace.current_conversation
+                    and user_workspace.current_conversation.id == conversation_id
+                ):
+                    # 如果请求的 conversation_id 正好是当前内存中的会话，直接复用
+                    logger.info(
+                        f"[CHAT_HANDLER] Conversation {conversation_id} not found on disk, but matches current in-memory conversation, reusing it"
+                    )
+                elif user_workspace.current_conversation:
                     logger.warning(
                         f"[CHAT_HANDLER] Conversation {conversation_id} not found, reusing current conversation: {user_workspace.current_conversation.id}",
                     )
@@ -442,7 +446,6 @@ class ChatHandler(AsyncMessageHandler):
 
         """
         try:
-            logger.info(f"[CHAT_HANDLER] Starting agent creation for workspace: {user_workspace.workspace_info.id}")
             agent = await Agent.create_with_default_engine(user_workspace)
             logger.info("[CHAT_HANDLER] Agent created successfully, now initializing...")
             await agent.initialize()
@@ -889,7 +892,6 @@ class ChatHandler(AsyncMessageHandler):
             return
 
         current_llm_id = user_workspace.workspace_info.user_ui_context.current_llm_id
-        logger.info(f"[CHAT_HANDLER] Setting LLM to user selection: {current_llm_id}")
 
         # 获取 LLMProvider 并设置当前配置
         llm_provider = agent.execution_engine._llm_service
@@ -933,7 +935,7 @@ class ChatHandler(AsyncMessageHandler):
                     logger.info(f"[CHAT_HANDLER] Using default config: {default_config}")
                     llm_provider.set_current_config(default_config)
             else:
-                logger.info(f"[CHAT_HANDLER] ✅ Successfully set LLM config to: {current_llm_id}")
+                pass  # No available configs, skip
         except (ConfigurationError, LLMError, ValueError) as e:
             logger.error(f"[CHAT_HANDLER] Error configuring LLM provider: {e}", exc_info=True)
             # LLM 配置失败不应阻止任务继续
@@ -970,8 +972,6 @@ class ChatHandler(AsyncMessageHandler):
 
             if file_refs:
                 logger.info(f"[CHAT_HANDLER] Detected {len(file_refs)} @ file references (will be processed by Agent)")
-                for ref_path in file_refs:
-                    logger.debug(f"[CHAT_HANDLER] File ref: @{ref_path} (Agent will read if needed)")
 
         # 返回原始消息，保留@指令供Agent处理
         return UserInputMessage(text=original_message)
@@ -1138,7 +1138,6 @@ class ChatHandler(AsyncMessageHandler):
         try:
             if agent and hasattr(agent, "user_workspace") and hasattr(agent.user_workspace, "workspace_info"):
                 workspace_id = agent.user_workspace.workspace_info.id
-                logger.debug(f"[CHAT_HANDLER] Got workspace_id for error: {workspace_id}")
         except Exception as ws_id_error:
             logger.warning(f"[CHAT_HANDLER] Failed to get workspace_id for error: {ws_id_error}")
 
@@ -1250,7 +1249,7 @@ class ChatHandler(AsyncMessageHandler):
             try:
                 save_success = await user_workspace.save_current_conversation()
                 if save_success:
-                    logger.info(
+                    logger.debug(
                         f"[CHAT_HANDLER] Successfully saved conversation {user_workspace.current_conversation.id} in finally block",
                     )
                 else:
@@ -1293,7 +1292,6 @@ class ChatHandler(AsyncMessageHandler):
         task_info = self._task_event_handler_ids.pop(task_id, None)
 
         if not task_info:
-            logger.debug(f"[EVENT_HANDLER] ✅ Task {task_id} handlers already cleaned up or never registered")
             return
 
         # 提取 handler_ids 和 event_bus
@@ -1340,15 +1338,8 @@ class ChatHandler(AsyncMessageHandler):
 
                 if success:
                     removed_count += 1
-                    logger.debug(
-                        f"[EVENT_HANDLER] ✅ Removed handler {handler_id} for event {event_type_value}",
-                    )
                 else:
-                    # 🔧 优化：将 WARNING 降为 DEBUG，因为这是正常情况（可能已被其他路径清理）
                     already_removed_count += 1
-                    logger.debug(
-                        f"[EVENT_HANDLER] ℹ️ Handler {handler_id} for event {event_type_value} was already removed (normal, may be cleaned by other path)",
-                    )
             except ValueError:
                 logger.debug(
                     f"[EVENT_HANDLER] ⚠️ Invalid event type {event_type_value}, skipping cleanup",
@@ -1407,6 +1398,26 @@ class ChatHandler(AsyncMessageHandler):
 
             # 3. 加载或创建会话
             await self._load_or_create_conversation(user_workspace, user_message)
+
+            # 🔥 3.5. 立即发送 conversation_id 给前端
+            if user_workspace.current_conversation:
+                from dawei.websocket.protocol import ConversationInfoMessage
+                # 🔧 FIX: Convert datetime to ISO format string
+                created_at_str = None
+                if user_workspace.current_conversation.created_at:
+                    if isinstance(user_workspace.current_conversation.created_at, str):
+                        created_at_str = user_workspace.current_conversation.created_at
+                    else:
+                        created_at_str = user_workspace.current_conversation.created_at.isoformat()
+
+                conv_info_msg = ConversationInfoMessage(
+                    session_id=session_id,
+                    conversation_id=user_workspace.current_conversation.id,
+                    title=user_workspace.current_conversation.title,
+                    created_at=created_at_str,
+                )
+                await self.send_message(session_id, conv_info_msg)
+                logger.info(f"[CHAT_HANDLER] ✅ Sent CONVERSATION_INFO message: conversation_id={user_workspace.current_conversation.id}")
 
             # 4. 创建和初始化 Agent
             agent = await self._create_and_initialize_agent(user_workspace)
@@ -1521,9 +1532,6 @@ class ChatHandler(AsyncMessageHandler):
                 logger.info(
                     f"[CHAT_HANDLER] 🎯 Received TOOL_CALL_RESULT event: event_id={event.event_id}, task_id={task_id}",
                 )
-                logger.info(f"[CHAT_HANDLER] 🎯 Event data: {event_data}")
-            else:
-                logger.debug(f"任务 {task_id} 事件: {event_type_enum}, 数据: {event_data}")
 
             message_to_send = None
             llm_api_message = None  # 用于 LLM API 状态消息
@@ -1533,7 +1541,7 @@ class ChatHandler(AsyncMessageHandler):
                 if event_type_enum == TaskEventType.TASK_COMPLETED:
                     result_content = event_data.result if hasattr(event_data, "result") and event_data.result else "任务已完成。"
 
-                    logger.info(
+                    logger.debug(
                         f"[CHAT_HANDLER] 📦 任务完成: task_id={task_id}, 发送 AGENT_COMPLETE 消息",
                     )
 
@@ -1550,7 +1558,7 @@ class ChatHandler(AsyncMessageHandler):
                     conversation_id = None
                     if user_workspace and user_workspace.current_conversation:
                         conversation_id = user_workspace.current_conversation.id
-                        logger.info(f"[CHAT_HANDLER] Including conversation_id in AGENT_COMPLETE: {conversation_id}")
+                        logger.debug(f"[CHAT_HANDLER] Including conversation_id in AGENT_COMPLETE: {conversation_id}")
 
                     agent_complete_message = AgentCompleteMessage(
                         session_id=session_id,
@@ -1563,7 +1571,6 @@ class ChatHandler(AsyncMessageHandler):
                         metadata={},
                     )
                     await self.send_message(session_id, agent_complete_message)
-                    logger.info("[CHAT_HANDLER] ✅ AGENT_COMPLETE 消息已发送")
 
                     # 发送任务完成信令
                     message_to_send = TaskNodeCompleteMessage(
@@ -1631,10 +1638,16 @@ class ChatHandler(AsyncMessageHandler):
                 # 处理完成接收事件
                 elif event_type_enum == TaskEventType.COMPLETE_RECEIVED:
                     # event_data 是 CompleteMessage 对象，使用 from_stream_message 方法
+                    # 获取当前会话ID
+                    conv_id = None
+                    if user_workspace and user_workspace.current_conversation:
+                        conv_id = user_workspace.current_conversation.id
+
                     message_to_send = StreamCompleteMessage.from_stream_message(
                         event_data,
                         session_id=session_id,
                         task_id=task_id,
+                        conversation_id=conv_id,
                     )
                     message_to_send.user_message_id = user_message_id
 
@@ -1670,7 +1683,6 @@ class ChatHandler(AsyncMessageHandler):
                                 "workspace_info",
                             ):
                                 workspace_id = agent.user_workspace.workspace_info.id
-                                logger.debug(f"[CHAT_HANDLER] Got workspace_id: {workspace_id}")
                             else:
                                 logger.warning(
                                     "[CHAT_HANDLER] Agent or workspace_info not available for workspace_id",
@@ -1943,9 +1955,6 @@ class ChatHandler(AsyncMessageHandler):
                 if llm_api_message:
                     try:
                         await self.send_message(session_id, llm_api_message)
-                        logger.debug(
-                            f"[CHAT_HANDLER] 📤 Sent LLM API message: {llm_api_message.type}",
-                        )
                     except Exception as e:
                         self.logger.warning(
                             f"Failed to send LLM API message: {e}",
@@ -2000,9 +2009,6 @@ class ChatHandler(AsyncMessageHandler):
             try:
                 handler_id = event_bus.add_handler(event_type, event_handler)
                 handler_ids[event_type.value] = handler_id
-                logger.debug(
-                    f"[EVENT_HANDLER] Registered handler {handler_id} for event {event_type.value} (task: {task_id})",
-                )
             except Exception as e:
                 logger.error(f"订阅事件 {event_type} 时出错: {e}", exc_info=True)
 
@@ -2135,9 +2141,6 @@ class ChatHandler(AsyncMessageHandler):
                 # 发送完消息后清理映射，避免内存泄漏
                 if task_result.task_id in self._task_to_session_map:
                     del self._task_to_session_map[task_result.task_id]
-                    logger.debug(
-                        f"Cleaned up task_to_session_map entry for task {task_result.task_id}",
-                    )
         except Exception as e:
             logger.error(
                 f"发送任务完成时出错: {e}",

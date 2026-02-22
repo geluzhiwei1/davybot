@@ -70,7 +70,6 @@ class OpenAIToolProvider(ToolProvider):
 
         """
         logger.info(f"[OpenAIToolProvider] mcp_call invoked with tool_name: {tool_name}")
-        logger.debug(f"[OpenAIToolProvider] tool_input: {tool_input}")
 
         # Return a mock response
         return {
@@ -263,16 +262,16 @@ class CustomToolProvider(ToolProvider):
                     ws_path = Path(self.workspace_path)
                     ws_skills_dir = ws_path / ".dawei" / "skills"
                     logger.info(f"[Skills] Checking workspace skills: {ws_skills_dir}")
-                    if ws_skills_dir.exists() and any(ws_skills_dir.iterdir()):
+                    if ws_skills_dir.exists():
                         skills_roots.append(ws_path)
-                        logger.info(f"[Skills] ✓ Found workspace skills at: {ws_skills_dir}")
+                        logger.info(f"[Skills] ✓ Added workspace skills root: {ws_skills_dir}")
 
                 # Level 2: Global user (DAWEI_HOME) - always included
-                global_skills_dir = dawei_home / "skills"
+                global_skills_dir = dawei_home / ".dawei" / "skills"
                 logger.info(f"[Skills] Checking global skills: {global_skills_dir}")
-                if global_skills_dir.exists() and any(global_skills_dir.iterdir()):
+                if global_skills_dir.exists():
                     skills_roots.append(dawei_home)
-                    logger.info(f"[Skills] ✓ Found global skills at: {global_skills_dir}")
+                    logger.info(f"[Skills] ✓ Added global skills root: {global_skills_dir}")
 
                 # Always create skills tools, even if skills_roots is empty
                 # This allows list_skills to work as a discovery tool
