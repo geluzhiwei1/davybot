@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import re
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -34,8 +35,6 @@ class SearchFilesTool(CustomBaseTool):
     @safe_tool_operation("search_files", fallback_value="Error: Failed to search files")
     def _run(self, path: str, regex: str, file_pattern: str | None = None) -> str:
         """Search for regex pattern in files."""
-        from pathlib import Path
-
         path_obj = Path(path)
 
         if not path_obj.exists():
@@ -60,7 +59,7 @@ class SearchFilesTool(CustomBaseTool):
                 file_path = root / file
 
                 try:
-                    with Path(file_path).open(encoding="utf-8") as f:
+                    with Path(file_path).open(encoding="utf-8", errors="replace") as f:
                         lines = f.readlines()
 
                     # Search for pattern in each line
@@ -127,7 +126,7 @@ class CodebaseSearchTool(CustomBaseTool):
                     file_path = root / file
 
                     try:
-                        with Path(file_path).open(encoding="utf-8") as f:
+                        with Path(file_path).open(encoding="utf-8", errors="replace") as f:
                             content = f.read()
 
                         # Simple relevance scoring

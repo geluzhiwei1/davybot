@@ -112,7 +112,7 @@ class ReadFileTool(CustomBaseTool):
         if not Path(full_path).exists():
             return f"Error: File not found at {Path(full_path).name}"
 
-        with Path(full_path).open(encoding="utf-8") as f:
+        with Path(full_path).open(encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
 
         # Apply line range if specified
@@ -289,7 +289,7 @@ class ListCodeDefinitionsTool(CustomBaseTool):
         """Extract definitions from a Python file."""
         definitions = []
 
-        with Path(file_path).open(encoding="utf-8") as f:
+        with Path(file_path).open(encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         tree = ast.parse(content)
