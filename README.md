@@ -1,6 +1,8 @@
 
 # 大微-AI个人助手
 
+安装和配置：https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
+安装和使用skill: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
 
 # 快速安装
 
@@ -16,6 +18,7 @@ pip install -i https://pypi.org/simple/ davybot
 dawei server start
 # 或者 
 python -m dawei.cli.dawei server start
+# Ctrl + C 退出
 
 # 访问
 http://localhost:8465/app
