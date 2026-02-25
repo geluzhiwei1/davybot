@@ -7,6 +7,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import ChatView from '../views/ChatView.vue'
 import WorkspacesView from '../views/WorkspacesView.vue'
 import WorkspaceSettingsView from '../views/WorkspaceSettingsView.vue'
+import WelcomeView from '../views/WelcomeView.vue'
 import ElementPlusTest from '../components/ElementPlusTest.vue'
 import CheckpointView from '../views/CheckpointView.vue'
 import E2ETestPage from '../views/E2ETestPage.vue'
@@ -14,6 +15,11 @@ import E2ETestPage from '../views/E2ETestPage.vue'
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
+    {
+      path: '/welcome',
+      name: 'welcome',
+      component: WelcomeView
+    },
     {
       path: '/dawei/:workspaceId?',
       name: 'chat',
@@ -48,7 +54,7 @@ const router = createRouter({
     },
     {
       path: '/',
-      redirect: '/workspaces'
+      redirect: '/welcome'
     }
   ]
 })

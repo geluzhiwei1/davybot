@@ -13,6 +13,7 @@ use crash_handler::{setup_panic_hook, get_all_crash_reports, clear_all_crash_rep
 #[cfg(feature = "standalone")]
 mod backend_management {
     use std::path::PathBuf;
+    use std::process::Command;
 
     #[cfg(target_os = "windows")]
     pub fn get_backend_script() -> PathBuf {
@@ -91,6 +92,58 @@ mod backend_management {
             Err(e) => Err(format!("Failed to stop backend: {}", e)),
         }
     }
+
+    pub async fn restart_backend() -> Result<String, String> {
+        // First stop
+        match stop_backend().await {
+            Ok(_) => {
+                // Wait a bit for the backend to stop
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                // Then start
+                start_backend().await
+            }
+            Err(e) => Err(format!("Failed to stop backend during restart: {}", e)),
+        }
+    }
+}
+
+// Backend management for non-standalone versions (via API calls)
+mod backend_management_api {
+    use std::time::Duration;
+
+    /// Try to restart backend via API call
+    pub async fn restart_backend_via_api() -> Result<String, String> {
+        // Try to call the backend's restart endpoint if it exists
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+        // First try to get health to see if backend is running
+        let health_url = "http://127.0.0.1:8465/health";
+        let health_response = client.get(health_url).send().await;
+
+        if health_response.is_err() {
+            return Err("Backend is not running. Please start it manually using 'dawei server start'".to_string());
+        }
+
+        // Try to call restart endpoint (this may not exist in all versions)
+        let restart_url = "http://127.0.0.1:8465/api/server/restart";
+        let response = client.post(restart_url).send().await;
+
+        match response {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    Ok("Backend restart signal sent".to_string())
+                } else {
+                    Err(format!("Backend returned status: {}", resp.status()))
+                }
+            }
+            Err(_) => {
+                Err("Restart endpoint not available. Please restart manually using 'dawei server restart'".to_string())
+            }
+        }
+    }
 }
 
 // Tauri commands - only available in standalone version
@@ -104,6 +157,18 @@ async fn start_backend() -> Result<String, String> {
 #[tauri::command]
 async fn stop_backend() -> Result<String, String> {
     backend_management::stop_backend().await
+}
+
+#[cfg(feature = "standalone")]
+#[tauri::command]
+async fn restart_backend() -> Result<String, String> {
+    backend_management::restart_backend().await
+}
+
+/// Restart backend command for non-standalone versions (via API)
+#[tauri::command]
+async fn restart_backend_api() -> Result<String, String> {
+    backend_management_api::restart_backend_via_api().await
 }
 
 // ==================== 崩溃报告 Tauri Commands ====================
@@ -147,6 +212,15 @@ fn get_dawei_home() -> PathBuf {
     let base_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
 
     base_dir.join(".dawei")
+}
+
+/// 获取 DAWEI_HOME 目录 (Tauri command)
+#[tauri::command]
+async fn get_dawei_home_command() -> Result<String, String> {
+    get_dawei_home()
+        .to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Failed to convert DAWEI_HOME to string".to_string())
 }
 
 /// 读取服务器启动信息
@@ -220,12 +294,17 @@ fn main() {
             get_crash_reports,
             clear_crash_reports,
             // 服务器信息命令
+            get_dawei_home_command,
             get_server_start_info,
             // 后端管理命令
             #[cfg(feature = "standalone")]
             start_backend,
             #[cfg(feature = "standalone")]
             stop_backend,
+            #[cfg(feature = "standalone")]
+            restart_backend,
+            // 非standalone版本的重启命令
+            restart_backend_api,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

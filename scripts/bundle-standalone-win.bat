@@ -56,7 +56,7 @@ mkdir "%PACKAGE_DIR%\resources"
 
 REM Copy main executable
 echo Copying main executable...
-copy "%TARGET_DIR%\ip-agent.exe" "%PACKAGE_DIR%\"
+copy "%TARGET_DIR%\davybot.exe" "%PACKAGE_DIR%\"
 
 REM Copy resources
 echo Copying Python environment...
@@ -122,9 +122,9 @@ echo   WriteUninstaller "$INSTDIR\uninstall.exe"
 echo.
 echo   ; Create shortcuts
 echo   CreateDirectory "$SMPROGRAMS\大微 AI 助手"
-echo   CreateShortcut "$SMPROGRAMS\大微 AI 助手\大微 AI 助手.lnk" "$INSTDIR\ip-agent.exe"
+echo   CreateShortcut "$SMPROGRAMS\大微 AI 助手\大微 AI 助手.lnk" "$INSTDIR\davybot.exe"
 echo   CreateShortcut "$SMPROGRAMS\大微 AI 助手\卸载.lnk" "$INSTDIR\uninstall.exe"
-echo   CreateShortCut "$DESKTOP\大微 AI 助手.lnk" "$INSTDIR\ip-agent.exe"
+echo   CreateShortCut "$DESKTOP\大微 AI 助手.lnk" "$INSTDIR\davybot.exe"
 echo.
 echo   ; Write registry keys
 echo   WriteRegStr HKCU "Software\大微 AI 助手" "" "$INSTDIR"
@@ -184,7 +184,7 @@ if exist "%TARGET_DIR%\dawei-standalone-setup.exe" (
 )
 
 echo 📦 Package Contents:
-echo    - ip-agent.exe ^(Main application^)
+echo    - davybot.exe ^(Main application^)
 echo    - python-env/ ^(Python 3.14 runtime + dependencies^)
 echo    - Backend scripts ^(start/stop for Windows/Linux^)
 echo.

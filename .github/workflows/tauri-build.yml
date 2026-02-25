@@ -1,0 +1,430 @@
+name: Build Tauri Standalone
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Build version (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--config src-tauri/tauri.conf.standalone.json'
+            target: 'universal-apple-darwin'
+          - platform: 'linux-latest'
+            args: '--config src-tauri/tauri.conf.standalone.json'
+          - platform: 'windows-latest'
+            args: '--config src-tauri/tauri.conf.standalone.json'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ========== Setup Node.js & pnpm ==========
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      # ========== Setup Rust (for Tauri) ==========
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # ========== Setup Python (for standalone) ==========
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ========== Cache dependencies ==========
+      - name: Cache Rust registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Rust index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            webui/src-tauri/target
+            ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      # ========== Install frontend dependencies ==========
+      - name: Install pnpm dependencies
+        working-directory: ./webui
+        run: pnpm install --frozen-lockfile
+
+      # ========== Prepare Python environment ==========
+      - name: Prepare Python environment
+        run: |
+          cd agent
+          python -m venv .venv
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            .venv/Scripts/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+          else
+            .venv/bin/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+          fi
+        shell: bash
+
+      - name: Copy Python environment to Tauri resources
+        run: |
+          mkdir -p webui/src-tauri/resources
+          rm -rf webui/src-tauri/resources/python-env
+          cp -r agent/.venv webui/src-tauri/resources/python-env
+
+          # Clean up Python cache to reduce size
+          find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
+        shell: bash
+
+      # ========== Platform-specific setup ==========
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'linux-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install openssl@3
+
+      # ========== Build frontend ==========
+      - name: Build frontend
+        working-directory: ./webui
+        run: pnpm build-only
+
+      # ========== Build Tauri app (no bundle) ==========
+      - name: Build Tauri app
+        working-directory: ./webui
+        run: pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle
+
+      # ========== Create portable ZIP packages ==========
+      - name: Create portable ZIP package (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          APP_NAME="davybot"
+          ZIP_DIR="webui/src-tauri/target/release/${APP_NAME}-standalone-win-portable-v${VERSION}"
+          ZIP_NAME="${APP_NAME}-standalone-win-portable-v${VERSION}.zip"
+
+          # Create package directory
+          mkdir -p "${ZIP_DIR}/resources"
+
+          # Copy main executable
+          cp webui/src-tauri/target/release/${APP_NAME}.exe "${ZIP_DIR}/"
+
+          # Copy Python environment
+          cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
+
+          # Copy backend scripts
+          cp webui/src-tauri/resources/start-backend.bat "${ZIP_DIR}/resources/"
+          cp webui/src-tauri/resources/stop-backend.bat "${ZIP_DIR}/resources/"
+          cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
+          cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
+
+          # Copy icons
+          mkdir -p "${ZIP_DIR}/icons"
+          cp -r webui/src-tauri/icons/* "${ZIP_DIR}/icons/" 2>/dev/null || true
+
+          # Create README
+          cat > "${ZIP_DIR}/README.txt" << 'EOF'
+          # Dawei AI Assistant - Standalone Portable Version
+
+          Version: ${VERSION}
+
+          ## Usage
+
+          1. Extract this ZIP file to any directory
+          2. Double-click davybot.exe to launch the application
+
+          The application will automatically start the backend service on first launch.
+
+          ## Directory Structure
+
+          - davybot.exe              : Main application
+          - resources/               : Resource files directory
+            - python-env/            : Python runtime environment (Windows venv)
+              - Scripts/python.exe   : Python interpreter
+              - Scripts/pip.exe      : Python package manager
+              - Lib/                 : Python standard library
+              - Lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
+            - start-backend.bat      : Windows backend startup script
+            - stop-backend.bat       : Windows backend stop script
+            - start-backend.sh       : Linux/Mac backend startup script
+            - stop-backend.sh        : Linux/Mac backend stop script
+          - icons/                   : Application icons
+
+          ## System Requirements
+
+          - Windows 10 or higher (64-bit)
+          - About 500 MB free disk space
+
+          ## Notes
+
+          - First launch may take a few seconds to initialize
+          - Do not move or delete the resources directory
+          - If you encounter issues, check the application logs
+          - Windows version uses Scripts\python.exe, Linux/Mac uses bin/python
+
+          ## Support
+
+          Project Homepage: https://github.com/dawei/patent-agent
+
+          Copyright (c) 2026 Dawei Team. All rights reserved.
+          EOF
+
+          # Create ZIP
+          cd webui/src-tauri/target/release
+          7z a -tzip "${ZIP_NAME}" "${ZIP_DIR}" -mx=9
+
+      - name: Create portable ZIP package (Linux)
+        if: matrix.platform == 'linux-latest'
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          APP_NAME="davybot"
+          ZIP_DIR="webui/src-tauri/target/release/${APP_NAME}-standalone-linux-portable-v${VERSION}"
+          ZIP_NAME="${APP_NAME}-standalone-linux-portable-v${VERSION}.zip"
+
+          # Create package directory
+          mkdir -p "${ZIP_DIR}/resources"
+
+          # Copy main executable
+          cp webui/src-tauri/target/release/${APP_NAME} "${ZIP_DIR}/"
+
+          # Copy Python environment
+          cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
+
+          # Copy backend scripts
+          cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
+          cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
+
+          # Copy icons
+          mkdir -p "${ZIP_DIR}/icons"
+          cp -r webui/src-tauri/icons/* "${ZIP_DIR}/icons/" 2>/dev/null || true
+
+          # Create README
+          cat > "${ZIP_DIR}/README.txt" << 'EOF'
+          # Dawei AI Assistant - Standalone Portable Version
+
+          Version: ${VERSION}
+
+          ## Usage
+
+          1. Extract this ZIP file to any directory
+          2. Run ./davybot to launch the application
+
+          The application will automatically start the backend service on first launch.
+
+          ## Directory Structure
+
+          - davybot                  : Main application
+          - resources/               : Resource files directory
+            - python-env/            : Python runtime environment
+              - bin/python           : Python interpreter
+              - bin/pip              : Python package manager
+              - lib/                 : Python standard library
+              - lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
+            - start-backend.sh       : Backend startup script
+            - stop-backend.sh        : Backend stop script
+          - icons/                   : Application icons
+
+          ## System Requirements
+
+          - Linux x86_64
+          - About 500 MB free disk space
+
+          ## Notes
+
+          - First launch may take a few seconds to initialize
+          - Make the script executable: chmod +x davybot
+          - Do not move or delete the resources directory
+          - If you encounter issues, check the application logs
+
+          ## Support
+
+          Project Homepage: https://github.com/dawei/patent-agent
+
+          Copyright (c) 2026 Dawei Team. All rights reserved.
+          EOF
+
+          # Create ZIP
+          cd webui/src-tauri/target/release
+          zip -qr "${ZIP_NAME}" "${ZIP_DIR}"
+
+      - name: Create portable ZIP package (macOS)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          APP_NAME="davybot"
+          ZIP_DIR="webui/src-tauri/target/release/${APP_NAME}-standalone-darwin-portable-v${VERSION}"
+          ZIP_NAME="${APP_NAME}-standalone-darwin-portable-v${VERSION}.zip"
+
+          # Create package directory
+          mkdir -p "${ZIP_DIR}/resources"
+
+          # Copy main executable (for universal-apple-darwin)
+          if [ -f "webui/src-tauri/target/universal-apple-darwin/release/${APP_NAME}" ]; then
+            cp webui/src-tauri/target/universal-apple-darwin/release/${APP_NAME} "${ZIP_DIR}/"
+          else
+            cp webui/src-tauri/target/release/${APP_NAME} "${ZIP_DIR}/"
+          fi
+
+          # Copy Python environment
+          cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
+
+          # Copy backend scripts
+          cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
+          cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
+
+          # Copy icons
+          mkdir -p "${ZIP_DIR}/icons"
+          cp -r webui/src-tauri/icons/* "${ZIP_DIR}/icons/" 2>/dev/null || true
+
+          # Create README
+          cat > "${ZIP_DIR}/README.txt" << 'EOF'
+          # Dawei AI Assistant - Standalone Portable Version
+
+          Version: ${VERSION}
+
+          ## Usage
+
+          1. Extract this ZIP file to any directory
+          2. Run ./davybot to launch the application
+
+          The application will automatically start the backend service on first launch.
+
+          ## Directory Structure
+
+          - davybot                  : Main application
+          - resources/               : Resource files directory
+            - python-env/            : Python runtime environment
+              - bin/python           : Python interpreter
+              - bin/pip              : Python package manager
+              - lib/                 : Python standard library
+              - lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
+            - start-backend.sh       : Backend startup script
+            - stop-backend.sh        : Backend stop script
+          - icons/                   : Application icons
+
+          ## System Requirements
+
+          - macOS 11 (Big Sur) or higher (Universal binary for Intel & Apple Silicon)
+          - About 500 MB free disk space
+
+          ## Notes
+
+          - First launch may take a few seconds to initialize
+          - Make the script executable: chmod +x davybot
+          - Do not move or delete the resources directory
+          - If you encounter issues, check the application logs
+
+          ## Support
+
+          Project Homepage: https://github.com/dawei/patent-agent
+
+          Copyright (c) 2026 Dawei Team. All rights reserved.
+          EOF
+
+          # Create ZIP
+          cd webui/src-tauri/target/release
+          zip -qr "${ZIP_NAME}" "${ZIP_DIR}"
+
+      # ========== Upload artifacts ==========
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-build-${{ matrix.platform }}
+          path: |
+            webui/src-tauri/target/release/*.zip
+            webui/src-tauri/target/release/bundle/
+            webui/src-tauri/target/*/release/bundle/
+          if-no-files-found: warn
+
+  # ========== Release to GitHub ==========
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tauri-build-*
+          merge-multiple: true
+          path: ./bundles
+
+      - name: Display structure of downloaded files
+        run: ls -R ./bundles
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Release $TAG" \
+            --notes "## Tauri Standalone Release $TAG
+
+          ### Installation
+
+          #### Portable ZIP Packages (Recommended)
+          - **Windows**: `davybot-standalone-win-portable-v${TAG#v}.zip` - No installation required
+          - **Linux**: `davybot-standalone-linux-portable-v${TAG#v}.zip` - No installation required
+          - **macOS**: `davybot-standalone-darwin-portable-v${TAG#v}.zip` - No installation required
+
+          #### Installers
+          **Windows**: Download `.exe` installer for traditional installation
+          **macOS**: Download `.dmg` file for easy installation (universal binary)
+          **Linux**: Download `.deb` / `.AppImage` file for package-based installation
+
+          ### Features
+
+          - Complete Python environment included (FastAPI, uvicorn, and all dependencies)
+          - No external Python installation required
+          - Standalone operation - works offline
+          - Portable ZIP versions require no installation
+
+          ### Quick Start (Portable)
+
+          1. Download the appropriate ZIP file for your platform
+          2. Extract to any folder
+          3. Run the application:
+             - Windows: Double-click \`davybot.exe\`
+             - Linux/macOS: Run \`./davybot\`
+          " \
+            ./bundles/*/*

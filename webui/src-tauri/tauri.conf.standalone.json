@@ -2,11 +2,10 @@
   "$schema": "https://schema.tauri.app/config/2.0.0",
   "productName": "dawei-standalone",
   "version": "0.1.0",
-  "identifier": "com.dawei.ip-agent.standalone",
+  "identifier": "com.dawei.davybot.standalone",
   "build": {
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build-only",
-    "beforeBundleCommand": "python ../../scripts/copy-resources.py",
+    "beforeBuildCommand": "pnpm build-only && python ../../../scripts/copy-resources.py",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
@@ -31,8 +30,7 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
-      "msi"
+      "nsis"
     ],
     "icon": [
       "icons/icon.ico",

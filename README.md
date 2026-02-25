@@ -1,8 +1,16 @@
 
 # 大微-AI个人助手
 
-安装和配置：https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
-安装和使用skill: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
+## 特性
+
+- 跨平台、易安装【pip版本，standablone版本】
+- 可视化UI
+- 技能的可视化安装和编辑 用户参考[docs\user\skills\work-with-skills.md](docs\user\skills\work-with-skills.md)，开发参考[docs\user\skills\work-with-skills.md](docs\user\skills\work-with-skills.md)
+- 智能体、智能体团队的安装和编辑
+
+## 视频
+- 安装和配置：https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
+- 安装和使用skill: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
 
 # 快速安装
 

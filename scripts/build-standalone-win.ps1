@@ -180,7 +180,7 @@ if (Test-Path $BundleDir) {
 }
 
 Write-Success "📦 Package Contents:"
-Write-Output "  - ip-agent.exe (Main application)"
+Write-Output "  - davybot.exe (Main application)"
 Write-Output "  - python-env/ (Python runtime + dependencies)"
 Write-Output "  - Backend scripts (start/stop for Windows/Linux)"
 Write-Output ""

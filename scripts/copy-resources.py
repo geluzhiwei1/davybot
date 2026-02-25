@@ -10,6 +10,19 @@ import shutil
 import sys
 from pathlib import Path
 
+def find_project_root():
+    """Find project root directory by looking for marker files/dirs"""
+    current = Path(__file__).parent
+    # Check if we're in the scripts directory
+    if current.name == "scripts":
+        return current.parent
+    # Otherwise, search upward for marker
+    for parent in [current, *current.parents]:
+        if (parent / "agent").exists() and (parent / "webui").exists():
+            return parent
+    # Fallback to parent of script directory
+    return Path(__file__).parent.parent
+
 def copy_resources():
     """Copy resources to Tauri target directory"""
 
@@ -19,23 +32,28 @@ def copy_resources():
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-    # Paths
-    project_root = Path(__file__).parent.parent
-    web_dir = project_root / "apps" / "web"
+    # Paths - auto-detect project root
+    project_root = find_project_root()
+    web_dir = project_root / "webui"
     tauri_dir = web_dir / "src-tauri"
-    target_resources = tauri_dir / "target" / "release" / "resources"
+    # Copy to src-tauri/resources so NSIS can bundle them
+    bundle_resources = tauri_dir / "resources"
+
+    print(f"Project root: {project_root}")
+    print(f"WebUI directory: {web_dir}")
+    print(f"Tauri directory: {tauri_dir}")
 
     print("========================================")
     print("  Copying Resources for Bundling")
     print("========================================")
     print()
 
-    # Ensure target resources directory exists
-    target_resources.mkdir(parents=True, exist_ok=True)
+    # Ensure bundle resources directory exists
+    bundle_resources.mkdir(parents=True, exist_ok=True)
 
-    # Copy Python environment
-    python_env_src = tauri_dir / "resources" / "python-env"
-    python_env_dst = target_resources / "python-env"
+    # Copy Python environment from agent/.venv to src-tauri/resources/python-env
+    python_env_src = project_root / "agent" / ".venv"
+    python_env_dst = bundle_resources / "python-env"
 
     print("[1/3] Copying Python environment...")
     print(f"  Source: {python_env_src}")
@@ -68,7 +86,7 @@ def copy_resources():
 
     for script in scripts:
         src = tauri_dir / script
-        dst = target_resources / script
+        dst = bundle_resources / script
 
         if src.exists():
             shutil.copy2(src, dst)
@@ -81,7 +99,7 @@ def copy_resources():
     print("[3/3] Copying icon...")
 
     icon_src = tauri_dir / "icons" / "icon.ico"
-    icon_dst = target_resources / "icon.ico"
+    icon_dst = bundle_resources / "icon.ico"
 
     if icon_src.exists():
         shutil.copy2(icon_src, icon_dst)

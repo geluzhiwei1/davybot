@@ -1,5 +1,5 @@
 [package]
-name = "ip-agent"
+name = "davybot"
 version = "0.1.0"
 description = "大微 - AI 助手"
 authors = ["dawei Team"]
@@ -21,6 +21,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 chrono = "0.4"  # 用于时间戳生成
 dirs = "5"  # 用于获取用户主目录
+reqwest = { version = "0.12", features = ["json"] }  # HTTP客户端用于API调用
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
