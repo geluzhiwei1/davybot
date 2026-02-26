@@ -159,7 +159,21 @@ jobs:
       # ========== Build Tauri app (no bundle) ==========
       - name: Build Tauri app
         working-directory: ./webui
-        run: pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" == "macos-latest" ]; then
+            # For macOS, build for x86_64 and aarch64 separately, then use lipo
+            pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target x86_64-apple-darwin
+            pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target aarch64-apple-darwin
+            # Create universal binary using lipo
+            mkdir -p webui/src-tauri/target/universal-apple-darwin/release
+            lipo -create -output webui/src-tauri/target/universal-apple-darwin/release/davybot \
+              webui/src-tauri/target/x86_64-apple-darwin/release/davybot \
+              webui/src-tauri/target/aarch64-apple-darwin/release/davybot
+          else
+            # For Windows and Linux, build normally
+            pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle
+          fi
 
       # ========== Create portable ZIP packages ==========
       - name: Create portable ZIP package (Windows)
