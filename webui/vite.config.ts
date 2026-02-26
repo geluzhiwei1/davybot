@@ -99,6 +99,8 @@ export default defineConfig({
         pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
       },
     },
+    // Increase chunk size warning limit (default is 500kB)
+    chunkSizeWarningLimit: 1000,
     // Externalize Tauri packages for web builds
     // These are only available in Tauri context, not in browser
     rollupOptions: {
@@ -106,6 +108,29 @@ export default defineConfig({
         '@tauri-apps/api',
         '@tauri-apps/plugin-clipboard-manager',
       ],
+      output: {
+        // Manual chunk splitting for better performance (using function for rolldown compatibility)
+        manualChunks(id) {
+          // Vendor chunk for Vue ecosystem
+          if (id.includes('node_modules/vue') || id.includes('node_modules/@vue') ||
+              id.includes('node_modules/vue-router') || id.includes('node_modules/pinia')) {
+            return 'vendor';
+          }
+          // Element Plus chunk
+          if (id.includes('node_modules/element-plus')) {
+            return 'element-plus';
+          }
+          // Editor libraries
+          if (id.includes('node_modules/codemirror') || id.includes('node_modules/@codemirror')) {
+            return 'editor';
+          }
+          // Other utilities
+          if (id.includes('node_modules/axios') || id.includes('node_modules/marked') ||
+              id.includes('node_modules/papaparse')) {
+            return 'utils';
+          }
+        },
+      },
     },
   },
   // Optimize for Tauri

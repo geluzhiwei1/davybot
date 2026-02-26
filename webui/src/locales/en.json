@@ -180,7 +180,24 @@
       "plugins": "Plugins",
       "mcpServers": "MCP Servers",
       "executionEnvironment": "Execution Environment",
-      "privacy": "Privacy Configuration"
+      "privacy": "Privacy Configuration",
+      "proxy": "Proxy Settings"
+    },
+    "proxy": {
+      "title": "Proxy Configuration",
+      "description": "Configure proxy for LLM API access. Leave empty to use system default or direct connection.",
+      "supported": "Supports",
+      "httpProxy": "HTTP Proxy",
+      "httpProxyPlaceholder": "http://127.0.0.1:7890",
+      "httpsProxy": "HTTPS Proxy",
+      "httpsProxyPlaceholder": "http://127.0.0.1:7890",
+      "noProxy": "No Proxy",
+      "noProxyPlaceholder": "localhost,127.0.0.1,*.local",
+      "noProxyTip": "Comma separated, e.g.: localhost,127.0.0.1,*.local",
+      "save": "Save Proxy Config",
+      "refresh": "Refresh",
+      "saveSuccess": "Proxy config saved successfully",
+      "saveError": "Failed to save proxy config"
     },
     "workspace": {
       "title": "Workspace Configuration",

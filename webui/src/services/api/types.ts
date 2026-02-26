@@ -388,6 +388,13 @@ export interface UserUIContext {
   conversation_id: string | null;
 }
 
+// 代理配置
+export interface ProxyConfig {
+  http_proxy: string;
+  https_proxy: string;
+  no_proxy: string;
+}
+
 // 插件配置相关类型（两层配置系统）
 export interface PluginInstanceConfig {
   enabled: boolean;

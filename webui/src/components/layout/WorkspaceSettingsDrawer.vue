@@ -851,6 +851,56 @@
               @config-changed="handlePrivacyConfigChanged" />
           </el-scrollbar>
         </el-tab-pane>
+
+        <!-- 代理设置 Tab -->
+        <el-tab-pane :label="t('workspaceSettings.tabs.proxy')" name="proxy">
+          <el-scrollbar max-height="calc(100vh - 200px)">
+            <el-form :model="proxyConfig" label-width="140px" class="settings-form" style="padding: 20px;">
+              <el-alert
+                :title="t('workspaceSettings.proxy.title')"
+                type="info"
+                :closable="false"
+                style="margin-bottom: 20px;">
+                <template #default>
+                  <p>{{ t('workspaceSettings.proxy.description') }}</p>
+                  <p style="margin-top: 8px;">
+                    {{ t('workspaceSettings.proxy.supported') }}:
+                    <code>http://127.0.0.1:7890</code> or <code>socks5://127.0.0.1:1080</code>
+                  </p>
+                </template>
+              </el-alert>
+
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item :label="t('workspaceSettings.proxy.httpProxy')">
+                    <el-input v-model="proxyConfig.http_proxy" :placeholder="t('workspaceSettings.proxy.httpProxyPlaceholder')" clearable />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item :label="t('workspaceSettings.proxy.httpsProxy')">
+                    <el-input v-model="proxyConfig.https_proxy" :placeholder="t('workspaceSettings.proxy.httpsProxyPlaceholder')" clearable />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+
+              <el-form-item :label="t('workspaceSettings.proxy.noProxy')">
+                <el-input v-model="proxyConfig.no_proxy" :placeholder="t('workspaceSettings.proxy.noProxyPlaceholder')">
+                  <template #prepend>NO_PROXY</template>
+                </el-input>
+                <div class="form-tip">{{ t('workspaceSettings.proxy.noProxyTip') }}</div>
+              </el-form-item>
+
+              <el-form-item>
+                <el-button type="primary" @click="saveProxyConfig" :loading="savingProxy">
+                  {{ t('workspaceSettings.proxy.save') }}
+                </el-button>
+                <el-button @click="loadProxyConfig">
+                  {{ t('workspaceSettings.proxy.refresh') }}
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </el-scrollbar>
+        </el-tab-pane>
       </el-tabs>
     </div>
 
@@ -1622,7 +1672,8 @@ const loadSettings = async (forceReload: boolean = false) => {
     loadMcpSettings(),
     loadAdvancedSettings(),
     loadSkills(forceReload),
-    loadPlugins(forceReload)
+    loadPlugins(forceReload),
+    loadProxyConfig()  // 加载代理配置
   ]);
   settingsLoaded.value = true; // 加载完成后设置状态，确保 tabs 正确渲染
 };
@@ -1735,6 +1786,49 @@ const loadUIContext = async () => {
     // UI Context removed
   } catch (error) {
     console.error('Failed to load UI context:', error);
+  }
+};
+
+// 加载代理配置
+const loadProxyConfig = async () => {
+  if (!props.workspaceId) return;
+  try {
+    const data = await apiManager.getWorkspacesApi().getProxyConfig(props.workspaceId);
+    // 只提取代理字段，不包含 success、message 等额外字段
+    proxyConfig.value = {
+      http_proxy: data?.http_proxy || '',
+      https_proxy: data?.https_proxy || '',
+      no_proxy: data?.no_proxy || ''
+    };
+  } catch (error) {
+    console.error('Failed to load proxy config:', error);
+    proxyConfig.value = { http_proxy: '', https_proxy: '', no_proxy: '' };
+  }
+};
+
+// 保存代理配置
+const saveProxyConfig = async () => {
+  if (!props.workspaceId) return;
+  savingProxy.value = true;
+  try {
+    console.log('[Proxy] Saving config:', JSON.stringify(proxyConfig.value));
+    const result = await apiManager.getWorkspacesApi().updateProxyConfig(props.workspaceId, proxyConfig.value);
+    console.log('[Proxy] Save success, result:', result);
+
+    // ✅ 更新本地状态，确保数据一致性
+    proxyConfig.value = {
+      http_proxy: result.http_proxy || '',
+      https_proxy: result.https_proxy || '',
+      no_proxy: result.no_proxy || ''
+    };
+    console.log('[Proxy] Local state updated:', proxyConfig.value);
+
+    ElMessage.success(t('workspaceSettings.proxy.saveSuccess'));
+  } catch (error) {
+    console.error('[Proxy] Failed to save proxy config:', error);
+    ElMessage.error(t('workspaceSettings.proxy.saveError'));
+  } finally {
+    savingProxy.value = false;
   }
 };
 
@@ -2646,6 +2740,14 @@ const skillVditorRef = ref<HTMLDivElement | null>(null);
 const skillVditor = ref<Vditor | null>(null);
 const skillVditorInitialized = ref(false);
 const savingSkillFile = ref(false);
+
+// 代理配置
+const proxyConfig = ref({
+  http_proxy: '',
+  https_proxy: '',
+  no_proxy: ''
+});
+const savingProxy = ref(false);
 
 // 过滤后的 skills 列表
 const filteredSkills = computed(() => {

@@ -11,7 +11,8 @@ import type {
   Conversation,
   PaginatedResponse,
   UserUIEnvironments,
-  UserUIContext
+  UserUIContext,
+  ProxyConfig
 } from '../types';
 
 // 工作区API服务类
@@ -477,6 +478,31 @@ export class WorkspacesApiService {
         data
       );
       return response.ui_environments;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 获取代理配置
+  async getProxyConfig(workspaceId: string): Promise<ProxyConfig> {
+    try {
+      const response = await httpClient.get<ProxyConfig>(
+        `${this.baseUrl}/${workspaceId}/proxy`
+      );
+      return response;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 更新代理配置
+  async updateProxyConfig(workspaceId: string, data: Partial<ProxyConfig>): Promise<ProxyConfig> {
+    try {
+      const response = await httpClient.put<ProxyConfig>(
+        `${this.baseUrl}/${workspaceId}/proxy`,
+        data
+      );
+      return response;
     } catch (error) {
       throw this.handleError(error);
     }
@@ -1415,6 +1441,8 @@ export const {
   updateMemberRole,
   getUIEnvironments,
   updateUIEnvironments,
+  getProxyConfig,
+  updateProxyConfig,
   getUIContext,
   updateUIContext,
   createFileOrDirectory,
@@ -1470,6 +1498,8 @@ export const {
   updateMemberRole: workspacesApi.updateMemberRole.bind(workspacesApi),
   getUIEnvironments: workspacesApi.getUIEnvironments.bind(workspacesApi),
   updateUIEnvironments: workspacesApi.updateUIEnvironments.bind(workspacesApi),
+  getProxyConfig: workspacesApi.getProxyConfig.bind(workspacesApi),
+  updateProxyConfig: workspacesApi.updateProxyConfig.bind(workspacesApi),
   getUIContext: workspacesApi.getUIContext.bind(workspacesApi),
   updateUIContext: workspacesApi.updateUIContext.bind(workspacesApi),
   getSystemEnvironments: workspacesApi.getSystemEnvironments.bind(workspacesApi),

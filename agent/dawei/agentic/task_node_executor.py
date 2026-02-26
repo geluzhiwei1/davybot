@@ -158,6 +158,7 @@ class TaskNodeExecutionEngine:
         # 创建执行任务
         self.execution_task = asyncio.create_task(self._run_task_loop())
 
+        result = None  # 初始化 result 变量，避免 CancelledError 时未定义
         try:
             # 任务本身没有超时限制,只通过 LLM 请求超时控制
             result = await self.execution_task

@@ -5,13 +5,14 @@
   "identifier": "com.dawei.davybot.standalone",
   "build": {
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build-only && python ../../../scripts/copy-resources.py",
+    "beforeBuildCommand": "pnpm build-only",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "大微 - AI 助手 (Standalone)",
         "width": 1400,
         "height": 900,
@@ -19,7 +20,8 @@
         "minHeight": 768,
         "resizable": true,
         "fullscreen": false,
-        "center": true
+        "center": true,
+        "url": "welcome.html"
       }
     ],
     "security": {

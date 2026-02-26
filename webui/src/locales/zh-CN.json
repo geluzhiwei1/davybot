@@ -180,7 +180,24 @@
       "plugins": "插件",
       "mcpServers": "MCP",
       "executionEnvironment": "执行环境",
-      "privacy": "隐私配置"
+      "privacy": "隐私配置",
+      "proxy": "代理设置"
+    },
+    "proxy": {
+      "title": "代理配置说明",
+      "description": "配置 LLM API 的代理访问。留空则使用系统默认代理或直连。",
+      "supported": "支持",
+      "httpProxy": "HTTP 代理",
+      "httpProxyPlaceholder": "http://127.0.0.1:7890",
+      "httpsProxy": "HTTPS 代理",
+      "httpsProxyPlaceholder": "http://127.0.0.1:7890",
+      "noProxy": "不代理地址",
+      "noProxyPlaceholder": "localhost,127.0.0.1,*.local",
+      "noProxyTip": "逗号分隔，如：localhost,127.0.0.1,*.local",
+      "save": "保存代理配置",
+      "refresh": "刷新",
+      "saveSuccess": "代理配置已保存",
+      "saveError": "保存代理配置失败"
     },
     "workspace": {
       "title": "工作区配置",

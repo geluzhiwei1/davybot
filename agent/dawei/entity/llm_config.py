@@ -23,6 +23,10 @@ class LLMConfig:
     output_price: float = 0.0
     reasoning_effort: str = None
     custom_headers: dict[str, str] = field(default_factory=dict)
+    # 代理配置
+    http_proxy: str = ""  # HTTP 代理 URL, 如 "http://127.0.0.1:7890"
+    https_proxy: str = ""  # HTTPS 代理 URL
+    no_proxy: str = ""  # 跳过代理的地址, 逗号分隔
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "LLMConfig":
@@ -49,6 +53,9 @@ class LLMConfig:
             output_price=config_dict.get("openAiCustomModelInfo", {}).get("outputPrice", 0.0),
             reasoning_effort=config_dict.get("openAiCustomModelInfo", {}).get("reasoningEffort"),
             custom_headers=config_dict.get("openAiHeaders", {}),
+            http_proxy=config_dict.get("httpProxy", ""),
+            https_proxy=config_dict.get("httpsProxy", ""),
+            no_proxy=config_dict.get("noProxy", ""),
         )
 
 

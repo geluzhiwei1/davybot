@@ -58,18 +58,30 @@ jobs:
         with:
           python-version: '3.12'
 
+      # ========== Platform-specific setup ==========
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'linux-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf p7zip-full
+
+      - name: Install dependencies (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install openssl@3
+
       # ========== Cache dependencies ==========
       - name: Cache Rust registry
         uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
 
       - name: Cache Rust index
         uses: actions/cache@v4
         with:
           path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
 
       - name: Cache Rust build
         uses: actions/cache@v4
@@ -77,7 +89,13 @@ jobs:
           path: |
             webui/src-tauri/target
             ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: agent/.venv
+          key: ${{ runner.os }}-python-venv-${{ hashFiles('agent/pyproject.toml') }}
 
       # ========== Install frontend dependencies ==========
       - name: Install pnpm dependencies
@@ -85,14 +103,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # ========== Prepare Python environment ==========
-      - name: Prepare Python environment
+      - name: Create Python venv if cache miss
         run: |
           cd agent
-          python -m venv .venv
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            .venv/Scripts/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
-          else
-            .venv/bin/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+          if [ ! -d ".venv" ]; then
+            python -m venv .venv
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              .venv/Scripts/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+            else
+              .venv/bin/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+            fi
           fi
         shell: bash
 
@@ -107,22 +127,31 @@ jobs:
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
         shell: bash
 
-      # ========== Platform-specific setup ==========
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'linux-latest'
+      - name: Copy backend scripts to Tauri resources
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          # Copy backend scripts to resources directory
+          cp webui/src-tauri/resources/start-backend.sh webui/src-tauri/resources/ 2>/dev/null || true
+          cp webui/src-tauri/resources/stop-backend.sh webui/src-tauri/resources/ 2>/dev/null || true
+          cp webui/src-tauri/resources/start-backend.bat webui/src-tauri/resources/ 2>/dev/null || true
+          cp webui/src-tauri/resources/stop-backend.bat webui/src-tauri/resources/ 2>/dev/null || true
 
-      - name: Install dependencies (macOS only)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          brew install openssl@3
+          # Verify files
+          echo "Backend scripts in resources:"
+          ls -la webui/src-tauri/resources/*.sh webui/src-tauri/resources/*.bat 2>/dev/null || echo "No scripts found"
+        shell: bash
 
       # ========== Build frontend ==========
       - name: Build frontend
         working-directory: ./webui
         run: pnpm build-only
+
+      # ========== Copy welcome.html to dist ==========
+      - name: Copy welcome.html to frontend dist
+        run: |
+          # Copy welcome.html to the dist directory
+          cp webui/src-tauri/resources/welcome.html webui/dist/
+          echo "Copied welcome.html to dist/"
+          ls -la webui/dist/welcome.html
 
       # ========== Build Tauri app (no bundle) ==========
       - name: Build Tauri app
@@ -147,6 +176,9 @@ jobs:
 
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
+
+          # Copy welcome.html
+          cp webui/dist/welcome.html "${ZIP_DIR}/resources/"
 
           # Copy backend scripts
           cp webui/src-tauri/resources/start-backend.bat "${ZIP_DIR}/resources/"
@@ -175,6 +207,7 @@ jobs:
 
           - davybot.exe              : Main application
           - resources/               : Resource files directory
+            - welcome.html           : Welcome page (standalone HTML)
             - python-env/            : Python runtime environment (Windows venv)
               - Scripts/python.exe   : Python interpreter
               - Scripts/pip.exe      : Python package manager
@@ -227,6 +260,9 @@ jobs:
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
 
+          # Copy welcome.html
+          cp webui/dist/welcome.html "${ZIP_DIR}/resources/"
+
           # Copy backend scripts
           cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
           cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
@@ -252,6 +288,7 @@ jobs:
 
           - davybot                  : Main application
           - resources/               : Resource files directory
+            - welcome.html           : Welcome page (standalone HTML)
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/pip              : Python package manager
@@ -306,6 +343,9 @@ jobs:
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
 
+          # Copy welcome.html
+          cp webui/dist/welcome.html "${ZIP_DIR}/resources/"
+
           # Copy backend scripts
           cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
           cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
@@ -331,6 +371,7 @@ jobs:
 
           - davybot                  : Main application
           - resources/               : Resource files directory
+            - welcome.html           : Welcome page (standalone HTML)
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/pip              : Python package manager
