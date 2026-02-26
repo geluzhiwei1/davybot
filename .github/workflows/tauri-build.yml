@@ -49,8 +49,10 @@ jobs:
       # ========== Setup Rust (for Tauri) ==========
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+
+      - name: Add Rust targets (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
       # ========== Setup Python (for standalone) ==========
       - name: Setup Python
@@ -147,6 +149,7 @@ jobs:
 
       # ========== Copy welcome.html to dist ==========
       - name: Copy welcome.html to frontend dist
+        shell: bash
         run: |
           # Copy welcome.html to the dist directory
           cp webui/src-tauri/resources/welcome.html webui/dist/
