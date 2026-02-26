@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-13'
+          - platform: 'macos-12'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-apple-darwin'
             arch: 'x86_64'
@@ -190,7 +190,7 @@ jobs:
           echo "Building for ${{ matrix.target }}..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }}
           echo "Build completed successfully"
-          ls -la webui/src-tauri/target/${{ matrix.target }}/release/davybot
+          ls -la src-tauri/target/${{ matrix.target }}/release/davybot
 
       - name: Build Tauri app (Linux)
         if: startsWith(matrix.platform, 'linux')
@@ -200,7 +200,7 @@ jobs:
           echo "Building for ${{ matrix.target }}..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }}
           echo "Build completed successfully"
-          ls -la webui/src-tauri/target/${{ matrix.target }}/release/davybot
+          ls -la src-tauri/target/${{ matrix.target }}/release/davybot
 
       - name: Build Tauri app (Windows)
         if: startsWith(matrix.platform, 'windows')
@@ -289,7 +289,8 @@ jobs:
 
           # Create ZIP
           cd webui/src-tauri/target/release
-          7z a -tzip "${ZIP_NAME}" "${ZIP_DIR}" -mx=9
+          # Use relative path since we're already in the release directory
+          7z a -tzip "${ZIP_NAME}" "$(basename "${ZIP_DIR}")" -mx=9
 
       - name: Create portable ZIP package (Linux)
         if: matrix.platform == 'linux-latest'
@@ -370,7 +371,9 @@ jobs:
 
           # Create ZIP
           cd webui/src-tauri/target/${{ matrix.target }}/release
-          zip -qr "${ZIP_NAME}" "${ZIP_DIR}"
+          # Use relative path since we're already in the release directory
+          ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
+          zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
 
           echo "Created ZIP: ${ZIP_NAME}"
           ls -la "${ZIP_NAME}"
@@ -418,7 +421,7 @@ jobs:
       - name: Download x86_64 binary
         uses: actions/download-artifact@v4
         with:
-          name: tauri-build-macos-13-x86_64
+          name: tauri-build-macos-12-x86_64
           path: ./binaries/x86_64
 
       - name: Download aarch64 binary
@@ -542,7 +545,9 @@ jobs:
 
           # Create ZIP
           cd webui/src-tauri/target/release
-          zip -qr "${ZIP_NAME}" "${ZIP_DIR}"
+          # Use relative path since we're already in the release directory
+          ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
+          zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
 
           echo "Created universal ZIP: ${ZIP_NAME}"
           ls -la "${ZIP_NAME}"
