@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -80,20 +81,111 @@
         }
 
         .status-banner {
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 16px;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
             transition: all 0.3s ease;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 24px;
+            align-items: center;
+            /* Default checking state - neutral gray */
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            box-shadow: 0 4px 16px rgba(107, 114, 128, 0.4);
         }
 
         .status-banner.online {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 2px 12px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
         }
 
         .status-banner.offline {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            box-shadow: 0 2px 12px rgba(239, 68, 68, 0.3);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+        }
+
+        .status-banner-left {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .status-banner-right {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .status-banner-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .status-banner-actions .btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .status-banner-actions .btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .status-banner-actions .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-start-in-banner {
+            padding: 24px 60px;
+            font-size: 24px;
+            font-weight: 800;
+            border: none;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            background: rgba(255, 255, 255, 0.98);
+            color: #10b981;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+            border: 3px solid rgba(255, 255, 255, 0.7);
+            letter-spacing: 1px;
+            min-width: 240px;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+
+        .status-banner.offline .btn-start-in-banner {
+            color: #ef4444;
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        .btn-start-in-banner:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-4px) scale(1.08);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+        }
+
+        .btn-start-in-banner .btn-icon {
+            font-size: 32px;
+        }
+
+        .btn-start-in-banner:disabled {
+            cursor: not-allowed;
+            opacity: 0.4;
+            transform: none;
         }
 
         .status-indicator {
@@ -137,9 +229,11 @@
 
         .info-row {
             display: flex;
+            align-items: flex-start;
             justify-content: space-between;
             padding: 12px 0;
             border-bottom: 1px solid #f0f0f0;
+            gap: 16px;
         }
 
         .info-row:last-child {
@@ -155,6 +249,10 @@
             font-size: 14px;
             color: #333;
             font-weight: 500;
+            flex: 1;
+            min-width: 0;
+            overflow-wrap: break-word;
+            word-break: break-all;
         }
 
         .info-value code {
@@ -164,51 +262,6 @@
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 13px;
             color: #667eea;
-        }
-
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            padding: 12px 0;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 12px 32px;
-            font-size: 16px;
-            font-weight: 600;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-secondary {
-            background: #f5f5f5;
-            color: #333;
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-            background: #e0e0e0;
         }
 
         .help-text {
@@ -243,8 +296,13 @@
         }
 
         @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .pulse-success::before,
@@ -271,9 +329,11 @@
                 transform: scale(0.6);
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.5;
             }
+
             100% {
                 transform: scale(1.4);
                 opacity: 0;
@@ -305,14 +365,58 @@
         .app-log .log-success {
             color: #89d185;
         }
+
+        /* Language Switcher */
+        .language-switcher {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .lang-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .lang-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .lang-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            font-weight: 600;
+        }
+
+        body {
+            position: relative;
+        }
     </style>
 </head>
+
 <body>
+    <!-- Language Switcher -->
+    <div class="language-switcher">
+        <button class="lang-btn" data-lang="zh">中文</button>
+        <button class="lang-btn" data-lang="en">English</button>
+    </div>
+
     <div class="welcome-container">
         <!-- Header -->
         <div class="welcome-header">
-            <h1 class="app-title">大微</h1>
-            <p class="app-subtitle">AI 个人助手平台</p>
+            <h1 class="app-title" data-i18n="app.title">大微</h1>
+            <p class="app-subtitle" data-i18n="app.subtitle">AI 个人助手平台</p>
         </div>
 
         <!-- Server Status -->
@@ -320,51 +424,57 @@
             <div class="card">
                 <div class="card-header">
                     <span>🔌</span>
-                    <span>服务器状态</span>
+                    <span data-i18n="server.status">服务器状态</span>
                 </div>
 
                 <div class="status-banner" id="statusBanner">
-                    <div class="status-indicator">
-                        <div class="status-icon-wrapper" id="statusIconWrapper">
-                            <div class="status-icon" id="statusIcon">✓</div>
+                    <div class="status-banner-left">
+                        <div class="status-indicator">
+                            <div class="status-icon-wrapper" id="statusIconWrapper">
+                                <div class="status-icon" id="statusIcon">✓</div>
+                            </div>
+                            <div class="status-text">
+                                <div class="status-title" id="statusTitle" data-i18n="status.checking">检查中...</div>
+                                <div class="status-desc" id="statusDesc" data-i18n="status.connecting">正在连接到后端服务</div>
+                            </div>
                         </div>
-                        <div class="status-text">
-                            <div class="status-title" id="statusTitle">检查中...</div>
-                            <div class="status-desc" id="statusDesc">正在连接到后端服务</div>
+                        <div class="status-banner-actions" id="statusBannerActions">
+                            <button class="btn" id="startBackendBtn">
+                                <span>🚀</span>
+                                <span data-i18n="btn.startBackend">启动后端</span>
+                            </button>
+                            <button class="btn" id="refreshStatusBtn">
+                                <span>🔄</span>
+                                <span data-i18n="btn.refresh">刷新状态</span>
+                            </button>
                         </div>
+                    </div>
+                    <div class="status-banner-right">
+                        <button class="btn-start-in-banner" id="enterBtn" disabled>
+                            <span class="btn-icon">🚀</span>
+                            <span data-i18n="btn.start">开始使用</span>
+                        </button>
                     </div>
                 </div>
 
                 <div class="info-row">
-                    <span class="info-label">连接状态</span>
-                    <span class="info-value" id="connectionStatus">检查中...</span>
+                    <span class="info-label" data-i18n="info.connection">连接状态</span>
+                    <span class="info-value" id="connectionStatus" data-i18n="status.checking">检查中...</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">服务器地址</span>
+                    <span class="info-label" data-i18n="info.serverAddress">服务器地址</span>
                     <span class="info-value"><code>http://localhost:8465</code></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Python</span>
+                    <span class="info-value" id="pythonInfo" data-i18n="info.pythonDetecting">检测中...</span>
                 </div>
             </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <button class="btn btn-primary" id="enterBtn" disabled onclick="enterApp()">
-                <span>📁</span>
-                <span>进入工作空间</span>
-            </button>
-            <button class="btn btn-primary" id="startBackendBtn" onclick="startBackend()">
-                <span>🚀</span>
-                <span>启动后端</span>
-            </button>
-            <button class="btn btn-secondary" onclick="refreshStatus()">
-                <span>🔄</span>
-                <span>刷新状态</span>
-            </button>
-        </div>
-
         <!-- Help Text -->
         <div class="help-text" id="helpText">
-            <p>正在检查后端服务状态...</p>
+            <p data-i18n="help.checkingStatus">正在检查后端服务状态...</p>
         </div>
 
         <!-- Application Log -->
@@ -372,9 +482,253 @@
     </div>
 
     <script>
+        // ==================== i18n System ====================
+        const translations = {
+            zh: {
+                app: {
+                    title: '大微',
+                    subtitle: 'AI 个人助手平台'
+                },
+                server: {
+                    status: '服务器状态'
+                },
+                status: {
+                    checking: '检查中...',
+                    connecting: '正在连接到后端服务',
+                    online: '后端服务已启动',
+                    onlineDesc: '所有系统正常运行',
+                    offline: '后端服务未启动',
+                    offlineDesc: '请启动后端服务以使用完整功能',
+                    connected: '✓ 已连接',
+                    disconnected: '✗ 未连接'
+                },
+                btn: {
+                    startBackend: '启动后端',
+                    restartBackend: '重启后端',
+                    refresh: '刷新状态',
+                    start: '开始使用'
+                },
+                info: {
+                    connection: '连接状态',
+                    serverAddress: '服务器地址',
+                    pythonDetecting: '检测中...',
+                    pythonSystem: '系统 Python',
+                    pythonNotDetected: '未检测到'
+                },
+                help: {
+                    checkingStatus: '正在检查后端服务状态...',
+                    starting: '正在启动后端服务，请稍候...',
+                    restarting: '正在重启后端服务，请稍候...',
+                    offlineTauri: '后端服务未启动<br>点击"启动后端"按钮即可自动启动',
+                    offlineWeb: '后端服务未启动<br>启动方法：在终端运行 <code>cd agent && dawei server start</code>',
+                    online: '✓ 后端服务运行正常，可以开始使用'
+                },
+                log: {
+                    envDetectStart: '=== 开始环境检测 ===',
+                    tauriDetected: '✓ Tauri环境检测成功',
+                    buttonsShown: '✓ 状态横幅操作按钮已显示',
+                    webMode: '✗ Web模式，非Tauri环境',
+                    envDetectComplete: '=== 环境检测完成 ===',
+                    envDetectError: '✗ 环境检测错误: {}',
+                    checkingServer: '🔍 检查服务器状态...',
+                    serverTarget: '→ 目标: {}',
+                    sendingHealthCheck: '→ 发送健康检查请求...',
+                    healthCheckResponse: '✓ 健康检查响应: {}',
+                    backendOnline: '✓ 后端服务运行正常',
+                    backendOffline: '✗ 后端离线: {}',
+                    startingBackend: '🚀 开始启动后端',
+                    restartingBackend: '🔄 开始重启后端',
+                    startSuccess: '✓ 后端{}成功: {}',
+                    startFailed: '✗ {}失败: {}',
+                    refreshClicked: '━━━━━━━━━━━━━━━━━━━━━━',
+                    refreshButton: '🔄 刷新状态按钮点击',
+                    recheckingStatus: '→ 重新检查后端服务状态...',
+                    enterApp: '📁 进入主应用...',
+                    domLoaded: '🚀 DOM加载完成，开始初始化...',
+                    enterButtonBound: '✓ 进入工作空间按钮事件已绑定',
+                    startButtonBound: '✓ 启动后端按钮事件已绑定',
+                    refreshButtonBound: '✓ 刷新状态按钮事件已绑定',
+                    waitingTauri: '⏳ 等待Tauri API就绪...',
+                    appLogListenerStarted: '✓ app-log事件监听已启动',
+                    pythonInfo: '✓ Python 信息: {}',
+                    pythonDetectFailed: '✗ Python 检测失败: {}',
+                    initComplete: '✅ 初始化完成'
+                },
+                alert: {
+                    backendNotAvailable: '启动后端功能仅在桌面版本中可用'
+                }
+            },
+            en: {
+                app: {
+                    title: 'Dawei',
+                    subtitle: 'AI Personal Assistant Platform'
+                },
+                server: {
+                    status: 'Server Status'
+                },
+                status: {
+                    checking: 'Checking...',
+                    connecting: 'Connecting to backend service',
+                    online: 'Backend Service Online',
+                    onlineDesc: 'All systems operational',
+                    offline: 'Backend Service Offline',
+                    offlineDesc: 'Please start the backend service',
+                    connected: '✓ Connected',
+                    disconnected: '✗ Disconnected'
+                },
+                btn: {
+                    startBackend: 'Start Backend',
+                    restartBackend: 'Restart Backend',
+                    refresh: 'Refresh',
+                    start: 'Get Started'
+                },
+                info: {
+                    connection: 'Connection Status',
+                    serverAddress: 'Server Address',
+                    pythonDetecting: 'Detecting...',
+                    pythonSystem: 'System Python',
+                    pythonNotDetected: 'Not detected'
+                },
+                help: {
+                    checkingStatus: 'Checking backend service status...',
+                    starting: 'Starting backend service, please wait...',
+                    restarting: 'Restarting backend service, please wait...',
+                    offlineTauri: 'Backend service is not running<br>Click "Start Backend" to start it automatically',
+                    offlineWeb: 'Backend service is not running<br>To start: Run <code>cd agent && dawei server start</code> in terminal',
+                    online: '✓ Backend service is running normally'
+                },
+                log: {
+                    envDetectStart: '=== Starting environment detection ===',
+                    tauriDetected: '✓ Tauri environment detected',
+                    buttonsShown: '✓ Status banner action buttons shown',
+                    webMode: '✗ Web mode, not Tauri environment',
+                    envDetectComplete: '=== Environment detection complete ===',
+                    envDetectError: '✗ Environment detection error: {}',
+                    checkingServer: '🔍 Checking server status...',
+                    serverTarget: '→ Target: {}',
+                    sendingHealthCheck: '→ Sending health check request...',
+                    healthCheckResponse: '✓ Health check response: {}',
+                    backendOnline: '✓ Backend service is running',
+                    backendOffline: '✗ Backend offline: {}',
+                    startingBackend: '🚀 Starting backend',
+                    restartingBackend: '🔄 Restarting backend',
+                    startSuccess: '✓ Backend {} successful: {}',
+                    startFailed: '✗ {} failed: {}',
+                    refreshClicked: '━━━━━━━━━━━━━━━━━━━━━━',
+                    refreshButton: '🔄 Refresh button clicked',
+                    recheckingStatus: '→ Rechecking backend service status...',
+                    enterApp: '📁 Entering main application...',
+                    domLoaded: '🚀 DOM loaded, initializing...',
+                    enterButtonBound: '✓ Enter workspace button event bound',
+                    startButtonBound: '✓ Start backend button event bound',
+                    refreshButtonBound: '✓ Refresh status button event bound',
+                    waitingTauri: '⏳ Waiting for Tauri API to be ready...',
+                    appLogListenerStarted: '✓ app-log event listener started',
+                    pythonInfo: '✓ Python info: {}',
+                    pythonDetectFailed: '✗ Python detection failed: {}',
+                    initComplete: '✅ Initialization complete'
+                },
+                alert: {
+                    backendNotAvailable: 'Start backend feature is only available in desktop version'
+                }
+            }
+        };
+
+        let currentLang = 'zh';
+
+        // Auto-detect language from browser or system
+        function detectLanguage() {
+            // Try to get from localStorage first
+            const savedLang = localStorage.getItem('dawei-language');
+            if (savedLang && translations[savedLang]) {
+                return savedLang;
+            }
+
+            // Auto-detect from browser
+            const browserLang = navigator.language || navigator.userLanguage;
+            if (browserLang.startsWith('zh')) {
+                return 'zh';
+            }
+            return 'en'; // Default to English
+        }
+
+        // Set language and update UI
+        function setLanguage(lang) {
+            if (!translations[lang]) {
+                console.warn(`Language ${lang} not available, falling back to zh`);
+                lang = 'zh';
+            }
+
+            currentLang = lang;
+            localStorage.setItem('dawei-language', lang);
+
+            // Update active state of language buttons
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+
+            // Update all elements with data-i18n attribute
+            updateTranslations();
+
+            // Update HTML lang attribute
+            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+        }
+
+        // Update all translatable elements
+        function updateTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.dataset.i18n;
+                const translation = getTranslation(key);
+                if (translation) {
+                    element.textContent = translation;
+                }
+            });
+        }
+
+        // Get translation by key (supports nested keys like 'app.title')
+        function getTranslation(key) {
+            const keys = key.split('.');
+            let result = translations[currentLang];
+            for (const k of keys) {
+                if (result && result[k] !== undefined) {
+                    result = result[k];
+                } else {
+                    return null;
+                }
+            }
+            return result;
+        }
+
+        // Format translation with parameters (e.g., "Hello {}", "World")
+        function t(key, ...params) {
+            const template = getTranslation(key);
+            if (!template) return key;
+
+            if (params.length === 0) return template;
+
+            // Replace {} placeholders with parameters
+            return template.replace(/\{\}/g, () => params.shift() || '');
+        }
+
+        // Initialize language switcher
+        function initLanguageSwitcher() {
+            const langButtons = document.querySelectorAll('.lang-btn');
+            langButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setLanguage(btn.dataset.lang);
+                });
+            });
+
+            // Set initial language
+            const initialLang = detectLanguage();
+            setLanguage(initialLang);
+        }
+
+        // ==================== Original Code ====================
         const API_BASE = 'http://localhost:8465/api';
         let isTauriEnv = false;
         let isStandalone = false;
+        let isBackendRunning = false;
 
         // Application logger - 显示在页面上（开发和生产环境都显示）
         function screenLog(msg, type = 'info') {
@@ -402,33 +756,33 @@
 
         // Check if running in Tauri environment
         async function detectEnvironment() {
-            screenLog('=== 开始环境检测 ===');
-            const startBackendBtn = document.getElementById('startBackendBtn');
+            screenLog(t('log.envDetectStart'));
+            const statusBannerActions = document.getElementById('statusBannerActions');
             const helpText = document.getElementById('helpText');
 
             try {
                 // Check if Tauri API is available
                 if (window.__TAURI__ && window.__TAURI__.core) {
                     isTauriEnv = true;
-                    screenLog('✓ Tauri环境检测成功', 'success');
-                    if (startBackendBtn) {
-                        startBackendBtn.style.display = 'flex';
-                        screenLog('✓ 启动后端按钮已显示');
+                    screenLog(t('log.tauriDetected'), 'success');
+                    if (statusBannerActions) {
+                        statusBannerActions.style.display = 'flex';
+                        screenLog(t('log.buttonsShown'));
                     }
                 } else {
                     // Not Tauri environment (web mode)
                     isTauriEnv = false;
-                    screenLog('✗ Web模式，非Tauri环境');
-                    if (startBackendBtn) {
-                        startBackendBtn.style.display = 'none';
+                    screenLog(t('log.webMode'));
+                    if (statusBannerActions) {
+                        statusBannerActions.style.display = 'none';
                     }
                 }
-                screenLog('=== 环境检测完成 ===', 'success');
+                screenLog(t('log.envDetectComplete'), 'success');
             } catch (e) {
-                screenLog(`✗ 环境检测错误: ${e}`, 'error');
+                screenLog(t('log.envDetectError', e), 'error');
                 isTauriEnv = false;
-                if (startBackendBtn) {
-                    startBackendBtn.style.display = 'none';
+                if (statusBannerActions) {
+                    statusBannerActions.style.display = 'none';
                 }
             }
         }
@@ -438,24 +792,35 @@
             const helpText = document.getElementById('helpText');
 
             if (!isTauriEnv) {
-                alert('启动后端功能仅在桌面版本中可用');
+                alert(t('alert.backendNotAvailable'));
                 return;
             }
 
+            const action = isBackendRunning ? 'restart' : 'start';
+            const actionKey = isBackendRunning ? 'btn.restartBackend' : 'btn.startBackend';
+            const logKey = isBackendRunning ? 'log.restartingBackend' : 'log.startingBackend';
+            const helpKey = isBackendRunning ? 'help.restarting' : 'help.starting';
+
             try {
-                screenLog(`🚀 开始启动后端`);
-
-                // Disable button and show loading
-                startBtn.disabled = true;
-                startBtn.innerHTML = '<span class="loading">⚙️</span><span>启动中...</span>';
-
-                helpText.className = 'help-text';
-                helpText.innerHTML = '<p>正在启动后端服务，请稍候...</p>';
+                // 如果后端已经在运行，执行重启
+                if (isBackendRunning) {
+                    screenLog(t('log.restartingBackend'));
+                    startBtn.disabled = true;
+                    startBtn.innerHTML = '<span class="loading">⚙️</span><span>' + t('btn.restartBackend') + '...</span>';
+                    helpText.className = 'help-text';
+                    helpText.innerHTML = '<p>' + t('help.restarting') + '</p>';
+                } else {
+                    screenLog(t('log.startingBackend'));
+                    startBtn.disabled = true;
+                    startBtn.innerHTML = '<span class="loading">⚙️</span><span>' + t('btn.startBackend') + '...</span>';
+                    helpText.className = 'help-text';
+                    helpText.innerHTML = '<p>' + t('help.starting') + '</p>';
+                }
 
                 // Call Tauri command
                 const { invoke } = window.__TAURI__.core;
                 const result = await invoke('start_backend');
-                screenLog(`✓ 后端启动成功: ${result}`, 'success');
+                screenLog(t('log.startSuccess', isBackendRunning ? '重启' : '启动', result), 'success');
 
                 // Success
                 helpText.className = 'help-text success';
@@ -468,21 +833,25 @@
                 await checkServerStatus();
 
             } catch (error) {
-                screenLog(`✗ 启动失败: ${error}`, 'error');
+                screenLog(t('log.startFailed', isBackendRunning ? '重启' : '启动', error), 'error');
 
                 // Error
                 helpText.className = 'help-text';
-                helpText.innerHTML = `<p>❌ 启动失败: ${String(error)}</p>`;
+                helpText.innerHTML = `<p>❌ ${isBackendRunning ? '重启' : '启动'}失败: ${String(error)}</p>`;
 
-                // Re-enable button
+                // Re-enable button with correct text
                 startBtn.disabled = false;
-                startBtn.innerHTML = '<span>🚀</span><span>启动后端</span>';
+                if (isBackendRunning) {
+                    startBtn.innerHTML = '<span>🔄</span><span>' + t('btn.restartBackend') + '</span>';
+                } else {
+                    startBtn.innerHTML = '<span>🚀</span><span>' + t('btn.startBackend') + '</span>';
+                }
             }
         }
 
         async function checkServerStatus() {
-            screenLog('🔍 检查服务器状态...');
-            screenLog('→ 目标: ' + API_BASE + '/health');
+            screenLog(t('log.checkingServer'));
+            screenLog(t('log.serverTarget', API_BASE + '/health'));
 
             const statusBanner = document.getElementById('statusBanner');
             const statusIconWrapper = document.getElementById('statusIconWrapper');
@@ -495,7 +864,7 @@
             const helpText = document.getElementById('helpText');
 
             try {
-                screenLog('→ 发送健康检查请求...');
+                screenLog(t('log.sendingHealthCheck'));
 
                 // Create abort controller with timeout
                 const controller = new AbortController();
@@ -507,66 +876,68 @@
                 });
 
                 clearTimeout(timeoutId);
-                screenLog(`✓ 健康检查响应: ${response.status}`, 'success');
+                screenLog(t('log.healthCheckResponse', response.status), 'success');
 
                 if (response.ok) {
                     // Online
-                    screenLog('✓ 后端服务运行正常', 'success');
+                    isBackendRunning = true;
+                    screenLog(t('log.backendOnline'), 'success');
                     statusBanner.className = 'status-banner online';
                     statusIconWrapper.className = 'status-icon-wrapper pulse-success';
                     statusIcon.textContent = '✓';
-                    statusTitle.textContent = '后端服务已启动';
-                    statusDesc.textContent = '所有系统正常运行';
-                    connectionStatus.innerHTML = '<span style="color: #10b981;">✓ 已连接</span>';
+                    statusTitle.textContent = t('status.online');
+                    statusDesc.textContent = t('status.onlineDesc');
+                    connectionStatus.innerHTML = '<span style="color: #10b981;">' + t('status.connected') + '</span>';
                     enterBtn.disabled = false;
                     helpText.className = 'help-text success';
-                    helpText.innerHTML = '<p>✓ 后端服务运行正常，可以开始使用</p>';
+                    helpText.innerHTML = '<p>' + t('help.online') + '</p>';
 
-                    // Re-enable start backend button if it exists
+                    // Update button to "重启后端" since backend is running
                     if (startBackendBtn) {
                         startBackendBtn.disabled = false;
-                        startBackendBtn.innerHTML = '<span>🚀</span><span>启动后端</span>';
+                        startBackendBtn.innerHTML = '<span>🔄</span><span>' + t('btn.restartBackend') + '</span>';
                     }
                 } else {
                     throw new Error('Server not responding');
                 }
             } catch (error) {
                 // Offline
-                screenLog(`✗ 后端离线: ${error}`, 'error');
+                isBackendRunning = false;
+                screenLog(t('log.backendOffline', error), 'error');
                 statusBanner.className = 'status-banner offline';
                 statusIconWrapper.className = 'status-icon-wrapper pulse-error';
                 statusIcon.textContent = '✗';
-                statusTitle.textContent = '后端服务未启动';
-                statusDesc.textContent = '请启动后端服务以使用完整功能';
-                connectionStatus.innerHTML = '<span style="color: #ef4444;">✗ 未连接</span>';
+                statusTitle.textContent = t('status.offline');
+                statusDesc.textContent = t('status.offlineDesc');
+                connectionStatus.innerHTML = '<span style="color: #ef4444;">' + t('status.disconnected') + '</span>';
                 enterBtn.disabled = true;
 
                 // Update help text based on environment
                 if (isTauriEnv) {
                     helpText.className = 'help-text';
-                    helpText.innerHTML = '<p>后端服务未启动<br>点击下方"启动后端"按钮即可自动启动</p>';
+                    helpText.innerHTML = '<p>' + t('help.offlineTauri') + '</p>';
                 } else {
                     helpText.className = 'help-text';
-                    helpText.innerHTML = '<p>后端服务未启动<br>启动方法：在终端运行 <code>cd agent && dawei server start</code></p>';
+                    helpText.innerHTML = '<p>' + t('help.offlineWeb') + '</p>';
                 }
 
-                // Re-enable start backend button if it exists
+                // Reset button to "启动后端" since backend is not running
                 if (startBackendBtn) {
                     startBackendBtn.disabled = false;
-                    startBackendBtn.innerHTML = '<span>🚀</span><span>启动后端</span>';
+                    startBackendBtn.innerHTML = '<span>🚀</span><span>' + t('btn.startBackend') + '</span>';
                 }
             }
         }
 
         function refreshStatus() {
-            screenLog('━━━━━━━━━━━━━━━━━━━━━━');
-            screenLog('🔄 刷新状态按钮点击');
-            screenLog('→ 重新检查后端服务状态...');
+            screenLog(t('log.refreshClicked'));
+            screenLog(t('log.refreshButton'));
+            screenLog(t('log.recheckingStatus'));
             checkServerStatus();
         }
 
         function enterApp() {
-            screenLog('📁 进入主应用...');
+            screenLog(t('log.enterApp'));
             // Navigate to the main app
             // Dev mode: Vite dev server; Production: backend /app path
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -578,15 +949,109 @@
             }
         }
 
+        async function checkPythonInfo() {
+            const pythonInfo = document.getElementById('pythonInfo');
+            if (!pythonInfo) return;
+
+            if (!isTauriEnv) {
+                // Web mode: show system Python info
+                pythonInfo.innerHTML = '<span style="color: #666;">' + t('info.pythonSystem') + '</span>';
+                return;
+            }
+
+            try {
+                const { invoke } = window.__TAURI__.core;
+                const result = await invoke('get_python_info');
+                screenLog(t('log.pythonInfo', result), 'success');
+
+                // Parse the result: "Python 3.12.0 @ /path/to/python\nUV: /path/to/uv"
+                const lines = result.split('\n');
+                const pythonLine = lines[0];
+                const uvLine = lines[1];
+
+                // Parse Python info: "Python 3.12.0 @ /path/to/python"
+                const pythonMatch = pythonLine.match(/Python ([\d.]+) @ (.+)/);
+                if (pythonMatch) {
+                    const version = pythonMatch[1];
+                    const pythonPath = pythonMatch[2];
+
+                    // Parse UV path: "UV: /path/to/uv"
+                    const uvMatch = uvLine.match(/UV: (.+)/);
+                    const uvPath = uvMatch ? uvMatch[1] : '';
+
+                    pythonInfo.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                            <div>
+                                <code>${version}</code>
+                                <span style="color: #666; font-size: 11px;">${pythonPath}</span>
+                            </div>
+                            <div style="font-size: 11px; color: #999;">
+                                uv: ${uvPath}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    pythonInfo.innerHTML = `<span style="color: #667eea;">${result}</span>`;
+                }
+            } catch (error) {
+                screenLog(t('log.pythonDetectFailed', error), 'error');
+                pythonInfo.innerHTML = '<span style="color: #ef4444;">' + t('info.pythonNotDetected') + '</span>';
+            }
+        }
+
         // Initialize on page load
         window.addEventListener('DOMContentLoaded', async () => {
-            screenLog('🚀 DOM加载完成，开始初始化...');
+            // Initialize language switcher first
+            initLanguageSwitcher();
+
+            screenLog(t('log.domLoaded'));
+
+            // Attach event listeners to buttons
+            const enterBtn = document.getElementById('enterBtn');
+            const startBackendBtn = document.getElementById('startBackendBtn');
+            const refreshStatusBtn = document.getElementById('refreshStatusBtn');
+
+            if (enterBtn) {
+                enterBtn.addEventListener('click', enterApp);
+                screenLog(t('log.enterButtonBound'));
+            }
+
+            if (startBackendBtn) {
+                startBackendBtn.addEventListener('click', startBackend);
+                screenLog(t('log.startButtonBound'));
+            }
+
+            if (refreshStatusBtn) {
+                refreshStatusBtn.addEventListener('click', refreshStatus);
+                screenLog(t('log.refreshButtonBound'));
+            }
 
             // For Tauri, we need to wait for the API to be ready
             if (window.__TAURI__) {
-                screenLog('⏳ 等待Tauri API就绪...');
+                screenLog(t('log.waitingTauri'));
                 // Tauri 2.x uses core.invoke, wait a bit for it to be ready
                 await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Listen for app-log events from Rust backend
+                if (window.__TAURI__.event) {
+                    const unlisten = window.__TAURI__.event.listen('app-log', (event) => {
+                        const logMessage = event.payload;
+                        if (logMessage) {
+                            // Split by newlines and log each line
+                            const lines = logMessage.split('\n');
+                            lines.forEach(line => {
+                                if (line.trim()) {
+                                    // Detect log type based on emoji
+                                    let type = 'info';
+                                    if (line.includes('✅') || line.includes('✓')) type = 'success';
+                                    if (line.includes('❌') || line.includes('✗') || line.includes('失败') || line.includes('failed')) type = 'error';
+                                    screenLog(line, type);
+                                }
+                            });
+                        }
+                    });
+                    screenLog(t('log.appLogListenerStarted'), 'success');
+                }
             }
 
             // First detect environment
@@ -595,8 +1060,12 @@
             // Then check server status
             await checkServerStatus();
 
-            screenLog('✅ 初始化完成', 'success');
+            // Check Python info
+            await checkPythonInfo();
+
+            screenLog(t('log.initComplete'), 'success');
         });
     </script>
 </body>
+
 </html>

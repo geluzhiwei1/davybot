@@ -38,6 +38,8 @@ jobs:
             arch: 'aarch64'
           - platform: 'windows-latest'
             args: '--config src-tauri/tauri.conf.standalone.json'
+            target: 'x86_64-pc-windows-msvc'
+            arch: 'x86_64'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -138,16 +140,30 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # ========== Prepare Python environment ==========
-      - name: Create Python venv if cache miss
+      - name: Install UV package manager
+        run: |
+          # Install UV using pip (works on all platforms)
+          pip3 install uv -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+
+      - name: Create Python venv with UV if cache miss
         run: |
           cd agent
           if [ ! -d ".venv" ]; then
-            python -m venv .venv
-            if [ "$RUNNER_OS" == "Windows" ]; then
-              .venv/Scripts/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
-            else
-              .venv/bin/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
-            fi
+            # Create venv with UV
+            uv venv --python 3.12 .venv
+
+            # Install UV in the venv (needed for standalone)
+            uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+
+            # Install pip in the venv (for compatibility)
+            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+
+            # Install project dependencies
+            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
+          else
+            # Sync existing dependencies
+            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv 2>/dev/null || true
           fi
         shell: bash
 
@@ -160,19 +176,6 @@ jobs:
           # Clean up Python cache to reduce size
           find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
-        shell: bash
-
-      - name: Copy backend scripts to Tauri resources
-        run: |
-          # Copy backend scripts to resources directory
-          cp webui/src-tauri/resources/start-backend.sh webui/src-tauri/resources/ 2>/dev/null || true
-          cp webui/src-tauri/resources/stop-backend.sh webui/src-tauri/resources/ 2>/dev/null || true
-          cp webui/src-tauri/resources/start-backend.bat webui/src-tauri/resources/ 2>/dev/null || true
-          cp webui/src-tauri/resources/stop-backend.bat webui/src-tauri/resources/ 2>/dev/null || true
-
-          # Verify files
-          echo "Backend scripts in resources:"
-          ls -la webui/src-tauri/resources/*.sh webui/src-tauri/resources/*.bat 2>/dev/null || echo "No scripts found"
         shell: bash
 
       # ========== Build frontend ==========
@@ -229,16 +232,6 @@ jobs:
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
-          # Copy backend scripts
-          cp webui/src-tauri/resources/start-backend.bat "${ZIP_DIR}/resources/"
-          cp webui/src-tauri/resources/stop-backend.bat "${ZIP_DIR}/resources/"
-          cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
-          cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
-
-          # Copy icons
-          mkdir -p "${ZIP_DIR}/icons"
-          cp -r webui/src-tauri/icons/* "${ZIP_DIR}/icons/" 2>/dev/null || true
-
           # Create README
           cat > "${ZIP_DIR}/README.txt" << 'EOF'
           # Dawei AI Assistant - Standalone Portable Version
@@ -259,14 +252,10 @@ jobs:
             - welcome.html           : Welcome page (standalone HTML)
             - python-env/            : Python runtime environment (Windows venv)
               - Scripts/python.exe   : Python interpreter
+              - Scripts/uv.exe       : UV package manager
               - Scripts/pip.exe      : Python package manager
               - Lib/                 : Python standard library
               - Lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
-            - start-backend.bat      : Windows backend startup script
-            - stop-backend.bat       : Windows backend stop script
-            - start-backend.sh       : Linux/Mac backend startup script
-            - stop-backend.sh        : Linux/Mac backend stop script
-          - icons/                   : Application icons
 
           ## System Requirements
 
@@ -276,9 +265,10 @@ jobs:
           ## Notes
 
           - First launch may take a few seconds to initialize
+          - The backend service is automatically managed by the application
           - Do not move or delete the resources directory
           - If you encounter issues, check the application logs
-          - Windows version uses Scripts\python.exe, Linux/Mac uses bin/python
+          - The application uses UV to run dawei server commands
 
           ## Support
 
@@ -314,14 +304,6 @@ jobs:
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
-          # Copy backend scripts
-          cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
-          cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
-
-          # Copy icons
-          mkdir -p "${ZIP_DIR}/icons"
-          cp -r webui/src-tauri/icons/* "${ZIP_DIR}/icons/" 2>/dev/null || true
-
           # Create README
           cat > "${ZIP_DIR}/README.txt" << EOF
           # Dawei AI Assistant - Standalone Portable Version
@@ -343,12 +325,10 @@ jobs:
             - welcome.html           : Welcome page (standalone HTML)
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
+              - bin/uv               : UV package manager
               - bin/pip              : Python package manager
               - lib/                 : Python standard library
               - lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
-            - start-backend.sh       : Backend startup script
-            - stop-backend.sh        : Backend stop script
-          - icons/                   : Application icons
 
           ## System Requirements
 
@@ -463,11 +443,17 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Create Python environment
+      - name: Install UV package manager
+        run: |
+          pip3 install uv -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+
+      - name: Create Python environment with UV
         run: |
           cd agent
-          python -m venv .venv
-          .venv/bin/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+          uv venv --python 3.12 .venv
+          uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+          uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+          uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
 
       - name: Copy resources
         run: |
@@ -501,14 +487,6 @@ jobs:
 
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
-
-          # Copy backend scripts
-          cp webui/src-tauri/resources/start-backend.sh "${ZIP_DIR}/resources/"
-          cp webui/src-tauri/resources/stop-backend.sh "${ZIP_DIR}/resources/"
-
-          # Copy icons
-          mkdir -p "${ZIP_DIR}/icons"
-          cp -r webui/src-tauri/icons/* "${ZIP_DIR}/icons/" 2>/dev/null || true
 
           # Create README
           cat > "${ZIP_DIR}/README.txt" << 'EOF'

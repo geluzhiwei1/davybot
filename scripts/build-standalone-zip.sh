@@ -79,22 +79,59 @@ echo "App: ${APP_NAME} v${APP_VERSION}"
 echo "Target: ${TARGET_TRIPLE}"
 echo ""
 
-# 1. Prepare Python environment
-echo "[1/6] Preparing Python environment..."
+# 1. Prepare Python environment using UV
+echo "[1/6] Preparing Python environment with UV..."
 
-# Create venv if not exists
-if [ ! -d "${AGENT_DIR}/.venv" ]; then
-    echo "Creating Python virtual environment..."
-    cd "${AGENT_DIR}"
-    python3 -m venv .venv
-
-    echo "Installing dependencies..."
-    if [ -f ".venv/bin/pip" ]; then
-        .venv/bin/pip install -e . -i https://mirrors.aliyun.com/pypi/simple/ --quiet
-    else
-        echo "❌ Failed to create Python environment"
+# Ensure uv is available on the system
+if ! command -v uv &> /dev/null; then
+    echo "Installing uv package manager..."
+    # Install uv using pip
+    pip3 install uv -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to install uv"
         exit 1
     fi
+fi
+
+# Create venv using uv if not exists
+if [ ! -d "${AGENT_DIR}/.venv" ]; then
+    echo "Creating Python virtual environment with uv..."
+    cd "${AGENT_DIR}"
+    # Create venv with pip (needed for some packages)
+    uv venv --python 3.12 .venv
+
+    echo "Installing uv in the venv first..."
+    # Install uv using the system's uv (or pip)
+    uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+
+    echo "Installing pip..."
+    # Install pip for compatibility
+    uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+
+    echo "Installing dependencies with uv..."
+    uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to install dependencies"
+        exit 1
+    fi
+else
+    echo "✓ Python virtual environment already exists"
+    echo "Syncing dependencies with uv..."
+    cd "${AGENT_DIR}"
+    # Use uv to sync dependencies (faster and more reliable)
+    uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+
+    echo "Ensuring pip is installed..."
+    uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv 2>/dev/null || true
+fi
+
+# Verify uv is available in the venv
+echo "Verifying uv in virtual environment..."
+if [ ! -f "${AGENT_DIR}/.venv/bin/uv" ]; then
+    echo "WARNING: uv not found in venv, installing with uv..."
+    uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+else
+    echo "✓ uv is available in virtual environment"
 fi
 
 # Copy Python environment to Tauri resources
@@ -171,14 +208,6 @@ echo "Copying welcome.html..."
 cp "${TAURI_DIR}/resources/welcome.html" "${ZIP_DIR}/resources/"
 echo "✓ welcome.html copied"
 
-# Icons
-echo "Copying icons..."
-if [ -d "${TAURI_DIR}/icons" ]; then
-    mkdir -p "${ZIP_DIR}/icons"
-    cp -r "${TAURI_DIR}/icons"/* "${ZIP_DIR}/icons/" 2>/dev/null || true
-    echo "✓ Icons copied"
-fi
-
 # Make scripts executable
 chmod +x "${ZIP_DIR}/resources/"*.sh 2>/dev/null || true
 chmod +x "${ZIP_DIR}/${APP_NAME}"
@@ -211,9 +240,9 @@ The application will automatically start the backend service on first launch.
   - python-env/            : Python runtime environment
     - bin/python           : Python interpreter
     - bin/uv               : UV package manager
+    - bin/pip              : Python package manager
     - lib/                 : Python standard library
     - lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
-- icons/                   : Application icons
 
 ## System Requirements
 
@@ -296,9 +325,8 @@ fi
 
 echo "📦 Package Contents:"
 echo "   - ${APP_NAME} (${TARGET_ARCH} binary)"
-echo "   - resources/python-env/ (Python runtime + dependencies)"
+echo "   - resources/python-env/ (Python runtime + uv + pip + dependencies)"
 echo "   - resources/welcome.html (Startup page)"
-echo "   - icons/ (Application icons)"
 echo "   - README.txt (Usage instructions)"
 echo ""
 
