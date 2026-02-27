@@ -364,7 +364,7 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-build-${{ matrix.platform }}-${{ matrix.arch }}
+          name: davybot-standalone-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             webui/src-tauri/target/${{ matrix.target }}/release/davybot
           if-no-files-found: warn
@@ -373,7 +373,7 @@ jobs:
         if: startsWith(matrix.platform, 'linux')
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-build-${{ matrix.platform }}-${{ matrix.arch }}
+          name: davybot-standalone-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             webui/src-tauri/target/${{ matrix.target }}/release/davybot
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
@@ -383,7 +383,7 @@ jobs:
         if: startsWith(matrix.platform, 'windows')
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-build-${{ matrix.platform }}-x86_64
+          name: davybot-standalone-${{ matrix.platform }}-x86_64
           path: |
             webui/src-tauri/target/release/*.zip
             webui/src-tauri/target/release/bundle/
@@ -401,13 +401,13 @@ jobs:
       - name: Download x86_64 binary
         uses: actions/download-artifact@v4
         with:
-          name: tauri-build-macos-12-x86_64
+          name: davybot-standalone-macos-12-x86_64
           path: ./binaries/x86_64
 
       - name: Download aarch64 binary
         uses: actions/download-artifact@v4
         with:
-          name: tauri-build-macos-latest-aarch64
+          name: davybot-standalone-macos-latest-aarch64
           path: ./binaries/aarch64
 
       - name: Verify downloaded binaries
@@ -533,7 +533,7 @@ jobs:
       - name: Upload universal binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-build-macos-universal
+          name: davybot-standalone-macos-universal
           path: |
             webui/src-tauri/target/universal-apple-darwin/release/davybot
             webui/src-tauri/target/release/*universal*.zip
@@ -548,7 +548,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: tauri-build-*
+          pattern: davybot-standalone-*
           merge-multiple: true
           path: ./bundles
 
@@ -560,6 +560,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=${GITHUB_REF#refs/tags/}
+          
+          # Find all ZIP files in bundles directory
+          echo "=== Finding all ZIP files ==="
+          find ./bundles -name "*.zip" -type f
+          
+          # Upload all ZIP files to release
           gh release create "$TAG" \
             --repo "${{ github.repository }}" \
             --title "Release $TAG" \
@@ -598,4 +604,4 @@ jobs:
           - \`x86_64\`: Download the x86_64 version
           - \`aarch64\`: Download the aarch64 version
           " \
-            ./bundles/*/*
+            $(find ./bundles -name "*.zip" -type f)
