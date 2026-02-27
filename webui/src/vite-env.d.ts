@@ -5,7 +5,11 @@
 
 /// <reference types="vite/client" />
 
-declare const __TAURI__: boolean
+// Tauri 2.x type declaration
+// __TAURI__ is an object in Tauri 2.x, not a boolean
+declare interface Window {
+  __TAURI__?: Record<string, unknown>
+}
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string

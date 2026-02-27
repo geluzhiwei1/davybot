@@ -14,9 +14,11 @@ export enum Platform {
 
 /**
  * Detect if the app is running in Tauri environment
+ *
+ * Tauri 2.x detection: window.__TAURI__ is an object, not a boolean
  */
 export function isTauri(): boolean {
-  return typeof window !== 'undefined' && window.__TAURI__ === true
+  return typeof window !== 'undefined' && window.__TAURI__ !== undefined
 }
 
 /**
