@@ -1,72 +1,106 @@
 
-# 大微-AI个人助手
+[English](README.md) | [中文](README_CN.md) | 
 
-## 特性
+# Dawei AI Personal Assistant
 
-- 可视化UI：智能体、智能体团队的安装和编辑
-- 开放、集成的智能体、技能市场，一键安装和卸载。skills参考[docs/user/skills/work-with-skills.md](docs/user/skills/work-with-skills.md)
-- 数据安全：文件不上传，隐私保护
-- 中文为第一支持语言
-- 跨平台、易安装【pip版本，standablone版本】
-- 极简依赖，完整构建智能
+## Design Philosophy
 
+- Based on the PDCA (Plan, Do, Check, Act) principle to process user instructions
+- Easy to use
 
-## 视频
-- 安装和配置：https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
-- 安装和使用skill: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
+## Features
 
-# 快速安装
+- Visual UI: Installation and editing of agents and agent teams
+- Open and integrated agent and skills marketplace with one-click install and uninstall. For skills reference, see [docs/user/skills/work-with-skills_en.md](docs/user/skills/work-with-skills_en.md)
+- Data Security: No file uploads, privacy protection
+- Cross-platform, easy to install
+  - pip version: Install davybot via pip, access webui via browser on local or other machines; especially suitable for Linux systems without GUI
+  - standalone version: Download zip package, extract and run, no additional installation required
+- Minimal dependencies, complete agent system building
+- Scheduled task system
+
+## Videos
+- Installation and Configuration: https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
+- Installation and Usage of Skills: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
+
+# Quick Installation
 
 ## pip
 
-``` bash
-# 安装
+```bash
+# Install
 pip install davybot
-# 或者
+# or
 pip install -i https://pypi.org/simple/ davybot
 
-# 启动
+# Start
 dawei server start
-# 或者 
+# or
 python -m dawei.cli.dawei server start
-# Ctrl + C 退出
+# Ctrl + C to exit
 
-# 访问
+# Access
 http://localhost:8465/app
 
 ```
 
 # Web UI
 
-![主界面](asserts/web-ui/main.png)
+![Main Interface](asserts/web-ui/main.png)
 
-[Web UI 详情](asserts/web-ui/README.md)
+[Web UI Details](asserts/web-ui/README.md)
 
-# Next 即将发布
+# Coming Soon
 
 ## combot: Computer Bot
 
-开发飞书、微信等插件，实现类似openclaw的通过即时聊天工具控制agent的功能。
+Developing plugins for Feishu, WeChat, and other platforms to implement agent control features through instant messaging tools, similar to openclaw.
 
+# Tech Stack
+| Component | Version | Description |
+|-----------|---------|-------------|
+| **Tauri** | 2.x | Rust frontend framework |
+| **Rust** | stable | via dtolnay/rust-toolchain |
+| **Node.js** | 22 | Frontend build |
+| **pnpm** | 9 | Package manager |
+| **Python** | 3.12 | Backend runtime (embedded) |
+| **UV** | 0.10.6 | Python package manager (embedded) |
 
-# 发布计划
-- [√] 开发者预览版本（多平台）： 给有开发经验的专业技术人员试用，需要clone 代码，自行安装运行, 参见 [docs/development/local-development.md](docs/development/local-development.md)
-- [√] 技术人版本（多平台）： 给技术人或者有一定计算机基础的人员试用，使用pip install 安装
-- windows app版本： windows 下载安装，直接使用
-- Linux app 版本： Ubuntu 下载安装，直接使用
-- 移动端 App 版本（跨平台）： 手机版本，安装后直接使用 
+# Platform Support
+## ✅ Supported Platforms
 
-# 依赖代码库
+| Platform | Architecture | Build Status | Package Format | Notes |
+|----------|--------------|---------------|----------------|-------|
+| **Linux** | x86_64 | ✅ Full Support | ZIP | Verified, 135M |
+| **Linux** | aarch64 | ✅ CI Support | ZIP | ARM64 cross-compile |
+| **macOS** | x86_64 | ✅ CI Support | ZIP | Intel Macs |
+| **macOS** | aarch64 | ✅ CI Support | ZIP | Apple Silicon |
+| **macOS** | Universal | ✅ CI Support | ZIP | Intel + ARM (lipo merged) |
+| **Windows** | x86_64 | ⚠️ Config Exists | ZIP/NSIS | Local build unverified |
 
-## 集市和资源
+### 📈 Support Coverage
+
+- **Desktop Platforms**: 100% (Linux, macOS, Windows full coverage)
+- **Architecture Support**: 90% (x86_64 all platforms, ARM64 Linux/macOS support)
+- **CI/CD**: 100% (All platforms have GitHub Actions workflow)
+
+# Release Plan
+- [√] Developer Preview (Multi-platform): For experienced professional developers. Requires cloning code and self-installation. See [docs/development/local-development.md](docs/development/local-development.md)
+- [√] Tech Version (Multi-platform): For tech-savvy users or those with some computer background. Install via pip install
+- Windows App Version: Download and install on Windows for direct use
+- Linux App Version: Download and install on Ubuntu for direct use
+- Mobile App Version (Cross-platform): Mobile version, install and use directly
+
+# Dependency Repositories
+
+## Market and Resources
 - https://github.com/geluzhiwei1/davybot-market-cli
 - https://github.com/geluzhiwei1/davybot-skills
 - https://github.com/geluzhiwei1/davybot-agents
 
-## 插件-即时聊天工具
+## Plugins - Instant Messaging Tools
 
 - https://github.com/geluzhiwei1/davybot-plugins-im.git
 
-
-# 微信交流群
+# WeChat Group Chat
 ![alt text](asserts/group.png)
