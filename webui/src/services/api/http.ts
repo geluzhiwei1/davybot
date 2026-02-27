@@ -9,6 +9,7 @@ import type { ApiResponse, HttpConfig } from './types';
 import { logger } from '@/utils/logger';
 import { NetworkError } from '@/utils/errors';
 import { getApiBaseUrl } from '@/utils/platform';
+import { appConfig } from '@/config/app.config';
 
 // HTTP客户端类
 export class HttpClient {
@@ -295,12 +296,12 @@ declare module 'axios' {
 export const createHttpClient = (config?: Partial<HttpConfig>): HttpClient => {
   const defaultConfig: HttpConfig = {
     baseURL: getApiBaseUrl(), // 使用平台检测获取正确的API基础URL
-    timeout: 10000,
+    timeout: appConfig.api.timeout,
     headers: {
       'Content-Type': 'application/json'
     },
-    logRequests: import.meta.env.DEV,
-    logResponses: import.meta.env.DEV
+    logRequests: appConfig.api.logRequests,
+    logResponses: appConfig.api.logResponses
   };
 
   return new HttpClient({ ...defaultConfig, ...config });

@@ -23,6 +23,9 @@
         </el-input>
         <div class="form-tip">
           工作区的完整路径，将在此路径下创建 .dawei 配置目录<br />
+          <el-tag v-if="isTauri()" type="success" size="small" style="margin-left: 8px">
+            支持 Windows/macOS/Linux
+          </el-tag>
           <el-tag v-if="!isTauri()" type="warning" size="small" style="margin-left: 8px">
             Web 模式：请手动输入路径
           </el-tag>
@@ -137,17 +140,21 @@ const selectDirectory = async () => {
   try {
     selectingDirectory.value = true
 
-    // 调用 Tauri 命令选择目录
+    // 调用 Tauri 命令选择目录（支持 Windows/macOS/Linux）
     const selected = await invoke<string | null>('select_directory')
 
     if (selected) {
       formData.path = selected
+      ElMessage.success('目录已选择')
       // 触发路径验证
       await validatePath()
+    } else {
+      // 用户取消了选择
+      ElMessage.info('已取消目录选择')
     }
   } catch (error) {
     console.error('Directory selection error:', error)
-    ElMessage.error('选择目录失败')
+    ElMessage.error('选择目录失败：' + (error as Error).message)
   } finally {
     selectingDirectory.value = false
   }

@@ -107,6 +107,7 @@ import { useConnectionStore } from '@/stores/connection';
 import { useParallelTasksStore } from '@/stores/parallelTasks';
 import { apiManager } from '@/services/api';
 import { httpClient } from '@/services/api/http';
+import { appConfig } from '@/config/app.config';
 import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
@@ -222,7 +223,7 @@ const handleCloseFile = (fileId: string) => {
 };
 
 // Development helper: expose test function globally
-if (import.meta.env.DEV) {
+if (appConfig.debug.exposeGlobal) {
   (window as unknown).testFollowupDialog = () => {
     followupData.value = {
       question: '这是一个测试问题：你的名字是什么？',

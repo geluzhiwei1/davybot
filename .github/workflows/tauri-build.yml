@@ -403,7 +403,7 @@ jobs:
         if: startsWith(matrix.platform, 'windows')
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-build-${{ matrix.platform }}
+          name: tauri-build-${{ matrix.platform }}-x86_64
           path: |
             webui/src-tauri/target/release/*.zip
             webui/src-tauri/target/release/bundle/

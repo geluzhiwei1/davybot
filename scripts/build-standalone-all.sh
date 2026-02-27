@@ -1,16 +1,19 @@
 #!/bin/bash
 # Complete standalone build script for Linux/macOS
 # Creates portable ZIP package
+# Updated to match GitHub CI workflow
 
 set -e
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT_DIR="${PROJECT_ROOT}/scripts"
+# Get script directory absolute path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
 
 echo "========================================="
-echo "   Dawei Standalone Build Script"
+echo "   Dawei Standalone Build Script v2"
 echo "   ==============================="
 echo "   Creates portable ZIP package"
+echo "   (Matches GitHub CI workflow)"
 echo "========================================="
 echo ""
 
@@ -34,5 +37,3 @@ echo "     - Extract it to any folder"
 echo "     - Run the application directly"
 echo "     - No installation required!"
 echo ""
-
-endlocal

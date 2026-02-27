@@ -113,7 +113,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       workspaceList.value.push(workspace)
       await setWorkspace(workspace.id)
       return workspace
-    } catch {
+    } catch (error) {
       logger.error('Failed to create workspace', error)
       ElMessage.error('创建工作区失败')
       throw error // Fast fail - re-throw for caller to handle
@@ -137,7 +137,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       conversationList.value.push(conversation)
       await setConversation(conversation.id)
       return conversation
-    } catch {
+    } catch (error) {
       logger.error('Failed to create conversation', error)
       ElMessage.error('创建会话失败')
       throw error // Fast fail - re-throw for caller to handle
@@ -151,7 +151,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     try {
       const workspaces = await apiManager.getWorkspacesApi().getWorkspaces()
       workspaceList.value = workspaces
-    } catch {
+    } catch (error) {
       logger.error('Failed to load workspaces', error)
       ElMessage.error('加载工作区失败，请刷新页面重试')
       throw error // Fast fail - re-throw to prevent silent failure
@@ -181,7 +181,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         currentConversationId.value = latestConversation.id
         isTempConversation.value = false
       }
-    } catch {
+    } catch (error) {
       logger.error('Failed to load conversations', error)
       ElMessage.error('加载会话列表失败，请刷新重试')
       throw error // Fast fail - re-throw to prevent silent failure
@@ -291,7 +291,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       }
 
       return loadedMessages
-    } catch {
+    } catch (error) {
       logger.error('[WORKSPACE_STORE] Error loading conversation:', error)
       throw new Error(`加载会话失败: ${error instanceof Error ? error.message : String(error)}`)
     }

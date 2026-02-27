@@ -279,6 +279,32 @@
                 opacity: 0;
             }
         }
+
+        .app-log {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            min-height: 100px;
+        }
+
+        .app-log .log-entry {
+            margin: 2px 0;
+            padding: 2px 4px;
+        }
+
+        .app-log .log-error {
+            color: #f48771;
+        }
+
+        .app-log .log-success {
+            color: #89d185;
+        }
     </style>
 </head>
 <body>
@@ -326,6 +352,10 @@
                 <span>📁</span>
                 <span>进入工作空间</span>
             </button>
+            <button class="btn btn-primary" id="startBackendBtn" onclick="startBackend()">
+                <span>🚀</span>
+                <span>启动后端</span>
+            </button>
             <button class="btn btn-secondary" onclick="refreshStatus()">
                 <span>🔄</span>
                 <span>刷新状态</span>
@@ -336,12 +366,124 @@
         <div class="help-text" id="helpText">
             <p>正在检查后端服务状态...</p>
         </div>
+
+        <!-- Application Log -->
+        <div class="app-log" id="appLog"></div>
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8465';
+        const API_BASE = 'http://localhost:8465/api';
+        let isTauriEnv = false;
+        let isStandalone = false;
+
+        // Application logger - 显示在页面上（开发和生产环境都显示）
+        function screenLog(msg, type = 'info') {
+            const appLog = document.getElementById('appLog');
+            if (!appLog) {
+                console.error('[screenLog] appLog element not found!');
+                return;
+            }
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            if (type === 'error') entry.classList.add('log-error');
+            if (type === 'success') entry.classList.add('log-success');
+
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${msg}`;
+            appLog.appendChild(entry);
+
+            // 滚动到底部显示最新日志
+            appLog.scrollTop = appLog.scrollHeight;
+
+            // 同时输出到控制台（便于开发调试）
+            console.warn(`[Dawei] ${msg}`);
+        }
+
+        // Check if running in Tauri environment
+        async function detectEnvironment() {
+            screenLog('=== 开始环境检测 ===');
+            const startBackendBtn = document.getElementById('startBackendBtn');
+            const helpText = document.getElementById('helpText');
+
+            try {
+                // Check if Tauri API is available
+                if (window.__TAURI__ && window.__TAURI__.core) {
+                    isTauriEnv = true;
+                    screenLog('✓ Tauri环境检测成功', 'success');
+                    if (startBackendBtn) {
+                        startBackendBtn.style.display = 'flex';
+                        screenLog('✓ 启动后端按钮已显示');
+                    }
+                } else {
+                    // Not Tauri environment (web mode)
+                    isTauriEnv = false;
+                    screenLog('✗ Web模式，非Tauri环境');
+                    if (startBackendBtn) {
+                        startBackendBtn.style.display = 'none';
+                    }
+                }
+                screenLog('=== 环境检测完成 ===', 'success');
+            } catch (e) {
+                screenLog(`✗ 环境检测错误: ${e}`, 'error');
+                isTauriEnv = false;
+                if (startBackendBtn) {
+                    startBackendBtn.style.display = 'none';
+                }
+            }
+        }
+
+        async function startBackend() {
+            const startBtn = document.getElementById('startBackendBtn');
+            const helpText = document.getElementById('helpText');
+
+            if (!isTauriEnv) {
+                alert('启动后端功能仅在桌面版本中可用');
+                return;
+            }
+
+            try {
+                screenLog(`🚀 开始启动后端`);
+
+                // Disable button and show loading
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<span class="loading">⚙️</span><span>启动中...</span>';
+
+                helpText.className = 'help-text';
+                helpText.innerHTML = '<p>正在启动后端服务，请稍候...</p>';
+
+                // Call Tauri command
+                const { invoke } = window.__TAURI__.core;
+                const result = await invoke('start_backend');
+                screenLog(`✓ 后端启动成功: ${result}`, 'success');
+
+                // Success
+                helpText.className = 'help-text success';
+                helpText.innerHTML = `<p>✓ ${result}</p><p>正在等待后端服务就绪...</p>`;
+
+                // Wait a bit for backend to start
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // Check server status
+                await checkServerStatus();
+
+            } catch (error) {
+                screenLog(`✗ 启动失败: ${error}`, 'error');
+
+                // Error
+                helpText.className = 'help-text';
+                helpText.innerHTML = `<p>❌ 启动失败: ${String(error)}</p>`;
+
+                // Re-enable button
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<span>🚀</span><span>启动后端</span>';
+            }
+        }
 
         async function checkServerStatus() {
+            screenLog('🔍 检查服务器状态...');
+            screenLog('→ 目标: ' + API_BASE + '/health');
+
             const statusBanner = document.getElementById('statusBanner');
             const statusIconWrapper = document.getElementById('statusIconWrapper');
             const statusIcon = document.getElementById('statusIcon');
@@ -349,16 +491,27 @@
             const statusDesc = document.getElementById('statusDesc');
             const connectionStatus = document.getElementById('connectionStatus');
             const enterBtn = document.getElementById('enterBtn');
+            const startBackendBtn = document.getElementById('startBackendBtn');
             const helpText = document.getElementById('helpText');
 
             try {
+                screenLog('→ 发送健康检查请求...');
+
+                // Create abort controller with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
                 const response = await fetch(`${API_BASE}/health`, {
                     method: 'GET',
-                    signal: AbortSignal.timeout(3000)
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
+                screenLog(`✓ 健康检查响应: ${response.status}`, 'success');
 
                 if (response.ok) {
                     // Online
+                    screenLog('✓ 后端服务运行正常', 'success');
                     statusBanner.className = 'status-banner online';
                     statusIconWrapper.className = 'status-icon-wrapper pulse-success';
                     statusIcon.textContent = '✓';
@@ -368,11 +521,18 @@
                     enterBtn.disabled = false;
                     helpText.className = 'help-text success';
                     helpText.innerHTML = '<p>✓ 后端服务运行正常，可以开始使用</p>';
+
+                    // Re-enable start backend button if it exists
+                    if (startBackendBtn) {
+                        startBackendBtn.disabled = false;
+                        startBackendBtn.innerHTML = '<span>🚀</span><span>启动后端</span>';
+                    }
                 } else {
                     throw new Error('Server not responding');
                 }
             } catch (error) {
                 // Offline
+                screenLog(`✗ 后端离线: ${error}`, 'error');
                 statusBanner.className = 'status-banner offline';
                 statusIconWrapper.className = 'status-icon-wrapper pulse-error';
                 statusIcon.textContent = '✗';
@@ -380,23 +540,62 @@
                 statusDesc.textContent = '请启动后端服务以使用完整功能';
                 connectionStatus.innerHTML = '<span style="color: #ef4444;">✗ 未连接</span>';
                 enterBtn.disabled = true;
-                helpText.className = 'help-text';
-                helpText.innerHTML = '<p>后端服务未启动<br>启动方法：在终端运行 <code>cd agent && dawei server start</code></p>';
+
+                // Update help text based on environment
+                if (isTauriEnv) {
+                    helpText.className = 'help-text';
+                    helpText.innerHTML = '<p>后端服务未启动<br>点击下方"启动后端"按钮即可自动启动</p>';
+                } else {
+                    helpText.className = 'help-text';
+                    helpText.innerHTML = '<p>后端服务未启动<br>启动方法：在终端运行 <code>cd agent && dawei server start</code></p>';
+                }
+
+                // Re-enable start backend button if it exists
+                if (startBackendBtn) {
+                    startBackendBtn.disabled = false;
+                    startBackendBtn.innerHTML = '<span>🚀</span><span>启动后端</span>';
+                }
             }
         }
 
         function refreshStatus() {
+            screenLog('━━━━━━━━━━━━━━━━━━━━━━');
+            screenLog('🔄 刷新状态按钮点击');
+            screenLog('→ 重新检查后端服务状态...');
             checkServerStatus();
         }
 
         function enterApp() {
+            screenLog('📁 进入主应用...');
             // Navigate to the main app
-            window.location.href = 'index.html';
+            // Dev mode: Vite dev server; Production: backend /app path
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // Dev mode: use Vite dev server
+                window.location.href = 'http://localhost:8460/';
+            } else {
+                // Production mode: frontend served by backend at /app
+                window.location.href = '/app';
+            }
         }
 
-        // Check status on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            checkServerStatus();
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            screenLog('🚀 DOM加载完成，开始初始化...');
+
+            // For Tauri, we need to wait for the API to be ready
+            if (window.__TAURI__) {
+                screenLog('⏳ 等待Tauri API就绪...');
+                // Tauri 2.x uses core.invoke, wait a bit for it to be ready
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // First detect environment
+            await detectEnvironment();
+
+            // Then check server status
+            await checkServerStatus();
+
+            screenLog('✅ 初始化完成', 'success');
         });
     </script>
 </body>

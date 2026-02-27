@@ -6,8 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build-only",
-    "devUrl": "http://localhost:8460",
-    "frontendDist": "../dist"
+    "frontendDist": "resources"
   },
   "app": {
     "windows": [
@@ -21,12 +20,14 @@
         "resizable": true,
         "fullscreen": false,
         "center": true,
-        "url": "welcome.html"
+        "url": "welcome.html",
+        "devtools": true
       }
     ],
     "security": {
       "csp": "default-src 'self'; connect-src 'self' http://localhost:* ws://localhost:* https://api.dawei.com wss://api.dawei.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' blob:; object-src 'none'; frame-src 'self';"
-    }
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,

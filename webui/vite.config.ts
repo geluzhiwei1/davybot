@@ -88,17 +88,11 @@ export default defineConfig({
   },
   // Ensure Tauri can find the build output
   build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-    // 生产环境移除console语句，提升性能
+    outDir: 'src-tauri/resources',
+    emptyOutDir: false,
+    // 使用默认压缩配置，保留 logger 的 console.warn/error 调用
+    // logger.ts 会根据环境自动控制日志级别
     minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
-      },
-    },
     // Increase chunk size warning limit (default is 500kB)
     chunkSizeWarningLimit: 1000,
     // Externalize Tauri packages for web builds

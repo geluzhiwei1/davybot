@@ -4,171 +4,55 @@
 use std::path::PathBuf;
 use std::fs;
 use serde_json::Value;
+use tauri::Manager;
 
 // ==================== 崩溃处理模块 ====================
 mod crash_handler;
 use crash_handler::{setup_panic_hook, get_all_crash_reports, clear_all_crash_reports};
 
-// Only include backend management for standalone version
-#[cfg(feature = "standalone")]
-mod backend_management {
-    use std::path::PathBuf;
-    use std::process::Command;
-
-    #[cfg(target_os = "windows")]
-    pub fn get_backend_script() -> PathBuf {
-        let mut exe_path = std::env::current_exe().unwrap();
-        exe_path.pop();
-        exe_path.push("start-backend.bat");
-        exe_path
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    pub fn get_backend_script() -> PathBuf {
-        let mut exe_path = std::env::current_exe().unwrap();
-        exe_path.pop();
-        exe_path.push("start-backend.sh");
-        exe_path
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn get_stop_script() -> PathBuf {
-        let mut exe_path = std::env::current_exe().unwrap();
-        exe_path.pop();
-        exe_path.push("stop-backend.bat");
-        exe_path
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    pub fn get_stop_script() -> PathBuf {
-        let mut exe_path = std::env::current_exe().unwrap();
-        exe_path.pop();
-        exe_path.push("stop-backend.sh");
-        exe_path
-    }
-
-    pub async fn start_backend() -> Result<String, String> {
-        let script_path = get_backend_script();
-
-        if !script_path.exists() {
-            return Err(format!("Backend script not found: {:?}", script_path));
-        }
-
-        #[cfg(target_os = "windows")]
-        let output = Command::new("cmd")
-            .args(["/C", script_path.to_str().unwrap()])
-            .output();
-
-        #[cfg(not(target_os = "windows"))]
-        let output = Command::new("sh")
-            .arg(script_path.to_str().unwrap())
-            .output();
-
-        match output {
-            Ok(_) => Ok("Backend started successfully".to_string()),
-            Err(e) => Err(format!("Failed to start backend: {}", e)),
-        }
-    }
-
-    pub async fn stop_backend() -> Result<String, String> {
-        let script_path = get_stop_script();
-
-        if !script_path.exists() {
-            return Err(format!("Stop script not found: {:?}", script_path));
-        }
-
-        #[cfg(target_os = "windows")]
-        let output = Command::new("cmd")
-            .args(["/C", script_path.to_str().unwrap()])
-            .output();
-
-        #[cfg(not(target_os = "windows"))]
-        let output = Command::new("sh")
-            .arg(script_path.to_str().unwrap())
-            .output();
-
-        match output {
-            Ok(_) => Ok("Backend stopped successfully".to_string()),
-            Err(e) => Err(format!("Failed to stop backend: {}", e)),
-        }
-    }
-
-    pub async fn restart_backend() -> Result<String, String> {
-        // First stop
-        match stop_backend().await {
-            Ok(_) => {
-                // Wait a bit for the backend to stop
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                // Then start
-                start_backend().await
-            }
-            Err(e) => Err(format!("Failed to stop backend during restart: {}", e)),
-        }
-    }
-}
-
-// Backend management for non-standalone versions (via API calls)
-mod backend_management_api {
-    use std::time::Duration;
-
-    /// Try to restart backend via API call
-    pub async fn restart_backend_via_api() -> Result<String, String> {
-        // Try to call the backend's restart endpoint if it exists
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-        // First try to get health to see if backend is running
-        let health_url = "http://127.0.0.1:8465/health";
-        let health_response = client.get(health_url).send().await;
-
-        if health_response.is_err() {
-            return Err("Backend is not running. Please start it manually using 'dawei server start'".to_string());
-        }
-
-        // Try to call restart endpoint (this may not exist in all versions)
-        let restart_url = "http://127.0.0.1:8465/api/server/restart";
-        let response = client.post(restart_url).send().await;
-
-        match response {
-            Ok(resp) => {
-                if resp.status().is_success() {
-                    Ok("Backend restart signal sent".to_string())
-                } else {
-                    Err(format!("Backend returned status: {}", resp.status()))
-                }
-            }
-            Err(_) => {
-                Err("Restart endpoint not available. Please restart manually using 'dawei server restart'".to_string())
-            }
-        }
-    }
-}
-
-// Tauri commands - only available in standalone version
-#[cfg(feature = "standalone")]
+/// Start backend command - unified for both dev and standalone
 #[tauri::command]
 async fn start_backend() -> Result<String, String> {
-    backend_management::start_backend().await
-}
+    use std::process::Command;
+    use std::path::PathBuf;
 
-#[cfg(feature = "standalone")]
-#[tauri::command]
-async fn stop_backend() -> Result<String, String> {
-    backend_management::stop_backend().await
-}
+    // Get uv path from environment variable or use default
+    let uv_path = if let Ok(path) = std::env::var("DAWEI_UV_PATH") {
+        PathBuf::from(path)
+    } else {
+        // Default: check if running from standalone build
+        let exe_path = std::env::current_exe().unwrap();
+        let exe_dir = exe_path.parent().unwrap();
 
-#[cfg(feature = "standalone")]
-#[tauri::command]
-async fn restart_backend() -> Result<String, String> {
-    backend_management::restart_backend().await
-}
+        // Check if resources/python-env/uv exists
+        let standalone_uv = exe_dir.join("resources/python-env/bin/uv");
+        let standalone_uv_bat = exe_dir.join("resources/python-env/Scripts/uv.exe");
 
-/// Restart backend command for non-standalone versions (via API)
-#[tauri::command]
-async fn restart_backend_api() -> Result<String, String> {
-    backend_management_api::restart_backend_via_api().await
+        if standalone_uv.exists() {
+            standalone_uv
+        } else if standalone_uv_bat.exists() {
+            standalone_uv_bat
+        } else {
+            // Fallback to system uv
+            PathBuf::from("uv")
+        }
+    };
+
+    // Unified: use uv dawei server start
+    #[cfg(unix)]
+    let result = Command::new(&uv_path)
+        .args(["run", "--directory", "../agent", "dawei", "server", "start"])
+        .spawn();
+
+    #[cfg(windows)]
+    let result = Command::new(&uv_path)
+        .args(["run", "--directory", "..\\agent", "dawei", "server", "start"])
+        .spawn();
+
+    match result {
+        Ok(_) => Ok("Backend started successfully".to_string()),
+        Err(e) => Err(format!("Failed to start backend: {}", e))
+    }
 }
 
 // ==================== 崩溃报告 Tauri Commands ====================
@@ -180,15 +64,47 @@ async fn navigate_to_main() -> Result<(), String> {
     Ok(())
 }
 
-/// 选择目录
+/// 选择目录（跨平台支持）
 #[tauri::command]
 async fn select_directory() -> Result<Option<String>, String> {
     use rfd::AsyncFileDialog;
 
-    let file_dialog = AsyncFileDialog::new();
+    // 获取用户主目录作为默认位置
+    let home_dir = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    // 创建文件对话框，设置初始目录为用户主目录
+    let mut file_dialog = AsyncFileDialog::new()
+        .set_directory(&home_dir);
+
+    // 平台特定优化
+    #[cfg(target_os = "macos")]
+    {
+        // macOS显示优化
+        file_dialog = file_dialog.set_title("选择工作区目录");
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows显示优化
+        file_dialog = file_dialog.set_title("选择工作区目录");
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux显示优化
+        file_dialog = file_dialog.set_title("选择工作区目录");
+    }
+
     let folder = file_dialog.pick_folder().await;
 
-    Ok(folder.map(|p| p.path().to_string_lossy().to_string()))
+    match folder {
+        Some(path) => {
+            let path_str = path.path().to_string_lossy().to_string();
+            Ok(Some(path_str))
+        }
+        None => Ok(None)
+    }
 }
 
 /// 获取所有崩溃报告
@@ -251,37 +167,23 @@ async fn clear_crash_reports() -> Result<(), String> {
 fn main() {
     // ==================== 设置 Panic Hook ====================
     setup_panic_hook();
+
+    // 只在debug模式启用DevTools
+    #[cfg(debug_assertions)]
+    {
+        std::env::set_var("TAURI_DEVTOOLS", "1");
+    }
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init());
 
-    #[cfg(feature = "standalone")]
+    // 只在debug模式自动打开DevTools (所有构建类型)
+    #[cfg(debug_assertions)]
     let builder = builder.setup(|app| {
-        // Auto-start backend on app launch (standalone only)
-        let _app_handle = app.handle().clone();
-        tauri::async_runtime::spawn(async move {
-            // Wait a bit for the app to initialize
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-
-            match start_backend().await {
-                Ok(msg) => println!("{}", msg),
-                Err(e) => eprintln!("Failed to start backend: {}", e),
-            }
-        });
-        Ok(())
-    });
-
-    #[cfg(feature = "standalone")]
-    let builder = builder.on_window_event(|window, event| {
-        // Stop backend when window is closing (standalone only)
-        if let tauri::WindowEvent::CloseRequested { .. } = event {
-            let _app_handle = window.app_handle();
-            tauri::async_runtime::block_on(async move {
-                match stop_backend().await {
-                    Ok(msg) => println!("{}", msg),
-                    Err(e) => eprintln!("Failed to stop backend: {}", e),
-                }
-            });
+        if let Some(window) = app.get_webview_window("main") {
+            window.open_devtools();
         }
+        Ok(())
     });
 
     builder
@@ -297,14 +199,7 @@ fn main() {
             get_dawei_home_command,
             get_server_start_info,
             // 后端管理命令
-            #[cfg(feature = "standalone")]
             start_backend,
-            #[cfg(feature = "standalone")]
-            stop_backend,
-            #[cfg(feature = "standalone")]
-            restart_backend,
-            // 非standalone版本的重启命令
-            restart_backend_api,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
