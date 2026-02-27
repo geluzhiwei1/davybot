@@ -28,11 +28,11 @@ jobs:
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'aarch64-apple-darwin'
             arch: 'aarch64'
-          - platform: 'linux-latest'
+          - platform: 'ubuntu-latest'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
-          - platform: 'linux-latest'
+          - platform: 'ubuntu-latest'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'aarch64-unknown-linux-gnu'
             arch: 'aarch64'
@@ -68,11 +68,11 @@ jobs:
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
       - name: Add Rust targets (Linux ARM64)
-        if: matrix.platform == 'linux-latest' && matrix.arch == 'aarch64'
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
         run: rustup target add aarch64-unknown-linux-gnu
 
       - name: Install ARM64 cross-compilation tools
-        if: matrix.platform == 'linux-latest' && matrix.arch == 'aarch64'
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -81,7 +81,7 @@ jobs:
             qemu-user-static
 
       - name: Configure Rust for ARM64 cross-compilation
-        if: matrix.platform == 'linux-latest' && matrix.arch == 'aarch64'
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
         run: |
           mkdir -p ~/.cargo
           cat >> ~/.cargo/config.toml << 'EOF'
@@ -97,7 +97,7 @@ jobs:
 
       # ========== Platform-specific setup ==========
       - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'linux-latest'
+        if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf p7zip-full
@@ -272,7 +272,7 @@ jobs:
           ls -la "${ZIP_NAME}"
 
       - name: Build Tauri app (Linux)
-        if: startsWith(matrix.platform, 'linux')
+        if: startsWith(matrix.platform, 'ubuntu')
         working-directory: ./webui
         run: |
           # For Linux, build for the specific architecture
@@ -359,7 +359,7 @@ jobs:
           7z a -tzip "${ZIP_NAME}" "$(basename "${ZIP_DIR}")" -mx=9
 
       - name: Create portable ZIP package (Linux)
-        if: matrix.platform == 'linux-latest'
+        if: matrix.platform == 'ubuntu-latest'
         shell: bash
         run: |
           VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
@@ -446,7 +446,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload artifacts (Linux)
-        if: startsWith(matrix.platform, 'linux')
+        if: startsWith(matrix.platform, 'ubuntu')
         uses: actions/upload-artifact@v4
         with:
           name: davybot-standalone-${{ matrix.platform }}-${{ matrix.arch }}
