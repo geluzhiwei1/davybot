@@ -250,7 +250,11 @@ class Agent:
             logger.info("[AGENT_CREATE] Creating base services...")
             # 创建基础服务
             message_processor = EnhancedSystemBuilder(user_workspace=user_workspace)
-            llm_service = LLMProvider(workspace_path=user_workspace.absolute_path)
+
+            if not user_workspace.llm_manager:
+                raise RuntimeError("Workspace LLM manager not initialized")
+            llm_service = user_workspace.llm_manager
+            logger.info("[AGENT_CREATE] Using workspace's LLMProvider")
 
             # 【修复】使用 WorkspaceToolManager 而不是 ToolManager
             # WorkspaceToolManager 会初始化 Skills 工具

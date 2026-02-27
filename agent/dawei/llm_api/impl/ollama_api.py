@@ -280,7 +280,10 @@ class OllamaClient(OpenaiCompatibleClient):
             self.logger.debug(f"Request params: {json.dumps(params, indent=2)}")
 
             try:
-                async with session.post(url, json=params) as response:
+                # 准备请求参数（包括代理配置）
+                request_kwargs = self._prepare_request_kwargs(params, url)
+
+                async with session.post(url, **request_kwargs) as response:
                     self.logger.info(f"Response status: {response.status}")
 
                     if response.status != 200:
@@ -364,7 +367,10 @@ class OllamaClient(OpenaiCompatibleClient):
             session = self._get_client_session()
             url = f"{self.base_url}/{endpoint}"
 
-            async with session.post(url, json=params) as response:
+            # 准备请求参数（包括代理配置）
+            request_kwargs = self._prepare_request_kwargs(params, url)
+
+            async with session.post(url, **request_kwargs) as response:
                 if response.status != 200:
                     error_text = await response.text()
                     raise LLMError(f"Ollama API request failed: {response.status} - {error_text}")

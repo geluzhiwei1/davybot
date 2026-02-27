@@ -548,20 +548,145 @@ class UserWorkspace:
         logger.info(f"Workspace config saved: {config_file}")
 
     async def _load_settings(self):
-        """加载设置配置"""
-        if not self.settings_file.exists():
-            logger.warning("Settings file not found, using defaults")
-            self.workspace_settings = WorkspaceSettings()
-            return
+        """加载设置配置（合并全局配置和工作区配置）
 
-        with Path(self.settings_file).open(encoding="utf-8") as f:
-            config_data = json.load(f)
+        配置继承规则：
+        1. 全局配置：~/.dawei/configs/settings.json
+        2. 工作区配置：{workspace}/.dawei/settings.json
+        3. 工作区配置覆盖全局配置（相同字段）
+        4. 工作区不存在的字段继承全局配置
 
-        # LLM 配置现在由 LLMProvider 管理，这里只加载工作区设置
-        global_settings = config_data.get("globalSettings", {})
-        self.workspace_settings = WorkspaceSettings.from_dict(global_settings)
+        注意：
+        - 空字符串、空列表、False、0 等假值会正确覆盖全局配置
+        - 显式设置的字段会继承全局默认值
+        - 例如：全局 config["allowedCommands"] = ["pnpm"]，
+          工作区不设置该字段时，会继承 ["pnpm"]
+          工作区设置 "allowedCommands": [] 时，会覆盖为 []
+        """
+        # 1. 先加载全局配置作为基础
+        global_settings_path = Path.home() / ".dawei" / "configs" / "settings.json"
+        global_settings_dict = {}
+
+        if global_settings_path.exists():
+            try:
+                with global_settings_path.open(encoding="utf-8") as f:
+                    global_data = json.load(f)
+                    global_settings_dict = global_data.get("globalSettings", {})
+                    logger.info(f"Loaded global settings from {global_settings_path}")
+            except (OSError, json.JSONDecodeError) as e:
+                logger.warning(f"Failed to load global settings: {e}")
+
+        # 2. 加载工作区配置（覆盖全局配置）
+        workspace_settings_dict = {}
+        if self.settings_file.exists():
+            try:
+                with Path(self.settings_file).open(encoding="utf-8") as f:
+                    config_data = json.load(f)
+                    workspace_settings_dict = config_data.get("globalSettings", {})
+                    logger.info(f"Loaded workspace settings from {self.settings_file}")
+            except (OSError, json.JSONDecodeError) as e:
+                logger.warning(f"Failed to load workspace settings: {e}")
+        else:
+            logger.info("Workspace settings file not found, using global settings")
+
+        # 3. 合并配置（工作区配置覆盖全局配置）
+        merged_settings = {**global_settings_dict, **workspace_settings_dict}
+
+        # 4. 创建 WorkspaceSettings 对象
+        self.workspace_settings = WorkspaceSettings.from_dict(merged_settings)
+
+        # 5. 记录配置来源
+        if workspace_settings_dict:
+            overridden_fields = set(workspace_settings_dict.keys()) & set(global_settings_dict.keys())
+            if overridden_fields:
+                logger.info(f"Workspace settings override global fields: {overridden_fields}")
+            else:
+                logger.info("Workspace settings only add new fields to global settings")
 
         logger.info("Workspace settings loaded successfully.")
+
+    async def _save_settings(self, only_fields: set[str] | None = None):
+        """保存设置配置到 settings.json
+
+        Args:
+            only_fields: 只保存指定的字段（驼峰命名，如 {"httpProxy", "httpsProxy"}），
+                        None 表示保存所有字段
+        """
+        if self.workspace_settings is None:
+            self.workspace_settings = WorkspaceSettings()
+
+        # 读取现有的 settings.json（如果存在）
+        existing_data = {}
+        if self.settings_file.exists():
+            try:
+                with Path(self.settings_file).open(encoding="utf-8") as f:
+                    existing_data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        # 字段名映射：Python 字段名 -> JSON 字段名
+        field_mapping = {
+            "auto_approval_enabled": "autoApprovalEnabled",
+            "always_allow_read_only": "alwaysAllowReadOnly",
+            "always_allow_read_only_outside_workspace": "alwaysAllowReadOnlyOutsideWorkspace",
+            "always_allow_write": "alwaysAllowWrite",
+            "always_allow_write_outside_workspace": "alwaysAllowWriteOutsideWorkspace",
+            "always_allow_write_protected": "alwaysAllowWriteProtected",
+            "write_delay_ms": "writeDelayMs",
+            "always_allow_browser": "browserToolEnabled",
+            "always_approve_resubmit": "alwaysApproveResubmit",
+            "request_delay_seconds": "requestDelaySeconds",
+            "always_allow_mcp": "mcpEnabled",
+            "always_allow_mode_switch": "alwaysAllowModeSwitch",
+            "always_allow_subtasks": "alwaysAllowSubtasks",
+            "always_allow_execute": "alwaysAllowExecute",
+            "always_allow_followup_questions": "alwaysAllowFollowupQuestions",
+            "followup_auto_approve_timeout_ms": "followupAutoApproveTimeoutMs",
+            "always_allow_update_todo_list": "alwaysAllowUpdateTodoList",
+            "allowed_commands": "allowedCommands",
+            "denied_commands": "deniedCommands",
+            "max_concurrent_file_reads": "maxConcurrentFileReads",
+            "max_workspace_files": "maxWorkspaceFiles",
+            "max_read_file_line": "maxReadFileLine",
+            "max_image_file_size": "maxImageFileSize",
+            "max_total_image_size": "maxTotalImageSize",
+            "terminal_output_line_limit": "terminalOutputLineLimit",
+            "terminal_output_character_limit": "terminalOutputCharacterLimit",
+            "http_proxy": "httpProxy",
+            "https_proxy": "httpsProxy",
+            "no_proxy": "noProxy",
+        }
+
+        # 增量更新或全量更新
+        if only_fields:
+            # 增量模式：只更新指定的字段
+            if "globalSettings" not in existing_data:
+                existing_data["globalSettings"] = {}
+
+            for py_field, json_field in field_mapping.items():
+                if json_field in only_fields:
+                    # 更新指定字段
+                    value = getattr(self.workspace_settings, py_field)
+                    existing_data["globalSettings"][json_field] = value
+
+            logger.info(f"Workspace settings incremental update: {only_fields}")
+        else:
+            # 全量模式：保存所有字段（向后兼容）
+            settings_dict = {
+                json_field: getattr(self.workspace_settings, py_field)
+                for py_field, json_field in field_mapping.items()
+            }
+            existing_data["globalSettings"] = settings_dict
+            logger.info("Workspace settings full update")
+
+        # 确保 settings 目录存在
+        self.settings_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # 写入文件
+        with self.settings_file.open("w", encoding="utf-8") as f:
+            json.dump(existing_data, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Workspace settings saved: {self.settings_file}")
 
     async def _load_plugins_config(self):
         """加载插件配置

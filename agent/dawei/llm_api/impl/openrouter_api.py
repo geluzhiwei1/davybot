@@ -228,7 +228,10 @@ class OpenRouterClient(BaseClient):
 
             while retry_count < self.max_retries:
                 try:
-                    async with session.post(url, json=params) as response:
+                    # 准备请求参数（包括代理配置）
+                    request_kwargs = self._prepare_request_kwargs(params, url)
+
+                    async with session.post(url, **request_kwargs) as response:
                         if response.status == 200:
                             async for line in response.content:
                                 line = line.decode("utf-8").strip()
@@ -399,7 +402,10 @@ class OpenRouterClient(BaseClient):
 
             logger.info(f"Generating image with model: {model}")
 
-            async with aiohttp.ClientSession(headers=headers) as session, session.post(url, json=request_body) as response:
+            # 准备请求参数（包括代理配置）
+            request_kwargs = self._prepare_request_kwargs(request_body, url)
+
+            async with aiohttp.ClientSession(headers=headers) as session, session.post(url, **request_kwargs) as response:
                 if not response.ok:
                     error_text = await response.text()
                     error_message = f"Failed to generate image: {response.status} {response.status_text}"

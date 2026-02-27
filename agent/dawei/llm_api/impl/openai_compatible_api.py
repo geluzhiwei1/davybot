@@ -256,7 +256,10 @@ class OpenaiCompatibleClient(BaseClient):
                     url_local = url
 
                     try:
-                        async with session.post(url, json=params) as response:
+                        # 准备请求参数（包括代理配置）
+                        request_kwargs = self._prepare_request_kwargs(params, url)
+
+                        async with session.post(url, **request_kwargs) as response:
                             response_status_local = response.status
                             response_headers_local = dict(response.headers)
 

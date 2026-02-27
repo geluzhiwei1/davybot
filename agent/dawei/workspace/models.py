@@ -124,6 +124,10 @@ class WorkspaceSettings:
     max_total_image_size: int = 20
     terminal_output_line_limit: int = 500
     terminal_output_character_limit: int = 50000
+    # 代理配置
+    http_proxy: str = ""
+    https_proxy: str = ""
+    no_proxy: str = ""
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "WorkspaceSettings":
@@ -161,6 +165,9 @@ class WorkspaceSettings:
             max_total_image_size=config_dict.get("maxTotalImageSize", 20),
             terminal_output_line_limit=config_dict.get("terminalOutputLineLimit", 500),
             terminal_output_character_limit=config_dict.get("terminalOutputCharacterLimit", 50000),
+            http_proxy=config_dict.get("httpProxy", ""),
+            https_proxy=config_dict.get("httpsProxy", ""),
+            no_proxy=config_dict.get("noProxy", ""),
         )
 
 

@@ -197,6 +197,49 @@ class BaseClient(LlmApi, ABC):
             self._session = ClientSession(**session_kwargs)
         return self._session
 
+    def _get_proxy_config(self) -> dict[str, Any] | None:
+        """获取代理配置
+
+        Returns:
+            代理配置字典，如果没有配置则返回 None
+        """
+        # 从配置中读取代理设置（支持驼峰和下划线两种命名）
+        http_proxy = self.config.get("http_proxy", self.config.get("httpProxy", ""))
+        https_proxy = self.config.get("https_proxy", self.config.get("httpsProxy", ""))
+
+        # 如果两个都是空的，返回 None
+        if not http_proxy and not https_proxy:
+            return None
+
+        # 使用 https_proxy 优先，否则使用 http_proxy
+        proxy_url = https_proxy or http_proxy
+
+        return {
+            "http": http_proxy or proxy_url,
+            "https": https_proxy or proxy_url,
+        }
+
+    def _prepare_request_kwargs(self, params: dict[str, Any], url: str) -> dict[str, Any]:
+        """准备请求参数（包括代理配置）
+
+        Args:
+            params: 请求参数
+            url: 请求URL
+
+        Returns:
+            包含代理配置的请求参数字典
+        """
+        request_kwargs = {"json": params}
+
+        # 获取并添加代理配置
+        proxy_config = self._get_proxy_config()
+        if proxy_config:
+            # 根据URL的schema选择代理
+            proxy = proxy_config.get("https" if url.startswith("https") else "http")
+            request_kwargs["proxy"] = proxy
+
+        return request_kwargs
+
     @abstractmethod
     def _prepare_headers(self) -> dict[str, str]:
         """准备请求头"""
@@ -356,7 +399,10 @@ class BaseClient(LlmApi, ABC):
             logger.info(f"Headers: {session.headers}")
             logger.info(f"Body: {json.dumps(params, indent=2, ensure_ascii=False)}")
 
-            async with session.post(url, json=params) as response:
+            # 准备请求参数（包括代理配置）
+            request_kwargs = self._prepare_request_kwargs(params, url)
+
+            async with session.post(url, **request_kwargs) as response:
                 logger.info(f"Response Status: {response.status}")
                 logger.info(f"Response Headers: {dict(response.headers)}")
 
@@ -435,7 +481,10 @@ class BaseClient(LlmApi, ABC):
             logger.info(f"Headers: {session.headers}")
             logger.info(f"Body: {json.dumps(params, indent=2, ensure_ascii=False)}")
 
-            async with session.post(url, json=params) as response:
+            # 准备请求参数（包括代理配置）
+            request_kwargs = self._prepare_request_kwargs(params, url)
+
+            async with session.post(url, **request_kwargs) as response:
                 if response.status != 200:
                     error_text = await response.text()
 

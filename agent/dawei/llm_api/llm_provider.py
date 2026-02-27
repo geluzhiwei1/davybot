@@ -67,6 +67,18 @@ def _load_settings_file(settings_file: Path, source: str) -> dict[str, LLMProvid
         logger.error(f"Failed to load settings from {settings_file}: {e}", exc_info=True)
         raise RuntimeError(f"Cannot load LLM settings: {e}")
 
+    # 加载全局代理配置（从 globalSettings）
+    global_proxy_config = {}
+    if data and "globalSettings" in data:
+        global_settings = data.get("globalSettings", {})
+        global_proxy_config = {
+            "httpProxy": global_settings.get("httpProxy", ""),
+            "httpsProxy": global_settings.get("httpsProxy", ""),
+            "noProxy": global_settings.get("noProxy", ""),
+        }
+        if any(global_proxy_config.values()):
+            logger.info(f"Loaded proxy config from globalSettings: {global_proxy_config}")
+
     configs = {}
     if data and "providerProfiles" in data:
         provider_profiles = data["providerProfiles"]
@@ -75,13 +87,19 @@ def _load_settings_file(settings_file: Path, source: str) -> dict[str, LLMProvid
         mode_api_configs = provider_profiles.get("modeApiConfigs", {})
 
         for config_name, config_data in api_configs.items():
-            llm_config = LLMConfig.from_dict(config_data)
+            # 合并全局代理配置到每个 LLM 配置
+            # 如果 LLM 配置本身没有设置代理，则使用全局代理
+            merged_config = {**config_data}
+            if global_proxy_config and not config_data.get("httpProxy"):
+                merged_config.update(global_proxy_config)
+
+            llm_config = LLMConfig.from_dict(merged_config)
             provider_config = LLMProviderConfig(
                 name=config_name,
                 config=llm_config,
                 source=source,
                 is_default=(config_name == current_config_name),
-                raw_config=config_data,  # 保存完整的原始配置数据
+                raw_config=merged_config,  # 保存合并后的完整配置
             )
             configs[config_name] = provider_config
 
@@ -745,10 +763,20 @@ class LLMProvider(ILLMService):
         return None
 
     def reload_configs(self):
-        """重新加载所有配置"""
+        """重新加载所有配置并清理现有客户端"""
+        # 清理所有活跃的客户端，强制下次使用新配置创建新实例
+        if self._active_llm_clients:
+            logger.info(f"Cleaning up {len(self._active_llm_clients)} active LLM clients before reload...")
+            # 直接清空列表，让旧客户端被垃圾回收
+            # 注意：旧客户端的 HTTP session 会在下次使用时自动创建新实例
+            self._active_llm_clients.clear()
+            logger.info("All active LLM clients cleared")
+
+        # 重新加载配置
         self._configs.clear()
         self._mode_llm_configs.clear()
         self._load_all_configs()
+
         # 清理流管理器缓存，因为配置可能已更改
         self._parser_cache.clear_cache()
         logger.info("All LLM configurations reloaded")

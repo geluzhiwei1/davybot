@@ -6,6 +6,7 @@
 import logging
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
@@ -92,7 +93,10 @@ async def get_workspace_files_or_content(
 ):
     """Gets the file list of a workspace or the content of a single file."""
     if not await storage.exists(path):
-        raise FileNotFoundError(f"Path does not exist: {path}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Path does not exist: {path}",
+        )
 
     if await storage.is_directory(path):
         files = await storage.list_directory(
@@ -447,12 +451,22 @@ async def get_mode_rules(
                 # 尝试转换为相对于工作区的路径
                 try:
                     relative_dir = str(rules_abs_path.relative_to(workspace_path))
-                except ValueError:
-                    # 如果不在工作区内，使用绝对路径但简化显示
-                    relative_dir = str(rules_abs_path)
+                except ValueError as e:
+                    # 规则目录不在工作区内，这是配置错误
+                    logger.error(
+                        f"Rules directory {rules_abs_path} is not within workspace {workspace_path}"
+                    )
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Rules directory must be within workspace path: {e}",
+                    )
             except Exception as e:
-                logger.warning(f"Failed to convert rules dir to relative: {e}")
-                relative_dir = str(rules_dir) if rules_dir else None
+                # 其他意外错误 - fast fail
+                logger.error(f"Failed to convert rules dir to relative path: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to process rules directory: {e!s}",
+                )
 
         logger.info(f"Successfully retrieved {len(rules_dict)} rules files for mode {mode_slug}")
         return ModeRulesResponse(success=True, rules=rules_dict, directory=relative_dir)
@@ -621,8 +635,15 @@ async def update_mode_rules(
         if rules_dir and workspace.absolute_path:
             try:
                 relative_dir = str(Path(rules_dir).relative_to(Path(workspace.absolute_path)))
-            except ValueError:
-                relative_dir = rules_dir
+            except ValueError as e:
+                # 规则目录不在工作区内，这是配置错误
+                logger.error(
+                    f"Rules directory {rules_dir} is not within workspace {workspace.absolute_path}"
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Rules directory must be within workspace path: {e}",
+                )
 
         return ModeRulesResponse(
             success=True,
@@ -644,4 +665,127 @@ async def update_mode_rules(
         # Unexpected error - fast fail
         logger.critical(f"Unexpected error updating rules for mode {mode_slug}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# --- 代理配置路由 ---
+
+
+def _validate_proxy_url(proxy_url: str, field_name: str) -> None:
+    """验证代理URL格式
+
+    Args:
+        proxy_url: 代理URL
+        field_name: 字段名称（用于错误消息）
+
+    Raises:
+        HTTPException: 如果URL格式无效
+    """
+    if not proxy_url:
+        return  # 空字符串是有效的（表示禁用代理）
+
+    try:
+        result = urlparse(proxy_url)
+        # 检查必需的URL组件
+        if not result.scheme or not result.netloc:
+            raise ValueError("Missing scheme or network location")
+
+        # 检查支持的协议
+        valid_schemes = {"http", "https", "socks", "socks5"}
+        if result.scheme not in valid_schemes:
+            raise ValueError(f"Unsupported scheme. Supported schemes: {', '.join(valid_schemes)}")
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {field_name} URL format: {e}",
+        )
+
+
+@router.get("/{workspace_id}/proxy")
+async def get_proxy_config(
+    workspace_id: str,
+    workspace: UserWorkspace = Depends(get_user_workspace),
+):
+    """获取工作区代理配置"""
+    try:
+        # 确保工作区已初始化
+        if not workspace.is_initialized():
+            await workspace.initialize()
+
+        # 确保settings已加载
+        if workspace.workspace_settings is None:
+            await workspace._load_settings()
+
+        # 返回代理配置
+        return {
+            "http_proxy": workspace.workspace_settings.http_proxy,
+            "https_proxy": workspace.workspace_settings.https_proxy,
+            "no_proxy": workspace.workspace_settings.no_proxy,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get proxy config: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get proxy config: {e!s}",
+        )
+
+
+@router.put("/{workspace_id}/proxy")
+async def update_proxy_config(
+    workspace_id: str,
+    proxy_update: dict[str, Any],
+    workspace: UserWorkspace = Depends(get_user_workspace),
+):
+    """更新工作区代理配置"""
+    try:
+        # 确保工作区已初始化
+        if not workspace.is_initialized():
+            await workspace.initialize()
+
+        # 确保settings已加载
+        if workspace.workspace_settings is None:
+            await workspace._load_settings()
+
+        # 验证并更新代理配置
+        updated_fields = set()
+        if "http_proxy" in proxy_update:
+            _validate_proxy_url(proxy_update["http_proxy"], "http_proxy")
+            workspace.workspace_settings.http_proxy = proxy_update["http_proxy"]
+            updated_fields.add("httpProxy")
+        if "https_proxy" in proxy_update:
+            _validate_proxy_url(proxy_update["https_proxy"], "https_proxy")
+            workspace.workspace_settings.https_proxy = proxy_update["https_proxy"]
+            updated_fields.add("httpsProxy")
+        if "no_proxy" in proxy_update:
+            # no_proxy 不需要URL验证（它是逗号分隔的域名列表）
+            workspace.workspace_settings.no_proxy = proxy_update["no_proxy"]
+            updated_fields.add("noProxy")
+
+        # 增量保存配置（只保存 proxy 字段，不影响其他配置）
+        await workspace._save_settings(only_fields=updated_fields)
+
+        logger.info(f"Proxy config updated for workspace {workspace_id}")
+
+        # 重新加载 LLM 配置以应用新的 proxy 设置
+        if workspace.llm_manager:
+            try:
+                workspace.llm_manager.reload_configs()
+                logger.info(f"LLM configs reloaded after proxy update for workspace {workspace_id}")
+            except Exception as e:
+                logger.warning(f"Failed to reload LLM configs after proxy update: {e}")
+
+        # 返回更新后的代理配置
+        return {
+            "http_proxy": workspace.workspace_settings.http_proxy,
+            "https_proxy": workspace.workspace_settings.https_proxy,
+            "no_proxy": workspace.workspace_settings.no_proxy,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to update proxy config: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update proxy config: {e!s}",
+        )
 
