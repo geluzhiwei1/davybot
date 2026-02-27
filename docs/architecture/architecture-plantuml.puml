@@ -1,0 +1,798 @@
+@startuml Dawei架构图 - PlantUML版本
+
+!define THEME event
+!include <archimate/Archimate>
+
+title Dawei Agent 系统架构图
+
+' ========================================
+' 1. 系统分层架构图
+' ========================================
+
+package "UI Layer - 用户界面层" {
+    [CLI\n命令行界面] as CLI
+    [TUI\n文本界面] as TUI
+    [REST API\nFastAPI] as REST
+}
+
+package "Communication Layer - 通信层" {
+    [WebSocket\n实时通信] as WS
+    [AsyncTask\n异步任务] as AT
+    [A2UI\n交互式UI] as A2UI
+}
+
+package "Agent Layer - 智能体层" {
+    [Agent\n核心智能体] as Agent
+    [TaskGraph\n任务图引擎] as TG
+    [Mode System\nPDCA模式] as Mode
+    [Memory\n记忆系统] as Mem
+}
+
+package "Tool Layer - 工具层" {
+    [ToolManager\n工具管理器] as TM
+    [SkillManager\n技能管理器] as SM
+    [Sandbox\n沙箱执行] as Sand
+    [MCP Manager\nMCP工具] as MCP
+}
+
+package "LLM Layer - 大模型层" {
+    [LLMProvider\n多提供商] as LLM
+    [ModelRouter\n模型路由] as MR
+    [CircuitBreaker\n熔断器] as CB
+    [RequestQueue\n请求队列] as RQ
+}
+
+package "Data Layer - 数据层" {
+    [Storage\n存储抽象] as Store
+    [Workspace\n工作空间] as WS
+    [Conversation\n会话管理] as Conv
+    [Checkpoint\n检查点] as CP
+}
+
+package "Infrastructure Layer - 基础设施层" {
+    [EventBus\n事件总线] as EB
+    [DI Container\n依赖注入] as DI
+    [Config\n配置管理] as CFG
+    [Logger\n日志系统] as LOG
+    [Metrics\n指标收集] as MET
+}
+
+' 连接关系
+CLI -down-> Agent
+TUI -down-> Agent
+REST -down-> WS
+
+WS -down-> Agent
+AT -down-> Agent
+A2UI -down-> Agent
+
+Agent -down-> TG
+Agent -down-> Mode
+Agent -down-> Mem
+
+TG -down-> TM
+TG -down-> LLM
+
+TM -down-> SM
+TM -down-> Sand
+TM -down-> MCP
+
+LLM -down-> MR
+MR -down-> CB
+CB -down-> RQ
+
+Agent -down-> Store
+Agent -down-> WS
+Agent -down-> Conv
+TG -down-> CP
+
+Agent -down-> EB
+Agent -down-> DI
+Agent -down-> CFG
+Agent -down-> LOG
+Agent -down-> MET
+
+' 高亮核心组件
+ Agent #Pink
+ EB #LightYellow
+ DI #LightYellow
+
+@enduml
+
+@startuml Dawei 3C图 - Component-Class-Connection
+
+title Dawei 3C 图 (Component - Class - Connection)
+
+' ========================================
+' 2.1 Agent Orchestration Component
+' ========================================
+
+package "Component: Agent Orchestration" {
+    class Agent {
+        -event_bus: EventBus
+        -task_engine: TaskGraphExecutionEngine
+        -tool_executor: IToolExecutor
+        -llm_service: ILLMService
+        -mode_manager: ModeManager
+        +run(task_graph)
+        +stop()
+        +switch_mode(mode)
+    }
+
+    class TaskGraphExecutionEngine {
+        -agent: Agent
+        -node_executors: Dict
+        +execute(graph)
+        +create_node_executor(node)
+    }
+
+    class TaskNodeExecutionEngine {
+        -node: TaskNode
+        -llm_service: ILLMService
+        -tool_executor: IToolExecutor
+        +execute(node)
+        +handle_tool_call(tool)
+    }
+
+    class CheckpointManager {
+        +save_checkpoint()
+        +load_checkpoint()
+        +compute_diff()
+    }
+
+    class ContextManager {
+        +manage_context()
+        +count_tokens()
+        +paginate()
+    }
+
+    Agent *-- TaskGraphExecutionEngine : owns
+    Agent *-- CheckpointManager : uses
+    Agent *-- ContextManager : uses
+    TaskGraphExecutionEngine *-- TaskNodeExecutionEngine : creates
+}
+
+' ========================================
+' 2.2 Tool System Component
+' ========================================
+
+package "Component: Tool System" {
+    class ToolManager {
+        -tool_providers: List
+        -skill_manager: SkillManager
+        +get_tool(name)
+        +list_tools()
+        +reload_tools()
+    }
+
+    class ToolExecutor {
+        -tool_manager: ToolManager
+        +execute(tool_name, args)
+        +execute_tool_call(tool_call)
+    }
+
+    class SkillManager {
+        +discover_skills()
+        +load_skill()
+        +search_skills()
+    }
+
+    class CustomBaseTool {
+        <<abstract>>
+        +execute()
+        +validate()
+    }
+
+    ToolManager *-- SkillManager : manages
+    ToolExecutor ..> ToolManager : uses
+    CustomBaseTool <|--.. ToolExecutor : executes
+}
+
+' ========================================
+' 2.3 LLM Integration Component
+' ========================================
+
+package "Component: LLM Integration" {
+    class LLMProvider {
+        -model_router: ModelRouter
+        -circuit_breaker: CircuitBreaker
+        -rate_limiter: RateLimiter
+        +chat(messages)
+        +stream(messages)
+    }
+
+    class ModelRouter {
+        -models: List
+        -load_balancer: LoadBalancer
+        +route(request)
+        +add_model(model)
+    }
+
+    class CircuitBreaker {
+        -state: State
+        -failure_count: int
+        +call()
+        +reset()
+    }
+
+    class RateLimiter {
+        -rate: float
+        +acquire()
+        +release()
+    }
+
+    LLMProvider *-- ModelRouter : uses
+    ModelRouter ..> CircuitBreaker : protected by
+    CircuitBreaker ..> RateLimiter : limited by
+}
+
+' ========================================
+' 2.4 Communication Component
+' ========================================
+
+package "Component: Communication" {
+    class WebSocketManager {
+        -router: MessageRouter
+        -sessions: Dict
+        -event_bus: EventBus
+        +connect(ws)
+        +disconnect(session_id)
+        +broadcast(message)
+    }
+
+    class MessageRouter {
+        -handlers: Dict
+        +register(message_type, handler)
+        +route(message)
+    }
+
+    class SessionManager {
+        -sessions: Dict
+        +create_session()
+        +get_session()
+        +close_session()
+    }
+
+    class MessageProtocol {
+        <<enumeration>>
+        CONNECT
+        USER_MESSAGE
+        STREAM_CONTENT
+        TOOL_CALL
+        AGENT_COMPLETE
+    }
+
+    WebSocketManager *-- MessageRouter : routes via
+    WebSocketManager *-- SessionManager : manages
+    MessageRouter ..> MessageProtocol : validates
+}
+
+' ========================================
+' 2.5 Infrastructure Component
+' ========================================
+
+package "Component: Infrastructure" {
+    class EventBus {
+        -subscribers: Dict
+        +subscribe(event_type, handler)
+        +publish(event)
+        -notify(event_type, data)
+    }
+
+    class DependencyContainer {
+        -services: Dict
+        +register(service, instance)
+        +resolve(service_type)
+    }
+
+    class Settings {
+        +database: DatabaseConfig
+        +llm: LLMProviderConfig
+        +agent: AgentExecutionConfig
+    }
+
+    class ErrorHandler {
+        +handle_errors()
+        +log_error()
+    }
+
+    EventBus ..> DependencyContainer : injected via
+    DependencyContainer ..> Settings : configured by
+    EventBus ..> ErrorHandler : handled by
+}
+
+' 组件间连接
+Agent ..> ToolExecutor : requires
+Agent ..> LLMProvider : requests LLM
+Agent ..> WebSocketManager : communicates
+TaskNodeExecutionEngine ..> ToolExecutor : uses
+TaskNodeExecutionEngine ..> LLMProvider : requests LLM
+
+WebSocketManager ..> EventBus : forwards events
+ToolExecutor ..> EventBus : emits events
+Agent ..> EventBus : publishes events
+
+Agent #LightPink
+LLMProvider #LightBlue
+EventBus #LightYellow
+ToolManager #LightGreen
+
+@enduml
+
+@startuml Dawei Agent执行流程 - 序列图
+
+title Agent 执行流程序列图
+
+actor User
+participant WebSocketManager
+participant Agent
+participant TaskGraphExecutionEngine
+participant TaskNodeExecutionEngine
+participant LLMProvider
+participant ToolExecutor
+participant EventBus
+
+User -> WebSocketManager: 发送消息
+activate WebSocketManager
+
+WebSocketManager -> Agent: 创建/获取 Agent 实例
+activate Agent
+
+Agent -> EventBus: 发布 AGENT_START 事件
+activate EventBus
+EventBus --> Agent: 事件已发布
+deactivate EventBus
+
+Agent -> TaskGraphExecutionEngine: 执行任务图
+activate TaskGraphExecutionEngine
+
+TaskGraphExecutionEngine -> TaskNodeExecutionEngine: 执行任务节点
+activate TaskNodeExecutionEngine
+
+TaskNodeExecutionEngine -> LLMProvider: 请求 LLM 响应
+activate LLMProvider
+LLMProvider --> TaskNodeExecutionEngine: 返回响应（可能包含工具调用）
+deactivate LLMProvider
+
+alt 需要工具调用
+    TaskNodeExecutionEngine -> ToolExecutor: 执行工具
+    activate ToolExecutor
+
+    ToolExecutor -> EventBus: 发布 TOOL_START 事件
+    activate EventBus
+    EventBus --> ToolExecutor: 事件已发布
+    deactivate EventBus
+
+    ToolExecutor --> TaskNodeExecutionEngine: 返回工具结果
+    deactivate ToolExecutor
+
+    ToolExecutor -> EventBus: 发布 TOOL_COMPLETE 事件
+    activate EventBus
+    EventBus --> ToolExecutor: 事件已发布
+    deactivate EventBus
+
+    TaskNodeExecutionEngine -> LLMProvider: 继续请求（包含工具结果）
+    activate LLMProvider
+    LLMProvider --> TaskNodeExecutionEngine: 返回最终响应
+    deactivate LLMProvider
+end
+
+TaskNodeExecutionEngine --> TaskGraphExecutionEngine: 节点完成
+deactivate TaskNodeExecutionEngine
+
+TaskGraphExecutionEngine --> Agent: 任务图完成
+deactivate TaskGraphExecutionEngine
+
+Agent -> EventBus: 发布 AGENT_COMPLETE 事件
+activate EventBus
+EventBus --> Agent: 事件已发布
+deactivate EventBus
+
+Agent --> WebSocketManager: 流式响应
+deactivate Agent
+
+WebSocketManager --> User: 接收结果
+deactivate WebSocketManager
+
+@enduml
+
+@startuml Dawei 工具系统架构图
+
+title 工具系统 - 4层配置架构
+
+package "4-Tier Tool Configuration" {
+    database "Builtin Tools\n(dawei/)" as Builtin {
+        [Read Tools]
+        [Edit Tools]
+        [Search Tools]
+        [Command Tools]
+    }
+
+    database "System Tools\n(/etc/dawei/)" as System {
+        [Custom Tools]
+    }
+
+    database "User Tools\n(~/.dawei/)" as User {
+        [Personal Tools]
+    }
+
+    database "Workspace Tools\n(workspace/.dawei/)" as Workspace {
+        [Project Tools]
+    }
+}
+
+package "Tool Management" {
+    class ToolManager {
+        -providers: List
+        -tool_groups: Dict
+        +get_tool(name)
+        +list_tools(group)
+        +reload_tools()
+    }
+
+    class ToolProvider {
+        <<interface>>
+        +get_tools()
+        +get_tool(name)
+    }
+
+    class ToolExecutor {
+        -tool_manager: ToolManager
+        +execute(tool, args)
+        +validate(tool, args)
+    }
+
+    class CustomBaseTool {
+        <<abstract>>
+        +name: str
+        +description: str
+        +execute(args)
+    }
+}
+
+package "Tool Groups" {
+    rectangle "read" as Read
+    rectangle "edit" as Edit
+    rectangle "browser" as Browser
+    rectangle "command" as Command
+    rectangle "mcp" as MCP_Tools
+    rectangle "task_graph" as TG
+    rectangle "workflow" as Workflow
+}
+
+package "Mode Filtering" {
+    rectangle "Orchestrator\n(All tools)" as Orch
+    rectangle "Plan\n(READ-ONLY)" as Plan
+    rectangle "Do\n(Execute)" as Do
+    rectangle "Check\n(Validate)" as Check
+    rectangle "Act\n(Improve)" as Act
+}
+
+' 配置加载流向
+Builtin -down-> ToolManager
+System -down-> ToolManager
+User -down-> ToolManager
+Workspace -down-> ToolManager
+
+' 工具管理器内部
+ToolManager *-- ToolProvider
+ToolManager *-- ToolExecutor
+ToolProvider <|--.. CustomBaseTool
+
+' 工具组
+CustomBaseTool ..> Read : group
+CustomBaseTool ..> Edit : group
+CustomBaseTool ..> Browser : group
+CustomBaseTool ..> Command : group
+CustomBaseTool ..> MCP_Tools : group
+CustomBaseTool ..> TG : group
+CustomBaseTool ..> Workflow : group
+
+' 模式过滤
+Orch ..> Read : all
+Plan ..> Read : ✓
+Plan ..> Edit : ✗
+Do ..> Read : ✓
+Do ..> Edit : ✓
+Check ..> Read : ✓
+Act ..> Read : ✓
+Act ..> Edit : ✓
+
+' 优先级标注
+Builtin #LightGreen
+System #LightBlue
+User #LightYellow
+Workspace #Pink
+
+@enduml
+
+@startuml Dawei PDCA模式系统图
+
+title PDCA 模式系统 - 5种模式
+
+package "PDCA Cycle" {
+    rectangle "Orchestrator\n优先级: 90\n🪃" as Orchestrator #LightPink
+    rectangle "Plan\n优先级: 80\n📋" as Plan #LightCyan
+    rectangle "Do\n优先级: 70\n⚙️" as Do #LightGreen
+    rectangle "Check\n优先级: 75\n✓" as Check #LightYellow
+    rectangle "Act\n优先级: 78\n🚀" as Act #LightBlue
+}
+
+package "Tool Groups" {
+    [read\n文件读取] as Read
+    [edit\n文件编辑] as Edit
+    [browser\n浏览器] as Browser
+    [command\n命令执行] as Command
+    [mcp\nMCP工具] as MCP
+    [task_graph\n任务图] as TG
+    [workflow\n工作流] as Workflow
+}
+
+' PDCA 循环
+Orchestrator -down-> Plan : 管理
+Plan -down-> Do : 计划
+Do -down-> Check : 执行
+Check -right-> Act : 检查
+Act -up-> Plan : 改进
+
+' 模式权限
+Orchestrator ..> Read : 所有工具
+Orchestrator ..> Edit : 所有工具
+Orchestrator ..> Browser : 所有工具
+Orchestrator ..> Command : 所有工具
+Orchestrator ..> MCP : 所有工具
+Orchestrator ..> TG : 所有工具
+Orchestrator ..> Workflow : 所有工具
+
+Plan ..> Read : ✓
+Plan ..> Browser : ✓
+Plan ..> MCP : ✓
+Plan ..> TG : ✓
+Plan ..> Workflow : ✓
+
+Do ..> Read : ✓
+Do ..> Edit : ✓
+Do ..> Browser : ✓
+Do ..> Command : ✓
+Do ..> MCP : ✓
+Do ..> Workflow : ✓
+
+Check ..> Read : ✓
+Check ..> Command : ✓
+Check ..> Browser : ✓
+Check ..> MCP : ✓
+
+Act ..> Read : ✓
+Act ..> Edit : ✓
+Act ..> Browser : ✓
+Act ..> MCP : ✓
+Act ..> Workflow : ✓
+
+@enduml
+
+@startuml Dawei 事件驱动架构图
+
+title 事件驱动架构 - EventBus
+
+package "Event Publishers" {
+    [Agent] as EP_Agent
+    [ToolExecutor] as EP_Tool
+    [LLMProvider] as EP_LLM
+    [TaskGraphEngine] as EP_Task
+    [WebSocketManager] as EP_WS
+}
+
+package "Event Bus" {
+    class EventBus {
+        -subscribers: Dict[str, List[Callable]]
+        +subscribe(event_type, handler)
+        +unsubscribe(event_type, handler)
+        +publish(event_type, data)
+        -notify(event_type, data)
+    }
+}
+
+package "Event Subscribers" {
+    [WebSocket Handlers] as ES_WS
+    [CheckpointManager] as ES_CP
+    [Metrics Collector] as ES_Metrics
+    [Logger] as ES_Log
+    [TUI Handler] as ES_TUI
+}
+
+' 事件发布连接
+EP_Agent -down-> EventBus : AGENT_START\nAGENT_COMPLETE\nAGENT_ERROR
+EP_Tool -down-> EventBus : TOOL_START\nTOOL_COMPLETE\nTOOL_ERROR
+EP_LLM -down-> EventBus : LLM_REQUEST\nLLM_RESPONSE\nLLM_ERROR
+EP_Task -down-> EventBus : TASK_NODE_START\nTASK_NODE_COMPLETE\nTASK_GRAPH_UPDATE
+EP_WS -down-> EventBus : WS_CONNECTED\nWS_DISCONNECTED
+
+' 事件订阅连接
+EventBus -down-> ES_WS : 转发事件
+EventBus -down-> ES_CP : 保存检查点
+EventBus -down-> ES_Metrics : 收集指标
+EventBus -down-> ES_Log : 记录日志
+EventBus -down-> ES_TUI : 更新UI
+
+EventBus #LightYellow
+
+@enduml
+
+@startuml Dawei 技能系统架构图
+
+title 技能系统 - 渐进式加载
+
+package "4-Tier Skill Discovery" {
+    database "模式特定\n.dawei/skills-{mode}/" as ModeSkills #Pink
+    database "全局模式特定\n~/.dawei/skills-{mode}/" as GlobalMode #LightYellow
+    database "项目通用\n.dawei/skills/" as ProjectSkills #LightCyan
+    database "全局通用\n~/.dawei/skills/" as GlobalSkills #LightGreen
+}
+
+package "Progressive Loading (3-Level)" {
+    rectangle "Level 1: Discovery\n仅加载 frontmatter" as Discovery {
+        [name]
+        [description]
+        [license]
+    }
+
+    rectangle "Level 2: Instructions\n加载 SKILL.md 内容" as Instructions {
+        [完整内容]
+        [使用指南]
+        [示例]
+    }
+
+    rectangle "Level 3: Resources\n访问资源文件" as Resources {
+        [reference.md]
+        [templates/]
+        [examples/]
+    }
+}
+
+package "Skill Tools" {
+    [list_skills] as List
+    [search_skills] as Search
+    [get_skill] as Get
+    [list_skill_resources] as ListRes
+    [read_skill_resource] as ReadRes
+}
+
+package "Skill File Format" {
+    file "SKILL.md" as SKILL
+    object "Frontmatter" as FM
+    object "Content" as CT
+    database "Resource Files" as RF
+}
+
+' 优先级加载
+ModeSkills -down-> Discovery
+GlobalMode -down-> Discovery
+ProjectSkills -down-> Discovery
+GlobalSkills -down-> Discovery
+
+' 渐进式加载
+Discovery -down-> Instructions
+Instructions -down-> Resources
+
+' 工具映射
+Discovery -down-> List
+Discovery -down-> Search
+Instructions -down-> Get
+Resources -down-> ListRes
+Resources -down-> ReadRes
+
+' 文件结构
+SKILL *-- FM : contains
+SKILL *-- CT : contains
+SKILL *-- RF : references
+
+@enduml
+
+@startuml Dawei 模块依赖关系图
+
+title 模块依赖关系 - 7层架构
+
+package "Layer 7: UI Layer" {
+    [cli/] as L7_CLI
+    [tui/] as L7_TUI
+    [api/] as L7_API
+}
+
+package "Layer 6: Communication" {
+    [websocket/] as L6_WS
+    [async_task/] as L6_AT
+    [a2ui/] as L6_A2UI
+}
+
+package "Layer 5: Agent" {
+    [agentic/] as L5_Agentic
+    [task_graph/] as L5_TG
+    [mode/] as L5_Mode
+    [memory/] as L5_Mem
+}
+
+package "Layer 4: Capabilities" {
+    [tools/] as L4_Tools
+    [sandbox/] as L4_Sandbox
+    [skills/] as L4_Skills
+}
+
+package "Layer 3: LLM & Prompts" {
+    [llm_api/] as L3_LLM
+    [prompts/] as L3_Prompts
+}
+
+package "Layer 2: Data & Storage" {
+    [storage/] as L2_Storage
+    [workspace/] as L2_WS
+    [conversation/] as L2_Conv
+}
+
+package "Layer 1: Infrastructure" {
+    [core/] as L1_Core
+    [interfaces/] as L1_Interfaces
+    [config/] as L1_Config
+    [entity/] as L1_Entity
+    [logg/] as L1_Logg
+}
+
+' Layer 7 -> Layer 5
+L7_CLI -down-> L5_Agentic
+L7_TUI -down-> L5_Agentic
+L7_API -down-> L6_WS
+
+' Layer 6 -> Layer 5
+L6_WS -down-> L5_Agentic
+L6_AT -down-> L5_Agentic
+L6_A2UI -down-> L5_Agentic
+
+' Layer 5 内部
+L5_Agentic -down-> L5_TG
+L5_Agentic -down-> L5_Mode
+L5_Agentic -down-> L5_Mem
+L5_Agentic -down-> L4_Tools
+L5_Agentic -down-> L3_LLM
+
+' Layer 5 -> Layer 4
+L5_TG -down-> L4_Tools
+L5_TG -down-> L3_LLM
+L4_Tools -down-> L4_Sandbox
+L4_Tools -down-> L4_Skills
+
+' Layer 5 -> Layer 3
+L3_LLM -down-> L3_Prompts
+
+' Layer 5 -> Layer 2
+L5_Agentic -down-> L2_Storage
+L5_Agentic -down-> L2_WS
+L5_Agentic -down-> L2_Conv
+
+L5_TG -down-> L2_Storage
+L4_Tools -down-> L2_WS
+
+' Layer 5,6 -> Layer 1
+L6_WS -down-> L1_Core
+L5_Agentic -down-> L1_Core
+L4_Tools -down-> L1_Core
+
+L7_API -down-> L1_Entity
+L6_WS -down-> L1_Entity
+L5_Agentic -down-> L1_Entity
+
+L5_Agentic -down-> L1_Interfaces
+L4_Tools -down-> L1_Interfaces
+L3_LLM -down-> L1_Interfaces
+
+L5_Agentic -down-> L1_Config
+L6_WS -down-> L1_Config
+L7_API -down-> L1_Config
+
+L5_Agentic -down-> L1_Logg
+L6_WS -down-> L1_Logg
+
+' 样式
+L1_Core #LightYellow
+L5_Agentic #LightPink
+L6_WS #LightCyan
+
+@enduml
