@@ -123,7 +123,7 @@ jobs:
           path: |
             webui/src-tauri/target
             ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-build-target-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
 
       - name: Cache Python venv
         uses: actions/cache@v4
@@ -205,6 +205,13 @@ jobs:
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
           echo "Build completed successfully"
           ls -la src-tauri/target/${{ matrix.target }}/release/davybot
+
+      - name: Copy macOS binaries to simple path
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          mkdir -p binaries
+          cp webui/src-tauri/target/${{ matrix.target }}/release/davybot binaries/davybot-${{ matrix.arch }}
+          ls -la binaries/
 
       - name: Create portable ZIP package (macOS)
         if: startsWith(matrix.platform, 'macos')
@@ -452,9 +459,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: davybot-standalone-macos-${{ matrix.arch }}-v${{ env.VERSION }}
-          path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/davybot
-          if-no-files-found: warn
+          path: binaries/davybot-${{ matrix.arch }}
+          if-no-files-found: error
 
       - name: Upload artifacts (Linux x86_64)
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
@@ -507,41 +513,39 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: davybot-standalone-macos-x86_64-v${{ env.VERSION }}
-          path: ./binaries/x86_64
+          path: ./binaries
 
       - name: Download aarch64 binary
         uses: actions/download-artifact@v4
         with:
           name: davybot-standalone-macos-aarch64-v${{ env.VERSION }}
-          path: ./binaries/aarch64
+          path: ./binaries
 
-      - name: Verify downloaded binaries
+      - name: Verify and create universal binary
         run: |
+          # Verify downloaded binaries
+          echo "=== Downloaded binaries ==="
+          ls -la binaries/
+          echo ""
           echo "=== x86_64 binary ==="
-          ls -la ./binaries/x86_64/webui/src-tauri/target/x86_64-apple-darwin/release/davybot
-          file ./binaries/x86_64/webui/src-tauri/target/x86_64-apple-darwin/release/davybot
-
+          file binaries/davybot-x86_64
+          echo ""
           echo "=== aarch64 binary ==="
-          ls -la ./binaries/aarch64/webui/src-tauri/target/aarch64-apple-darwin/release/davybot
-          file ./binaries/aarch64/webui/src-tauri/target/aarch64-apple-darwin/release/davybot
-
-      - name: Create universal binary
-        run: |
-          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
-          APP_NAME="davybot"
+          file binaries/davybot-aarch64
 
           # Create universal binary using lipo
           mkdir -p webui/src-tauri/target/universal-apple-darwin/release
           lipo -create \
-            -output webui/src-tauri/target/universal-apple-darwin/release/${APP_NAME} \
-            ./binaries/x86_64/webui/src-tauri/target/x86_64-apple-darwin/release/${APP_NAME} \
-            ./binaries/aarch64/webui/src-tauri/target/aarch64-apple-darwin/release/${APP_NAME}
+            -output webui/src-tauri/target/universal-apple-darwin/release/davybot \
+            binaries/davybot-x86_64 \
+            binaries/davybot-aarch64
 
           # Verify universal binary
+          echo ""
           echo "=== Universal binary ==="
-          ls -la webui/src-tauri/target/universal-apple-darwin/release/${APP_NAME}
-          file webui/src-tauri/target/universal-apple-darwin/release/${APP_NAME}
-          lipo -info webui/src-tauri/target/universal-apple-darwin/release/${APP_NAME}
+          ls -la webui/src-tauri/target/universal-apple-darwin/release/davybot
+          file webui/src-tauri/target/universal-apple-darwin/release/davybot
+          lipo -info webui/src-tauri/target/universal-apple-darwin/release/davybot
 
       - name: Setup Python
         uses: actions/setup-python@v5
