@@ -140,7 +140,7 @@ jobs:
       - name: Install UV package manager
         run: |
           # Install UV using pip (works on all platforms)
-          pip3 install uv -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+          pip3 install uv --quiet
 
       - name: Create Python venv with UV if cache miss
         run: |
@@ -152,28 +152,28 @@ jobs:
             # Install UV in the venv (needed for standalone)
             # On Windows, don't use --target to ensure uv.exe goes to Scripts/
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              .venv/Scripts/pip.exe install uv --index-url https://mirrors.aliyun.com/pypi/simple/
+              .venv/Scripts/pip.exe install uv
             else
-              uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+              uv pip install uv --target .venv
             fi
 
             # Install pip in the venv (for compatibility)
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              .venv/Scripts/pip.exe install pip --index-url https://mirrors.aliyun.com/pypi/simple/
+              .venv/Scripts/pip.exe install pip
             else
-              uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+              uv pip install pip --target .venv
             fi
 
             # Install project dependencies
-            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
+            uv pip install -e .
           else
             # Sync existing dependencies
-            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+            uv pip install -e . 2>/dev/null || true
             # Ensure uv and pip are available
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              .venv/Scripts/pip.exe install uv pip --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+              .venv/Scripts/pip.exe install uv pip 2>/dev/null || true
             else
-              uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv 2>/dev/null || true
+              uv pip install pip --target .venv 2>/dev/null || true
             fi
           fi
         shell: bash
@@ -576,15 +576,15 @@ jobs:
 
       - name: Install UV package manager
         run: |
-          pip3 install uv -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+          pip3 install uv --quiet
 
       - name: Create Python environment with UV
         run: |
           cd agent
           uv venv --python 3.12 .venv
-          uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
-          uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
-          uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
+          uv pip install uv --target .venv
+          uv pip install pip --target .venv
+          uv pip install -e .
 
       - name: Copy resources
         run: |

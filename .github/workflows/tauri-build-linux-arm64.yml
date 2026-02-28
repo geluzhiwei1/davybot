@@ -116,7 +116,7 @@ jobs:
       - name: Install UV package manager
         run: |
           # Install UV using pip (works on all platforms)
-          pip3 install uv -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+          pip3 install uv --quiet
 
       - name: Create Python venv with UV if cache miss
         run: |
@@ -125,19 +125,19 @@ jobs:
             # Create venv with UV
             uv venv --python 3.12 .venv
 
-            # Install UV in the venv (needed for standalone)
-            uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+            # Install UV in venv (needed for standalone)
+            uv pip install uv --target .venv
 
-            # Install pip in the venv (for compatibility)
-            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+            # Install pip in venv (for compatibility)
+            uv pip install pip --target .venv
 
             # Install project dependencies
-            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
+            uv pip install -e .
           else
             # Sync existing dependencies
-            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+            uv pip install -e . 2>/dev/null || true
             # Ensure uv and pip are available
-            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv 2>/dev/null || true
+            uv pip install pip --target .venv 2>/dev/null || true
           fi
         shell: bash
 
@@ -161,7 +161,7 @@ jobs:
       - name: Build Tauri app (Linux ARM64)
         working-directory: ./webui
         run: |
-          # For Linux ARM64, build for the specific architecture
+          # For Linux ARM64, build for specific architecture
           echo "Building for aarch64-unknown-linux-gnu..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target aarch64-unknown-linux-gnu --features standalone
           echo "Build completed successfully"
@@ -179,7 +179,7 @@ jobs:
           # Create package directory
           mkdir -p "${ZIP_DIR}/resources"
 
-          # Copy main executable from the correct target directory
+          # Copy main executable from correct target directory
           cp webui/src-tauri/target/aarch64-unknown-linux-gnu/release/${APP_NAME} "${ZIP_DIR}/"
 
           # Copy Python environment
