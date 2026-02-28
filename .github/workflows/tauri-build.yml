@@ -446,13 +446,14 @@ jobs:
           ls -la "${ZIP_NAME}"
 
       # ========== Upload artifacts ==========
-      - name: Upload artifacts (macOS)
+      # Note: macOS artifacts upload binaries only (ZIP packages created in create-universal job)
+      - name: Upload artifacts (macOS - binaries only)
         if: startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v4
         with:
           name: davybot-standalone-macos-${{ matrix.arch }}-v${{ env.VERSION }}
           path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/*.zip
+            webui/src-tauri/target/${{ matrix.target }}/release/davybot
           if-no-files-found: warn
 
       - name: Upload artifacts (Linux x86_64)
@@ -461,6 +462,7 @@ jobs:
         with:
           name: davybot-standalone-linux-x86_64-v${{ env.VERSION }}
           path: |
+            webui/src-tauri/target/${{ matrix.target }}/release/davybot
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: warn
 
