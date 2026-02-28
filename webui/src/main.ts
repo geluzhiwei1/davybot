@@ -21,6 +21,14 @@ import './styles/dark-mode-comprehensive.css' // 统一深色主题
 import './styles/dark-mode-component-fixes.css' // 组件特定深色模式修复
 import './styles/element-plus-popper-fix.css' // 修复 Element Plus Popper 被遮挡问题
 
+// ==================== PDF Viewer 错误过滤 ====================
+// 在 Tauri 环境中，PDF viewer 会触发跨 origin 安全错误，这些错误是预期的且无害
+// 此过滤器会在应用启动时初始化，以减少控制台噪音
+import { initPDFErrorFilter } from './utils/pdf-error-filter'
+
+// 尽早初始化错误过滤（在应用创建之前）
+initPDFErrorFilter()
+
 // ==================== 全局错误处理 ====================
 // import { errorHandler } from './services/errorHandler'
 

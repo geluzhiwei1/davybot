@@ -60,6 +60,14 @@ def load_conversation_file(file_path: Path) -> dict[str, Any]:
         "lastUpdated": last_updated,
         "messageCount": len(data.get("messages", [])),
         "path": str(file_path),
+        # 新增：任务类型字段
+        "task_type": data.get("task_type", "user"),
+        "source_task_id": data.get("source_task_id"),
+        # 元数据
+        "metadata": data.get("metadata", {}),
+        # 时间戳
+        "createdAt": data.get("createdAt"),
+        "updatedAt": data.get("updatedAt"),
     }
 
 
@@ -70,8 +78,18 @@ async def get_workspace_conversations(
     limit: int = 50,
     sortBy: str = "updatedAt",
     sortOrder: str = "desc",
+    task_type: str | None = None,  # 新增：按任务类型过滤
 ):
-    """Get conversations from a workspace with pagination support."""
+    """Get conversations from a workspace with pagination and filtering support.
+
+    Args:
+        workspace_id: Workspace identifier
+        page: Page number (default: 1)
+        limit: Items per page (default: 50)
+        sortBy: Sort field (default: updatedAt)
+        sortOrder: Sort order asc/desc (default: desc)
+        task_type: Filter by task type - "user", "scheduled", or None for all (default: None)
+    """
     chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
 
     conversation_files = list(chat_history_dir.glob("*.json"))
@@ -80,7 +98,9 @@ async def get_workspace_conversations(
     for file_path in conversation_files:
         conversation = load_conversation_file(file_path)
         if conversation:
-            conversations.append(conversation)
+            # 按 task_type 过滤
+            if task_type is None or conversation.get("task_type") == task_type:
+                conversations.append(conversation)
 
     # Sort conversations
     reverse_order = sortOrder == "desc"

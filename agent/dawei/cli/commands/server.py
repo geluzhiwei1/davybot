@@ -3,8 +3,10 @@
 
 """Server Command - Start the FastAPI web server"""
 
+import os
 import sys
 import time
+from pathlib import Path
 
 import click
 
@@ -48,15 +50,86 @@ def server_cmd():
 )
 @click.option("--super", is_flag=True, help="⚠️  Enable super mode (bypass all security)")
 @click.option("--force-kill", is_flag=True, help="Kill process using the port without asking")
+@click.option(
+    "--daemon",
+    "-d",
+    is_flag=True,
+    help="Run as daemon (background service) - Unix/Linux only",
+)
+@click.option(
+    "--log-file",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Log file path for daemon mode (default: ~/.dawei/logs/dawei-server-<port>.log)",
+)
+@click.option(
+    "--pid-file",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="PID file path for daemon mode (default: ~/.dawei/run/dawei-server-<port>.pid)",
+)
 @click.pass_context
-def server_start(ctx, host, port, reload, workers, log_level, super, force_kill):
+def server_start(ctx, host, port, reload, workers, log_level, super, force_kill, daemon, log_file, pid_file):
     """Start the Dawei web server with WebSocket support.
 
     This starts the FastAPI server with REST API and WebSocket endpoints.
+    Can run in foreground (default) or as a daemon (background service).
     """
     verbose = ctx.obj.get("verbose", False)
     # Check if super mode is enabled globally or per-command
     super_mode = super or ctx.obj.get("super", False)
+
+    # Validate daemon options
+    if daemon:
+        if sys.platform == "win32":
+            click.echo(
+                click.style(
+                    "❌ Daemon mode is not supported on Windows.\n"
+                    "   Use a service manager like NSSM or run with screen/tmux.",
+                    fg="red",
+                ),
+                err=True,
+            )
+            sys.exit(1)
+
+        if reload:
+            click.echo(
+                click.style(
+                    "❌ Cannot use --reload with --daemon.\n"
+                    "   Daemon mode requires a stable process.",
+                    fg="red",
+                ),
+                err=True,
+            )
+            sys.exit(1)
+
+    # Setup PID and log file paths for daemon mode
+    if daemon:
+        from dawei.core.daemon import (
+            check_pid_file,
+            create_log_file,
+            get_pid_file_path,
+        )
+
+        # Determine PID file path
+        pid_file = pid_file or get_pid_file_path(port)
+
+        # Check if already running
+        is_running, existing_pid = check_pid_file(pid_file)
+        if is_running:
+            click.echo()
+            click.echo(
+                click.style(
+                    f"⚠️  Server is already running as daemon (PID: {existing_pid})",
+                    fg="yellow",
+                    bold=True,
+                )
+            )
+            click.echo(f"   PID file: {pid_file}")
+            sys.exit(1)
+
+        # Determine log file path
+        log_file = log_file or create_log_file(port=port)
 
     click.echo(click.style("🚀 Starting Dawei Server", fg="green", bold=True))
     click.echo(f"   Host: {host}")
@@ -64,6 +137,10 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill)
     click.echo(f"   Reload: {'enabled' if reload else 'disabled'}")
     if workers > 1:
         click.echo(f"   Workers: {workers}")
+    if daemon:
+        click.echo(f"   Mode: {click.style('DAEMON', fg='magenta', bold=True)}")
+        click.echo(f"   PID file: {pid_file}")
+        click.echo(f"   Log file: {log_file}")
 
     if super_mode:
         click.echo()
@@ -175,17 +252,56 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill)
 
         server = uvicorn.Server(config)
 
-        # Print access URLs
-        click.echo(click.style("✅ Server ready!", fg="green", bold=True))
-        click.echo()
-        click.echo("   🌐 Web UI:     ", nl=False)
-        click.echo(click.style(f"http://localhost:{port}/app/", fg="red", bold=True))
-        click.echo()
-        click.echo("Press Ctrl+C to stop the server")
-        click.echo()
+        # Daemonize before starting server
+        if daemon:
+            from dawei.core.daemon import daemonize, write_pid_file
+
+            click.echo(click.style("🔄 Daemonizing...", fg="cyan"))
+            click.echo()
+
+            # Daemonize (double-fork)
+            daemonize(
+                stdin="/dev/null",
+                stdout=str(log_file),
+                stderr=str(log_file),
+            )
+
+            # Write PID file (after daemonization, we're in the child process)
+            write_pid_file(pid_file)
+
+            # Log startup to file
+            with open(log_file, "a") as f:
+                f.write(f"\n{'=' * 60}\n")
+                f.write(f"Dawei Server Starting (PID: {os.getpid()})\n")
+                f.write(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Host: {host}\n")
+                f.write(f"Port: {port}\n")
+                f.write(f"Workers: {workers}\n")
+                f.write(f"Log Level: {log_level}\n")
+                f.write(f"{'=' * 60}\n\n")
+
+        # Print access URLs (only in foreground mode)
+        if not daemon:
+            click.echo(click.style("✅ Server ready!", fg="green", bold=True))
+            click.echo()
+            click.echo("   🌐 Web UI:     ", nl=False)
+            click.echo(click.style(f"http://localhost:{port}/app/", fg="red", bold=True))
+            click.echo()
+            click.echo("Press Ctrl+C to stop the server")
+            click.echo()
 
         # Run server
         server.run()
+
+        # If we get here and were in daemon mode, clean up PID file on exit
+        if daemon:
+            from dawei.core.daemon import remove_pid_file
+
+            remove_pid_file(pid_file)
+            with open(log_file, "a") as f:
+                f.write(f"\nDawei Server Stopped (PID: {os.getpid()})\n")
+                f.write(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"{'=' * 60}\n")
 
     except ImportError as e:
         click.echo(
@@ -210,11 +326,19 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill)
 @click.option("--host", "-h", default="0.0.0.0", help="Server host (for port checking)")
 @click.option("--port", "-p", type=int, default=8465, help="Server port")
 @click.option("--force", "-f", is_flag=True, help="Force stop without confirmation")
-def server_stop(host, port, force):
+@click.option(
+    "--pid-file",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="PID file path for daemon mode (default: ~/.dawei/run/dawei-server-<port>.pid)",
+)
+def server_stop(host, port, force, pid_file):
     """Stop the Dawei web server.
 
     This command will find and kill the process using the specified port.
+    If started as a daemon, it will use the PID file to stop the server.
     """
+    from dawei.core.daemon import check_pid_file, get_pid_file_path, remove_pid_file
     from dawei.core.port_manager import (
         find_process_using_port,
         is_port_in_use,
@@ -225,6 +349,44 @@ def server_stop(host, port, force):
     click.echo(f"   Host: {host}")
     click.echo(f"   Port: {port}")
     click.echo()
+
+    # Determine PID file path
+    pid_file = pid_file or get_pid_file_path(port)
+
+    # First, try to stop via PID file (daemon mode)
+    is_daemon_running, daemon_pid = check_pid_file(pid_file)
+
+    if is_daemon_running and daemon_pid:
+        click.echo(f"   Found daemon: PID {click.style(str(daemon_pid), fg='cyan')}")
+        click.echo(f"   PID file: {pid_file}")
+        click.echo()
+
+        # Confirm before killing (unless --force is specified)
+        if not force and not click.confirm(
+            click.style("Do you want to stop this daemon server?", fg="yellow"),
+            default=True,
+        ):
+            click.echo(click.style("❌ Aborted. Server is still running.", fg="red"))
+            return
+
+        # Kill the daemon process
+        try:
+            import signal
+
+            os.kill(daemon_pid, signal.SIGTERM)
+            click.echo()
+            click.echo(click.style("✅ Daemon server stopped successfully!", fg="green", bold=True))
+
+            # Remove PID file
+            remove_pid_file(pid_file)
+            return
+        except OSError as e:
+            click.echo()
+            click.echo(
+                click.style(f"❌ Failed to stop daemon: {e}", fg="red"),
+                err=True,
+            )
+            # Fall through to port-based stopping
 
     # Check if port is in use
     if not is_port_in_use(port, host):
@@ -259,6 +421,9 @@ def server_stop(host, port, force):
     if kill_process_using_port(port, force=True):
         click.echo()
         click.echo(click.style("✅ Server stopped successfully!", fg="green", bold=True))
+
+        # Clean up stale PID file if exists
+        remove_pid_file(pid_file)
     else:
         click.echo()
         click.echo(click.style("❌ Failed to stop the server.", fg="red"), err=True)

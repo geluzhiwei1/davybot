@@ -155,7 +155,7 @@ class WorkspacePersistenceManager:
         self.scheduled_tasks_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(
-            f"[PERSISTENCE] Workspace persistence directories initialized",
+            "[PERSISTENCE] Workspace persistence directories initialized",
             extra={
                 "global_dirs": [str(d) for d in global_dirs],
                 "workspace_dir": str(self.persistence_dir),
@@ -400,7 +400,13 @@ class WorkspacePersistenceManager:
                     continue
 
             # 按更新时间排序(最新的在前)
-            resources.sort(key=lambda r: r.get("updated_at", ""), reverse=True)
+            # 将 None 视为最早的时间，放在最后
+            def sort_key(r):
+                updated_at = r.get("updated_at")
+                # 返回元组 (is_none, updated_at)，None值会被排在最后
+                return (updated_at is None, updated_at or "")
+
+            resources.sort(key=sort_key, reverse=True)
 
             return resources
 

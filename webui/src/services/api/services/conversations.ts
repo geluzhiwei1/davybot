@@ -26,13 +26,14 @@ export class ConversationsApiService {
     search?: string;
     isArchived?: boolean;
     tags?: string[];
+    task_type?: 'user' | 'scheduled' | null;
   }): Promise<PaginatedResponse<Conversation>> {
     // Backend endpoint is /api/workspaces/{workspace_id}/conversations
     if (params?.workspaceId) {
-      const { workspaceId, ...queryParams } = params;  // ✅ 从 params 中分离 workspaceId
+      const { workspaceId, task_type, ...queryParams } = params;  // ✅ 从 params 中分离 workspaceId 和 task_type
       return await httpClient.get<PaginatedResponse<Conversation>>(
         `/workspaces/${workspaceId}/conversations`,
-        queryParams  // ✅ 只传其他参数作为 query params
+        { ...queryParams, taskType: task_type }  // ✅ 只传其他参数作为 query params, 转换 task_type 为 taskType
       );
     }
     return await httpClient.get<PaginatedResponse<Conversation>>(this.baseUrl, params);

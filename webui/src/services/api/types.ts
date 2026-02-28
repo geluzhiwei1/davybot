@@ -136,6 +136,8 @@ export interface Conversation {
   isArchived?: boolean;
   tags?: string[];
   metadata?: ConversationMetadata;
+  task_type?: TaskType;
+  source_task_id?: string;
 }
 
 export interface ConversationMetadata {
@@ -148,7 +150,12 @@ export interface ConversationMetadata {
     output: number;
     total: number;
   };
+  repeat_count?: number;
+  triggered_at?: string;
 }
+
+// Task type for conversations
+export type TaskType = 'user' | 'scheduled';
 
 export interface Message {
   id: string;
@@ -449,4 +456,59 @@ export interface UpdatePluginConfigRequest {
 
 export interface ResetPluginConfigRequest {
   plugin_id: string;
+}
+
+// Scheduled Task types
+export interface ScheduledTask {
+  task_id: string;
+  workspace_id: string;
+  description: string;
+  schedule_type: 'delay' | 'at_time' | 'recurring' | 'cron';
+  trigger_time: string;
+  repeat_interval?: number;
+  max_repeats?: number;
+  cron_expression?: string;
+  execution_type: 'message';
+  execution_data: {
+    message?: string;
+    llm?: string;
+    mode?: string;
+  };
+  status: 'pending' | 'paused' | 'triggered' | 'completed' | 'failed' | 'cancelled';
+  created_at: string;
+  updated_at?: string;
+  paused_at?: string;
+  resumed_at?: string;
+  triggered_at?: string;
+  repeat_count: number;
+  last_error?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface ScheduledTaskExecution {
+  conversation_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  repeat_count: number;
+  triggered_at: string;
+}
+
+export interface ScheduledTasksListResponse {
+  success: boolean;
+  tasks: ScheduledTask[];
+  total: number;
+  scheduler_active: boolean;
+}
+
+export interface ScheduledTaskExecutionsResponse {
+  success: boolean;
+  task_id: string;
+  executions: ScheduledTaskExecution[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }

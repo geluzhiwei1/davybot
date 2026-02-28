@@ -114,6 +114,7 @@ from dawei.websocket.handlers.chat import ConnectHandler
 from dawei.websocket.ws_server import websocket_server
 from dawei.api import market
 from dawei.api import privacy
+from dawei.api import scheduled_tasks
 
 # Load environment variables
 cwd_env = Path(".env")
@@ -325,6 +326,7 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     app.include_router(conversations.router)
     app.include_router(system.router)
     app.include_router(skills.router)
+    app.include_router(scheduled_tasks.router)
 
     # Register unified exception handlers
     register_exception_handlers(app)

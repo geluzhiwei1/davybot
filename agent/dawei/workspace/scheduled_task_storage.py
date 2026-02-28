@@ -34,24 +34,50 @@ class ScheduledTaskStorage:
         self._cache: dict[str, ScheduledTask] = {}
         self._loaded = False
 
-    async def _ensure_loaded(self) -> None:
-        """加载任务到缓存"""
+    async def _ensure_loaded(self, fail_on_error: bool = False) -> None:
+        """加载任务到缓存 - 加载所有任务（包括已完成和失败的）
+
+        Args:
+            fail_on_error: 如果为True，加载失败时抛出异常（fast fail）
+
+        Raises:
+            RuntimeError: 当fail_on_error=True且有任务加载失败时
+
+        """
         if self._loaded:
             return
 
         tasks_data = await self.persistence.list_resources(ResourceType.SCHEDULED_TASK)
 
+        loaded_count = 0
+        failed_tasks = []
+
         for task_data in tasks_data:
             try:
                 task = ScheduledTask.from_dict(task_data)
-                # 只加载未完成或未取消的任务
-                if task.status.value in ["pending", "triggered"]:
-                    self._cache[task.task_id] = task
-            except Exception:
-                logger.exception("[SCHEDULER_STORAGE] Failed to load task: ")
+                # ✅ 加载所有任务到缓存
+                self._cache[task.task_id] = task
+                loaded_count += 1
+            except Exception as e:
+                task_id = task_data.get("task_id", "unknown")
+                failed_tasks.append(task_id)
+                logger.error(
+                    f"[SCHEDULER_STORAGE] Failed to load task {task_id}: {e}",
+                    exc_info=True,
+                )
+
+        # ✅ Fast fail: 如果有任务加载失败，抛出异常
+        if fail_on_error and failed_tasks:
+            raise RuntimeError(
+                f"Failed to load {len(failed_tasks)} scheduled tasks: {failed_tasks}. "
+                f"Please check task data integrity in {self.workspace_path}"
+            )
 
         self._loaded = True
-        logger.info(f"[SCHEDULER_STORAGE] Loaded {len(self._cache)} scheduled tasks")
+        logger.info(
+            f"[SCHEDULER_STORAGE] Loaded {loaded_count} scheduled tasks "
+            f"(total files: {len(tasks_data)}, failed: {len(failed_tasks)})"
+        )
 
     async def save_task(self, task: ScheduledTask) -> bool:
         """保存任务

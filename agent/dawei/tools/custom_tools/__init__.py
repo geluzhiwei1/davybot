@@ -12,6 +12,7 @@ This package provides a comprehensive set of tools organized by functionality:
 - Command Tools: Command execution, slash commands, shell commands
 - MCP Tools: Model Context Protocol tool integration
 - Workflow Tools: Todo management, mode switching, task control
+- Timer Tools: Scheduled task management and reminders
 """
 
 # Original tools
@@ -23,7 +24,6 @@ from .browser_tools import (
     TypeTextTool,
 )
 from .command_tools import ExecuteCommandTool, RunSlashCommandTool, ShellCommandTool
-from .diagram_generator import GenerateDiagramTool
 from .diff_applier import ApplyDiffTool
 from .document_parser import DocumentParsingTool
 from .edit_tools import ApplyDiffTool as EnhancedApplyDiffTool
@@ -44,12 +44,11 @@ from .market_tools import (
     SkillListTool,
     SkillSearchTool,
 )
-from .mcp_tools import AccessMCPResourceTool, ListMCPServersTool, UseMCPToolTool
-from .mermaid_charting import MermaidChartingTool
+from .mcp_tools import AccessMCPResource, ConnectMCPServer, DisconnectMCPServer, ListMCPServers, UseMCPTool
 
 # Custom tools
 from .read_tools import ListCodeDefinitionsTool, ListFilesTool, ReadFileTool
-from .search_tools import CodebaseSearchTool, SearchFilesTool
+from .search_tools import FullTextSearchTool, SearchFilesTool
 from .smart_file_edit import SmartFileEditTool
 
 # Timer/Scheduler tools
@@ -69,15 +68,13 @@ __all__ = [
     # Original tools
     "DocumentParsingTool",
     "ApplyDiffTool",
-    "GenerateDiagramTool",
-    "MermaidChartingTool",
     # Read Tools
     "ReadFileTool",
     "ListFilesTool",
     "ListCodeDefinitionsTool",
     # Search Tools
     "SearchFilesTool",
-    "CodebaseSearchTool",
+    "FullTextSearchTool",
     # Edit Tools
     "InsertContentTool",
     "WriteToFileTool",
@@ -94,9 +91,11 @@ __all__ = [
     "RunSlashCommandTool",
     "ShellCommandTool",
     # MCP Tools
-    "UseMCPToolTool",
-    "AccessMCPResourceTool",
-    "ListMCPServersTool",
+    "UseMCPTool",
+    "AccessMCPResource",
+    "ListMCPServers",
+    "ConnectMCPServer",
+    "DisconnectMCPServer",
     # Workflow Tools
     "AskFollowupQuestionTool",
     "AttemptCompletionTool",

@@ -26,60 +26,6 @@ class ToolProvider(ABC):
         """
 
 
-class OpenAIToolProvider(ToolProvider):
-    """Provides tools in OpenAI function call format."""
-
-    def get_tools(self) -> list[dict[str, Any]]:
-        """Returns a list of OpenAI-compatible tools.
-        Currently includes mcp_call tool for multimodal capabilities.
-        """
-        logger.info("Loading tools from OpenAIToolProvider...")
-
-        # Define mcp_call tool
-        mcp_call_tool = {
-            "name": "mcp_call",
-            "description": "调用一个多模态能力代理(MCP)来执行需要视觉或其他非文本理解的任务",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "tool_name": {
-                        "type": "string",
-                        "description": "需要调用的具体多模态工具的名称",
-                    },
-                    "tool_input": {
-                        "type": "object",
-                        "description": "传递给该多模态工具的输入参数",
-                    },
-                },
-                "required": ["tool_name", "tool_input"],
-            },
-            "callable": self._mcp_call_placeholder,
-        }
-
-        return [mcp_call_tool]
-
-    def _mcp_call_placeholder(self, tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
-        """Placeholder implementation for mcp_call.
-
-        Args:
-            tool_name: The name of the multimodal tool to call
-            tool_input: The input parameters for the tool
-
-        Returns:
-            A mock success response
-
-        """
-        logger.info(f"[OpenAIToolProvider] mcp_call invoked with tool_name: {tool_name}")
-
-        # Return a mock response
-        return {
-            "status": "success",
-            "message": f"mcp_call tool '{tool_name}' was called successfully",
-            "tool_name": tool_name,
-            "result": f"Mock result for {tool_name} with input {tool_input}",
-        }
-
-
 class CustomToolProvider(ToolProvider):
     """Provides custom-defined tools."""
 
@@ -150,12 +96,10 @@ class CustomToolProvider(ToolProvider):
             from .custom_tools import (
                 browser_tools,
                 command_tools,
-                diagram_generator,
                 diff_applier,
                 document_parser,
                 edit_tools,
                 mcp_tools,
-                mermaid_charting,
                 read_tools,
                 search_tools,
                 timer_tools,
@@ -171,8 +115,6 @@ class CustomToolProvider(ToolProvider):
                 mcp_tools,
                 document_parser,
                 diff_applier,
-                diagram_generator,
-                mermaid_charting,
                 timer_tools,
                 a2ui_tools,
             ]

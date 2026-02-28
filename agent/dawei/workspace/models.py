@@ -129,6 +129,12 @@ class WorkspaceSettings:
     https_proxy: str = ""
     no_proxy: str = ""
 
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        from dataclasses import asdict
+
+        return asdict(self)
+
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "WorkspaceSettings":
         """从字典创建工作区设置"""

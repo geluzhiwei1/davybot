@@ -149,6 +149,21 @@ class UserWorkspace:
 
         logger.info(f"UserWorkspace initialized: {self.absolute_path}")
 
+    @property
+    def workspace_id(self) -> str:
+        """获取工作区 ID
+
+        Returns:
+            工作区 UUID
+
+        """
+        # 优先从 workspace_info 获取
+        if self.workspace_info and hasattr(self.workspace_info, 'id'):
+            return self.workspace_info.id
+
+        # 否则返回 uuid（向后兼容）
+        return self.uuid
+
     # ==================== WorkspaceContext 属性访问代理 ====================
 
     @property
@@ -687,6 +702,45 @@ class UserWorkspace:
             json.dump(existing_data, f, indent=2, ensure_ascii=False)
 
         logger.info(f"Workspace settings saved: {self.settings_file}")
+
+    async def get_settings(self) -> dict:
+        """获取工作区设置（用于定时任务等场景）
+
+        Returns:
+            包含工作区设置的字典，包括：
+            - llm_model: 默认 LLM 模型
+            - agent_mode: 默认 Agent 模式
+            - 其他全局设置
+
+        """
+        # 确保 workspace_settings 已加载
+        if self.workspace_settings is None:
+            await self._load_settings()
+
+        # 返回关键设置
+        settings = {}
+
+        # 从 workspace_settings 转换为字典格式
+        if self.workspace_settings:
+            # 获取所有属性
+            settings_dict = self.workspace_settings.to_dict()
+
+            # 添加 LLM 模型配置（从 llm_manager 获取默认模型）
+            if self.llm_manager and hasattr(self.llm_manager, 'get_default_model'):
+                try:
+                    settings["llm_model"] = self.llm_manager.get_default_model()
+                except Exception:
+                    settings["llm_model"] = "deepseek/deepseek-chat"
+            else:
+                settings["llm_model"] = "deepseek/deepseek-chat"
+
+            # 添加 Agent 模式配置
+            settings["agent_mode"] = getattr(self.workspace_settings, "agent_mode", "orchestrator")
+
+            # 合并其他全局设置
+            settings.update(settings_dict)
+
+        return settings
 
     async def _load_plugins_config(self):
         """加载插件配置

@@ -1,10 +1,10 @@
 # Copyright (c) 2025 格律至微
 # SPDX-License-Identifier: AGPL-3.0-only
 
-"""Browser Automation Tools using Playwright (Real Implementation)
+"""Browser Automation Tools using Playwright
 
-This module provides real browser automation capabilities using Playwright's synchronous API.
-It replaces the previous mock implementation with actual Playwright functionality.
+This module provides browser automation capabilities using Playwright's synchronous API.
+Requires playwright to be installed: pip install playwright
 """
 
 import contextlib
@@ -16,14 +16,18 @@ from pydantic import BaseModel, Field
 from dawei.core.decorators import safe_tool_operation
 from dawei.tools.custom_base_tool import CustomBaseTool
 
-# Try to import Playwright sync API
+# Import Playwright sync API (required dependency)
+# ✅ Fast fail: 明确检查Playwright依赖，提供清晰的错误消息
 try:
     from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
-
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
-
+except ImportError as e:
+    raise ImportError(
+        "Browser automation tools require Playwright to be installed. "
+        "Please install it with:\n"
+        "  pip install playwright\n"
+        "  playwright install\n"
+        "See https://playwright.dev/python/docs/intro for more details."
+    ) from e
 
 # Singleton browser instance (shared across all tool calls)
 _browser = None
@@ -35,9 +39,6 @@ _playwright = None
 def _get_browser_page():
     """Get or create the global browser and page instances."""
     global _browser, _context, _page, _playwright
-
-    if not PLAYWRIGHT_AVAILABLE:
-        raise RuntimeError("Playwright is not installed. Install with: pip install playwright")
 
     if _page is None:
         _playwright = sync_playwright().start()
@@ -135,10 +136,6 @@ class BrowserActionTool(CustomBaseTool):
     """
     args_schema: type[BaseModel] = BrowserActionInput
 
-    def __init__(self):
-        super().__init__()
-        self._use_real = PLAYWRIGHT_AVAILABLE
-
     @safe_tool_operation(
         "browser_action",
         fallback_value='{"action": "error", "status": "error", "message": "Failed to execute browser action"}',
@@ -154,10 +151,6 @@ class BrowserActionTool(CustomBaseTool):
         screenshot_path: str | None = None,
     ) -> str:
         """Perform browser action using Playwright."""
-        # If Playwright is not available, fall back to mock
-        if not self._use_real:
-            return self._mock_run(action, selector, value, url, wait_for, timeout, screenshot_path)
-
         result = {"action": action, "status": "success"}
 
         try:
@@ -232,46 +225,6 @@ class BrowserActionTool(CustomBaseTool):
             result["message"] = f"Action failed: {e!s}"
 
         return json.dumps(result, indent=2, ensure_ascii=False)
-
-    def _mock_run(
-        self,
-        action: str,
-        selector: str | None = None,
-        value: str | None = None,
-        url: str | None = None,
-        _wait_for: str | None = None,
-        _timeout: int = 30000,
-        screenshot_path: str | None = None,
-    ) -> str:
-        """Mock implementation when Playwright is not available."""
-        result = {
-            "action": action,
-            "status": "success",
-            "message": f"Mock browser action '{action}' executed (Playwright not available)",
-        }
-
-        if action == "navigate" and url:
-            result["url"] = url
-            result["message"] = f"Mock navigation to {url} completed"
-
-        elif action == "click" and selector:
-            result["selector"] = selector
-            result["message"] = f"Mock click on '{selector}' completed"
-
-        elif action == "fill" and selector and value:
-            result["selector"] = selector
-            result["value"] = value
-            result["message"] = f"Mock fill '{value}' into '{selector}' completed"
-
-        elif action == "screenshot":
-            result["screenshot_path"] = screenshot_path or "mock_screenshot.png"
-            result["message"] = "Mock screenshot saved"
-
-        elif action == "evaluate" and value:
-            result["result"] = "mock_result"
-            result["message"] = "Mock JavaScript evaluation completed"
-
-        return json.dumps(result, indent=2)
 
 
 # Enhanced Browser Actions with more specific tools

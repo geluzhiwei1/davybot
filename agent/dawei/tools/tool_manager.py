@@ -21,7 +21,7 @@ from typing import Any
 
 from dawei.config import get_dawei_home
 
-from .tool_provider import CustomToolProvider, OpenAIToolProvider
+from .tool_provider import CustomToolProvider
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ class ToolConfig:
 
 
 def _load_builtin_tools(workspace_path: str | None = None) -> dict[str, ToolConfig]:
-    """加载内置工具 (CustomToolProvider + OpenAIToolProvider)
+    """加载内置工具 (CustomToolProvider)
 
     Args:
         workspace_path: 工作区路径（可选）
@@ -187,7 +187,7 @@ def _load_builtin_tools(workspace_path: str | None = None) -> dict[str, ToolConf
     """
     tools = {}
 
-    # 1. 从 CustomToolProvider 加载自定义工具
+    # 从 CustomToolProvider 加载自定义工具
     try:
         custom_provider = CustomToolProvider(workspace_path=workspace_path)
         custom_tools = custom_provider.get_tools()
@@ -199,21 +199,6 @@ def _load_builtin_tools(workspace_path: str | None = None) -> dict[str, ToolConf
         # Fast Fail: 内置工具加载失败应立即抛出
         logger.error(f"Failed to load custom tools: {e}", exc_info=True)
         raise RuntimeError(f"Cannot load builtin custom tools: {e}")
-
-    # 2. 从 OpenAIToolProvider 加载 OpenAI 工具（可选）
-    try:
-        openai_provider = OpenAIToolProvider()
-        openai_tools = openai_provider.get_tools()
-        for tool_dict in openai_tools:
-            tool_config = ToolConfig.from_dict(tool_dict, "default")
-            tools[tool_config.name] = tool_config
-        logger.info(f"Loaded {len(openai_tools)} OpenAI tools")
-    except ImportError:
-        # OpenAI tools are optional - log and continue
-        logger.warning("OpenAI tools not available (optional dependency)")
-    except Exception as e:
-        # OpenAI tool errors - warning but don't fail
-        logger.warning(f"OpenAI tools initialization failed: {e}")
 
     logger.info(f"Total builtin tools loaded: {len(tools)}")
     return tools
@@ -391,11 +376,6 @@ class ToolManager:
                 "provider": "CustomToolProvider",
                 "description": "自定义工具提供者，从 custom_tools 包加载工具",
                 "count": len(default_tools),
-            },
-            "openai_tools": {
-                "provider": "OpenAIToolProvider",
-                "description": "OpenAI 工具提供者，提供多模态能力代理工具",
-                "count": len([t for t in default_tools if "mcp_call" in t.name]),
             },
         }
 

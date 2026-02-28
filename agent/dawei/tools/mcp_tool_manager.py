@@ -3,6 +3,8 @@
 
 """MCP 工具管理器 - 实现 user/workspace 二级加载和管理机制
 支持同名覆盖，优先级：workspace > user
+
+使用真实的MCP Python SDK实现客户端连接和工具调用。
 """
 
 import asyncio
@@ -14,6 +16,17 @@ from pathlib import Path
 from typing import Any
 
 from dawei.core.decorators import safe_system_operation
+
+# Import MCP SDK (required dependency)
+try:
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+    ClientSession = None  # type: ignore
+    StdioServerParameters = None  # type: ignore
+    stdio_client = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +102,10 @@ class MCPServerInfo:
     tools: list[dict[str, Any]] = field(default_factory=list)
     resources: list[dict[str, Any]] = field(default_factory=list)
     connected_at: datetime | None = None
+    session: Any = None  # ClientSession instance
+    read_stream: Any = None  # Read stream for stdio_client
+    write_stream: Any = None  # Write stream for stdio_client
+    client_context: Any = None  # stdio_client context manager
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
@@ -359,49 +376,107 @@ class MCPToolManager:
     @safe_system_operation("connect_mcp_server", fallback_value=False)
     async def connect_server(self, server_name: str) -> bool:
         """连接MCP服务器"""
+        if not MCP_AVAILABLE:
+            logger.error("MCP SDK is not installed. Install with: pip install mcp")
+            return False
+
         if server_name not in self._servers:
             logger.error(f"Server '{server_name}' not found")
             return False
 
         server_info = self._servers[server_name]
+        config = server_info.config
 
         logger.info(f"Connecting to MCP server: {server_name}")
         server_info.status = "connecting"
         server_info.last_error = None
 
-        # 这里应该实现实际的MCP服务器连接逻辑
-        # 目前使用模拟连接
-        await asyncio.sleep(1)  # 模拟连接延迟
+        try:
+            # Create stdio server parameters
+            server_params = StdioServerParameters(
+                command=config.command,
+                args=config.args,
+                cwd=config.cwd,
+            )
 
-        # 模拟成功连接
-        server_info.status = "connected"
-        server_info.connected_at = datetime.now(UTC)
-        server_info.tools = [
-            {
-                "name": f"{server_name}_tool1",
-                "description": f"Tool 1 from {server_name}",
-                "parameters": {"type": "object", "properties": {}},
-            },
-            {
-                "name": f"{server_name}_tool2",
-                "description": f"Tool 2 from {server_name}",
-                "parameters": {"type": "object", "properties": {}},
-            },
-        ]
-        server_info.resources = [
-            {
-                "uri": f"{server_name}://resource1",
-                "name": "Resource 1",
-                "description": f"Resource 1 from {server_name}",
-            },
-        ]
+            # Create stdio client context
+            client_context = stdio_client(server_params)
 
-        logger.info(f"Successfully connected to MCP server: {server_name}")
-        return True
+            # Manually enter the context to keep streams alive
+            read_stream, write_stream = await client_context.__aenter__()
+
+            # Create client session
+            session = ClientSession(read_stream, write_stream)
+
+            # Initialize the session
+            await session.initialize()
+
+            # Store everything needed to keep connection alive
+            server_info.client_context = client_context
+            server_info.read_stream = read_stream
+            server_info.write_stream = write_stream
+            server_info.session = session
+            server_info.status = "connected"
+            server_info.connected_at = datetime.now(UTC)
+
+            # List available tools
+            tools_response = await session.list_tools()
+            server_info.tools = [
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.inputSchema,
+                }
+                for tool in tools_response.tools
+            ]
+
+            # List available resources
+            try:
+                resources_response = await session.list_resources()
+                server_info.resources = [
+                    {
+                        "uri": resource.uri,
+                        "name": resource.name,
+                        "description": resource.description,
+                        "mime_type": resource.mimeType,
+                    }
+                    for resource in resources_response.resources
+                ]
+            except Exception as e:
+                logger.warning(f"Failed to list resources for {server_name}: {e}")
+                server_info.resources = []
+
+            logger.info(
+                f"Successfully connected to MCP server: {server_name} "
+                f"({len(server_info.tools)} tools, {len(server_info.resources)} resources)"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to connect to MCP server {server_name}: {e}", exc_info=True)
+            server_info.status = "error"
+            server_info.last_error = str(e)
+
+            # Clean up on error
+            if server_info.client_context:
+                try:
+                    await server_info.client_context.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            server_info.session = None
+            server_info.read_stream = None
+            server_info.write_stream = None
+            server_info.client_context = None
+
+            return False
 
     @safe_system_operation("disconnect_mcp_server", fallback_value=False)
     async def disconnect_server(self, server_name: str) -> bool:
         """断开MCP服务器连接"""
+        if not MCP_AVAILABLE:
+            logger.error("MCP SDK is not installed. Install with: pip install mcp")
+            return False
+
         if server_name not in self._servers:
             logger.error(f"Server '{server_name}' not found")
             return False
@@ -410,17 +485,30 @@ class MCPToolManager:
 
         logger.info(f"Disconnecting from MCP server: {server_name}")
 
-        # 这里应该实现实际的MCP服务器断开逻辑
-        # 目前使用模拟断开
-        await asyncio.sleep(0.5)  # 模拟断开延迟
+        try:
+            # Close the client context if it exists
+            if server_info.client_context:
+                await server_info.client_context.__aexit__(None, None, None)
+                server_info.client_context = None
 
-        server_info.status = "disconnected"
-        server_info.connected_at = None
-        server_info.tools.clear()
-        server_info.resources.clear()
+            # Clear streams and session
+            server_info.read_stream = None
+            server_info.write_stream = None
+            server_info.session = None
 
-        logger.info(f"Successfully disconnected from MCP server: {server_name}")
-        return True
+            # Update status
+            server_info.status = "disconnected"
+            server_info.connected_at = None
+            server_info.tools.clear()
+            server_info.resources.clear()
+
+            logger.info(f"Successfully disconnected from MCP server: {server_name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error disconnecting from MCP server {server_name}: {e}", exc_info=True)
+            server_info.last_error = str(e)
+            return False
 
     async def connect_all_servers(self) -> dict[str, bool]:
         """连接所有服务器"""
@@ -471,6 +559,103 @@ class MCPToolManager:
                 "override_details": override_info[:5],  # 只显示前5个覆盖详情
             },
         }
+
+    async def call_tool(
+        self, server_name: str, tool_name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
+        """调用MCP工具
+
+        Args:
+            server_name: MCP服务器名称
+            tool_name: 工具名称
+            arguments: 工具参数
+
+        Returns:
+            工具执行结果
+        """
+        if not MCP_AVAILABLE:
+            raise RuntimeError("MCP SDK is not installed. Install with: pip install mcp")
+
+        server_info = self.get_server_info(server_name)
+        if not server_info:
+            raise ValueError(f"MCP server '{server_name}' not found")
+
+        if server_info.status != "connected":
+            raise RuntimeError(f"MCP server '{server_name}' is not connected (status: {server_info.status})")
+
+        if not server_info.session:
+            raise RuntimeError(f"MCP server '{server_name}' has no active session")
+
+        try:
+            logger.info(f"Calling MCP tool: {server_name}.{tool_name} with arguments: {arguments}")
+
+            # Call the tool
+            result = await server_info.session.call_tool(tool_name, arguments)
+
+            logger.info(f"MCP tool {server_name}.{tool_name} executed successfully")
+            return {
+                "server_name": server_name,
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "status": "success",
+                "result": result,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to call MCP tool {server_name}.{tool_name}: {e}", exc_info=True)
+            return {
+                "server_name": server_name,
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "status": "error",
+                "error": str(e),
+            }
+
+    async def access_resource(self, server_name: str, uri: str) -> dict[str, Any]:
+        """访问MCP资源
+
+        Args:
+            server_name: MCP服务器名称
+            uri: 资源URI
+
+        Returns:
+            资源内容
+        """
+        if not MCP_AVAILABLE:
+            raise RuntimeError("MCP SDK is not installed. Install with: pip install mcp")
+
+        server_info = self.get_server_info(server_name)
+        if not server_info:
+            raise ValueError(f"MCP server '{server_name}' not found")
+
+        if server_info.status != "connected":
+            raise RuntimeError(f"MCP server '{server_name}' is not connected (status: {server_info.status})")
+
+        if not server_info.session:
+            raise RuntimeError(f"MCP server '{server_name}' has no active session")
+
+        try:
+            logger.info(f"Accessing MCP resource: {server_name}:{uri}")
+
+            # Read the resource
+            result = await server_info.session.read_resource(uri)
+
+            logger.info(f"MCP resource {server_name}:{uri} accessed successfully")
+            return {
+                "server_name": server_name,
+                "uri": uri,
+                "status": "success",
+                "resource": result,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to access MCP resource {server_name}:{uri}: {e}", exc_info=True)
+            return {
+                "server_name": server_name,
+                "uri": uri,
+                "status": "error",
+                "error": str(e),
+            }
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""

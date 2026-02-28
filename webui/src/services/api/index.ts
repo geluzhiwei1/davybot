@@ -54,6 +54,13 @@ export type {
 } from './services/skills';
 
 export type {
+  ScheduledTask,
+  ScheduledTaskExecution,
+  ScheduledTasksListResponse,
+  ScheduledTaskExecutionsResponse
+} from './types';
+
+export type {
   MemoryEntry,
   MemoryFilters,
   MemoryListResponse,
@@ -83,6 +90,7 @@ export { WorkspacesApiService, workspacesApi } from './services/workspaces';
 export { FilesApiService, filesApi } from './services/files';
 export { ConversationsApiService, conversationsApi } from './services/conversations';
 export { SkillsApiService, skillsApi } from './services/skills';
+export { ScheduledTasksApiService, scheduledTasksApi } from './services/scheduledTasks';
 export {
   SlashCommandsApiService,
   slashCommandsApi,
@@ -227,6 +235,7 @@ import { WorkspacesApiService, workspacesApi } from './services/workspaces';
 import { FilesApiService, filesApi } from './services/files';
 import { ConversationsApiService, conversationsApi } from './services/conversations';
 import { SkillsApiService, skillsApi } from './services/skills';
+import { ScheduledTasksApiService, scheduledTasksApi } from './services/scheduledTasks';
 import { MemoryApiService, createMemoryApiService } from './services/memory';
 import { MarketApiService, marketApi } from './services/market';
 import type { HttpConfig, WebSocketConfig } from './types';
@@ -286,6 +295,10 @@ export class ApiManager {
 
   getMarketApi(): MarketApiService {
     return marketApi;
+  }
+
+  getScheduledTasksApi(): ScheduledTasksApiService {
+    return scheduledTasksApi;
   }
 
   setAuthToken(token: string): void {

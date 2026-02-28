@@ -22,7 +22,7 @@
     </el-alert>
 
     <div class="input-main-area">
-      <el-button :icon="Paperclip" circle @click="handleAttachment" title="添加附件" />
+      <!-- <el-button :icon="Paperclip" circle @click="handleAttachment" title="添加附件" /> -->
       <input
         ref="fileInputRef"
         type="file"

@@ -1,6 +1,8 @@
 # Copyright (c) 2025 格律至微
 # SPDX-License-Identifier: AGPL-3.0-only
 
+"""Search Tools - File pattern search and full-text search"""
+
 import re
 from pathlib import Path
 
@@ -10,7 +12,7 @@ from dawei.core.decorators import safe_tool_operation
 from dawei.tools.custom_base_tool import CustomBaseTool
 
 
-# Search Files Tool
+# Search Files Tool (Regex-based)
 class SearchFilesInput(BaseModel):
     """Input for SearchFilesTool."""
 
@@ -26,7 +28,7 @@ class SearchFilesInput(BaseModel):
 
 
 class SearchFilesTool(CustomBaseTool):
-    """Tool for searching patterns across files."""
+    """Tool for searching patterns across files using regex."""
 
     name: str = "search_files"
     description: str = "Performs regex search across files in a specified directory, providing context-rich results. All paths are relative to the current workspace directory."
@@ -87,98 +89,170 @@ class SearchFilesTool(CustomBaseTool):
         return f"No matches found for pattern: {regex}"
 
 
-# Codebase Search Tool (Mock implementation)
-class CodebaseSearchInput(BaseModel):
-    """Input for CodebaseSearchTool."""
+# Full-Text Search Tool
+class FullTextSearchInput(BaseModel):
+    """Input for FullTextSearchTool."""
 
-    query: str = Field(..., description="Semantic search query.")
-    path: str | None = Field(".", description="Path to search in (default: current directory).")
+    query: str = Field(..., description="Text query to search for in file contents.")
+    path: str = Field(".", description="Directory path to search in (default: current directory).")
     max_results: int = Field(10, description="Maximum number of results to return.")
+    file_extensions: list[str] | None = Field(
+        None,
+        description="List of file extensions to search (e.g., ['.py', '.js']). Searches common text files if not specified.",
+    )
 
 
-class CodebaseSearchTool(CustomBaseTool):
-    """Tool for semantic codebase search."""
+class FullTextSearchTool(CustomBaseTool):
+    """Tool for full-text search across source code files."""
 
-    name: str = "codebase_search"
-    description: str = "Performs semantic searches across the indexed codebase."
-    args_schema: type[BaseModel] = CodebaseSearchInput
+    name: str = "fulltext_search"
+    description: str = (
+        "Performs full-text search across files using keyword matching and relevance scoring. "
+        "Returns ranked results with context snippets showing matched lines. "
+        "Supports multiple file extensions and provides smart relevance scoring."
+    )
+    args_schema: type[BaseModel] = FullTextSearchInput
 
     @safe_tool_operation(
-        "codebase_search",
-        fallback_value="Error: Failed to perform codebase search",
+        "fulltext_search",
+        fallback_value="Error: Failed to perform full-text search",
     )
-    def _run(self, query: str, path: str = ".", max_results: int = 10) -> str:
-        """Perform semantic search (mock implementation)."""
-        # This is a mock implementation
-        # In a real implementation, this would use embeddings and vector search
-
-        # For now, do a simple text search as fallback
+    def _run(self, query: str, path: str = ".", max_results: int = 10, file_extensions: list[str] | None = None) -> str:
+        """Perform full-text search with relevance scoring."""
+        # Default file extensions to search
+        if file_extensions is None:
+            file_extensions = [".py", ".js", ".ts", ".jsx", ".tsx", ".md", ".txt", ".json", ".yaml", ".yml"]
 
         results = []
         query_lower = query.lower()
+        query_words = [w.lower() for w in query.split() if len(w) > 2]  # Filter short words
 
         for root, dirs, files in Path(path).walk():
-            # Skip hidden directories and common build directories
-            dirs[:] = [d for d in dirs if not d.name.startswith(".") and d.name not in ["node_modules", "__pycache__", "target"]]
+            # Skip hidden and build directories
+            dirs[:] = [d for d in dirs if not d.name.startswith(".") and d.name not in ["node_modules", "__pycache__", "target", "dist", "build"]]
 
             for file in files:
-                if file.suffix in (".py", ".js", ".ts", ".jsx", ".tsx", ".md", ".txt"):
-                    file_path = root / file
+                if file.suffix not in file_extensions:
+                    continue
 
-                    try:
-                        with Path(file_path).open(encoding="utf-8", errors="replace") as f:
-                            content = f.read()
+                file_path = root / file
 
-                        # Simple relevance scoring
-                        content_lower = content.lower()
-                        score = 0
+                try:
+                    with Path(file_path).open(encoding="utf-8", errors="replace") as f:
+                        content = f.read()
 
-                        # Exact matches get higher score
-                        if query in content:
-                            score += 10
-                        if query_lower in content_lower:
-                            score += 5
+                    # Calculate relevance score
+                    score = self._calculate_relevance_score(content, query, query_lower, query_words)
 
-                        # Word matches
-                        query_words = query_lower.split()
-                        for word in query_words:
-                            if word in content_lower:
-                                score += 1
+                    if score > 0:
+                        # Extract context snippets around matches
+                        snippet = self._extract_snippet(content, query_lower)
 
-                        if score > 0:
-                            # Extract a snippet
-                            lines = content.split("\n")
-                            snippet_lines = []
+                        results.append(
+                            {
+                                "file": str(file_path.relative_to(path) if path != "." else str(file_path)),
+                                "score": score,
+                                "snippet": snippet,
+                            },
+                        )
 
-                            for i, line in enumerate(lines):
-                                if query_lower in line.lower():
-                                    # Get context around match
-                                    start = max(0, i - 2)
-                                    end = min(len(lines), i + 3)
-                                    snippet = "\n".join(lines[start:end])
-                                    snippet_lines.append(snippet)
-                                    if len(snippet_lines) >= 3:  # Limit snippets
-                                        break
+                except (UnicodeDecodeError, PermissionError, OSError):
+                    # Skip files that can't be read
+                    continue
 
-                            results.append(
-                                {
-                                    "file": file_path,
-                                    "score": score,
-                                    "snippet": "\n...\n".join(snippet_lines),
-                                },
-                            )
-
-                    except (UnicodeDecodeError, PermissionError):
-                        continue
-
-        # Sort by score and limit results
+        # Sort by score (descending) and limit results
         results.sort(key=lambda x: x["score"], reverse=True)
         results = results[:max_results]
 
+        # Format results
         if results:
-            output = [f"## Semantic Search Results for: '{query}'\n"]
+            output = [f"## Full-Text Search Results for: '{query}'\n"]
+            output.append(f"Found {len(results)} result(s) in directory: {path}\n")
+
             for i, result in enumerate(results, 1):
-                output.append(f"\n{i}. **{result['file']}** (Score: {result['score']})")
+                output.append(f"\n{i}. **{result['file']}** (Relevance: {result['score']})")
                 output.append(f"```\n{result['snippet']}\n```")
+
             return "\n".join(output)
-        return f"No results found for query: {query}"
+
+        return f"No results found for query: '{query}' in directory: {path}"
+
+    def _calculate_relevance_score(self, content: str, query: str, query_lower: str, query_words: list[str]) -> int:
+        """Calculate relevance score for a file.
+
+        Scoring factors:
+        - Exact case-sensitive match: +10 points (first occurrence), +1 per additional occurrence
+        - Case-insensitive match: +5 points (first occurrence), +1 per additional occurrence
+        - Word-level matches: +1 point per occurrence (capped at 10 to avoid dominating)
+
+        Args:
+            content: File content
+            query: Original query (case-sensitive)
+            query_lower: Lowercase query
+            query_words: List of query words (lowercase, filtered)
+
+        Returns:
+            Relevance score (higher = more relevant)
+        """
+        score = 0
+        content_lower = content.lower()
+
+        # Check for exact match (highest priority)
+        if query in content:
+            # Count occurrences
+            exact_count = content.count(query)
+            score += 10 + max(0, exact_count - 1)  # First match: 10, additional: +1 each
+
+        # Check for case-insensitive match (if exact match not found)
+        elif query_lower in content_lower:
+            # Count occurrences
+            lower_count = content_lower.count(query_lower)
+            score += 5 + max(0, lower_count - 1)  # First match: 5, additional: +1 each
+
+        # Word-level matches (only if no phrase match yet)
+        if score == 0 and query_words:
+            word_matches = 0
+            for word in query_words:
+                if word in content_lower:
+                    word_count = content_lower.count(word)
+                    word_matches += word_count
+
+            # Add word match score (capped to avoid dominating)
+            score += min(word_matches, 10)
+
+        return score
+
+    def _extract_snippet(self, content: str, query_lower: str, max_snippets: int = 3, context_lines: int = 2) -> str:
+        """Extract context snippets around matches.
+
+        Args:
+            content: File content
+            query_lower: Lowercase query to find
+            max_snippets: Maximum number of snippets to extract
+            context_lines: Number of lines before/after match to include
+
+        Returns:
+            Formatted snippet with context
+        """
+        lines = content.split("\n")
+        snippet_lines = []
+        snippets_found = 0
+
+        for i, line in enumerate(lines):
+            if query_lower in line.lower():
+                # Get context around match
+                start = max(0, i - context_lines)
+                end = min(len(lines), i + context_lines + 1)
+
+                # Add line numbers
+                for j in range(start, end):
+                    prefix = ">>> " if j == i else "    "
+                    snippet_lines.append(f"{prefix}{j+1}:{lines[j]}")
+
+                snippet_lines.append("...")  # Separator between snippets
+                snippets_found += 1
+
+                if snippets_found >= max_snippets:
+                    break
+
+        return "\n".join(snippet_lines).rstrip()

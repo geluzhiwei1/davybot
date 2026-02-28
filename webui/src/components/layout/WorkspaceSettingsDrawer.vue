@@ -901,6 +901,16 @@
             </el-form>
           </el-scrollbar>
         </el-tab-pane>
+
+        <!-- 定时任务管理 Tab -->
+        <el-tab-pane :label="t('workspaceSettings.tabs.scheduledTasks')" name="scheduled-tasks">
+          <ScheduledTasksPanel v-if="props.workspaceId" :workspace-id="props.workspaceId" />
+        </el-tab-pane>
+
+        <!-- 检查点管理 Tab -->
+        <el-tab-pane :label="t('workspaceSettings.tabs.checkpoints')" name="checkpoints">
+          <CheckpointPanel v-if="props.workspaceId" :workspace-id="props.workspaceId" />
+        </el-tab-pane>
       </el-tabs>
     </div>
 
@@ -1324,6 +1334,8 @@ import MarketDialog from '@/components/market/MarketDialog.vue';
 import PluginConfigPanel from '@/components/workspace/PluginConfigPanel.vue';
 import CodeEditor from '@/components/editor/CodeEditor.vue';
 import FileTreeNode from './FileTreeNode.vue';
+import ScheduledTasksPanel from './ScheduledTasksPanel.vue';
+import CheckpointPanel from './CheckpointPanel.vue';
 import type { ResourceType } from '@/services/api/services/market';
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';

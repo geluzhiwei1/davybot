@@ -38,6 +38,10 @@ class Conversation(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="创建时间")
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="更新时间")
 
+    # 任务类型和来源
+    task_type: str = Field(default="user", description="任务类型: user(用户UI发起) | scheduled(定时任务)")
+    source_task_id: str | None = Field(None, description="源定时任务ID (仅当task_type='scheduled'时)")
+
     # 对话配置
     agent_mode: str | None = Field(None, description="代理模式")
     llm_model: str | None = Field(None, description="使用的LLM模型")

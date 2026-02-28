@@ -234,7 +234,8 @@ class Agent:
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.info(f"[AGENT_CREATE] Starting agent creation for workspace: {user_workspace.workspace_info.id}")
+        workspace_id = user_workspace.workspace_info.id if user_workspace.workspace_info else user_workspace.workspace_id
+        logger.info(f"[AGENT_CREATE] Starting agent creation for workspace: {workspace_id}")
 
         # 配置处理 - 使用共享工具函数
         config_obj = validate_and_create_config(config)

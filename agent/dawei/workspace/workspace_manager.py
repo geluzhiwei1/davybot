@@ -72,6 +72,26 @@ class WorkspaceManager:
         workspace = self.get_workspace_by_id(workspace_id)
         return workspace.get("name") if workspace else None
 
+    async def get_workspace(self, workspace_id: str):
+        """获取工作区对象（UserWorkspace 实例）
+
+        Args:
+            workspace_id: 工作区UUID
+
+        Returns:
+            UserWorkspace 对象，如果工作区不存在则返回 None
+
+        """
+        from .user_workspace import UserWorkspace
+
+        workspace_info = self.get_workspace_by_id(workspace_id)
+        if not workspace_info or not workspace_info.get("path"):
+            return None
+
+        # 创建 UserWorkspace 实例
+        workspace_path = workspace_info["path"]
+        return UserWorkspace(workspace_path)
+
     def reload(self):
         """重新加载工作区映射"""
         self.load_workspaces()
