@@ -32,7 +32,8 @@ jobs:
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
-          - platform: 'ubuntu-latest'
+          # Use ARM64 runner for Linux ARM builds (no cross-compilation needed)
+          - platform: 'ubuntu-24.04-arm64'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'aarch64-unknown-linux-gnu'
             arch: 'aarch64'
@@ -83,56 +84,6 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
-      - name: Add Rust targets (Linux ARM64)
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        run: rustup target add aarch64-unknown-linux-gnu
-
-      - name: Install ARM64 cross-compilation tools
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu \
-            qemu-user-static
-
-      - name: Install ARM64 system libraries for cross-compilation
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        run: |
-          sudo dpkg --add-architecture arm64
-
-          # Disable security repository (doesn't have arm64 packages for Ubuntu 24.04)
-          sudo rm -f /etc/apt/sources.list.d/ubuntu-security.sources
-
-          # Comment out all security repositories in main sources.list
-          sudo sed -i '/security.ubuntu.com/ s/^deb/#deb/' /etc/apt/sources.list
-
-          # Update package list (will show 404 warnings for security, but that's expected)
-          sudo apt-get update || true
-
-          # Install ARM64 libraries
-          sudo apt-get install -y \
-            libgtk-3-dev:arm64 \
-            libwebkit2gtk-4.1-dev:arm64 \
-            libappindicator3-dev:arm64 \
-            librsvg2-dev:arm64
-
-      - name: Configure Rust for ARM64 cross-compilation
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        run: |
-          mkdir -p ~/.cargo
-          cat >> ~/.cargo/config.toml << 'EOF'
-          [target.aarch64-unknown-linux-gnu]
-          linker = "aarch64-linux-gnu-gcc"
-          EOF
-
-      - name: Configure pkg-config for ARM64 cross-compilation
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        run: |
-          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig" >> $GITHUB_ENV
-          echo "PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig" >> $GITHUB_ENV
-
       # ========== Setup Python (for standalone) ==========
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -141,7 +92,7 @@ jobs:
 
       # ========== Platform-specific setup ==========
       - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
+        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf p7zip-full
@@ -337,7 +288,7 @@ jobs:
           echo "Building for ${{ matrix.target }}..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
           echo "Build completed successfully"
-          ls -la src-tauri/target/${{ matrix.target }}/release/davybot
+          ls -la src-tauri/target/${{ matrix.target }}/release/davybot || ls -la src-tauri/target/release/davybot
 
       - name: Build Tauri app (Windows)
         if: startsWith(matrix.platform, 'windows')
