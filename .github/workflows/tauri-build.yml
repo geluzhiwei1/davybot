@@ -706,40 +706,32 @@ jobs:
 
       - name: Extract artifact zips and reorganize
         run: |
-          # GitHub Actions artifacts are zipped, need to extract them
-          # The structure is: bundles/<artifact-name>/webui/src-tauri/target/.../release/*.zip
+          # GitHub Actions artifacts are already extracted by download-artifact@v4
+          # The portable ZIP files are in bundles/<artifact-name>/webui/src-tauri/target/.../release/
 
-          echo "=== Extracting artifacts to get real portable zips ==="
+          echo "=== Finding portable ZIP files from extracted artifacts ==="
           mkdir -p ./release-zips
 
-          # Find all artifact zips (they're in nested directories)
-          for artifact_zip in $(find ./bundles -name "*.zip" -type f); do
-            echo "Processing artifact zip: $artifact_zip"
+          # Find all portable and universal ZIP files directly in the bundles directory
+          # These are the final products we created in the build step
+          find ./bundles -type f \( -name "*portable*.zip" -o -name "*universal*.zip" \) | while read zip_file; do
+            echo "Found portable ZIP: $zip_file"
 
-            # Extract the artifact zip to a temp directory
-            temp_dir=$(mktemp -d)
-            unzip -q "$artifact_zip" -d "$temp_dir"
-
-            # Find the real portable zip inside (it's the one we created in CI)
-            real_zip=$(find "$temp_dir" -name "*portable*.zip" -o -name "*universal*.zip" | head -1)
-
-            if [ -n "$real_zip" ]; then
-              # Get the basename of the real zip
-              basename_zip=$(basename "$real_zip")
-              echo "  Found real portable zip: $basename_zip"
-
-              # Copy to release-zips directory
-              cp "$real_zip" "./release-zips/$basename_zip"
-            else
-              echo "  WARNING: No portable zip found in artifact"
-            fi
-
-            # Clean up
-            rm -rf "$temp_dir"
+            # Get the basename and copy to release-zips
+            basename_zip=$(basename "$zip_file")
+            cp "$zip_file" "./release-zips/$basename_zip"
           done
 
           echo "=== Final release zips ==="
           ls -lh ./release-zips/
+
+          # Verify we found the expected files
+          if [ -z "$(ls -A ./release-zips/)" ]; then
+            echo "ERROR: No portable ZIP files found!"
+            echo "Bundles structure:"
+            find ./bundles -type f -name "*.zip" || echo "No ZIP files found at all"
+            exit 1
+          fi
 
       - name: Get version for release
         id: release_version
