@@ -1,0 +1,252 @@
+name: Build Tauri Standalone - Linux ARM64
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Build version (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-arm64:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ========== Determine version ==========
+      - name: Set version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
+        shell: bash
+
+      # ========== Setup Node.js & pnpm ==========
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      # ========== Setup Rust (for Tauri) ==========
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust target (Linux ARM64 cross-compilation)
+        run: rustup target add aarch64-unknown-linux-gnu
+
+      # ========== Setup Python (for standalone) ==========
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ========== Install ARM64 system libraries for cross-compilation ==========
+      - name: Install ARM64 system libraries for cross-compilation
+        run: |
+          sudo dpkg --add-architecture arm64
+          # Disable security repository (doesn't have arm64 packages)
+          sudo rm -f /etc/apt/sources.list.d/ubuntu-security.sources
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev:arm64 \
+            libwebkit2gtk-4.1-dev:arm64 \
+            libappindicator3-dev:arm64 \
+            librsvg2-dev:arm64 \
+            patchelf \
+            p7zip-full
+
+      # ========== Cache dependencies ==========
+      - name: Cache Rust registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
+
+      - name: Cache Rust index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            webui/src-tauri/target
+            ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: agent/.venv
+          key: ${{ runner.os }}-python-venv-${{ hashFiles('agent/pyproject.toml') }}
+
+      # ========== Install frontend dependencies ==========
+      - name: Install pnpm dependencies
+        working-directory: ./webui
+        run: pnpm install --frozen-lockfile
+
+      # ========== Prepare Python environment ==========
+      - name: Install UV package manager
+        run: |
+          # Install UV using pip (works on all platforms)
+          pip3 install uv -i https://mirrors.aliyun.com/pypi/simple/ --quiet
+
+      - name: Create Python venv with UV if cache miss
+        run: |
+          cd agent
+          if [ ! -d ".venv" ]; then
+            # Create venv with UV
+            uv venv --python 3.12 .venv
+
+            # Install UV in the venv (needed for standalone)
+            uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+
+            # Install pip in the venv (for compatibility)
+            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+
+            # Install project dependencies
+            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
+          else
+            # Sync existing dependencies
+            uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+            # Ensure uv and pip are available
+            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv 2>/dev/null || true
+          fi
+        shell: bash
+
+      - name: Copy Python environment to Tauri resources
+        run: |
+          mkdir -p webui/src-tauri/resources
+          rm -rf webui/src-tauri/resources/python-env
+          cp -r agent/.venv webui/src-tauri/resources/python-env
+
+          # Clean up Python cache to reduce size
+          find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
+        shell: bash
+
+      # ========== Build frontend ==========
+      - name: Build frontend
+        working-directory: ./webui
+        run: pnpm build-only
+
+      # ========== Build Tauri app (Linux ARM64) ==========
+      - name: Build Tauri app (Linux ARM64)
+        working-directory: ./webui
+        run: |
+          # For Linux ARM64, build for the specific architecture
+          echo "Building for aarch64-unknown-linux-gnu..."
+          pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target aarch64-unknown-linux-gnu --features standalone
+          echo "Build completed successfully"
+          ls -la src-tauri/target/aarch64-unknown-linux-gnu/release/davybot
+
+      # ========== Create portable ZIP package (Linux ARM64) ==========
+      - name: Create portable ZIP package (Linux ARM64)
+        run: |
+          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          APP_NAME="davybot"
+          ARCH="aarch64"
+          ZIP_DIR="webui/src-tauri/target/aarch64-unknown-linux-gnu/release/${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}"
+          ZIP_NAME="${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}.zip"
+
+          # Create package directory
+          mkdir -p "${ZIP_DIR}/resources"
+
+          # Copy main executable from the correct target directory
+          cp webui/src-tauri/target/aarch64-unknown-linux-gnu/release/${APP_NAME} "${ZIP_DIR}/"
+
+          # Copy Python environment
+          cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
+
+          # Copy welcome.html
+          cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
+
+          # Create README
+          cat > "${ZIP_DIR}/README.txt" << EOF
+          # Dawei AI Assistant - Standalone Portable Version
+
+          Version: \${VERSION}
+          Architecture: ${ARCH}
+
+          ## Usage
+
+          1. Extract this ZIP file to any directory
+          2. Run ./davybot to launch the application
+
+          The application will automatically start the backend service on first launch.
+
+          ## Directory Structure
+
+          - davybot                  : Main application (${ARCH} binary)
+          - resources/               : Resource files directory
+            - welcome.html           : Welcome page (standalone HTML)
+            - python-env/            : Python runtime environment
+              - bin/python           : Python interpreter
+              - bin/uv               : UV package manager
+              - bin/pip              : Python package manager
+              - lib/                 : Python standard library
+              - lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
+
+          ## System Requirements
+
+          - Linux ${ARCH} (ARM 64-bit (aarch64))
+          - About 500 MB free disk space
+
+          ## Notes
+
+          - First launch may take a few seconds to initialize
+          - Make the script executable: chmod +x davybot
+          - Do not move or delete the resources directory
+          - If you encounter issues, check the application logs
+
+          ## Support
+
+          Project Homepage: https://github.com/dawei/patent-agent
+
+          Copyright (c) 2026 Dawei Team. All rights reserved.
+          EOF
+
+          # Create ZIP
+          cd webui/src-tauri/target/aarch64-unknown-linux-gnu/release
+          # Use relative path since we're already in the release directory
+          ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
+          zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
+
+          echo "Created ZIP: ${ZIP_NAME}"
+          ls -la "${ZIP_NAME}"
+
+      # ========== Upload artifacts ==========
+      - name: Upload artifacts (Linux ARM64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: davybot-standalone-linux-aarch64-v${{ env.VERSION }}
+          path: |
+            webui/src-tauri/target/aarch64-unknown-linux-gnu/release/*.zip
+          if-no-files-found: warn
