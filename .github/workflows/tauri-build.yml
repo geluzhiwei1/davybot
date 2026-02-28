@@ -37,6 +37,11 @@ jobs:
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
+          - platform: 'ubuntu-latest'
+            args: '--config src-tauri/tauri.conf.standalone.json'
+            target: 'aarch64-unknown-linux-gnu'
+            arch: 'aarch64'
+            use_qemu: true
           - platform: 'windows-latest'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-pc-windows-msvc'
@@ -85,6 +90,16 @@ jobs:
       - name: Add Rust targets (macOS)
         if: matrix.platform == 'macos-latest'
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Add Rust target (Linux ARM64)
+        if: matrix.arch == 'aarch64' && startsWith(matrix.platform, 'ubuntu')
+        run: rustup target add aarch64-unknown-linux-gnu
+
+      - name: Set up QEMU (for Linux ARM64 cross-compilation)
+        if: matrix.use_qemu == true
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       # ========== Setup Python (for standalone) ==========
       - name: Setup Python
@@ -289,11 +304,21 @@ jobs:
           echo "Created ZIP: ${ZIP_NAME}"
           ls -la "${ZIP_NAME}"
 
-      - name: Build Tauri app (Linux)
-        if: startsWith(matrix.platform, 'ubuntu')
+      - name: Build Tauri app (Linux ARM64 with QEMU)
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
         working-directory: ./webui
         run: |
-          # For Linux, build for the specific architecture
+          # For Linux ARM64, build with cross-compilation
+          echo "Building for ${{ matrix.target }} with QEMU..."
+          pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
+          echo "Build completed successfully"
+          ls -la src-tauri/target/${{ matrix.target }}/release/davybot || ls -la src-tauri/target/release/davybot
+
+      - name: Build Tauri app (Linux x86_64)
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
+        working-directory: ./webui
+        run: |
+          # For Linux x86_64, build for the specific architecture
           echo "Building for ${{ matrix.target }}..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
           echo "Build completed successfully"
@@ -452,6 +477,83 @@ jobs:
           echo "Created ZIP: ${ZIP_NAME}"
           ls -la "${ZIP_NAME}"
 
+      - name: Create portable ZIP package (Linux ARM64)
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          APP_NAME="davybot"
+          ARCH="${{ matrix.arch }}"
+          ZIP_DIR="webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}"
+          ZIP_NAME="${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}.zip"
+
+          # Create package directory
+          mkdir -p "${ZIP_DIR}/resources"
+
+          # Copy main executable from the correct target directory
+          cp webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME} "${ZIP_DIR}/"
+
+          # Copy Python environment
+          cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
+
+          # Copy welcome.html
+          cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
+
+          # Create README
+          cat > "${ZIP_DIR}/README.txt" << EOF
+          # Dawei AI Assistant - Standalone Portable Version
+
+          Version: \${VERSION}
+          Architecture: ${ARCH}
+
+          ## Usage
+
+          1. Extract this ZIP file to any directory
+          2. Run ./davybot to launch the application
+
+          The application will automatically start the backend service on first launch.
+
+          ## Directory Structure
+
+          - davybot                  : Main application (${ARCH} binary)
+          - resources/               : Resource files directory
+            - welcome.html           : Welcome page (standalone HTML)
+            - python-env/            : Python runtime environment
+              - bin/python           : Python interpreter
+              - bin/uv               : UV package manager
+              - bin/pip              : Python package manager
+              - lib/                 : Python standard library
+              - lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
+
+          ## System Requirements
+
+          - Linux ${ARCH} (ARM 64-bit/aarch64)
+          - Compatible with Raspberry Pi 4+, ARM servers, and other ARM64 devices
+          - About 500 MB free disk space
+
+          ## Notes
+
+          - First launch may take a few seconds to initialize
+          - Make the script executable: chmod +x davybot
+          - Do not move or delete the resources directory
+          - If you encounter issues, check the application logs
+
+          ## Support
+
+          Project Homepage: https://github.com/dawei/patent-agent
+
+          Copyright (c) 2026 Dawei Team. All rights reserved.
+          EOF
+
+          # Create ZIP
+          cd webui/src-tauri/target/${{ matrix.target }}/release
+          # Use relative path since we're already in the release directory
+          ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
+          zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
+
+          echo "Created ZIP: ${ZIP_NAME}"
+          ls -la "${ZIP_NAME}"
+
       # ========== Upload artifacts ==========
       # Note: macOS artifacts upload both binary and ZIP packages
       - name: Upload artifacts (macOS)
@@ -474,6 +576,16 @@ jobs:
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: warn
 
+      - name: Upload artifacts (Linux ARM64)
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: davybot-standalone-linux-aarch64-v${{ steps.version.outputs.version }}
+          path: |
+            webui/src-tauri/target/${{ matrix.target }}/release/davybot
+            webui/src-tauri/target/${{ matrix.target }}/release/*.zip
+          if-no-files-found: warn
+
       - name: Upload artifacts (Windows)
         if: startsWith(matrix.platform, 'windows')
         uses: actions/upload-artifact@v4
@@ -483,207 +595,9 @@ jobs:
             webui/src-tauri/target/release/*.zip
           if-no-files-found: warn
 
-  # ========== Create Universal macOS Binary ==========
-  create-universal:
-    needs: build
-    if: |
-      startsWith(github.ref, 'refs/tags/') ||
-      (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # ========== Determine version ==========
-      - name: Set version
-        id: version
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
-            VERSION=${VERSION#v}  # Remove leading 'v' if present
-          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
-          fi
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Building universal version: ${VERSION}"
-        shell: bash
-
-      - name: Download x86_64 binary
-        uses: actions/download-artifact@v4
-        with:
-          name: davybot-standalone-macos-x86_64-v${{ steps.version.outputs.version }}
-          path: ./downloads/x86_64
-
-      - name: Download aarch64 binary
-        uses: actions/download-artifact@v4
-        with:
-          name: davybot-standalone-macos-aarch64-v${{ steps.version.outputs.version }}
-          path: ./downloads/aarch64
-
-      - name: Verify and create universal binary
-        run: |
-          # Find and verify downloaded binaries
-          echo "=== Downloaded artifacts structure ==="
-          ls -la downloads/
-          echo ""
-          echo "=== x86_64 structure ==="
-          find downloads/x86_64 -name "davybot-*" -type f
-          echo ""
-          echo "=== aarch64 structure ==="
-          find downloads/aarch64 -name "davybot-*" -type f
-
-          # Find the actual binaries (they're in macos-binaries/ directory)
-          X86_64_BINARY=$(find downloads/x86_64 -path "*/macos-binaries/davybot-x86_64" -type f | head -1)
-          AARCH64_BINARY=$(find downloads/aarch64 -path "*/macos-binaries/davybot-aarch64" -type f | head -1)
-
-          echo "=== Found binaries ==="
-          echo "x86_64: ${X86_64_BINARY}"
-          echo "aarch64: ${AARCH64_BINARY}"
-          echo ""
-
-          # Verify the binaries
-          echo "=== x86_64 binary ==="
-          file "${X86_64_BINARY}"
-          echo ""
-          echo "=== aarch64 binary ==="
-          file "${AARCH64_BINARY}"
-          echo ""
-
-          # Create output directory and copy binaries to a temp location for lipo
-          mkdir -p webui/src-tauri/target/universal-apple-darwin/release
-          cp "${X86_64_BINARY}" /tmp/davybot-x86_64
-          cp "${AARCH64_BINARY}" /tmp/davybot-aarch64
-
-          # Create universal binary using lipo
-          lipo -create \
-            -output webui/src-tauri/target/universal-apple-darwin/release/davybot \
-            /tmp/davybot-x86_64 \
-            /tmp/davybot-aarch64
-
-          # Verify universal binary
-          echo "=== Universal binary ==="
-          ls -la webui/src-tauri/target/universal-apple-darwin/release/davybot
-          file webui/src-tauri/target/universal-apple-darwin/release/davybot
-          lipo -info webui/src-tauri/target/universal-apple-darwin/release/davybot
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install UV package manager
-        run: |
-          pip3 install uv --quiet
-
-      - name: Create Python environment with UV
-        run: |
-          cd agent
-          uv venv --python 3.12 .venv
-          uv pip install uv --target .venv
-          uv pip install pip --target .venv
-          uv pip install -e .
-
-      - name: Copy resources
-        run: |
-          mkdir -p webui/src-tauri/resources
-          rm -rf webui/src-tauri/resources/python-env
-          cp -r agent/.venv webui/src-tauri/resources/python-env
-          find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: 'webui/pnpm-lock.yaml'
-
-      - name: Build frontend
-        run: |
-          cd webui
-          pnpm install --frozen-lockfile
-          pnpm build-only
-
-      - name: Create universal portable ZIP
-        run: |
-          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
-          APP_NAME="davybot"
-          ZIP_DIR="webui/src-tauri/target/release/${APP_NAME}-standalone-darwin-universal-v${VERSION}"
-          ZIP_NAME="${APP_NAME}-standalone-darwin-universal-v${VERSION}.zip"
-
-          # Create package directory
-          mkdir -p "${ZIP_DIR}/resources"
-
-          # Copy universal binary
-          cp webui/src-tauri/target/universal-apple-darwin/release/${APP_NAME} "${ZIP_DIR}/"
-
-          # Copy Python environment
-          cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
-
-          # Copy welcome.html
-          cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
-
-          # Create README
-          cat > "${ZIP_DIR}/README.txt" << 'EOF'
-          # Dawei AI Assistant - Universal Binary (Intel + Apple Silicon)
-
-          Version: ${VERSION}
-
-          ## Usage
-
-          1. Extract this ZIP file to any directory
-          2. Run ./davybot to launch the application
-
-          The application will automatically start the backend service on first launch.
-
-          ## System Requirements
-
-          - macOS 11 (Big Sur) or higher (Universal binary for both Intel & Apple Silicon Macs)
-          - About 500 MB free disk space
-
-          ## Notes
-
-          - This is a universal binary that runs natively on both Intel and Apple Silicon Macs
-          - First launch may take a few seconds to initialize
-          - Make the script executable: chmod +x davybot
-          - Do not move or delete the resources directory
-          - If you encounter issues, check the application logs
-
-          ## Support
-
-          Project Homepage: https://github.com/dawei/patent-agent
-
-          Copyright (c) 2026 Dawei Team. All rights reserved.
-          EOF
-
-          # Create ZIP
-          cd webui/src-tauri/target/release
-          # Use relative path since we're already in the release directory
-          ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
-          zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
-
-          echo "Created universal ZIP: ${ZIP_NAME}"
-          ls -la "${ZIP_NAME}"
-
-      - name: Upload universal binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: davybot-standalone-macos-universal-v${{ steps.version.outputs.version }}
-          path: |
-            webui/src-tauri/target/release/*universal*.zip
-          if-no-files-found: warn
-
   # ========== Release to GitHub ==========
   release:
-    needs: [build, create-universal]
+    needs: build
     if: |
       always() && (
         startswith(github.ref, 'refs/tags/') ||
@@ -768,16 +682,12 @@ jobs:
 
           ### Installation
 
-          #### Portable ZIP Packages (Recommended)
-          - **macOS Universal**: \`davybot-standalone-darwin-universal-v${TAG#v}.zip\` - Works on both Intel & Apple Silicon Macs
+          #### Portable ZIP Packages (Standalone)
+          - **macOS Intel**: \`davybot-standalone-darwin-x86_64-portable-v${TAG#v}.zip\` - For Intel Macs (2019 and earlier)
+          - **macOS Apple Silicon**: \`davybot-standalone-darwin-aarch64-portable-v${TAG#v}.zip\` - For M1/M2/M3/M4 Macs
           - **Windows**: \`davybot-standalone-win-portable-v${TAG#v}.zip\` - No installation required
           - **Linux x86_64**: \`davybot-standalone-linux-x86_64-portable-v${TAG#v}.zip\` - For Intel/AMD 64-bit systems
           - **Linux ARM64**: \`davybot-standalone-linux-aarch64-portable-v${TAG#v}.zip\` - For ARM 64-bit systems (Raspberry Pi, etc.)
-
-          #### Installers
-          **Windows**: Download \`.exe\` installer for traditional installation
-          **macOS**: Download \`.dmg\` file for easy installation (universal binary)
-          **Linux**: Download \`.deb\` / \`.AppImage\` file for package-based installation
 
           ### Features
 
@@ -785,7 +695,7 @@ jobs:
           - No external Python installation required
           - Standalone operation - works offline
           - Portable ZIP versions require no installation
-          - Multi-architecture support (x86_64 and ARM64 for Linux)
+          - Multi-architecture support (x86_64 and ARM64 for Linux, Intel and Apple Silicon for macOS)
 
           ### Quick Start (Portable)
 
@@ -798,5 +708,11 @@ jobs:
           **Note for Linux users**: Check your architecture with \`uname -m\`:
           - \`x86_64\`: Download the x86_64 version
           - \`aarch64\`: Download the aarch64 version
+
+          **Note for macOS users**: Check your architecture with \`uname -m\`:
+          - \`x86_64\`: Download the x86_64 version (Intel Macs)
+          - \`arm64\` or \`aarch64\`: Download the aarch64 version (Apple Silicon Macs)
+
+          **Why no Universal Binary?** Due to technical limitations with Python C extensions on different architectures, we provide separate builds for Intel and Apple Silicon Macs. This ensures optimal performance and compatibility for both platforms.
           " \
             $(find ./release-zips -name "*.zip" -type f)
