@@ -46,6 +46,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ========== Determine version ==========
+      - name: Set version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
+        shell: bash
+
       # ========== Setup Node.js & pnpm ==========
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -80,6 +96,17 @@ jobs:
             g++-aarch64-linux-gnu \
             qemu-user-static
 
+      - name: Install ARM64 system libraries for cross-compilation
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev:arm64 \
+            libwebkit2gtk-4.1-dev:arm64 \
+            libappindicator3-dev:arm64 \
+            librsvg2-dev:arm64
+
       - name: Configure Rust for ARM64 cross-compilation
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
         run: |
@@ -88,6 +115,13 @@ jobs:
           [target.aarch64-unknown-linux-gnu]
           linker = "aarch64-linux-gnu-gcc"
           EOF
+
+      - name: Configure pkg-config for ARM64 cross-compilation
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
+        run: |
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig" >> $GITHUB_ENV
+          echo "PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig" >> $GITHUB_ENV
 
       # ========== Setup Python (for standalone) ==========
       - name: Setup Python
@@ -153,17 +187,31 @@ jobs:
             uv venv --python 3.12 .venv
 
             # Install UV in the venv (needed for standalone)
-            uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+            # On Windows, don't use --target to ensure uv.exe goes to Scripts/
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              .venv/Scripts/pip.exe install uv --index-url https://mirrors.aliyun.com/pypi/simple/
+            else
+              uv pip install uv --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+            fi
 
             # Install pip in the venv (for compatibility)
-            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              .venv/Scripts/pip.exe install pip --index-url https://mirrors.aliyun.com/pypi/simple/
+            else
+              uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv
+            fi
 
             # Install project dependencies
             uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
           else
             # Sync existing dependencies
             uv pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
-            uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv 2>/dev/null || true
+            # Ensure uv and pip are available
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              .venv/Scripts/pip.exe install uv pip --index-url https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+            else
+              uv pip install pip --index-url https://mirrors.aliyun.com/pypi/simple/ --target .venv 2>/dev/null || true
+            fi
           fi
         shell: bash
 
@@ -439,9 +487,8 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-${{ matrix.platform }}-${{ matrix.arch }}
+          name: davybot-standalone-macos-${{ matrix.arch }}-v${{ env.VERSION }}
           path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/davybot
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: warn
 
@@ -449,9 +496,8 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu')
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-${{ matrix.platform }}-${{ matrix.arch }}
+          name: davybot-standalone-linux-${{ matrix.arch }}-v${{ env.VERSION }}
           path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/davybot
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: warn
 
@@ -459,10 +505,9 @@ jobs:
         if: startsWith(matrix.platform, 'windows')
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-${{ matrix.platform }}-x86_64
+          name: davybot-standalone-windows-x86_64-v${{ env.VERSION }}
           path: |
             webui/src-tauri/target/release/*.zip
-            webui/src-tauri/target/release/bundle/
           if-no-files-found: warn
 
   # ========== Create Universal macOS Binary ==========
@@ -474,16 +519,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ========== Determine version ==========
+      - name: Set version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building universal version: ${VERSION}"
+        shell: bash
+
       - name: Download x86_64 binary
         uses: actions/download-artifact@v4
         with:
-          name: davybot-standalone-macos-latest-x86_64
+          name: davybot-standalone-macos-x86_64-v${{ env.VERSION }}
           path: ./binaries/x86_64
 
       - name: Download aarch64 binary
         uses: actions/download-artifact@v4
         with:
-          name: davybot-standalone-macos-latest-aarch64
+          name: davybot-standalone-macos-aarch64-v${{ env.VERSION }}
           path: ./binaries/aarch64
 
       - name: Verify downloaded binaries
@@ -609,9 +668,8 @@ jobs:
       - name: Upload universal binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-macos-universal
+          name: davybot-standalone-macos-universal-v${{ env.VERSION }}
           path: |
-            webui/src-tauri/target/universal-apple-darwin/release/davybot
             webui/src-tauri/target/release/*universal*.zip
           if-no-files-found: warn
 
