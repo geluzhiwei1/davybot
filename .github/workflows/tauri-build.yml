@@ -515,35 +515,55 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: davybot-standalone-macos-x86_64-v${{ steps.version.outputs.version }}
-          path: ./binaries
+          path: ./downloads/x86_64
 
       - name: Download aarch64 binary
         uses: actions/download-artifact@v4
         with:
           name: davybot-standalone-macos-aarch64-v${{ steps.version.outputs.version }}
-          path: ./binaries
+          path: ./downloads/aarch64
 
       - name: Verify and create universal binary
         run: |
-          # Verify downloaded binaries
-          echo "=== Downloaded binaries ==="
-          ls -la binaries/
+          # Find and verify downloaded binaries
+          echo "=== Downloaded artifacts structure ==="
+          ls -la downloads/
           echo ""
+          echo "=== x86_64 structure ==="
+          find downloads/x86_64 -name "davybot-*" -type f
+          echo ""
+          echo "=== aarch64 structure ==="
+          find downloads/aarch64 -name "davybot-*" -type f
+
+          # Find the actual binaries (they're in binaries/binaries/ due to artifact structure)
+          X86_64_BINARY=$(find downloads/x86_64 -path "*/binaries/davybot-x86_64" -type f | head -1)
+          AARCH64_BINARY=$(find downloads/aarch64 -path "*/binaries/davybot-aarch64" -type f | head -1)
+
+          echo "=== Found binaries ==="
+          echo "x86_64: ${X86_64_BINARY}"
+          echo "aarch64: ${AARCH64_BINARY}"
+          echo ""
+
+          # Verify the binaries
           echo "=== x86_64 binary ==="
-          file binaries/davybot-x86_64
+          file "${X86_64_BINARY}"
           echo ""
           echo "=== aarch64 binary ==="
-          file binaries/davybot-aarch64
+          file "${AARCH64_BINARY}"
+          echo ""
+
+          # Create output directory and copy binaries to a temp location for lipo
+          mkdir -p webui/src-tauri/target/universal-apple-darwin/release
+          cp "${X86_64_BINARY}" /tmp/davybot-x86_64
+          cp "${AARCH64_BINARY}" /tmp/davybot-aarch64
 
           # Create universal binary using lipo
-          mkdir -p webui/src-tauri/target/universal-apple-darwin/release
           lipo -create \
             -output webui/src-tauri/target/universal-apple-darwin/release/davybot \
-            binaries/davybot-x86_64 \
-            binaries/davybot-aarch64
+            /tmp/davybot-x86_64 \
+            /tmp/davybot-aarch64
 
           # Verify universal binary
-          echo ""
           echo "=== Universal binary ==="
           ls -la webui/src-tauri/target/universal-apple-darwin/release/davybot
           file webui/src-tauri/target/universal-apple-darwin/release/davybot
