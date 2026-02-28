@@ -572,6 +572,18 @@ jobs:
           find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
       - name: Build frontend
         run: |
           cd webui
