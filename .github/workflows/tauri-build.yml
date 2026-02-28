@@ -33,7 +33,7 @@ jobs:
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
           # Use ARM64 runner for Linux ARM builds (no cross-compilation needed)
-          - platform: 'ubuntu-24.04-arm64'
+          - platform: 'ubuntu-22.04-arm64'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'aarch64-unknown-linux-gnu'
             arch: 'aarch64'
