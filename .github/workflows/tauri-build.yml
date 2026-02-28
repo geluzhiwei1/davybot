@@ -10,6 +10,11 @@ on:
         description: 'Build version (optional)'
         required: false
         type: string
+      create_release:
+        description: 'Create GitHub release (only for manual trigger)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -48,6 +53,8 @@ jobs:
         run: |
           if [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
+            # Remove leading 'v' if present to avoid double 'v' prefix
+            VERSION=${VERSION#v}
           elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
@@ -469,7 +476,9 @@ jobs:
   # ========== Create Universal macOS Binary ==========
   create-universal:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    if: |
+      startsWith(github.ref, 'refs/tags/') ||
+      (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -479,7 +488,10 @@ jobs:
       - name: Set version
         id: version
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            VERSION=${VERSION#v}  # Remove leading 'v' if present
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
             VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
@@ -632,9 +644,14 @@ jobs:
   # ========== Release to GitHub ==========
   release:
     needs: [build, create-universal]
-    if: startsWith(github.ref, 'refs/tags/')
+    if: |
+      (startsWith(github.ref, 'refs/tags/')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -682,11 +699,28 @@ jobs:
           echo "=== Final release zips ==="
           ls -lh ./release-zips/
 
+      - name: Get version for release
+        id: release_version
+        run: |
+          # Determine version: use input version, tag ref, or Cargo.toml
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            VERSION=${VERSION#v}  # Remove leading 'v' if present
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Creating release for version: ${VERSION}"
+
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
+          VERSION="${{ steps.release_version.outputs.version }}"
+          TAG="v${VERSION}"
 
           # Find all real portable ZIP files
           echo "=== Finding all portable ZIP files ==="
