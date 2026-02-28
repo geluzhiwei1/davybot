@@ -209,9 +209,9 @@ jobs:
       - name: Copy macOS binaries to simple path
         if: startsWith(matrix.platform, 'macos')
         run: |
-          mkdir -p binaries
-          cp webui/src-tauri/target/${{ matrix.target }}/release/davybot binaries/davybot-${{ matrix.arch }}
-          ls -la binaries/
+          mkdir -p macos-binaries
+          cp webui/src-tauri/target/${{ matrix.target }}/release/davybot macos-binaries/davybot-${{ matrix.arch }}
+          ls -la macos-binaries/
 
       - name: Create portable ZIP package (macOS)
         if: startsWith(matrix.platform, 'macos')
@@ -460,7 +460,7 @@ jobs:
         with:
           name: davybot-standalone-macos-${{ matrix.arch }}-v${{ steps.version.outputs.version }}
           path: |
-            binaries/davybot-${{ matrix.arch }}
+            macos-binaries/davybot-${{ matrix.arch }}
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: error
 
@@ -535,9 +535,9 @@ jobs:
           echo "=== aarch64 structure ==="
           find downloads/aarch64 -name "davybot-*" -type f
 
-          # Find the actual binaries (they're in binaries/binaries/ due to artifact structure)
-          X86_64_BINARY=$(find downloads/x86_64 -path "*/binaries/davybot-x86_64" -type f | head -1)
-          AARCH64_BINARY=$(find downloads/aarch64 -path "*/binaries/davybot-aarch64" -type f | head -1)
+          # Find the actual binaries (they're in macos-binaries/ directory)
+          X86_64_BINARY=$(find downloads/x86_64 -path "*/macos-binaries/davybot-x86_64" -type f | head -1)
+          AARCH64_BINARY=$(find downloads/aarch64 -path "*/macos-binaries/davybot-aarch64" -type f | head -1)
 
           echo "=== Found binaries ==="
           echo "x86_64: ${X86_64_BINARY}"
@@ -685,8 +685,10 @@ jobs:
   release:
     needs: [build, create-universal]
     if: |
-      (startsWith(github.ref, 'refs/tags/')) ||
-      (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+      always() && (
+        startswith(github.ref, 'refs/tags/') ||
+        (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+      ) && (needs.build.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
