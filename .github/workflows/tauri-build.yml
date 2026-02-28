@@ -37,11 +37,6 @@ jobs:
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
-          - platform: 'ubuntu-latest'
-            args: '--config src-tauri/tauri.conf.standalone.json'
-            target: 'aarch64-unknown-linux-gnu'
-            arch: 'aarch64'
-            use_qemu: true
           - platform: 'windows-latest'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-pc-windows-msvc'
@@ -90,16 +85,6 @@ jobs:
       - name: Add Rust targets (macOS)
         if: matrix.platform == 'macos-latest'
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
-
-      - name: Add Rust target (Linux ARM64)
-        if: matrix.arch == 'aarch64' && startsWith(matrix.platform, 'ubuntu')
-        run: rustup target add aarch64-unknown-linux-gnu
-
-      - name: Set up QEMU (for Linux ARM64 cross-compilation)
-        if: matrix.use_qemu == true
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
 
       # ========== Setup Python (for standalone) ==========
       - name: Setup Python
@@ -165,18 +150,11 @@ jobs:
             uv venv --python 3.12 .venv
 
             # Install UV in the venv (needed for standalone)
-            # On Windows, don't use --target to ensure uv.exe goes to Scripts/
+            # On Windows, use uv directly now
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              .venv/Scripts/pip.exe install uv
+              uv pip install uv --target .venv
             else
               uv pip install uv --target .venv
-            fi
-
-            # Install pip in the venv (for compatibility)
-            if [[ "$RUNNER_OS" == "Windows" ]]; then
-              .venv/Scripts/pip.exe install pip
-            else
-              uv pip install pip --target .venv
             fi
 
             # Install project dependencies
@@ -184,11 +162,11 @@ jobs:
           else
             # Sync existing dependencies
             uv pip install -e . 2>/dev/null || true
-            # Ensure uv and pip are available
+            # Ensure uv is available
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              .venv/Scripts/pip.exe install uv pip 2>/dev/null || true
+              uv pip install uv 2>/dev/null || true
             else
-              uv pip install pip --target .venv 2>/dev/null || true
+              uv pip install uv --target .venv 2>/dev/null || true
             fi
           fi
         shell: bash
@@ -304,16 +282,6 @@ jobs:
           echo "Created ZIP: ${ZIP_NAME}"
           ls -la "${ZIP_NAME}"
 
-      - name: Build Tauri app (Linux ARM64 with QEMU)
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        working-directory: ./webui
-        run: |
-          # For Linux ARM64, build with cross-compilation
-          echo "Building for ${{ matrix.target }} with QEMU..."
-          pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
-          echo "Build completed successfully"
-          ls -la src-tauri/target/${{ matrix.target }}/release/davybot || ls -la src-tauri/target/release/davybot
-
       - name: Build Tauri app (Linux x86_64)
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
         working-directory: ./webui
@@ -400,7 +368,6 @@ jobs:
           cd webui/src-tauri/target/release
           # Use relative path since we're already in the release directory
           7z a -tzip "${ZIP_NAME}" "$(basename "${ZIP_DIR}")" -mx=9
-
       - name: Create portable ZIP package (Linux x86_64)
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
         shell: bash
@@ -451,84 +418,7 @@ jobs:
 
           ## System Requirements
 
-          - Linux ${ARCH} ($(if [ "${ARCH}" = "x86_64" ]; then echo 'Intel/AMD 64-bit'; else echo 'ARM 64-bit (aarch64)'; fi))
-          - About 500 MB free disk space
-
-          ## Notes
-
-          - First launch may take a few seconds to initialize
-          - Make the script executable: chmod +x davybot
-          - Do not move or delete the resources directory
-          - If you encounter issues, check the application logs
-
-          ## Support
-
-          Project Homepage: https://github.com/dawei/patent-agent
-
-          Copyright (c) 2026 Dawei Team. All rights reserved.
-          EOF
-
-          # Create ZIP
-          cd webui/src-tauri/target/${{ matrix.target }}/release
-          # Use relative path since we're already in the release directory
-          ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
-          zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
-
-          echo "Created ZIP: ${ZIP_NAME}"
-          ls -la "${ZIP_NAME}"
-
-      - name: Create portable ZIP package (Linux ARM64)
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        shell: bash
-        run: |
-          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
-          APP_NAME="davybot"
-          ARCH="${{ matrix.arch }}"
-          ZIP_DIR="webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}"
-          ZIP_NAME="${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}.zip"
-
-          # Create package directory
-          mkdir -p "${ZIP_DIR}/resources"
-
-          # Copy main executable from the correct target directory
-          cp webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME} "${ZIP_DIR}/"
-
-          # Copy Python environment
-          cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
-
-          # Copy welcome.html
-          cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
-
-          # Create README
-          cat > "${ZIP_DIR}/README.txt" << EOF
-          # Dawei AI Assistant - Standalone Portable Version
-
-          Version: \${VERSION}
-          Architecture: ${ARCH}
-
-          ## Usage
-
-          1. Extract this ZIP file to any directory
-          2. Run ./davybot to launch the application
-
-          The application will automatically start the backend service on first launch.
-
-          ## Directory Structure
-
-          - davybot                  : Main application (${ARCH} binary)
-          - resources/               : Resource files directory
-            - welcome.html           : Welcome page (standalone HTML)
-            - python-env/            : Python runtime environment
-              - bin/python           : Python interpreter
-              - bin/uv               : UV package manager
-              - bin/pip              : Python package manager
-              - lib/                 : Python standard library
-              - lib/site-packages/   : Third-party libraries (FastAPI, uvicorn, etc.)
-
-          ## System Requirements
-
-          - Linux ${ARCH} (ARM 64-bit/aarch64)
-          - Compatible with Raspberry Pi 4+, ARM servers, and other ARM64 devices
+          - Linux x86_64 (Intel/AMD 64-bit)
           - About 500 MB free disk space
 
           ## Notes
@@ -571,16 +461,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: davybot-standalone-linux-x86_64-v${{ steps.version.outputs.version }}
-          path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/davybot
-            webui/src-tauri/target/${{ matrix.target }}/release/*.zip
-          if-no-files-found: warn
-
-      - name: Upload artifacts (Linux ARM64)
-        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: davybot-standalone-linux-aarch64-v${{ steps.version.outputs.version }}
           path: |
             webui/src-tauri/target/${{ matrix.target }}/release/davybot
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
@@ -687,7 +567,6 @@ jobs:
           - **macOS Apple Silicon**: \`davybot-standalone-darwin-aarch64-portable-v${TAG#v}.zip\` - For M1/M2/M3/M4 Macs
           - **Windows**: \`davybot-standalone-win-portable-v${TAG#v}.zip\` - No installation required
           - **Linux x86_64**: \`davybot-standalone-linux-x86_64-portable-v${TAG#v}.zip\` - For Intel/AMD 64-bit systems
-          - **Linux ARM64**: \`davybot-standalone-linux-aarch64-portable-v${TAG#v}.zip\` - For ARM 64-bit systems (Raspberry Pi, etc.)
 
           ### Features
 
@@ -695,7 +574,7 @@ jobs:
           - No external Python installation required
           - Standalone operation - works offline
           - Portable ZIP versions require no installation
-          - Multi-architecture support (x86_64 and ARM64 for Linux, Intel and Apple Silicon for macOS)
+          - Multi-architecture support (Intel and Apple Silicon for macOS)
 
           ### Quick Start (Portable)
 
@@ -704,10 +583,6 @@ jobs:
           3. Run the application:
              - Windows: Double-click \`davybot.exe\`
              - Linux/macOS: Run \`./davybot\`
-
-          **Note for Linux users**: Check your architecture with \`uname -m\`:
-          - \`x86_64\`: Download the x86_64 version
-          - \`aarch64\`: Download the aarch64 version
 
           **Note for macOS users**: Check your architecture with \`uname -m\`:
           - \`x86_64\`: Download the x86_64 version (Intel Macs)
