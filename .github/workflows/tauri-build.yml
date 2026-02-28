@@ -100,6 +100,8 @@ jobs:
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'aarch64'
         run: |
           sudo dpkg --add-architecture arm64
+          # Disable security repository (doesn't have arm64 packages)
+          sudo rm -f /etc/apt/sources.list.d/ubuntu-security.sources
           sudo apt-get update
           sudo apt-get install -y \
             libgtk-3-dev:arm64 \
@@ -689,17 +691,54 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R ./bundles
 
+      - name: Extract artifact zips and reorganize
+        run: |
+          # GitHub Actions artifacts are zipped, need to extract them
+          # The structure is: bundles/<artifact-name>/webui/src-tauri/target/.../release/*.zip
+
+          echo "=== Extracting artifacts to get real portable zips ==="
+          mkdir -p ./release-zips
+
+          # Find all artifact zips (they're in nested directories)
+          for artifact_zip in $(find ./bundles -name "*.zip" -type f); do
+            echo "Processing artifact zip: $artifact_zip"
+
+            # Extract the artifact zip to a temp directory
+            temp_dir=$(mktemp -d)
+            unzip -q "$artifact_zip" -d "$temp_dir"
+
+            # Find the real portable zip inside (it's the one we created in CI)
+            real_zip=$(find "$temp_dir" -name "*portable*.zip" -o -name "*universal*.zip" | head -1)
+
+            if [ -n "$real_zip" ]; then
+              # Get the basename of the real zip
+              basename_zip=$(basename "$real_zip")
+              echo "  Found real portable zip: $basename_zip"
+
+              # Copy to release-zips directory
+              cp "$real_zip" "./release-zips/$basename_zip"
+            else
+              echo "  WARNING: No portable zip found in artifact"
+            fi
+
+            # Clean up
+            rm -rf "$temp_dir"
+          done
+
+          echo "=== Final release zips ==="
+          ls -lh ./release-zips/
+
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          
-          # Find all ZIP files in bundles directory
-          echo "=== Finding all ZIP files ==="
-          find ./bundles -name "*.zip" -type f
-          
-          # Upload all ZIP files to release
+
+          # Find all real portable ZIP files
+          echo "=== Finding all portable ZIP files ==="
+          find ./release-zips -name "*.zip" -type f
+
+          # Upload all portable ZIP files to release
           gh release create "$TAG" \
             --repo "${{ github.repository }}" \
             --title "Release $TAG" \
@@ -738,4 +777,4 @@ jobs:
           - \`x86_64\`: Download the x86_64 version
           - \`aarch64\`: Download the aarch64 version
           " \
-            $(find ./bundles -name "*.zip" -type f)
+            $(find ./release-zips -name "*.zip" -type f)

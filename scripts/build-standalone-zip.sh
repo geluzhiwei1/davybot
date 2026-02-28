@@ -72,8 +72,8 @@ else
     exit 1
 fi
 
-# Get version from standalone tauri config
-APP_VERSION=$(grep '"version"' "${TAURI_DIR}/tauri.conf.standalone.json" | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+# Get version from Cargo.toml (consistent with GitHub CI)
+APP_VERSION=$(grep '^version' "${TAURI_DIR}/Cargo.toml" | head -1 | awk -F '"' '{print $2}')
 
 echo "App: ${APP_NAME} v${APP_VERSION}"
 echo "Target: ${TARGET_TRIPLE}"
@@ -165,7 +165,7 @@ echo ""
 echo "[3/6] Building Tauri application..."
 echo "Building for target: ${TARGET_TRIPLE}"
 
-pnpm tauri build --config "${TAURI_DIR}/tauri.conf.standalone.json" --no-bundle --target "${TARGET_TRIPLE}"
+pnpm tauri build --config "${TAURI_DIR}/tauri.conf.standalone.json" --no-bundle --target "${TARGET_TRIPLE}" --features standalone
 
 # Verify build output
 TARGET_DIR="${TAURI_DIR}/target/${TARGET_TRIPLE}/release"
