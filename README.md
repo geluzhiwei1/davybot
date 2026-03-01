@@ -17,21 +17,17 @@
   - pip version: Install davybot via pip, access webui via browser on local or other machines; especially suitable for Linux systems without GUI
   - standalone version: Download zip package, extract and run, no additional installation required
 - Minimal dependencies, complete agent system building
-- Scheduled task system
-- Periodic task system
+- Scheduled and periodic task system
+- Instant messaging (Feishu, etc.) plugin system
 
 ## Key Metrics
 
-- **Lines of Code**: 103,012 lines
+- **Lines of Code**: 100,000+ lines
 - **Message Types**: 61 WebSocket message types
 - **Custom Tools**: 60 tool classes
 - **Modes**: 5 PDCA modes (orchestrator, plan, do, check, act)
 - **Plugin Types**: 2 base classes (ToolPlugin, ServicePlugin)
 - **Supported Languages**: 3 languages (en, zh_CN, zh_TW)
-
-## Videos
-- Installation and Configuration: https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
-- Installation and Usage of Skills: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
 
 ## Typical User Commands
 
@@ -87,11 +83,9 @@ Developing plugins for Feishu, WeChat, and other platforms to implement agent co
 | Platform | Architecture | Build Status | Package Format | Notes |
 |----------|--------------|---------------|----------------|-------|
 | **Linux** | x86_64 | ✅ Full Support | ZIP | Verified, 135M |
-| **Linux** | aarch64 | ✅ CI Support | ZIP | ARM64 cross-compile |
 | **macOS** | x86_64 | ✅ CI Support | ZIP | Intel Macs |
 | **macOS** | aarch64 | ✅ CI Support | ZIP | Apple Silicon |
-| **macOS** | Universal | ✅ CI Support | ZIP | Intel + ARM (lipo merged) |
-| **Windows** | x86_64 | ⚠️ Config Exists | ZIP/NSIS | Local build unverified |
+| **Windows** | x86_64 | ✅ CI Support | ZIP | Local build unverified |
 
 ### 📈 Support Coverage
 
@@ -192,13 +186,6 @@ graph TB
     style DI fill:#ffd43b,stroke:#fab005,stroke-width:2px
 ```
 
-# Release Plan
-- [√] Developer Preview (Multi-platform): For experienced professional developers. Requires cloning code and self-installation. See [docs/development/local-development.md](docs/development/local-development.md)
-- [√] Tech Version (Multi-platform): For tech-savvy users or those with some computer background. Install via pip install
-- Windows App Version: Download and install on Windows for direct use
-- Linux App Version: Download and install on Ubuntu for direct use
-- Mobile App Version (Cross-platform): Mobile version, install and use directly
-
 # Dependency Repositories
 
 ## Market and Resources
@@ -209,6 +196,15 @@ graph TB
 ## Plugins - Instant Messaging Tools
 
 - https://github.com/geluzhiwei1/davybot-plugins-im.git
+
+# User Help
+
+## Documentation
+ - Plugin Installation and Setup [docs/user/instant-message/feishu.md](docs/user/instant-message/feishu.md)
+
+## Videos
+- Installation and Configuration: https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
+- Installation and Usage of Skills: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
 
 # WeChat Group Chat
 ![alt text](asserts/group.png)

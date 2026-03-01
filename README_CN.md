@@ -18,19 +18,16 @@
  - standalone独立版： 下载zip包，解压就可以运行，无须额外安装
 - 极简依赖，完整构建智能体系统
 - 定时、周期任务系统
+- 即时通信软件（飞书等）插件系统
 
 ## 关键指标统计
 
-- **代码行数**: 103,012 行
+- **代码行数**: 10w + 行
 - **消息类型**: 61 种 WebSocket 消息类型
 - **自定义工具**: 60 个工具类
 - **模式数**: 5 个 PDCA 模式 (orchestrator, plan, do, check, act)
 - **插件类型**: 2 个基类 (ToolPlugin, ServicePlugin)
 - **支持语言**: 3 种 (en, zh_CN, zh_TW)
-
-## 视频
-- 安装和配置：https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
-- 安装和使用skill: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
 
 ## 典型用户指令
 
@@ -86,11 +83,9 @@ http://localhost:8465/app
 | 平台 | 架构 | 构建状态 | 打包格式 | 备注 |
 |------|------|----------|----------|------|
 | **Linux** | x86_64 | ✅ 完整支持 | ZIP | 已验证，135M |
-| **Linux** | aarch64 | ✅ CI支持 | ZIP | ARM64交叉编译 |
 | **macOS** | x86_64 | ✅ CI支持 | ZIP | Intel Macs |
 | **macOS** | aarch64 | ✅ CI支持 | ZIP | Apple Silicon |
-| **macOS** | Universal | ✅ CI支持 | ZIP | Intel + ARM (lipo合并) |
-| **Windows** | x86_64 | ⚠️ 配置存在 | ZIP/NSIS | 本地构建未验证 |
+| **Windows** | x86_64 | ✅ CI支持  | ZIP | 本地构建未验证 |
 
 ### 📈 支持覆盖率
 
@@ -192,12 +187,6 @@ graph TB
     style DI fill:#ffd43b,stroke:#fab005,stroke-width:2px
 ```
 
-# 发布计划
-- [√] 开发者预览版本（多平台）： 给有开发经验的专业技术人员试用，需要clone 代码，自行安装运行, 参见 [docs/development/local-development.md](docs/development/local-development.md)
-- [√] 技术人版本（多平台）： 给技术人或者有一定计算机基础的人员试用，使用pip install 安装
-- windows app版本： windows 下载安装，直接使用
-- Linux app 版本： Ubuntu 下载安装，直接使用
-- 移动端 App 版本（跨平台）： 手机版本，安装后直接使用 
 
 # 依赖代码库
 
@@ -210,6 +199,14 @@ graph TB
 
 - https://github.com/geluzhiwei1/davybot-plugins-im.git
 
+# 用户帮助
+
+## 文档
+ - 插件的安装与设置 [docs/user/instant-message/feishu.md](docs/user/instant-message/feishu.md)
+
+## 视频
+- 安装和配置：https://www.bilibili.com/video/BV1XDZfBvEit?t=7.0
+- 安装和使用skill: https://www.bilibili.com/video/BV1whZfBJEde?t=122.5
 
 # 微信交流群
 ![alt text](asserts/group.png)

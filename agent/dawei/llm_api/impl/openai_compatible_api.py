@@ -672,13 +672,6 @@ class OpenAICompatibleParser(StreamChunkParser):
 
         delta = chunk["choices"][0].get("delta", {})
 
-        # 【DEBUG】记录收到的原始delta，用于调试GLM等模型的内容显示问题
-        if delta:  # 只在delta非空时记录
-            logger.info(f"[LLM_STREAM] Received delta: keys={list(delta.keys())}, has_reasoning={bool(delta.get('reasoning_content'))}, has_content={bool(delta.get('content'))}, has_tool_calls={bool(delta.get('tool_calls'))}")
-            if delta.get("reasoning_content"):
-                logger.info(f"[LLM_STREAM] reasoning_content preview: {delta['reasoning_content'][:100]!r}")
-            if delta.get("content"):
-                logger.info(f"[LLM_STREAM] content preview: {delta['content'][:100]!r}")
 
         # 处理流式推理过程输出
         if delta.get("reasoning_content"):

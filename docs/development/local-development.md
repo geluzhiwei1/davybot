@@ -6,7 +6,7 @@
 cd agent
 
 # Install dependencies (using UV)
-uv pip install -e . -i https://mirrors.aliyun.com/pypi/simple/
+uv pip install -e .
 
 # Start FastAPI server (with auto-reload)
 dawei server start --reload

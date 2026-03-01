@@ -133,7 +133,13 @@ class WorkspaceContext:
     async def _load_settings(self) -> WorkspaceSettings | None:
         """加载工作区配置"""
         try:
-            settings_data = await self.persistence_manager.load_resource("workspace_settings", "settings")
+            # ✅ 修复：使用 ResourceType 枚举而不是字符串
+            from dawei.workspace.persistence_manager import ResourceType
+
+            settings_data = await self.persistence_manager.load_resource(
+                ResourceType.WORKSPACE_SETTINGS,
+                "settings"
+            )
             if settings_data:
                 return WorkspaceSettings.from_dict(settings_data)
         except Exception as e:
