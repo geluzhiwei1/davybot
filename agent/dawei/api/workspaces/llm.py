@@ -55,6 +55,8 @@ class LLMProviderCreate(BaseModel):
     rateLimitSeconds: int | None = Field(0, description="速率限制秒数")
     consecutiveMistakeLimit: int | None = Field(3, description="连续错误限制")
     enableReasoningEffort: bool | None = Field(True, description="启用推理强度")
+    toolChoice: str | None = Field(None, description="Tool Choice 设置 (auto, required, none)")
+    temperature: float | None = Field(1.0, description="Temperature 参数 (0.0-2.0)")
     saveLocation: str | None = Field("user", description="保存位置: user 或 workspace")
 
 
@@ -308,10 +310,21 @@ async def create_llm_provider(
             "rateLimitSeconds": provider_data.rateLimitSeconds,
             "consecutiveMistakeLimit": provider_data.consecutiveMistakeLimit,
             "enableReasoningEffort": provider_data.enableReasoningEffort,
+            "toolChoice": provider_data.toolChoice,
+            "temperature": provider_data.temperature,
         }
 
-        # 添加 OpenAI 特定配置
-        if provider_data.apiProvider == "openai":
+        # 添加 Ollama 特定配置
+        if provider_data.apiProvider == "ollama":
+            if provider_data.ollamaBaseUrl:
+                provider_config["ollamaBaseUrl"] = provider_data.ollamaBaseUrl
+            if provider_data.ollamaModelId:
+                provider_config["ollamaModelId"] = provider_data.ollamaModelId
+            if provider_data.ollamaApiKey:
+                provider_config["ollamaApiKey"] = provider_data.ollamaApiKey
+
+        # 添加 OpenAI 兼容配置（支持 openai、glm、deepseek 等）
+        else:
             if provider_data.openAiBaseUrl:
                 provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
             if provider_data.openAiApiKey:
@@ -323,15 +336,6 @@ async def create_llm_provider(
             if provider_data.openAiCustomModelInfo:
                 provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
             provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else {}
-
-        # 添加 Ollama 特定配置
-        elif provider_data.apiProvider == "ollama":
-            if provider_data.ollamaBaseUrl:
-                provider_config["ollamaBaseUrl"] = provider_data.ollamaBaseUrl
-            if provider_data.ollamaModelId:
-                provider_config["ollamaModelId"] = provider_data.ollamaModelId
-            if provider_data.ollamaApiKey:
-                provider_config["ollamaApiKey"] = provider_data.ollamaApiKey
 
         # 如果当前没有 currentApiConfigName，则设置为即将创建的 provider
         if "currentApiConfigName" not in provider_profiles or not provider_profiles.get("currentApiConfigName"):
@@ -407,9 +411,20 @@ async def update_llm_provider(
             "rateLimitSeconds": provider_data.rateLimitSeconds,
             "consecutiveMistakeLimit": provider_data.consecutiveMistakeLimit,
             "enableReasoningEffort": provider_data.enableReasoningEffort,
+            "toolChoice": provider_data.toolChoice,
+            "temperature": provider_data.temperature,
         }
 
-        if provider_data.apiProvider == "openai":
+        if provider_data.apiProvider == "ollama":
+            if provider_data.ollamaBaseUrl:
+                provider_config["ollamaBaseUrl"] = provider_data.ollamaBaseUrl
+            if provider_data.ollamaModelId:
+                provider_config["ollamaModelId"] = provider_data.ollamaModelId
+            if provider_data.ollamaApiKey:
+                provider_config["ollamaApiKey"] = provider_data.ollamaApiKey
+
+        # 更新 OpenAI 兼容配置（支持 openai、glm、deepseek 等）
+        else:
             if provider_data.openAiBaseUrl:
                 provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
             if provider_data.openAiApiKey:
@@ -422,14 +437,6 @@ async def update_llm_provider(
                 provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
             # 使用前端传来的 openAiHeaders，如果没有则使用现有配置的值
             provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else existing_config.get("openAiHeaders", {})
-
-        elif provider_data.apiProvider == "ollama":
-            if provider_data.ollamaBaseUrl:
-                provider_config["ollamaBaseUrl"] = provider_data.ollamaBaseUrl
-            if provider_data.ollamaModelId:
-                provider_config["ollamaModelId"] = provider_data.ollamaModelId
-            if provider_data.ollamaApiKey:
-                provider_config["ollamaApiKey"] = provider_data.ollamaApiKey
 
         api_configs[provider_name] = provider_config
         provider_profiles["apiConfigs"] = api_configs
@@ -510,12 +517,23 @@ async def test_llm_provider(
             # 使用流式 API 并迭代获取完整响应
             from dawei.entity.stream_message import CompleteMessage
 
+            # 从 UI 获取参数，如果没有设置则使用默认值
+            test_temperature = provider_data.temperature if provider_data.temperature is not None else 0.7
+            test_tool_choice = provider_data.toolChoice if provider_data.toolChoice else None
+
+            # 第一次测试：使用用户配置的参数（如果有 tool_choice 则使用，否则不强制）
             all_tool_calls = []
-            async for chunk in llm_api.create_message(
-                messages=test_messages,
-                tools=test_tools,
-                temperature=0.7,
-            ):
+            call_kwargs = {
+                "messages": test_messages,
+                "tools": test_tools,
+                "temperature": test_temperature,
+            }
+
+            # 如果用户设置了 tool_choice，则使用它
+            if test_tool_choice:
+                call_kwargs["tool_choice"] = test_tool_choice
+
+            async for chunk in llm_api.create_message(**call_kwargs):
                 if isinstance(chunk, CompleteMessage):
                     if chunk.tool_calls:
                         all_tool_calls.extend(chunk.tool_calls)
@@ -526,38 +544,39 @@ async def test_llm_provider(
                 return {
                     "success": True,
                     "supported": True,
-                    "message": "Tool Call 支持正常",
+                    "message": f"Tool Call 支持正常 (temperature={test_temperature}, tool_choice={test_tool_choice or 'auto'})",
                     "model": model_id,
                 }
             else:
                 # 没有返回 tool call，可能是模型不支持或没有强制要求
-                # 尝试强制要求 tool call
-                try:
-                    all_tool_calls_force = []
-                    async for chunk in llm_api.create_message(
-                        messages=test_messages,
-                        tools=test_tools,
-                        tool_choice="required",
-                        temperature=0.7,
-                    ):
-                        if isinstance(chunk, CompleteMessage):
-                            if chunk.tool_calls:
-                                all_tool_calls_force.extend(chunk.tool_calls)
+                # 尝试强制要求 tool call（仅在用户没有设置 tool_choice 时）
+                if not test_tool_choice:
+                    try:
+                        all_tool_calls_force = []
+                        async for chunk in llm_api.create_message(
+                            messages=test_messages,
+                            tools=test_tools,
+                            tool_choice="required",
+                            temperature=test_temperature,
+                        ):
+                            if isinstance(chunk, CompleteMessage):
+                                if chunk.tool_calls:
+                                    all_tool_calls_force.extend(chunk.tool_calls)
 
-                    if all_tool_calls_force:
-                        return {
-                            "success": True,
-                            "supported": True,
-                            "message": "Tool Call 支持正常 (强制模式)",
-                            "model": model_id,
-                        }
-                except Exception:
-                    pass
+                        if all_tool_calls_force:
+                            return {
+                                "success": True,
+                                "supported": True,
+                                "message": f"Tool Call 支持正常 (强制模式, temperature={test_temperature})",
+                                "model": model_id,
+                            }
+                    except Exception:
+                        pass
 
                 return {
                     "success": True,
                     "supported": False,
-                    "message": "该模型不支持 Tool Call 或未返回 tool call",
+                    "message": f"该模型不支持 Tool Call 或未返回 tool call (temperature={test_temperature}, tool_choice={test_tool_choice or 'auto'})",
                     "model": model_id,
                 }
 

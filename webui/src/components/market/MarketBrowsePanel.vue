@@ -11,7 +11,7 @@
         <InfoFilled />
       </el-icon>
       <span class="info-text">集市资源来源于 </span>
-      <el-link type="primary" :href="marketUrl" target="_blank" :underline="false">
+      <el-link type="primary" :underline="false" @click="handleMarketUrlClick">
         {{ marketUrl }}
         <el-icon class="link-icon">
           <TopRight />
@@ -135,6 +135,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { Search, Files, Connection, User, InfoFilled, TopRight } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useMarketStore } from '@/stores/market';
+import { isTauri } from '@/utils/platform';
+import { invoke } from '@tauri-apps/api/core';
 import ResourceCard from './ResourceCard.vue';
 import ResourceDetailDialog from './ResourceDetailDialog.vue';
 import type { SearchResult, ResourceType } from '@/services/api/services/market';
@@ -267,6 +269,21 @@ const handleForceInstall = async (resource: SearchResult) => {
 const handleViewDetails = (resource: SearchResult) => {
   selectedResource.value = resource;
   detailDialogVisible.value = true;
+};
+
+const handleMarketUrlClick = async () => {
+  try {
+    if (isTauri()) {
+      // Tauri 环境：使用系统浏览器打开
+      await invoke('open_by_system_browser', { url: marketUrl });
+    } else {
+      // Web 环境：使用 window.open
+      window.open(marketUrl, '_blank');
+    }
+  } catch (error) {
+    console.error('打开链接失败:', error);
+    ElMessage.error('打开链接失败，请手动访问: ' + marketUrl);
+  }
 };
 
 // Lifecycle

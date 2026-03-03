@@ -856,10 +856,7 @@
         <el-tab-pane :label="t('workspaceSettings.tabs.proxy')" name="proxy">
           <el-scrollbar max-height="calc(100vh - 200px)">
             <el-form :model="proxyConfig" label-width="140px" class="settings-form" style="padding: 20px;">
-              <el-alert
-                :title="t('workspaceSettings.proxy.title')"
-                type="info"
-                :closable="false"
+              <el-alert :title="t('workspaceSettings.proxy.title')" type="info" :closable="false"
                 style="margin-bottom: 20px;">
                 <template #default>
                   <p>{{ t('workspaceSettings.proxy.description') }}</p>
@@ -873,12 +870,14 @@
               <el-row :gutter="20">
                 <el-col :span="12">
                   <el-form-item :label="t('workspaceSettings.proxy.httpProxy')">
-                    <el-input v-model="proxyConfig.http_proxy" :placeholder="t('workspaceSettings.proxy.httpProxyPlaceholder')" clearable />
+                    <el-input v-model="proxyConfig.http_proxy"
+                      :placeholder="t('workspaceSettings.proxy.httpProxyPlaceholder')" clearable />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item :label="t('workspaceSettings.proxy.httpsProxy')">
-                    <el-input v-model="proxyConfig.https_proxy" :placeholder="t('workspaceSettings.proxy.httpsProxyPlaceholder')" clearable />
+                    <el-input v-model="proxyConfig.https_proxy"
+                      :placeholder="t('workspaceSettings.proxy.httpsProxyPlaceholder')" clearable />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -924,10 +923,10 @@
     <!-- Provider 编辑/创建对话框 -->
     <el-dialog v-model="showProviderDialog" :title="editingProvider ? '编辑 Provider' : '添加 Provider'" width="800px">
       <el-form :model="providerForm" label-width="160px">
-        <el-form-item label="Provider 名称" required>
-          <el-input v-model="providerForm.name" placeholder="例如: my-openai" :disabled="editingProvider !== null" />
+        <el-form-item label="配置名称" required>
+          <el-input v-model="providerForm.name" placeholder="例如：ali-qwen-3.0" :disabled="editingProvider !== null" />
           <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
-            Provider 的唯一标识符,创建后不可修改
+            本配置的的唯一名称,创建后不可修改
           </div>
         </el-form-item>
 
@@ -941,28 +940,34 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="API 类型" required>
+        <el-form-item label="API 厂家" required>
           <el-select v-model="providerForm.apiProvider" placeholder="选择 API 类型" style="width: 100%"
             @change="onApiProviderChange" filterable>
-            <el-option-group label="主流提供商">
-              <el-option label="DeepSeek" value="deepseek" />
-              <el-option label="Moonshot (Kimi)" value="moonshot" />
-              <el-option label="Qwen (通义千问)" value="qwen" />
-              <el-option label="GLM (智谱)" value="glm" />
-              <el-option label="MiniMax" value="minimax" />
+            <el-option-group v-if="DOMESTIC_PROVIDERS.length > 0" label="国内提供商">
+              <el-option v-for="provider in DOMESTIC_PROVIDERS" :key="provider"
+                :label="getProviderDisplayName(provider)" :value="provider" />
             </el-option-group>
-            <el-option-group label="国际提供商">
-              <el-option label="Gemini (Google)" value="gemini" />
-              <el-option label="Claude (Anthropic)" value="claude" />
-              <el-option label="OpenRouter" value="openrouter" />
+            <el-option-group v-if="INTERNATIONAL_PROVIDERS.length > 0" label="国际提供商">
+              <el-option v-for="provider in INTERNATIONAL_PROVIDERS" :key="provider"
+                :label="getProviderDisplayName(provider)" :value="provider" />
             </el-option-group>
-            <el-option-group label="其他">
-              <el-option label="OpenAI兼容" value="openai" />
-              <el-option label="Ollama (本地)" value="ollama" />
+            <el-option-group v-if="LOCAL_PROVIDERS.length > 0" label="本地提供商">
+              <el-option v-for="provider in LOCAL_PROVIDERS" :key="provider"
+                :label="getProviderDisplayName(provider)" :value="provider" />
             </el-option-group>
           </el-select>
           <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
             所有提供商都支持 Function Call (工具调用)
+          </div>
+
+          <!-- API 厂家帮助文档链接 -->
+          <div v-if="currentProviderDocsUrl" style="margin-top: 8px;">
+            <el-link @click="openDocsLink($event, currentProviderDocsUrl)" type="primary" :underline="false">
+              <el-icon>
+                <Link />
+              </el-icon>
+              查看 {{ getProviderDisplayName(providerForm.apiProvider) }} 配置帮助文档
+            </el-link>
           </div>
         </el-form-item>
 
@@ -979,8 +984,10 @@
           </el-form-item>
 
           <el-form-item label="模型 ID" required>
-            <el-input v-model="providerForm.openAiModelId"
-              placeholder="gpt-4o, deepseek-chat, claude-3-5-sonnet-20241022" />
+            <el-select v-model="providerForm.openAiModelId" filterable allow-create default-first-option
+              :reserve-keyword="false" placeholder="选择或输入模型 ID" style="width: 100%">
+              <el-option v-for="model in currentProviderModels" :key="model" :label="model" :value="model" />
+            </el-select>
           </el-form-item>
 
           <el-form-item label="自定义 Headers">
@@ -991,12 +998,13 @@
             </div>
           </el-form-item>
 
-          <el-form-item label="旧版格式">
+          <!-- 隐藏旧版格式选项 -->
+          <!-- <el-form-item label="旧版格式">
             <el-switch v-model="providerForm.openAiLegacyFormat" />
             <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
               某些 API 提供商需要使用旧版 OpenAI 格式
             </div>
-          </el-form-item>
+          </el-form-item> -->
         </template>
 
         <!-- Ollama 配置 -->
@@ -1006,7 +1014,10 @@
           </el-form-item>
 
           <el-form-item label="模型 ID" required>
-            <el-input v-model="providerForm.ollamaModelId" placeholder="llama3.1:latest, qwen2:7b" />
+            <el-select v-model="providerForm.ollamaModelId" filterable allow-create default-first-option
+              :reserve-keyword="false" placeholder="选择或输入模型 ID" style="width: 100%">
+              <el-option v-for="model in currentProviderModels" :key="model" :label="model" :value="model" />
+            </el-select>
           </el-form-item>
 
           <el-form-item label="API Key">
@@ -1051,6 +1062,30 @@
           <el-col :span="12">
             <el-form-item label="启用推理强度">
               <el-switch v-model="providerForm.enableReasoningEffort" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="Tool Choice">
+              <el-select v-model="providerForm.toolChoice" placeholder="默认(required)" clearable style="width: 100%">
+                <el-option label="Required (必须)" value="required" />
+                <el-option label="Auto (自动)" value="auto" />
+                <el-option label="None (不使用)" value="none" />
+              </el-select>
+              <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+                控制 LLM 是否强制调用工具
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="Temperature">
+              <el-input-number v-model="providerForm.temperature" :min="0" :max="2" :step="0.1" :precision="1"
+                :default="1.0" style="width: 100%" controls-position="right" />
+              <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+                控制输出随机性 (0.0-2.0)
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -1325,7 +1360,7 @@ import { ref, watch, computed, nextTick, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as yaml from 'js-yaml';
-import { Setting, Plus, Document, Refresh, Search, ShoppingCart, Edit, Delete, Loading } from '@element-plus/icons-vue';
+import { Setting, Plus, Document, Refresh, Search, ShoppingCart, Edit, Delete, Loading, Link } from '@element-plus/icons-vue';
 import { apiManager } from '@/services/api';
 import type { Skill } from '@/services/api';
 import { skillsApi } from '@/services/api/services/skills';
@@ -1340,6 +1375,22 @@ import type { ResourceType } from '@/services/api/services/market';
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';
 import { useThemeStore } from '@/stores/theme';
+import { isTauri } from '@/utils/platform';
+import { invoke } from '@tauri-apps/api/core';
+import {
+  getProviderDisplayName,
+  getProviderTagType,
+  getProviderDividerTitle,
+  getProviderDocsUrl,
+  getProviderConfig,
+  getProviderModels,
+  isOllamaProvider as isOllamaProviderUtil,
+  PROVIDER_CONFIGS,
+  DOMESTIC_PROVIDERS,
+  INTERNATIONAL_PROVIDERS,
+  LOCAL_PROVIDERS,
+  LLM_PROVIDERS
+} from '@/config/llm-provider-config';
 
 const { t } = useI18n();
 const themeStore = useThemeStore();
@@ -1522,6 +1573,8 @@ const providerForm = ref({
   rateLimitSeconds: 0,
   consecutiveMistakeLimit: 3,
   enableReasoningEffort: true,
+  toolChoice: 'required' as string | null,
+  temperature: 1.0 as number | null,
   saveLocation: 'user' as 'user' | 'workspace'  // 新增：保存位置
 });
 
@@ -1922,6 +1975,70 @@ const handleClose = () => {
   visible.value = false;
 };
 
+// 打开外部链接（支持 Web 和 Tauri）
+const openDocsLink = async (event: Event | string, urlParam?: string) => {
+  // 处理两种调用方式：直接传 URL，或者传 event + URL
+  let eventHandled = false;
+  let url: string;
+
+  if (typeof event === 'string') {
+    url = event;
+  } else {
+    // 如果第一个参数是 Event 对象
+    eventHandled = true;
+    if (urlParam) {
+      url = urlParam;
+    } else {
+      ElMessage.error('无效的链接地址');
+      return;
+    }
+    // 阻止默认行为和事件冒泡
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  console.log('[openDocsLink] Called with URL:', url, 'event handled:', eventHandled);
+
+  // URL 验证
+  if (!url || typeof url !== 'string') {
+    ElMessage.error('无效的链接地址');
+    return;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    const allowedProtocols = ['http:', 'https:', 'mailto:'];
+
+    if (!allowedProtocols.includes(parsedUrl.protocol)) {
+      ElMessage.error('不支持的链接类型');
+      return;
+    }
+  } catch (error) {
+    ElMessage.error('链接格式错误');
+    return;
+  }
+
+  // 平台特定处理
+  if (isTauri()) {
+    // Tauri 环境：使用系统浏览器打开
+    try {
+      console.log('[Tauri] Opening URL via system browser:', url);
+      await invoke('open_by_system_browser', { url });
+      ElMessage.success('已使用系统浏览器打开链接');
+    } catch (error) {
+      console.error('[Tauri] Failed to open URL:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      ElMessage.error('无法打开链接，请检查系统配置: ' + errorMsg);
+    }
+  } else {
+    // Web 环境：使用 window.open
+    const opened = window.open(url, '_blank');
+    if (!opened) {
+      ElMessage.error('请允许弹出窗口以打开链接');
+    }
+  }
+};
+
 // Provider 管理方法
 const showCreateProviderDialog = () => {
   editingProvider.value = null;
@@ -1942,6 +2059,8 @@ const showCreateProviderDialog = () => {
     rateLimitSeconds: 0,
     consecutiveMistakeLimit: 3,
     enableReasoningEffort: true,
+    toolChoice: 'required',
+    temperature: 1.0,
     saveLocation: 'user' as 'user' | 'workspace'  // 默认保存到用户级
   };
   customHeadersText.value = '';
@@ -1952,54 +2071,8 @@ const onApiProviderChange = () => {
   // 当切换 API 类型时自动填充推荐的配置
   const provider = providerForm.value.apiProvider;
 
-  // 提供商推荐配置
-  const providerConfigs: Record<string, { baseUrl: string; modelId: string; headers?: Record<string, string> }> = {
-    openai: {
-      baseUrl: 'https://api.openai.com/v1',
-      modelId: 'gpt-4o-mini'
-    },
-    deepseek: {
-      baseUrl: 'https://api.deepseek.com',
-      modelId: 'deepseek-chat'
-    },
-    moonshot: {
-      baseUrl: 'https://api.moonshot.cn/v1',
-      modelId: 'moonshot-v1-8k'
-    },
-    qwen: {
-      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      modelId: 'qwen-turbo'
-    },
-    glm: {
-      baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-      modelId: 'glm-4-flash'
-    },
-    gemini: {
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-      modelId: 'gemini-2.0-flash-exp'
-    },
-    claude: {
-      baseUrl: 'https://api.anthropic.com/v1',
-      modelId: 'claude-3-5-sonnet-20241022',
-      headers: {
-        'anthropic-version': '2023-06-01'
-      }
-    },
-    minimax: {
-      baseUrl: 'https://api.minimax.chat/v1',
-      modelId: 'abab6.5s-chat'
-    },
-    openrouter: {
-      baseUrl: 'https://openrouter.ai/api/v1',
-      modelId: 'openai/gpt-4o'
-    },
-    ollama: {
-      baseUrl: 'http://localhost:11434',
-      modelId: 'llama3.1'
-    }
-  };
-
-  const config = providerConfigs[provider];
+  // 使用导入的提供商配置
+  const config = getProviderConfig(provider);
   if (config) {
     if (provider === 'ollama') {
       // Ollama 使用不同的字段名
@@ -2057,7 +2130,9 @@ const editProvider = (provider: unknown) => {
     fuzzyMatchThreshold: config.fuzzyMatchThreshold ?? 1,
     rateLimitSeconds: config.rateLimitSeconds ?? 0,
     consecutiveMistakeLimit: config.consecutiveMistakeLimit ?? 3,
-    enableReasoningEffort: config.enableReasoningEffort ?? true
+    enableReasoningEffort: config.enableReasoningEffort ?? true,
+    toolChoice: config.toolChoice ?? 'required',
+    temperature: config.temperature ?? 1.0
   };
 
   // 序列化 headers 到文本
@@ -3114,63 +3189,22 @@ const getScopeTagType = (scope: string) => {
 
 // ==================== Provider 辅助函数 ====================
 
-// 提供商显示名称映射
-const providerDisplayNames: Record<string, string> = {
-  openai: 'OpenAI兼容',
-  deepseek: 'DeepSeek',
-  moonshot: 'Moonshot (Kimi)',
-  qwen: 'Qwen (通义千问)',
-  glm: 'GLM (智谱)',
-  gemini: 'Gemini',
-  claude: 'Claude',
-  minimax: 'MiniMax',
-  openrouter: 'OpenRouter',
-  ollama: 'Ollama (本地)'
-};
-
-// 判断是否为 Ollama Provider
+// 判断是否为 Ollama Provider（使用导入的工具函数）
 const isOllamaProvider = (provider: string): boolean => {
-  return provider === 'ollama';
+  return isOllamaProviderUtil(provider);
 };
 
-// 获取 Provider 分隔标题
-const getProviderDividerTitle = (provider: string): string => {
-  const titles: Record<string, string> = {
-    openai: 'OpenAI兼容 配置',
-    deepseek: 'DeepSeek 配置',
-    moonshot: 'Moonshot 配置',
-    qwen: 'Qwen 配置',
-    glm: 'GLM 配置',
-    gemini: 'Gemini 配置',
-    claude: 'Claude 配置',
-    minimax: 'MiniMax 配置',
-    openrouter: 'OpenRouter 配置',
-    ollama: 'Ollama 配置'
-  };
-  return titles[provider] || 'API 配置';
-};
+// 当前 Provider 的文档链接（使用导入的工具函数）
+const currentProviderDocsUrl = computed(() => {
+  const provider = providerForm.value.apiProvider;
+  return getProviderDocsUrl(provider);
+});
 
-// 提供商标签类型映射
-const providerTagTypes: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'info'> = {
-  openai: 'primary',
-  deepseek: 'success',
-  moonshot: 'success',
-  qwen: 'success',
-  glm: 'success',
-  gemini: 'warning',
-  claude: 'danger',
-  minimax: 'info',
-  openrouter: 'primary',
-  ollama: 'info'
-};
-
-const getProviderDisplayName = (provider: string) => {
-  return providerDisplayNames[provider] || provider;
-};
-
-const getProviderTagType = (provider: string) => {
-  return providerTagTypes[provider] || 'info';
-};
+// 当前 Provider 的可用模型列表（使用配置文件）
+const currentProviderModels = computed(() => {
+  const provider = providerForm.value.apiProvider;
+  return getProviderModels(provider);
+});
 
 // ==================== Market Dialog 方法 ====================
 

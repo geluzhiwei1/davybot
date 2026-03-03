@@ -316,6 +316,59 @@ async fn select_directory() -> Result<Option<String>, String> {
     }
 }
 
+/// 使用系统默认浏览器打开 URL
+#[tauri::command]
+async fn open_by_system_browser(url: String) -> Result<(), String> {
+    use tauri_plugin_shell::process::Command;
+
+    // 验证 URL 格式
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("URL 必须以 http:// 或 https:// 开头".to_string());
+    }
+
+    // 使用 shell plugin 的 open 方法
+    // 这会在系统默认浏览器中打开 URL
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &url])
+            .spawn()
+            .map_err(|e| format!("无法打开浏览器: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("无法打开浏览器: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // 尝试多个 Linux 浏览器命令
+        let open_commands = vec!["xdg-open", "gnome-open", "x-www-browser"];
+        let mut success = false;
+
+        for cmd in open_commands {
+            if std::process::Command::new(cmd)
+                .arg(&url)
+                .spawn()
+                .is_ok()
+            {
+                success = true;
+                break;
+            }
+        }
+
+        if !success {
+            return Err("无法找到可用的浏览器打开命令".to_string());
+        }
+    }
+
+    Ok(())
+}
+
 /// 获取所有崩溃报告
 #[tauri::command]
 async fn get_crash_reports() -> Result<Vec<crash_handler::CrashReport>, String> {
@@ -404,6 +457,8 @@ fn main() {
             navigate_to_main,
             // 文件操作命令
             select_directory,
+            // 系统浏览器命令
+            open_by_system_browser,
             // 崩溃报告命令
             get_crash_reports,
             clear_crash_reports,
