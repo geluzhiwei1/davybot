@@ -338,7 +338,7 @@
                 <div style="width: 280px; display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 600; font-size: 14px;">{{ t('workspaceSettings.skills.editor.files')
-                    }}</span>
+                      }}</span>
                     <el-button size="small" @click="refreshSkillFileTree" :icon="Refresh">
                       {{ t('workspaceSettings.skills.editor.refresh') }}
                     </el-button>
@@ -772,7 +772,7 @@
 
                 <el-form-item>
                   <el-button @click="loadUIEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                    }}</el-button>
+                  }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -837,7 +837,7 @@
 
                 <el-form-item>
                   <el-button @click="loadSystemEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                    }}</el-button>
+                  }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -943,17 +943,17 @@
         <el-form-item label="API 厂家" required>
           <el-select v-model="providerForm.apiProvider" placeholder="选择 API 类型" style="width: 100%"
             @change="onApiProviderChange" filterable>
-            <el-option-group v-if="DOMESTIC_PROVIDERS.length > 0" label="国内提供商">
+            <el-option-group v-if="DOMESTIC_PROVIDERS.length > 0" label="国内">
               <el-option v-for="provider in DOMESTIC_PROVIDERS" :key="provider"
                 :label="getProviderDisplayName(provider)" :value="provider" />
             </el-option-group>
-            <el-option-group v-if="INTERNATIONAL_PROVIDERS.length > 0" label="国际提供商">
+            <el-option-group v-if="INTERNATIONAL_PROVIDERS.length > 0" label="国际">
               <el-option v-for="provider in INTERNATIONAL_PROVIDERS" :key="provider"
                 :label="getProviderDisplayName(provider)" :value="provider" />
             </el-option-group>
-            <el-option-group v-if="LOCAL_PROVIDERS.length > 0" label="本地提供商">
-              <el-option v-for="provider in LOCAL_PROVIDERS" :key="provider"
-                :label="getProviderDisplayName(provider)" :value="provider" />
+            <el-option-group v-if="LOCAL_PROVIDERS.length > 0" label="私有">
+              <el-option v-for="provider in LOCAL_PROVIDERS" :key="provider" :label="getProviderDisplayName(provider)"
+                :value="provider" />
             </el-option-group>
           </el-select>
           <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
@@ -973,8 +973,8 @@
 
         <el-divider content-position="left">{{ getProviderDividerTitle(providerForm.apiProvider) }}</el-divider>
 
-        <!-- OpenAI 兼容配置 (openai, deepseek, moonshot, qwen, glm, gemini, claude, minimax, openrouter) -->
-        <template v-if="!isOllamaProvider(providerForm.apiProvider)">
+        <!-- OpenAI 兼容配置 (所有非 Ollama 提供商) -->
+        <template v-if="providerForm.apiProvider !== 'ollama'">
           <el-form-item label="Base URL" required>
             <el-input v-model="providerForm.openAiBaseUrl" placeholder="https://api.openai.com/v1" />
           </el-form-item>
@@ -1007,21 +1007,24 @@
           </el-form-item> -->
         </template>
 
-        <!-- Ollama 配置 -->
+        <!-- Ollama 配置 (使用 OpenAI 兼容字段) -->
         <template v-if="providerForm.apiProvider === 'ollama'">
           <el-form-item label="Base URL" required>
-            <el-input v-model="providerForm.ollamaBaseUrl" placeholder="http://localhost:11434" />
+            <el-input v-model="providerForm.openAiBaseUrl" placeholder="http://localhost:11434" />
+            <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+              Ollama 使用 OpenAI 兼容接口 (/v1/chat/completions)
+            </div>
           </el-form-item>
 
           <el-form-item label="模型 ID" required>
-            <el-select v-model="providerForm.ollamaModelId" filterable allow-create default-first-option
-              :reserve-keyword="false" placeholder="选择或输入模型 ID" style="width: 100%">
+            <el-select v-model="providerForm.openAiModelId" filterable allow-create default-first-option
+              :reserve-keyword="false" placeholder="选择或输入模型 ID (如 qwen2.5:7b)" style="width: 100%">
               <el-option v-for="model in currentProviderModels" :key="model" :label="model" :value="model" />
             </el-select>
           </el-form-item>
 
           <el-form-item label="API Key">
-            <el-input v-model="providerForm.ollamaApiKey" placeholder="key (可选)" />
+            <el-input v-model="providerForm.openAiApiKey" placeholder="ollama (可选)" />
           </el-form-item>
         </template>
 
@@ -1094,7 +1097,7 @@
       <template #footer>
         <div style="display: flex; justify-content: flex-end; width: 100%; gap: 8px;">
           <el-button @click="testProvider" :loading="testingProvider"
-            :disabled="!providerForm.openAiModelId && providerForm.apiProvider !== 'ollama'">
+            :disabled="!providerForm.openAiModelId">
             测试 Tool Call
           </el-button>
           <span v-if="providerTestResult" style="display: flex; align-items: center;">
@@ -1384,7 +1387,6 @@ import {
   getProviderDocsUrl,
   getProviderConfig,
   getProviderModels,
-  isOllamaProvider as isOllamaProviderUtil,
   PROVIDER_CONFIGS,
   DOMESTIC_PROVIDERS,
   INTERNATIONAL_PROVIDERS,
@@ -1564,9 +1566,6 @@ const providerForm = ref({
   openAiModelId: '',
   openAiLegacyFormat: false,
   openAiHeaders: {} as Record<string, string>,
-  ollamaBaseUrl: '',
-  ollamaModelId: '',
-  ollamaApiKey: '',
   diffEnabled: true,
   todoListEnabled: true,
   fuzzyMatchThreshold: 1,
@@ -1598,8 +1597,8 @@ const providerList = computed(() => {
       source: item.source,
       is_default: item.is_default,
       apiProvider: config.apiProvider || 'openai',
-      modelId: config.openAiModelId || config.ollamaModelId || config.model_id || 'N/A',
-      baseUrl: config.openAiBaseUrl || config.ollamaBaseUrl || config.base_url || 'N/A',
+      modelId: config.openAiModelId || config.model_id || 'N/A',
+      baseUrl: config.openAiBaseUrl || config.base_url || 'N/A',
       config: item.config
     });
   }
@@ -1612,8 +1611,8 @@ const providerList = computed(() => {
       source: item.source,
       is_default: item.is_default,
       apiProvider: config.apiProvider || 'openai',
-      modelId: config.openAiModelId || config.ollamaModelId || config.model_id || 'N/A',
-      baseUrl: config.openAiBaseUrl || config.ollamaBaseUrl || config.base_url || 'N/A',
+      modelId: config.openAiModelId || config.model_id || 'N/A',
+      baseUrl: config.openAiBaseUrl || config.base_url || 'N/A',
       config: item.config
     });
   }
@@ -2050,9 +2049,6 @@ const showCreateProviderDialog = () => {
     openAiModelId: 'gpt-4o-mini',
     openAiLegacyFormat: false,
     openAiHeaders: {},
-    ollamaBaseUrl: '',
-    ollamaModelId: '',
-    ollamaApiKey: '',
     diffEnabled: true,
     todoListEnabled: true,
     fuzzyMatchThreshold: 1,
@@ -2074,33 +2070,18 @@ const onApiProviderChange = () => {
   // 使用导入的提供商配置
   const config = getProviderConfig(provider);
   if (config) {
-    if (provider === 'ollama') {
-      // Ollama 使用不同的字段名
-      providerForm.value.ollamaBaseUrl = config.baseUrl;
-      providerForm.value.ollamaModelId = config.modelId;
-      // 清空 OpenAI 字段
-      providerForm.value.openAiBaseUrl = '';
-      providerForm.value.openAiApiKey = '';
-      providerForm.value.openAiModelId = '';
-      providerForm.value.openAiLegacyFormat = false;
-      customHeadersText.value = '';
-    } else {
-      // 其他提供商使用 OpenAI 兼容字段
-      providerForm.value.openAiBaseUrl = config.baseUrl;
-      providerForm.value.openAiModelId = config.modelId;
-      // 清空 Ollama 字段
-      providerForm.value.ollamaBaseUrl = '';
-      providerForm.value.ollamaModelId = '';
-      providerForm.value.ollamaApiKey = '';
+    // 所有 OpenAI 兼容提供商统一使用 openAi* 字段
+    providerForm.value.openAiBaseUrl = config.baseUrl;
+    providerForm.value.openAiModelId = config.modelId;
+    providerForm.value.openAiApiKey = config.apiKey || '';
 
-      // 处理自定义 headers
-      if (config.headers) {
-        providerForm.value.openAiHeaders = config.headers;
-        customHeadersText.value = JSON.stringify(config.headers, null, 2);
-      } else {
-        providerForm.value.openAiHeaders = {};
-        customHeadersText.value = '';
-      }
+    // 处理自定义 headers
+    if (config.headers) {
+      providerForm.value.openAiHeaders = config.headers;
+      customHeadersText.value = JSON.stringify(config.headers, null, 2);
+    } else {
+      providerForm.value.openAiHeaders = {};
+      customHeadersText.value = '';
     }
   }
 };
@@ -2122,9 +2103,6 @@ const editProvider = (provider: unknown) => {
     openAiModelId: config.openAiModelId || '',
     openAiLegacyFormat: config.openAiLegacyFormat || false,
     openAiHeaders: config.openAiHeaders || {},
-    ollamaBaseUrl: config.ollamaBaseUrl || '',
-    ollamaModelId: config.ollamaModelId || '',
-    ollamaApiKey: config.ollamaApiKey || '',
     diffEnabled: config.diffEnabled ?? true,
     todoListEnabled: config.todoListEnabled ?? true,
     fuzzyMatchThreshold: config.fuzzyMatchThreshold ?? 1,
@@ -2148,11 +2126,7 @@ const editProvider = (provider: unknown) => {
 // Test provider Tool Call support
 const testProvider = async () => {
   if (!props.workspaceId) return;
-  if (!providerForm.value.openAiModelId && providerForm.value.apiProvider !== 'ollama') {
-    ElMessage.error('请填写模型 ID');
-    return;
-  }
-  if (providerForm.value.apiProvider === 'ollama' && !providerForm.value.ollamaModelId) {
+  if (!providerForm.value.openAiModelId) {
     ElMessage.error('请填写模型 ID');
     return;
   }
@@ -3188,11 +3162,6 @@ const getScopeTagType = (scope: string) => {
 };
 
 // ==================== Provider 辅助函数 ====================
-
-// 判断是否为 Ollama Provider（使用导入的工具函数）
-const isOllamaProvider = (provider: string): boolean => {
-  return isOllamaProviderUtil(provider);
-};
 
 // 当前 Provider 的文档链接（使用导入的工具函数）
 const currentProviderDocsUrl = computed(() => {

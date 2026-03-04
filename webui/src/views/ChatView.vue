@@ -88,7 +88,7 @@
     <!-- 追问问题对话框 -->
     <FollowupQuestionDialog v-model:visible="showFollowupDialog" :question="followupData.question"
       :suggestions="followupData.suggestions" :tool-call-id="followupData.toolCallId" :task-id="followupData.taskId"
-      @response="handleFollowupResponse" />
+      @response="handleFollowupResponse" @cancel="handleFollowupCancel" />
 
     <!-- Global Image Viewer -->
     <ImageViewer v-model:visible="globalImageViewerVisible" :images="globalImageViewerImages"
@@ -601,6 +601,30 @@ async function handleFollowupResponse(toolCallId: string, response: string) {
     await chatStore.sendWebSocketMessage(responseMessage);
   } catch (error) {
     console.error('❌ 发送追问回复失败:', error);
+  }
+}
+
+async function handleFollowupCancel(toolCallId: string) {
+  try {
+    // 使用 chatStore 的 WebSocket 连接发送取消消息
+    const { MessageBuilder } = await import('@/services/protocol');
+
+    const cancelMessage = MessageBuilder.createBaseMessage(
+      MessageType.FOLLOWUP_CANCEL,
+      chatStore.sessionId || ''
+    );
+
+    // 添加特定字段
+    Object.assign(cancelMessage, {
+      task_id: followupData.value.taskId,
+      tool_call_id: toolCallId,
+      reason: 'user_cancelled'
+    });
+
+    // 通过 chatStore 发送消息
+    await chatStore.sendWebSocketMessage(cancelMessage);
+  } catch (error) {
+    console.error('❌ 发送追问取消失败:', error);
   }
 }
 </script>

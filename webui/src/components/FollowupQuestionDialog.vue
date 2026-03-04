@@ -73,6 +73,13 @@
     <template #footer>
       <div class="dialog-footer">
         <el-button
+          @click="handleCancel"
+          :disabled="isSubmitting"
+          size="large"
+        >
+          取消
+        </el-button>
+        <el-button
           type="primary"
           @click="submitResponse"
           :disabled="!hasResponse || isSubmitting"
@@ -101,6 +108,7 @@ interface Props {
 interface Emits {
   (e: 'update:visible', value: boolean): void;
   (e: 'response', toolCallId: string, response: string): void;
+  (e: 'cancel', toolCallId: string): void;
 }
 
 const props = defineProps<Props>();
@@ -164,6 +172,18 @@ async function submitResponse() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+function handleCancel() {
+  if (isSubmitting.value) {
+    return;
+  }
+
+  // 发送取消事件
+  emit('cancel', props.toolCallId);
+
+  // 立即关闭对话框
+  dialogVisible.value = false;
 }
 
 // 暴露方法给父组件
@@ -287,6 +307,7 @@ defineExpose({
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 .dialog-footer :deep(.el-button) {

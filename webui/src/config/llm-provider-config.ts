@@ -273,8 +273,8 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
 
   ollama: {
     api: {
-      baseUrl: 'http://localhost:11434',
-      modelId: 'llama3.1'
+      baseUrl: 'http://localhost:11434/v1',
+      modelId: 'qwen3.5:9b'
     },
     display: {
       displayName: 'Ollama (本地)',
@@ -283,6 +283,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
     },
     docsUrl: 'http://www.davybot.com/books/providers/llm.html#ollama',
     models: [
+      'qwen3.5:9b',
       'llama3.1',
       'llama3.2',
       'qwen2.5:7b',

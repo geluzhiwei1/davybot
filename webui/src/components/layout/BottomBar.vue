@@ -163,7 +163,7 @@ const fetchModes = async (forceReload = false) => {
 };
 
 // 获取LLMs配置
-const fetchLLMs = async () => {
+const fetchLLMs = async (forceReload = false) => {
   const workspaceId = getWorkspaceId();
   if (!workspaceId) {
     console.error('Workspace ID is not available in the route.');
@@ -171,8 +171,9 @@ const fetchLLMs = async () => {
   }
 
   try {
+    const reloadParam = forceReload ? '?reload=true' : '';
     const data = await httpClient.get<{ success: boolean; models: LLM[] }>(
-      `/workspaces/${workspaceId}/llms`
+      `/workspaces/${workspaceId}/llms${reloadParam}`
     );
     if (data.success && Array.isArray(data.models)) {
       llms.value = data.models;

@@ -49,6 +49,7 @@ export enum MessageType {
   // 用户交互
   FOLLOWUP_QUESTION = 'followup_question',
   FOLLOWUP_RESPONSE = 'followup_response',
+  FOLLOWUP_CANCEL = 'followup_cancel',
 
   // LLM API 可观测性
   LLM_API_REQUEST = 'llm_api_request',
@@ -302,6 +303,7 @@ export type WebSocketMessage =
   // 用户交互
   | FollowupQuestionMessage
   | FollowupResponseMessage
+  | FollowupCancelMessage
   // LLM API 可观测性
   | LLMApiRequestMessage
   | LLMApiResponseMessage
@@ -436,6 +438,14 @@ export interface FollowupResponseMessage extends BaseMessage {
   tool_call_id: string;
   response: string;
   user_message_id?: string;
+}
+
+// 追问取消消息（前端→后端）
+export interface FollowupCancelMessage extends BaseMessage {
+  type: MessageType.FOLLOWUP_CANCEL;
+  task_id: string;
+  tool_call_id: string;
+  reason: 'user_cancelled' | 'timeout' | 'skipped';
 }
 
 // ==================== LLM API 交互状态消息 ====================

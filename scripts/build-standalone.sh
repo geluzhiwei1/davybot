@@ -42,8 +42,8 @@ echo -e "${YELLOW}[4/5] 构建 Tauri 桌面应用 (Standalone)...${NC}"
 echo "这可能需要 5-10 分钟..."
 cd "$PROJECT_ROOT/webui"
 # Note: Tauri builds in release mode by default, --release flag is not needed
-# Using standalone config which includes Python environment
-pnpm tauri build --config src-tauri/tauri.conf.standalone.json
+# Using default config which is now the standalone configuration
+pnpm tauri build
 
 # 5. 显示构建结果
 echo ""

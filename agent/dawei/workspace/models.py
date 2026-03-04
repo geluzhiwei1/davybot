@@ -9,10 +9,10 @@
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from dawei.entity.system_info import (
     SystemEnvironments,
@@ -185,11 +185,22 @@ class WorkspaceSettings:
 class AgentConfig(BaseModel):
     """Agent 执行配置"""
 
-    mode: Literal["orchestrator", "plan", "do", "check", "act"] = "orchestrator"
+    mode: str = "orchestrator"
     plan_mode_confirm_required: bool = True
     enable_auto_mode_switch: bool = False
     auto_approve_tools: bool = True
     max_concurrent_subtasks: int = 3
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        """验证模式是否有效"""
+        from dawei.mode import get_valid_modes
+
+        valid_modes = get_valid_modes()
+        if v not in valid_modes:
+            raise ValueError(f"Invalid mode '{v}'. Must be one of: {valid_modes}")
+        return v
 
 
 class MemoryConfig(BaseModel):
