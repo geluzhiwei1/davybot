@@ -45,18 +45,15 @@ class LLMSettingsUpdate(BaseModel):
 
 
 class LLMProviderCreate(BaseModel):
-    """创建 LLM Provider 的请求模型"""
+    """创建 LLM Provider 的请求模型 - 统一使用 OpenAI 兼容字段"""
 
     name: str = Field(..., description="Provider 配置名称")
-    apiProvider: str = Field(..., description="API 提供商类型 (openai, ollama)")
+    apiProvider: str = Field(..., description="API 提供商类型 (openai, ollama, deepseek)")
     openAiBaseUrl: str | None = Field(None, description="OpenAI 兼容 API 基础 URL")
     openAiApiKey: str | None = Field(None, description="OpenAI API 密钥")
     openAiModelId: str | None = Field(None, description="OpenAI 模型 ID")
     openAiLegacyFormat: bool | None = Field(False, description="使用旧版 OpenAI 格式")
     openAiHeaders: dict[str, str] | None = Field(None, description="自定义 HTTP Headers")
-    ollamaBaseUrl: str | None = Field(None, description="Ollama 基础 URL")
-    ollamaModelId: str | None = Field(None, description="Ollama 模型 ID")
-    ollamaApiKey: str | None = Field(None, description="Ollama API 密钥")
     openAiCustomModelInfo: dict[str, Any] | None = Field(None, description="自定义模型信息")
     diffEnabled: bool | None = Field(True, description="启用差异编辑")
     todoListEnabled: bool | None = Field(True, description="启用 TODO 列表")

@@ -30,12 +30,17 @@ class LLMConfig:
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "LLMConfig":
-        """从字典创建LLM配置"""
+        """从字典创建LLM配置 - 所有 OpenAI 兼容提供商使用统一字段"""
+        api_provider = config_dict.get("apiProvider", "openai")
+        model_id = config_dict.get("openAiModelId", config_dict.get("apiModelId", ""))
+        base_url = config_dict.get("openAiBaseUrl", "")
+        api_key = config_dict.get("openAiApiKey", "")
+
         return cls(
-            apiProvider=config_dict.get("apiProvider", "openai"),
-            model_id=config_dict.get("openAiModelId", config_dict.get("apiModelId", "")),
-            api_key=config_dict.get("openAiApiKey", config_dict.get("deepSeekApiKey", "")),
-            base_url=config_dict.get("openAiBaseUrl", ""),
+            apiProvider=api_provider,
+            model_id=model_id,
+            api_key=api_key,
+            base_url=base_url,
             max_tokens=config_dict.get("openAiCustomModelInfo", {}).get("maxTokens", -1),
             context_window=config_dict.get("openAiCustomModelInfo", {}).get(
                 "contextWindow",

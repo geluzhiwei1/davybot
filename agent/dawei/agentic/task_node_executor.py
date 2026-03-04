@@ -357,10 +357,13 @@ class TaskNodeExecutionEngine:
             )
             raise asyncio.CancelledError("Stop requested by user")
 
-        # 根据任务类型动态计算超时
-        llm_timeout, tool_execution_timeout = self._get_timeout_for_task(
-            llm_timeout=llm_timeout,
-            tool_execution_timeout=tool_execution_timeout,
+        # 使用固定超时时间（默认值为原来的3倍）
+        # 如果用户未指定，使用默认值
+        final_llm_timeout = llm_timeout if llm_timeout is not None else 1800.0  # 30分钟 (600 * 3)
+        final_tool_timeout = tool_execution_timeout if tool_execution_timeout is not None else 900.0  # 15分钟 (300 * 3)
+
+        self.logger.info(
+            f"Timeout configuration for task '{self.task_node.mode or 'unknown'}': LLM={final_llm_timeout:.0f}s, Tools={final_tool_timeout:.0f}s",
         )
 
         self._tool_message_handler._has_attempt_completion = False
@@ -513,140 +516,6 @@ class TaskNodeExecutionEngine:
         finally:
             # 保存 checkpoint
             await self._save_checkpoint()
-
-    def _get_timeout_for_task(
-        self,
-        llm_timeout: float | None = None,
-        tool_execution_timeout: float | None = None,
-    ) -> tuple[float, float]:
-        """根据任务类型动态计算超时时间
-
-        Args:
-            llm_timeout: 用户指定的LLM超时
-            tool_execution_timeout: 用户指定的工具执行超时
-
-        Returns:
-            (llm_timeout, tool_execution_timeout) 元组
-
-        """
-        # 如果用户已明确指定，使用用户指定的值
-        if llm_timeout is not None and tool_execution_timeout is not None:
-            return llm_timeout, tool_execution_timeout
-
-        # 获取任务描述（UserInputText对象转为字符串）
-        task_description = ""
-        if hasattr(self.task_node, "description"):
-            desc = self.task_node.description
-            if hasattr(desc, "content"):
-                # UserInputText对象
-                task_description = desc.content
-            elif isinstance(desc, str):
-                # 字符串
-                task_description = desc
-            else:
-                # 其他类型，转为字符串
-                task_description = str(desc)
-
-        task_description = task_description.lower()
-        # 安全获取 mode（可能为 None）
-        mode = self.task_node.mode.lower() if self.task_node.mode else ""
-
-        # 检测是否为大型内容生成任务
-        is_large_generation = any(
-            keyword in task_description
-            for keyword in [
-                "html",
-                "生成html",
-                "创建页面",
-                "build page",
-                "generate html",
-                "前端",
-                "frontend",
-                "页面设计",
-                "page design",
-                "代码生成",
-                "code generation",
-                "大型",
-                "large",
-            ]
-        )
-
-        # 检测是否为复杂任务（包含多个步骤）
-        is_complex_task = any(
-            keyword in task_description
-            for keyword in [
-                "多个",
-                "multi",
-                "步骤",
-                "steps",
-                "流程",
-                "workflow",
-                "完整",
-                "complete",
-                "全部",
-                "all",
-                "全面",
-                "comprehensive",
-            ]
-        )
-
-        # 检测模式特定超时需求
-        mode_multipliers = {
-            "orchestrator": 1.5,  # 编排模式需要更长时间
-            "architect": 1.2,  # 架构模式需要更多思考
-            "code": 1.3,  # 代码生成可能较长
-            "ask": 0.8,  # 问答模式相对快速
-            "debug": 1.0,  # 调试模式标准时间
-        }
-
-        # 基础超时
-        base_llm_timeout = 600.0  # 10分钟
-        base_tool_timeout = 300.0  # 5分钟
-
-        # 应用模式乘数
-        mode_multiplier = mode_multipliers.get(mode, 1.0)
-
-        # 根据任务类型调整
-        if is_large_generation:
-            # 大型内容生成任务：增加LLM超时，减少工具超时
-            calculated_llm_timeout = min(
-                base_llm_timeout * 1.5 * mode_multiplier,
-                1800.0,
-            )  # 最多30分钟
-            calculated_tool_timeout = base_tool_timeout  # 保持标准工具超时
-        elif is_complex_task:
-            # 复杂任务：两者都增加
-            calculated_llm_timeout = min(
-                base_llm_timeout * 1.3 * mode_multiplier,
-                1500.0,
-            )  # 最多25分钟
-            calculated_tool_timeout = min(
-                base_tool_timeout * 1.5 * mode_multiplier,
-                900.0,
-            )  # 最多15分钟
-        else:
-            # 标准任务
-            calculated_llm_timeout = base_llm_timeout * mode_multiplier
-            calculated_tool_timeout = base_tool_timeout * mode_multiplier
-
-        # 如果用户指定了其中一个，另一个自动计算
-        if llm_timeout is not None:
-            final_llm_timeout = llm_timeout
-            # 工具超时约为LLM超时的50%
-            final_tool_timeout = tool_execution_timeout or (llm_timeout * 0.5)
-        elif tool_execution_timeout is not None:
-            final_tool_timeout = tool_execution_timeout
-            # LLM超时约为工具超时的2倍
-            final_llm_timeout = llm_timeout or (tool_execution_timeout * 2.0)
-        else:
-            final_llm_timeout = calculated_llm_timeout
-            final_tool_timeout = calculated_tool_timeout
-
-        self.logger.info(
-            f"Timeout configuration for task '{self.task_node.mode or 'unknown'}': LLM={final_llm_timeout:.0f}s, Tools={final_tool_timeout:.0f}s (is_large_generation={is_large_generation}, is_complex={is_complex_task})",
-        )
-
-        return final_llm_timeout, final_tool_timeout
 
     async def _save_checkpoint(self) -> None:
         """保存 checkpoint 到磁盘
@@ -1050,6 +919,19 @@ class TaskNodeExecutionEngine:
 
         """
         return await self._tool_message_handler.handle_followup_response(tool_call_id, response)
+
+    async def handle_followup_cancel(self, tool_call_id: str, reason: str) -> bool:
+        """处理前端发来的追问取消
+
+        Args:
+            tool_call_id: 工具调用ID
+            reason: 取消原因
+
+        Returns:
+            是否成功处理
+
+        """
+        return await self._tool_message_handler.handle_followup_cancel(tool_call_id, reason)
 
     async def _send_error_to_frontend(
         self,

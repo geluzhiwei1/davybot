@@ -285,8 +285,11 @@ async def get_workspace_modes(
         logger.info(f"Getting modes for workspace: {workspace.absolute_path}")
         modes_dict = workspace.mode_manager.get_all_modes()
 
-        # 定义内置 system modes 的固定顺序
-        builtin_mode_order = ["orchestrator", "plan", "do", "check", "act"]
+        # 动态获取内置模式的固定顺序
+        from dawei.mode import get_builtin_modes, get_default_mode
+
+        builtin_mode_order = get_builtin_modes()
+        default_mode = get_default_mode()
 
         # 分离 system modes 和自定义 modes
         system_modes = []
@@ -301,7 +304,7 @@ async def get_workspace_modes(
                 "slug": getattr(mode_info, "slug", mode_slug),
                 "name": getattr(mode_info, "name", mode_slug),
                 "description": getattr(mode_info, "description", ""),
-                "is_default": mode_slug == "orchestrator",
+                "is_default": mode_slug == default_mode,
                 "source": source,
                 # 包含完整的模式配置信息
                 "role_definition": getattr(mode_info, "role_definition", ""),

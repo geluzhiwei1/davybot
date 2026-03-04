@@ -65,10 +65,7 @@ class StreamProcessor:
             from .moonshot_api import MoonshotParser
 
             return MoonshotParser()
-        if self.provider == "ollama":
-            from .ollama_api import OllamaParser
 
-            return OllamaParser()
         # 默认使用OpenAI兼容解析器
         from .openai_compatible_api import OpenAICompatibleParser
 

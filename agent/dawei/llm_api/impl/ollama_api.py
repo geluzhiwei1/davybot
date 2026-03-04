@@ -78,22 +78,25 @@ class OllamaParser(StreamChunkParser):
         if chunk.get("done", False):
             self.is_done = True
 
-            # 添加使用统计消息
-            usage_data = {
+            # 保存使用统计信息，供 complete() 方法使用
+            self.final_usage = {
                 "prompt_tokens": chunk.get("prompt_eval_count", 0),
                 "completion_tokens": chunk.get("eval_count", 0),
                 "total_tokens": chunk.get("prompt_eval_count", 0) + chunk.get("eval_count", 0),
             }
 
+            # 添加使用统计消息
             messages.append(
-                UsageMessage(user_message_id=local_context.get_message_id(), data=usage_data),
+                UsageMessage(user_message_id=local_context.get_message_id(), data=self.final_usage),
             )
 
             # 添加完成消息
             messages.append(
                 CompleteMessage(
                     user_message_id=local_context.get_message_id(),
+                    content=self.content,
                     finish_reason="stop",
+                    usage=self.final_usage,
                 ),
             )
 
@@ -114,6 +117,31 @@ class OllamaParser(StreamChunkParser):
             )
 
         return messages
+
+    def complete(self, chunk: dict[str, Any]) -> CompleteMessage:
+        """创建完成消息
+
+        在流式处理结束后调用，返回最终的完成消息。
+
+        Args:
+            chunk: 最后一个数据块（可能为空）
+
+        Returns:
+            CompleteMessage对象
+
+        """
+        # 获取完成原因，默认为"stop"
+        finish_reason = "stop"
+        if chunk and chunk.get("done"):
+            # Ollama 在 done=true 时可能不提供 finish_reason
+            finish_reason = "stop"
+
+        # 使用已保存的内容和使用统计
+        return CompleteMessage(
+            content=self.content,
+            finish_reason=finish_reason,
+            usage=self.final_usage,
+        )
 
 
 class OllamaClient(OpenaiCompatibleClient):
@@ -187,7 +215,6 @@ class OllamaClient(OpenaiCompatibleClient):
         self,
         messages: list[LLMMessage],
         stream: bool = True,
-        **_kwargs,
     ) -> dict[str, Any]:
         """准备请求参数
 
@@ -196,7 +223,6 @@ class OllamaClient(OpenaiCompatibleClient):
         Args:
             messages: 消息列表
             stream: 是否流式输出
-            **kwargs: 额外参数
 
         Returns:
             请求参数字典
@@ -262,7 +288,7 @@ class OllamaClient(OpenaiCompatibleClient):
         if not messages:
             raise ValidationError("messages", messages, "must be non-empty list")
 
-        params = self._prepare_request_params(messages, stream=True, **kwargs)
+        params = self._prepare_request_params(messages, stream=True)
 
         self.logger.info(
             f"Creating Ollama message with model: {self.model}",
@@ -357,7 +383,7 @@ class OllamaClient(OpenaiCompatibleClient):
         if not messages:
             raise ValidationError("messages", messages, "must be non-empty list")
 
-        params = self._prepare_request_params(messages, stream=False, **kwargs)
+        params = self._prepare_request_params(messages, stream=False)
 
         self.logger.info(f"Generating text with Ollama model: {self.model}")
 
@@ -408,9 +434,8 @@ class OllamaClient(OpenaiCompatibleClient):
 
     async def close(self):
         """关闭客户端连接"""
-        if self._session and not self._session.closed:
-            await self._session.close()
-            self.logger.info("Ollama client closed")
+        # 调用父类的 close 方法，确保正确清理资源
+        await super().close()
 
 
 # 工厂函数

@@ -42,17 +42,6 @@ class TaskStatus(Enum):
     INTERACTIVE = "interactive"
     RESUMABLE = "resumable"
 
-
-class TaskMode(Enum):
-    """任务模式枚举"""
-
-    ARCHITECT = "architect"
-    CODE = "code"
-    ASK = "ask"
-    PLAN = "plan"
-    DEBUG = "debug"
-
-
 class ToolProtocol(Enum):
     """工具协议枚举"""
 

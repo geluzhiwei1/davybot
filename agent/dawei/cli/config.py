@@ -24,7 +24,7 @@ class CLIConfig:
     Attributes:
         workspace: 工作区路径
         llm: LLM模型名称（如 openai/gpt-4, deepseek/deepseek-chat）
-        mode: Agent模式（code, ask, architect, plan, debug）
+        mode: Agent模式（orchestrator, plan, do, check, act）
         message: 用户消息/指令
         verbose: 是否输出详细日志
         timeout: 执行超时时间（秒）
@@ -87,8 +87,9 @@ class CLIConfig:
         if not self._workspace_path.exists():
             return False, f"Workspace path does not exist: {self._workspace_path}"
 
-        # 验证mode是否有效 (PDCA modes)
-        valid_modes = ["orchestrator", "plan", "do", "check", "act"]
+        from dawei.mode import get_valid_modes
+
+        valid_modes = get_valid_modes(workspace_path=str(self._workspace_path))
         if self.mode.lower() not in valid_modes:
             return (
                 False,

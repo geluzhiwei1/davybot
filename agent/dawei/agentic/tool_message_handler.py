@@ -167,64 +167,67 @@ class ToolMessageHandle:
                 )
                 self.logger.exception(f"Invalid arguments string: {arguments_str}")
 
-                # 构建错误结果
-                error_result = {
-                    "error": f"Invalid arguments: {e}",
-                    "raw_arguments": arguments_str,
-                }
+                # 🆕 尝试修复常见的 LLM JSON 生成错误
+                arguments = self._try_fix_malformed_json(arguments_str, function_name)
+                if arguments:
+                    self.logger.info(f"Successfully recovered malformed JSON for {function_name}")
+                else:
+                    # 修复失败，构建错误结果
+                    error_result = {
+                        "error": f"Invalid arguments: {e}",
+                        "raw_arguments": arguments_str,
+                    }
 
-                # 添加工具消息到对话历史（包含错误信息）
-                self._user_workspace.current_conversation.say(
-                    ToolMessage(
-                        content=json.dumps(error_result, ensure_ascii=False),
-                        tool_call_id=tool_call_obj.tool_call_id,
-                    ),
-                )
+                    # 添加工具消息到对话历史（包含错误信息）
+                    self._user_workspace.current_conversation.say(
+                        ToolMessage(
+                            content=json.dumps(error_result, ensure_ascii=False),
+                            tool_call_id=tool_call_obj.tool_call_id,
+                        ),
+                    )
 
-                # 发送工具调用开始事件（失败）
-                await emit_typed_event(
-                    TaskEventType.TOOL_CALL_START,
-                    {
-                        "tool_name": function_name,
-                        "tool_input": {"raw_arguments": arguments_str},
-                        "tool_call_id": tool_call_id,
-                    },
-                    self._event_bus,
-                    task_id=self.task_node.task_node_id,
-                    source="tool_execution",
-                )
+                    # 发送工具调用开始事件（失败）
+                    await emit_typed_event(
+                        TaskEventType.TOOL_CALL_START,
+                        {
+                            "tool_name": function_name,
+                            "tool_input": {"raw_arguments": arguments_str},
+                            "tool_call_id": tool_call_id,
+                        },
+                        self._event_bus,
+                        task_id=self.task_node.task_node_id,
+                        source="tool_execution",
+                    )
 
-                # 发送工具调用结果事件（失败）
-                await emit_typed_event(
-                    TaskEventType.TOOL_CALL_RESULT,
-                    {
-                        "tool_name": function_name,
-                        "result": error_result,
-                        "is_error": True,
-                        "tool_call_id": tool_call_id,
-                    },
-                    self._event_bus,
-                    task_id=self.task_node.task_node_id,
-                    source="tool_execution",
-                )
+                    # 发送工具调用结果事件（失败）
+                    await emit_typed_event(
+                        TaskEventType.TOOL_CALL_RESULT,
+                        {
+                            "tool_name": function_name,
+                            "result": error_result,
+                            "is_error": True,
+                            "tool_call_id": tool_call_id,
+                        },
+                        self._event_bus,
+                        task_id=self.task_node.task_node_id,
+                        source="tool_execution",
+                    )
 
-                # 发送错误事件
-                await emit_typed_event(
-                    TaskEventType.ERROR_OCCURRED,
-                    {
-                        "error": f"Failed to parse tool arguments for {function_name}: {e}",
-                        "details": {"raw_arguments": arguments_str},
-                    },
-                    self._event_bus,
-                    task_id=self.task_node.task_node_id,
-                    source="tool_execution",
-                )
+                    # 发送错误事件
+                    await emit_typed_event(
+                        TaskEventType.ERROR_OCCURRED,
+                        {
+                            "error": f"Failed to parse tool arguments for {function_name}: {e}",
+                            "details": {"raw_arguments": arguments_str},
+                        },
+                        self._event_bus,
+                        task_id=self.task_node.task_node_id,
+                        source="tool_execution",
+                    )
 
-                raise  # 重新抛出 JSON 解析错误
-            except (json.JSONDecodeError, ValueError, TypeError) as e:
-                # 参数解析错误:返回错误结果但不中断执行
-                return {"error": f"Invalid arguments: {e}"}
+                    raise  # 重新抛出 JSON 解析错误
 
+            # ✅ 只有JSON解析成功才会执行到这里
             # 创建任务上下文
             context = self._user_workspace.create_task_context()
             self.logger.debug(f"Created task context for tool execution: {type(context)}")
@@ -705,6 +708,50 @@ class ToolMessageHandle:
             )
             # 返回具体的错误信息，而不仅仅是 False
             return {"error": str(e), "tool_call_id": tool_call_id, "success": False}
+
+    def _try_fix_malformed_json(self, json_str: str, function_name: str) -> dict | None:
+        """尝试修复常见的 LLM JSON 生成错误
+
+        Args:
+            json_str: 格式错误的 JSON 字符串
+            function_name: 工具名称
+
+        Returns:
+            修复后的字典，如果无法修复则返回 None
+
+        """
+        import re
+
+        try:
+            # 针对特定的错误模式进行修复
+            if function_name == "update_todo_list":
+                # 修复模式: {"todos":[ ] item1, ] item2, ...}
+                # 提取 todos 数组的内容
+                todos_match = re.search(r'"todos"\s*:\s*\[\s*\]([^\]]+)\]', json_str)
+                if todos_match:
+                    # 提取所有待办事项
+                    content = todos_match.group(1)
+                    # 移除所有 ] 符号和前导逗号
+                    items = []
+                    for line in content.split(','):
+                        # 清理每一行
+                        cleaned = re.sub(r'\s*\]\s*', '', line.strip())
+                        if cleaned:
+                            items.append(cleaned)
+
+                    if items:
+                        return {"todos": items}
+
+            # 通用修复：移除数组元素前的 ]
+            fixed = re.sub(r'\]\s*,', ',', json_str)
+            fixed = re.sub(r'\]\s+', ' ', fixed)
+
+            # 尝试解析修复后的 JSON
+            return json.loads(fixed)
+
+        except (json.JSONDecodeError, Exception) as e:
+            self.logger.debug(f"Failed to fix malformed JSON: {e}")
+            return None
 
     @property
     def has_attempt_completion(self) -> bool:

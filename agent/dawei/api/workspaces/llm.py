@@ -36,18 +36,15 @@ class LLMSettingsUpdate(BaseModel):
 
 
 class LLMProviderCreate(BaseModel):
-    """创建 LLM Provider 的请求模型"""
+    """创建 LLM Provider 的请求模型 - 简化版本，所有 OpenAI 兼容提供商使用统一字段"""
 
     name: str = Field(..., description="Provider 配置名称")
-    apiProvider: str = Field(..., description="API 提供商类型 (openai, ollama)")
+    apiProvider: str = Field(..., description="API 提供商类型 (openai, ollama, deepseek)")
     openAiBaseUrl: str | None = Field(None, description="OpenAI 兼容 API 基础 URL")
     openAiApiKey: str | None = Field(None, description="OpenAI API 密钥")
     openAiModelId: str | None = Field(None, description="OpenAI 模型 ID")
     openAiLegacyFormat: bool | None = Field(False, description="使用旧版 OpenAI 格式")
     openAiHeaders: dict[str, str] | None = Field(None, description="自定义 HTTP Headers")
-    ollamaBaseUrl: str | None = Field(None, description="Ollama 基础 URL")
-    ollamaModelId: str | None = Field(None, description="Ollama 模型 ID")
-    ollamaApiKey: str | None = Field(None, description="Ollama API 密钥")
     openAiCustomModelInfo: dict[str, Any] | None = Field(None, description="自定义模型信息")
     diffEnabled: bool | None = Field(True, description="启用差异编辑")
     todoListEnabled: bool | None = Field(True, description="启用 TODO 列表")
@@ -314,28 +311,17 @@ async def create_llm_provider(
             "temperature": provider_data.temperature,
         }
 
-        # 添加 Ollama 特定配置
-        if provider_data.apiProvider == "ollama":
-            if provider_data.ollamaBaseUrl:
-                provider_config["ollamaBaseUrl"] = provider_data.ollamaBaseUrl
-            if provider_data.ollamaModelId:
-                provider_config["ollamaModelId"] = provider_data.ollamaModelId
-            if provider_data.ollamaApiKey:
-                provider_config["ollamaApiKey"] = provider_data.ollamaApiKey
-
-        # 添加 OpenAI 兼容配置（支持 openai、glm、deepseek 等）
-        else:
-            if provider_data.openAiBaseUrl:
-                provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
-            if provider_data.openAiApiKey:
-                provider_config["openAiApiKey"] = provider_data.openAiApiKey
-            if provider_data.openAiModelId:
-                provider_config["openAiModelId"] = provider_data.openAiModelId
-            if provider_data.openAiLegacyFormat is not None:
-                provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
-            if provider_data.openAiCustomModelInfo:
-                provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
-            provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else {}
+        if provider_data.openAiBaseUrl:
+            provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
+        if provider_data.openAiApiKey:
+            provider_config["openAiApiKey"] = provider_data.openAiApiKey
+        if provider_data.openAiModelId:
+            provider_config["openAiModelId"] = provider_data.openAiModelId
+        if provider_data.openAiLegacyFormat is not None:
+            provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
+        if provider_data.openAiCustomModelInfo:
+            provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
+        provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else {}
 
         # 如果当前没有 currentApiConfigName，则设置为即将创建的 provider
         if "currentApiConfigName" not in provider_profiles or not provider_profiles.get("currentApiConfigName"):
@@ -415,28 +401,18 @@ async def update_llm_provider(
             "temperature": provider_data.temperature,
         }
 
-        if provider_data.apiProvider == "ollama":
-            if provider_data.ollamaBaseUrl:
-                provider_config["ollamaBaseUrl"] = provider_data.ollamaBaseUrl
-            if provider_data.ollamaModelId:
-                provider_config["ollamaModelId"] = provider_data.ollamaModelId
-            if provider_data.ollamaApiKey:
-                provider_config["ollamaApiKey"] = provider_data.ollamaApiKey
-
-        # 更新 OpenAI 兼容配置（支持 openai、glm、deepseek 等）
-        else:
-            if provider_data.openAiBaseUrl:
-                provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
-            if provider_data.openAiApiKey:
-                provider_config["openAiApiKey"] = provider_data.openAiApiKey
-            if provider_data.openAiModelId:
-                provider_config["openAiModelId"] = provider_data.openAiModelId
-            if provider_data.openAiLegacyFormat is not None:
-                provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
-            if provider_data.openAiCustomModelInfo:
-                provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
-            # 使用前端传来的 openAiHeaders，如果没有则使用现有配置的值
-            provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else existing_config.get("openAiHeaders", {})
+        if provider_data.openAiBaseUrl:
+            provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
+        if provider_data.openAiApiKey:
+            provider_config["openAiApiKey"] = provider_data.openAiApiKey
+        if provider_data.openAiModelId:
+            provider_config["openAiModelId"] = provider_data.openAiModelId
+        if provider_data.openAiLegacyFormat is not None:
+            provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
+        if provider_data.openAiCustomModelInfo:
+            provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
+        # 使用前端传来的 openAiHeaders，如果没有则使用现有配置的值
+        provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else existing_config.get("openAiHeaders", {})
 
         api_configs[provider_name] = provider_config
         provider_profiles["apiConfigs"] = api_configs
@@ -478,20 +454,22 @@ async def test_llm_provider(
     try:
         from dawei.llm_api.impl.openai_compatible_api import OpenaiCompatibleClient
 
-        # 构建 provider 配置
-        api_provider = provider_data.apiProvider
+        api_provider = provider_data.apiProvider.lower()
 
-        # 构建 config dict
         if api_provider == "ollama":
-            model_id = provider_data.ollamaModelId or "llama3.1:latest"
+            model_id = provider_data.openAiModelId or "llama3.1"
+            base_url = provider_data.openAiBaseUrl or "http://localhost:11434"
+            base_url = base_url.rstrip("/")
+
             config = {
                 "apiProvider": "ollama",
-                "ollamaBaseUrl": provider_data.ollamaBaseUrl or "http://localhost:11434",
-                "ollamaApiKey": provider_data.ollamaApiKey or "ollama",
-                "ollamaModelId": model_id,
+                "openAiBaseUrl": base_url,
+                "openAiModelId": model_id,
+                "openAiApiKey": provider_data.openAiApiKey or "ollama",
+                "openAiLegacyFormat": False,
             }
         else:
-            # OpenAI 兼容格式
+            # 其他 OpenAI 兼容提供商
             model_id = provider_data.openAiModelId or "gpt-4o"
             config = {
                 "apiProvider": api_provider,
@@ -501,13 +479,11 @@ async def test_llm_provider(
                 "openAiLegacyFormat": provider_data.openAiLegacyFormat or False,
             }
 
-        # 创建 API 实例
         llm_api = OpenaiCompatibleClient(config)
 
-        # 准备测试消息 - 带一个简单的 tool 定义
         from dawei.entity.lm_messages import UserMessage
 
-        test_messages = [UserMessage(content="Hello")]
+        test_messages = [UserMessage(content="call test_function('hello')")]
 
         # 准备一个简单的 tool
         test_tools = [{"type": "function", "function": {"name": "test_function", "description": "A test function", "parameters": {"type": "object", "properties": {"test_param": {"type": "string", "description": "A test parameter"}}, "required": ["test_param"]}}}]
@@ -581,6 +557,7 @@ async def test_llm_provider(
                 }
 
         except Exception as e:
+            logger.exception("test_llm_provider")
             error_msg = str(e)
             # 判断是否是模型不支持 tool call 的错误
             if "tool" in error_msg.lower() or "function" in error_msg.lower():

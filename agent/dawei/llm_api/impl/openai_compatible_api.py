@@ -76,18 +76,13 @@ class OpenaiCompatibleClient(BaseClient):
 
         self.provider = config.get("apiProvider", "openai")
 
-        # 根据provider获取配置
-        if self.provider == "ollama":
-            self.base_url = config.get("ollamaBaseUrl", "http://localhost:11434").rstrip("/")
-            self.api_key = config.get("ollamaApiKey", "ollama")
-            self.model = config.get("ollamaModelId", "llama3.1")
-        else:  # 默认为openai兼容
-            # 支持两种字段名：openAiBaseUrl（原始配置）和 base_url（LLMConfig内部字段）
-            self.base_url = config.get("openAiBaseUrl", config.get("base_url", "")).rstrip("/")
-            # 支持两种字段名：openAiApiKey（原始配置）和 api_key（LLMConfig内部字段）
-            self.api_key = config.get("openAiApiKey", config.get("api_key", ""))
-            # 支持两种字段名：openAiModelId（原始配置）和 model_id（LLMConfig内部字段）
-            self.model = config.get("openAiModelId", config.get("model_id", ""))
+        # 所有 OpenAI 兼容提供商使用统一字段（包括 Ollama）
+        base_url = config.get("openAiBaseUrl", config.get("base_url", ""))
+        self.base_url = base_url.rstrip("/")
+        # 支持两种字段名：openAiApiKey（原始配置）和 api_key（LLMConfig内部字段）
+        self.api_key = config.get("openAiApiKey", config.get("api_key", ""))
+        # 支持两种字段名：openAiModelId（原始配置）和 model_id（LLMConfig内部字段）
+        self.model = config.get("openAiModelId", config.get("model_id", ""))
 
         # 验证配置 - 使用断言式验证替代assert
         if not self.base_url or not self.base_url.startswith("http"):
@@ -546,9 +541,8 @@ class OpenaiCompatibleClient(BaseClient):
             },
         )
 
+
         endpoint = "chat/completions"
-        if self.provider == "ollama":
-            endpoint = "api/chat"
 
         # 创建原始流数据生成器
         async def raw_stream_generator():

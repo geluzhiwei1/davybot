@@ -62,7 +62,7 @@ def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, supe
         dawei agent run ./my-ws "Create hello world"
 
         # With specific mode
-        dawei agent run ./my-ws "Design API" --mode architect
+        dawei agent run ./my-ws "Design API" --mode plan
 
         # With verbose output
         dawei agent run ./my-ws "Explain PDCA" --verbose
