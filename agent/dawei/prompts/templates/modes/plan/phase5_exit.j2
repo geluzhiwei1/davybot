@@ -8,7 +8,7 @@
 **How plan_exit Works**:
 1. The tool will check that a plan file exists
 2. It will display a completion message to the user
-3. It will ask if the user wants to switch to code/build mode
+3. It will ask if the user wants to switch to Do mode (implementation)
 4. It will provide the switch_mode command if they want to proceed
 
 **Important Rules**:
@@ -27,8 +27,8 @@
 
 **What Happens After plan_exit**:
 1. User sees completion message and plan file path
-2. User is asked: "Would you like to switch to build mode?"
-3. If yes, user will use: `switch_mode(mode="code", reason="Ready to implement plan")`
+2. User is asked: "Would you like to switch to Do mode to implement?"
+3. If yes, user will use: `switch_mode(mode="do", reason="Ready to implement plan")`
 4. If no, user stays in Plan mode to refine the plan
 
 **Example**:
@@ -37,9 +37,9 @@ User: Create a plan for adding authentication
 Agent: [Goes through Phases 1-4, creates plan file]
 Agent: plan_exit()
 System: ✅ Plan complete at .dawei/plans/...
-System: 🔄 Switch to build mode to implement?
-User: Yes → switches to code mode
-User: No → stays in plan mode
+System: 🔄 Switch to Do mode to implement?
+User: Yes → switches to Do mode
+User: No → stays in Plan mode
 ```
 
 **Remember**:

@@ -134,6 +134,7 @@ class ChatHandler(AsyncMessageHandler):
         return [
             MessageType.USER_MESSAGE,
             MessageType.FOLLOWUP_RESPONSE,
+            MessageType.FOLLOWUP_CANCEL,
             MessageType.AGENT_STOP,
         ]
 
@@ -158,6 +159,10 @@ class ChatHandler(AsyncMessageHandler):
         # 处理 FOLLOWUP_RESPONSE 消息
         if message.type == MessageType.FOLLOWUP_RESPONSE:
             return await self._process_followup_response(session_id, message)
+
+        # 处理 FOLLOWUP_CANCEL 消息
+        if message.type == MessageType.FOLLOWUP_CANCEL:
+            return await self.handle_followup_cancel(session_id, message)
 
         # 处理 AGENT_STOP 消息
         if message.type == MessageType.AGENT_STOP:
@@ -259,6 +264,65 @@ class ChatHandler(AsyncMessageHandler):
                     if success:
                         logger.info(
                             f"Successfully delivered followup response to node {task_node_id}",
+                        )
+                        return None
+
+                logger.warning(f"No node executor found for tool_call_id: {tool_call_id}")
+            else:
+                logger.warning(f"Agent for task {task_id} has no execution_engine")
+        else:
+            logger.warning(f"No active agent found for task {task_id}")
+
+        return None
+
+    async def handle_followup_cancel(
+        self,
+        session_id: str,
+        message: BaseWebSocketMessage,
+    ) -> WebSocketMessage | None:
+        """处理前端发来的追问取消
+
+        Args:
+            session_id: 会话ID
+            message: FollowupCancelMessage
+
+        Returns:
+            None
+
+        """
+        from dawei.websocket.protocol import FollowupCancelMessage
+
+        if not isinstance(message, FollowupCancelMessage):
+            logger.error(f"Invalid message type for FOLLOWUP_CANCEL: {type(message)}")
+            return await self.send_error_message(
+                session_id,
+                "INVALID_MESSAGE_TYPE",
+                "Invalid message type for followup cancel",
+            )
+
+        task_id = message.task_id
+        tool_call_id = message.tool_call_id
+        reason = message.reason
+
+        logger.info(
+            f"Received followup cancel for task {task_id}, tool_call {tool_call_id}, reason: {reason}",
+        )
+
+        # 找到对应的 Agent 实例并处理取消
+        if task_id in self._active_agents:
+            agent = self._active_agents[task_id]
+
+            # 获取任务节点执行引擎
+            if hasattr(agent, "execution_engine") and agent.execution_engine:
+                # 查找所有任务节点执行引擎
+                for (
+                    task_node_id,
+                    node_executor,
+                ) in agent.execution_engine._node_executors.items():
+                    success = await node_executor.handle_followup_cancel(tool_call_id, reason)
+                    if success:
+                        logger.info(
+                            f"Successfully delivered followup cancel to node {task_node_id}",
                         )
                         return None
 

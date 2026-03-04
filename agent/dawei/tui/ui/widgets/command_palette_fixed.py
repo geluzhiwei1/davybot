@@ -238,12 +238,12 @@ def get_default_commands() -> list[Command]:
         ),
         Command("Toggle Tools", "Show/hide tool panel", "view.toggle_tools", "View"),
         Command("Clear Chat", "Clear chat history", "view.clear_chat", "View", "Ctrl+L"),
-        # Mode
-        Command("Code Mode", "Switch to code mode", "mode.code", "Mode"),
-        Command("Ask Mode", "Switch to ask mode", "mode.ask", "Mode"),
-        Command("Architect Mode", "Switch to architect mode", "mode.architect", "Mode"),
+        # Mode (PDCA)
+        Command("Orchestrator Mode", "Switch to orchestrator mode", "mode.orchestrator", "Mode"),
         Command("Plan Mode", "Switch to plan mode", "mode.plan", "Mode"),
-        Command("Debug Mode", "Switch to debug mode", "mode.debug", "Mode"),
+        Command("Do Mode", "Switch to do mode", "mode.do", "Mode"),
+        Command("Check Mode", "Switch to check mode", "mode.check", "Mode"),
+        Command("Act Mode", "Switch to act mode", "mode.act", "Mode"),
         # Session
         Command("New Session", "Start new chat session", "session.new", "Session"),
         Command("Save Session", "Save current session", "session.save", "Session", "Ctrl+S"),

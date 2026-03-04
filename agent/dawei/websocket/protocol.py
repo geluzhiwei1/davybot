@@ -78,6 +78,7 @@ class MessageType(StrEnum):
     # ==================== 用户交互 ====================
     FOLLOWUP_QUESTION = "followup_question"  # 后端向前端提问
     FOLLOWUP_RESPONSE = "followup_response"  # 前端向后端回复
+    FOLLOWUP_CANCEL = "followup_cancel"  # 前端取消追问
 
     # ==================== LLM API 可观测性 ====================
     LLM_API_REQUEST = "llm_api_request"  # LLM API 请求开始
@@ -756,6 +757,27 @@ class FollowupResponseMessage(BaseWebSocketMessage):
         return cls(**data)
 
 
+class FollowupCancelMessage(BaseWebSocketMessage):
+    """前端向后端发送的追问取消消息"""
+
+    type: MessageType = MessageType.FOLLOWUP_CANCEL
+    task_id: str = Field(..., description="任务ID")
+    tool_call_id: str = Field(..., description="工具调用ID")
+    reason: Literal["user_cancelled", "timeout", "skipped"] = Field(
+        default="user_cancelled",
+        description="取消原因"
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return self.to_websocket_format()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FollowupCancelMessage":
+        """从字典创建实例"""
+        return cls(**data)
+
+
 class ToolCallStartMessage(BaseWebSocketMessage):
     """工具调用开始消息"""
 
@@ -1033,7 +1055,7 @@ class AgentStartMessage(BaseWebSocketMessage):
 
     type: MessageType = MessageType.AGENT_START
     task_id: str = Field(..., description="任务ID")
-    agent_mode: str = Field(..., description="Agent模式 (architect, code, ask, debug, plan)")
+    agent_mode: str = Field(..., description="Agent模式 ")
     user_message: str = Field(..., description="用户原始消息")
     workspace_id: str = Field(..., description="工作区ID")
     metadata: dict[str, Any] | None = Field(None, description="其他元数据")
@@ -1294,9 +1316,8 @@ class ModeSwitchMessage(BaseWebSocketMessage):
         - do: 执行阶段
         - check: 检查阶段
         - act: 改进阶段
-        - build: 完整循环模式（向后兼容）
         """
-        valid_modes = ["orchestrator", "plan", "do", "check", "act", "build"]
+        valid_modes = ["orchestrator", "plan", "do", "check", "act"]
         if v not in valid_modes:
             raise ValueError(f"Invalid mode: '{v}'. Valid modes: {', '.join(valid_modes)}")
         return v
@@ -1550,6 +1571,7 @@ WebSocketMessage = Union[
     # 用户交互
     FollowupQuestionMessage,
     FollowupResponseMessage,
+    FollowupCancelMessage,
     # LLM API 可观测性
     LLMApiRequestMessage,
     LLMApiResponseMessage,
@@ -1606,6 +1628,7 @@ class MessageValidator:
         # 用户交互
         MessageType.FOLLOWUP_QUESTION: FollowupQuestionMessage,
         MessageType.FOLLOWUP_RESPONSE: FollowupResponseMessage,
+        MessageType.FOLLOWUP_CANCEL: FollowupCancelMessage,
         # LLM API 可观测性
         MessageType.LLM_API_REQUEST: LLMApiRequestMessage,
         MessageType.LLM_API_RESPONSE: LLMApiResponseMessage,
@@ -2182,6 +2205,7 @@ __all__ = [
     "ToolCallResultMessage",
     "FollowupQuestionMessage",
     "FollowupResponseMessage",
+    "FollowupCancelMessage",
     "ErrorMessage",
     "WarningMessage",
     "HeartbeatMessage",

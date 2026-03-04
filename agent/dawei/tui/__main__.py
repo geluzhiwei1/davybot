@@ -198,7 +198,7 @@ Notes:
         "--mode",
         "-m",
         default="",
-        choices=["plan", "build"],
+        choices=["orchestrator", "plan", "do", "check", "act"],
         help="Agent mode (optional, default: load from workspace config)",
     )
 

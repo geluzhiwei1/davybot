@@ -156,7 +156,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
             "mode_manager": mode_manager,
             "capabilities": capabilities,
             "custom_instructions": custom_instructions,
-            "all_models": mode_manager.get_all_modes(),
+            "all_modes": list(mode_manager.get_all_modes().values()),  # 修复: 将 dict 转换为列表
         }
 
         # 合并 additional_data 中的所有键值对到上下文中

@@ -93,15 +93,15 @@ class EnhancedHelpScreen(Screen):
 
 ---
 
-## 🤖 Agent Modes
+## 🤖 Agent Modes (PDCA Cycle)
 
 | Mode | Description |
 |------|-------------|
-| **plan** | Read-only: Analysis only, no file modifications |
-| **build** | Full mode: All operations enabled |
-| **ask** | Question answering |
-| **code** | Code writing and editing |
-| **debug** | Error diagnosis and fixing |
+| **orchestrator** | 🪃 Intelligent coordinator - manages PDCA cycles across all domains |
+| **plan** | 📋 Read-only: Understand, explore, design, and plan |
+| **do** | ⚙️ Execute: Complete tasks systematically |
+| **check** | ✓ Verify: Validate results and quality |
+| **act** | 🚀 Improve: Standardize and decide next steps |
 
 ---
 

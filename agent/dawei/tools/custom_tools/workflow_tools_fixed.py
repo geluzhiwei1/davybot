@@ -187,54 +187,73 @@ class SwitchModeTool(CustomBaseTool):
     description: ClassVar[str] = "Changes to a different mode for specialized tasks."
     args_schema: ClassVar[type[BaseModel]] = SwitchModeInput
 
-    def __init__(self, task_graph=None):
+    def __init__(self, task_graph=None, workspace_path: str | None = None):
         super().__init__()
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
-        # Available modes
-        self.available_modes = {
-            "code": {
-                "name": "💻 Code",
-                "description": "Use this mode when you need to write, modify, or refactor code",
-                "capabilities": ["write_code", "edit_files", "debug", "refactor"],
-            },
-            "ask": {
-                "name": "❓ Ask",
-                "description": "Use this mode when you need explanations, documentation, or answers to technical questions",
-                "capabilities": ["explain", "document", "analyze", "recommend"],
-            },
-            "architect": {
-                "name": "🏗️ Architect",
-                "description": "Use this mode when you need to plan, design, or strategize before implementation",
-                "capabilities": ["plan", "design", "architect", "strategize"],
-            },
-            "debug": {
-                "name": "🪲 Debug",
-                "description": "Use this mode when you're troubleshooting issues, investigating errors, or diagnosing problems",
-                "capabilities": ["debug", "troubleshoot", "diagnose", "fix"],
-            },
-            "orchestrator": {
-                "name": "🪃 Orchestrator",
-                "description": "Use this mode for complex, multi-step projects that require coordination across different specialties",
-                "capabilities": ["coordinate", "manage", "orchestrate", "integrate"],
-            },
-        }
+        self.workspace_path = workspace_path
+        # Lazy load available modes
+        self._available_modes: dict[str, dict[str, Any]] | None = None
+
+    def _load_available_modes(self) -> dict[str, dict[str, Any]]:
+        """动态加载可用模式从 ModeManager"""
+        if self._available_modes is not None:
+            return self._available_modes
+
+        try:
+            from dawei.mode.mode_manager import ModeManager
+
+            mode_manager = ModeManager(workspace_path=self.workspace_path)
+            all_modes = mode_manager.get_all_modes()
+
+            # 转换为工具所需的格式
+            available_modes = {}
+            for slug, mode_config in all_modes.items():
+                # 从 groups 字段提取 capabilities
+                capabilities = []
+                if mode_config.groups:
+                    for group in mode_config.groups:
+                        if isinstance(group, str):
+                            capabilities.append(group)
+                        elif isinstance(group, dict):
+                            capabilities.extend(group.get("tools", []))
+
+                available_modes[slug] = {
+                    "name": mode_config.name,
+                    "description": mode_config.description or mode_config.when_to_use,
+                    "capabilities": capabilities if capabilities else ["general"],
+                    "role_definition": mode_config.role_definition,
+                    "custom_instructions": mode_config.custom_instructions,
+                    "source": mode_config.source,
+                }
+
+            self._available_modes = available_modes
+            self.logger.info(f"Loaded {len(available_modes)} modes from ModeManager")
+            return available_modes
+
+        except Exception as e:
+            self.logger.error(f"Failed to load modes from ModeManager: {e}", exc_info=True)
+            # 返回空字典而不是硬编码的默认值
+            return {}
 
     def _run(self, mode_slug: str, reason: str | None = None) -> str:
         """Switch to specified mode with enhanced task management."""
         try:
+            # 动态加载可用模式
+            available_modes = self._load_available_modes()
+
             # Check if mode exists
-            if mode_slug not in self.available_modes:
+            if mode_slug not in available_modes:
                 return json.dumps(
                     {
                         "status": "error",
                         "message": f"Mode '{mode_slug}' not found",
-                        "available_modes": list(self.available_modes.keys()),
+                        "available_modes": list(available_modes.keys()),
                     },
                     indent=2,
                 )
 
-            mode_info = self.available_modes[mode_slug]
+            mode_info = available_modes[mode_slug]
 
             result = {
                 "type": "mode_switch",
@@ -243,6 +262,9 @@ class SwitchModeTool(CustomBaseTool):
                 "mode_name": mode_info["name"],
                 "mode_description": mode_info["description"],
                 "capabilities": mode_info["capabilities"],
+                "role_definition": mode_info.get("role_definition", ""),
+                "custom_instructions": mode_info.get("custom_instructions", ""),
+                "source": mode_info.get("source", "unknown"),
                 "reason": reason or "Mode switch requested",
                 "status": "switched",
                 "timestamp": asyncio.get_event_loop().time() if asyncio.get_event_loop() else None,
@@ -312,30 +334,50 @@ class NewTaskTool(CustomBaseTool):
     description: ClassVar[str] = "Creates a new subtask in specified mode with initial instructions."
     args_schema: ClassVar[type[BaseModel]] = NewTaskInput
 
-    def __init__(self, task_graph=None):
+    def __init__(self, task_graph=None, workspace_path: str | None = None):
         super().__init__()
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
-        # Available modes (same as SwitchModeTool)
-        self.available_modes = {
-            "code": "💻 Code",
-            "ask": "❓ Ask",
-            "architect": "🏗️ Architect",
-            "debug": "🪲 Debug",
-            "orchestrator": "🪃 Orchestrator",
-            "explore": "🔍 Explore",  # 【新增】EXPLORE 子代理类型
-        }
+        self.workspace_path = workspace_path
+        # Lazy load available modes
+        self._available_modes: dict[str, str] | None = None
+
+    def _load_available_modes(self) -> dict[str, str]:
+        """动态加载可用模式从 ModeManager"""
+        if self._available_modes is not None:
+            return self._available_modes
+
+        try:
+            from dawei.mode.mode_manager import ModeManager
+
+            mode_manager = ModeManager(workspace_path=self.workspace_path)
+            all_modes = mode_manager.get_all_modes()
+
+            # 转换为简化的格式 {slug: name}
+            available_modes = {slug: config.name for slug, config in all_modes.items()}
+
+            self._available_modes = available_modes
+            self.logger.info(f"Loaded {len(available_modes)} modes from ModeManager")
+            return available_modes
+
+        except Exception as e:
+            self.logger.error(f"Failed to load modes from ModeManager: {e}", exc_info=True)
+            # 返回空字典而不是硬编码的默认值
+            return {}
 
     def _run(self, mode: str, message: str) -> str:
         """Create new task in specified mode with enhanced task management."""
         try:
+            # 动态加载可用模式
+            available_modes = self._load_available_modes()
+
             # Check if mode exists
-            if mode not in self.available_modes:
+            if mode not in available_modes:
                 return json.dumps(
                     {
                         "status": "error",
                         "message": f"Mode '{mode}' not found",
-                        "available_modes": list(self.available_modes.keys()),
+                        "available_modes": list(available_modes.keys()),
                     },
                     indent=2,
                 )
@@ -358,7 +400,7 @@ class NewTaskTool(CustomBaseTool):
             result = {
                 "type": "new_task",
                 "mode": mode,
-                "mode_name": self.available_modes[mode],
+                "mode_name": available_modes[mode],
                 "message": message,
                 "initial_todos": [todo.content for todo in initial_todos],
                 "status": "created",
@@ -1906,8 +1948,8 @@ class AddTaskNodeInput(BaseModel):
     task_id: str = Field(..., description="Unique identifier for the task node.")
     description: str = Field(..., description="Description of the task.")
     mode: str = Field(
-        default="orchestrator",
-        description="Task execution mode (orchestrator, plan, do, check, act).",
+        default="",
+        description="Task execution mode (e.g., orchestrator, plan, do, check, act). Uses default mode if not specified.",
     )
     metadata: dict[str, Any] | None = Field(
         None,
@@ -1932,11 +1974,17 @@ class AddTaskNodeTool(CustomBaseTool):
         graph_id: str,
         task_id: str,
         description: str,
-        mode: str = "orchestrator",
+        mode: str = "",
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """Add a task node to the graph."""
         try:
+            # 如果没有指定模式，使用默认模式
+            if not mode:
+                from dawei.mode import get_default_mode
+
+                mode = get_default_mode()
+
             # 检查任务图是否存在
             if not hasattr(self, "_dag_managers"):
                 return json.dumps(
@@ -2373,8 +2421,9 @@ class ExecuteTaskGraphTool(CustomBaseTool):
 class WorkflowToolFactory:
     """工作流工具工厂，支持新旧架构"""
 
-    def __init__(self, task_graph=None):
+    def __init__(self, task_graph=None, workspace_path: str | None = None):
         self.task_graph = task_graph
+        self.workspace_path = workspace_path
         self.logger = get_logger(__name__)
 
     def create_tools(self) -> list[CustomBaseTool]:
@@ -2382,8 +2431,8 @@ class WorkflowToolFactory:
         tools = [
             AskFollowupQuestionTool(self.task_graph),
             AttemptCompletionTool(self.task_graph),
-            SwitchModeTool(self.task_graph),
-            NewTaskTool(self.task_graph),
+            SwitchModeTool(self.task_graph, self.workspace_path),
+            NewTaskTool(self.task_graph, self.workspace_path),
             UpdateTodoListTool(self.task_graph),
             GetTaskStatusTool(self.task_graph),
             # TODO 计划生成工具
@@ -2414,13 +2463,13 @@ class WorkflowToolFactory:
 
 
 # 便捷函数
-def create_workflow_tools(task_graph=None) -> list[CustomBaseTool]:
+def create_workflow_tools(task_graph=None, workspace_path: str | None = None) -> list[CustomBaseTool]:
     """创建工作流工具的便捷函数"""
-    factory = WorkflowToolFactory(task_graph)
+    factory = WorkflowToolFactory(task_graph, workspace_path)
     return factory.create_tools()
 
 
-def create_workflow_tool(tool_name: str, task_graph=None) -> CustomBaseTool | None:
+def create_workflow_tool(tool_name: str, task_graph=None, workspace_path: str | None = None) -> CustomBaseTool | None:
     """创建单个工作流工具的便捷函数"""
-    factory = WorkflowToolFactory(task_graph)
+    factory = WorkflowToolFactory(task_graph, workspace_path)
     return factory.get_tool(tool_name)

@@ -58,10 +58,6 @@ class ParserCache:
         """
         provider_lower = provider.lower()
 
-        if provider_lower == "ollama":
-            logger.debug(f"Creating OllamaParser for provider '{provider}'")
-            return OllamaParser()
-        # 默认使用 OpenAI 兼容解析器（适用于 deepseek, moonshot 等）
         logger.debug(f"Creating OpenAICompatibleParser for provider '{provider}'")
         return OpenAICompatibleParser()
 

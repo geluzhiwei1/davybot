@@ -27,12 +27,12 @@ class PlanExitInput(BaseModel):
 
 
 class PlanExitTool(CustomBaseTool):
-    """Plan Exit 工具 - 完成规划并建议切换到 build mode
+    """Plan Exit 工具 - 完成规划并建议切换到 Do mode
 
     功能：
     1. 检查 plan 文件是否存在
     2. 生成完成消息
-    3. 建议切换到 build mode
+    3. 建议切换到 Do mode（执行阶段）
     4. 提供切换命令示例
     """
 

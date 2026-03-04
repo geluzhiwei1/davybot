@@ -112,10 +112,10 @@ class TUIConfig:
             Default mode, or fallback if not found
 
         """
-        # Valid AgentMode values (from dawei.agentic.agent_config.AgentMode)
-        # Extended to support all agent modes
-        valid_modes = ["plan", "build", "orchestrator", "code", "ask", "debug"]
-        default_mode = "plan"
+        from dawei.mode import get_valid_modes, get_default_mode
+
+        valid_modes = get_valid_modes(workspace_path=self.workspace_absolute)
+        default_mode = get_default_mode()
 
         try:
             workspace_config_file = Path(self.workspace_absolute) / ".dawei" / "workspace.json"
@@ -164,9 +164,9 @@ class TUIConfig:
         if not workspace_path.exists():
             return False, f"Workspace path does not exist: {self.workspace_absolute}"
 
-        # Validate mode (AgentMode values)
-        # Extended to support all agent modes
-        valid_modes = ["plan", "build", "orchestrator", "code", "ask", "debug"]
+        from dawei.mode import get_valid_modes
+
+        valid_modes = get_valid_modes(workspace_path=self.workspace_absolute)
         if self.mode not in valid_modes:
             return False, f"Invalid mode: {self.mode}. Must be one of {valid_modes}"
 

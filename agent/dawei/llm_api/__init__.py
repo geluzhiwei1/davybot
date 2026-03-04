@@ -26,7 +26,6 @@ from .base_llm_api import LlmApi
 from .constants import (
     CACHE,
     CIRCUIT_BREAKER,
-    LLM_PROVIDER,
     RATE_LIMIT,
     REQUEST_QUEUE,
     TIMEOUT,
@@ -73,5 +72,4 @@ __all__ = [
     "REQUEST_QUEUE",
     "CACHE",
     "TIMEOUT",
-    "LLM_PROVIDER",
 ]

@@ -123,70 +123,8 @@ CACHE = CacheDefaults()
 TIMEOUT = TimeoutDefaults()
 
 
-# ==================== LLM 提供商配置 ====================
-
-
 class LLMProviderConfig:
     """LLM 提供商默认配置"""
-
-    # OpenAI 兼容提供商的默认 base URLs
-    BASE_URLS = {
-        "openai": "https://api.openai.com/v1",
-        "deepseek": "https://api.deepseek.com",
-        "moonshot": "https://api.moonshot.cn/v1",
-        "minimax": "https://api.minimax.chat/v1",
-        "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "glm": "https://open.bigmodel.cn/api/paas/v4",
-        "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
-        "claude": "https://api.anthropic.com/v1",
-        "openrouter": "https://openrouter.ai/api/v1",
-        "ollama": "http://localhost:11434",
-    }
-
-    # 推荐的模型(支持 Function Call)
-    RECOMMENDED_MODELS = {
-        "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
-        "deepseek": ["deepseek-chat", "deepseek-coder"],
-        "moonshot": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-        "minimax": ["abab6.5s-chat", "abab6.5-chat"],
-        "qwen": ["qwen-turbo", "qwen-plus", "qwen-max"],
-        "glm": ["glm-4", "glm-4-flash", "glm-3-turbo"],
-        "gemini": ["gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"],
-        "claude": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
-        "ollama": ["llama3.1", "llama3.2", "qwen2.5", "gemma2"],
-        "openrouter": ["openai/gpt-4o", "anthropic/claude-3.5-sonnet"],
-    }
-
-    # 提供商显示名称
-    PROVIDER_NAMES = {
-        "openai": "OpenAI",
-        "deepseek": "DeepSeek",
-        "moonshot": "Moonshot (Kimi)",
-        "minimax": "MiniMax",
-        "qwen": "Qwen (通义千问)",
-        "glm": "GLM (智谱)",
-        "gemini": "Gemini (Google)",
-        "claude": "Claude (Anthropic)",
-        "ollama": "Ollama (本地)",
-        "openrouter": "OpenRouter",
-    }
-
-    # 提供商官网
-    PROVIDER_URLS = {
-        "openai": "https://platform.openai.com/",
-        "deepseek": "https://platform.deepseek.com/",
-        "moonshot": "https://platform.moonshot.cn/",
-        "minimax": "https://platform.minimaxi.com/",
-        "qwen": "https://dashscope.console.aliyun.com/",
-        "glm": "https://open.bigmodel.cn/",
-        "gemini": "https://ai.google.dev/",
-        "claude": "https://console.anthropic.com/",
-        "ollama": "https://ollama.com/",
-        "openrouter": "https://openrouter.ai/",
-    }
-
-
-# ==================== 文件快照配置 ====================
 
 
 @dataclass
@@ -198,7 +136,3 @@ class SnapshotDefaults:
 
 
 SNAPSHOT = SnapshotDefaults()
-
-
-# 导出提供商配置
-LLM_PROVIDER = LLMProviderConfig()

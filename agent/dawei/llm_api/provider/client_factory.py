@@ -12,9 +12,7 @@ from typing import Any
 
 from dawei.core.exceptions import ConfigurationError
 from dawei.llm_api.base_llm_api import LlmApi
-from dawei.llm_api.impl.ollama_api import OllamaClient
 from dawei.llm_api.impl.openai_compatible_api import OpenaiCompatibleClient
-from dawei.llm_api.impl.openrouter_api import OpenRouterClient
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +26,6 @@ class LLMClientFactory:
     只需要配置正确的 base_url 和 api_key 即可
     """
 
-    # 支持的提供商类型
-    # 注意：所有标记为 OpenAI 兼容的提供商都使用 OpenaiCompatibleClient
-    # 只需要配置正确的 base_url 和 api_key
     SUPPORTED_PROVIDERS = {
         # OpenAI 官方
         "openai": OpenaiCompatibleClient,
@@ -44,22 +39,8 @@ class LLMClientFactory:
         "gemini": OpenaiCompatibleClient,  # Google Gemini
         "claude": OpenaiCompatibleClient,  # Anthropic Claude（通过兼容层）
         # 特殊提供商
-        "ollama": OllamaClient,
-        "openrouter": OpenRouterClient,
-    }
-
-    # 推荐的 Function Call 模型（仅支持有函数调用能力的模型）
-    RECOMMENDED_MODELS = {
-        "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
-        "deepseek": ["deepseek-chat", "deepseek-coder"],
-        "moonshot": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-        "minimax": ["abab6.5s-chat", "abab6.5-chat"],
-        "qwen": ["qwen-turbo", "qwen-plus", "qwen-max"],
-        "glm": ["glm-4", "glm-4-flash", "glm-3-turbo"],
-        "gemini": ["gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"],
-        "claude": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
-        "ollama": ["llama3.1", "llama3.2", "qwen2.5", "gemma2"],
-        "openrouter": ["openai/gpt-4o", "anthropic/claude-3.5-sonnet"],
+        "ollama": OpenaiCompatibleClient,
+        "openrouter": OpenaiCompatibleClient,
     }
 
     @classmethod
@@ -106,30 +87,6 @@ class LLMClientFactory:
 
         """
         return list(cls.SUPPORTED_PROVIDERS.keys())
-
-    @classmethod
-    def get_recommended_models(cls, provider: str) -> list[str]:
-        """获取指定提供商的推荐模型列表
-
-        Args:
-            provider: 提供商名称
-
-        Returns:
-            推荐模型列表
-
-        Raises:
-            ConfigurationError: 提供商不支持
-
-        """
-        provider = provider.lower() if provider else "openai"
-        models = cls.RECOMMENDED_MODELS.get(provider)
-
-        if not models:
-            raise ConfigurationError(
-                f"No recommended models found for provider '{provider}'. Supported providers: {list(cls.RECOMMENDED_MODELS.keys())}",
-            )
-
-        return models
 
     @classmethod
     def validate_config(cls, config: dict[str, Any]) -> tuple[bool, str]:

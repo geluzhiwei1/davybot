@@ -218,7 +218,7 @@ class ToolExecutor(IToolCallService):
 
             # Not in whitelist or no parameters provided
             self.logger.warning(
-                f"Tool '{tool_name}' is not allowed in PLAN mode (except for plan files in .dawei/plans/). Switch to BUILD mode to execute write operations.",
+                f"Tool '{tool_name}' is not allowed in PLAN mode (except for plan files in .dawei/plans/). Switch to DO mode to execute write operations.",
             )
             return False
 

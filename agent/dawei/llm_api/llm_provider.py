@@ -15,7 +15,6 @@
 import asyncio
 import json
 import logging
-import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -230,106 +229,6 @@ class LLMProvider(ILLMService):
         else:
             logger.warning("No LLM configurations available")
 
-    def _create_dynamic_config(self, provider: str, model: str) -> dict[str, Any] | None:
-        """创建动态配置字典
-
-        Args:
-            provider: 提供商名称 (e.g., "ollama", "openai")
-            model: 模型名称 (e.g., "llama3.1", "gpt-4")
-
-        Returns:
-            配置字典，如果提供商不支持则返回 None
-
-        """
-        provider_lower = provider.lower()
-
-        if provider_lower == "ollama":
-            return {
-                "apiProvider": "ollama",
-                "ollamaBaseUrl": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-                "ollamaModelId": model,
-                "ollamaApiKey": os.getenv("OLLAMA_API_KEY", "ollama"),
-                "model_id": model,
-                "max_tokens": 2000,
-                "temperature": 0.7,
-            }
-        if provider_lower == "openai":
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                logger.warning("OPENAI_API_KEY not set for dynamic OpenAI config")
-                return None
-            return {
-                "apiProvider": "openai",
-                "base_url": "https://api.openai.com/v1",
-                "api_key": api_key,
-                "model_id": model,
-                "max_tokens": 2000,
-                "temperature": 0.7,
-            }
-        if provider_lower == "deepseek":
-            api_key = os.getenv("DEEPSEEK_API_KEY")
-            if not api_key:
-                logger.warning("DEEPSEEK_API_KEY not set for dynamic DeepSeek config")
-                return None
-            return {
-                "apiProvider": "deepseek",
-                "base_url": "https://api.deepseek.com/v1",
-                "api_key": api_key,
-                "model_id": model,
-                "max_tokens": 2000,
-                "temperature": 0.7,
-            }
-        logger.warning(f"Unsupported provider for dynamic config: {provider}")
-        return None
-
-    def _set_provider_from_string(self, provider_string: str) -> bool:
-        """从 "provider/model" 格式的字符串创建并设置动态配置
-
-        Args:
-            provider_string: 提供商/模型字符串 (e.g., "ollama/llama3.1")
-
-        Returns:
-            是否设置成功
-
-        """
-        # 解析 provider/model 格式
-        parts = provider_string.split("/", 1)
-        if len(parts) != 2:
-            logger.error(f"Invalid provider format: {provider_string}. Expected 'provider/model'")
-            return False
-
-        provider, model = parts
-
-        # 创建动态配置
-        config_dict = self._create_dynamic_config(provider, model)
-        if not config_dict:
-            logger.error(f"Failed to create dynamic config for: {provider_string}")
-            return False
-
-        # 创建LLMConfig对象
-        llm_config = LLMConfig.from_dict(config_dict)
-
-        # 生成配置名称（使用完整的provider_string作为配置名）
-        config_name = provider_string
-
-        # 添加到用户配置（动态配置优先级较高）
-        provider_config = LLMProviderConfig(
-            name=config_name,
-            config=llm_config,
-            source="user",
-            is_default=False,
-        )
-
-        # 添加到配置字典
-        self._configs[config_name] = provider_config
-
-        logger.info(
-            f"Created dynamic LLM config: {config_name} (provider={provider}, model={model})",
-        )
-
-        # 设置为当前配置
-        return self.set_current_config(config_name)
-
     # 实现 ILLMService 接口的方法
     def get_available_providers(self) -> list[str]:
         """获取可用的 LLM 提供者列表（实现 ILLMService 接口）
@@ -357,9 +256,7 @@ class LLMProvider(ILLMService):
         """设置 LLM 提供者（实现 ILLMService 接口）
 
         Args:
-            provider_name: 提供者名称，支持两种格式：
-                          - 配置名称 (e.g., "my-openai-config")
-                          - provider/model 格式 (e.g., "ollama/llama3.1")
+            provider_name: 配置名称 (e.g., "my-openai-config")
 
         Returns:
             是否设置成功
@@ -367,13 +264,7 @@ class LLMProvider(ILLMService):
         """
         logger.debug(f"Setting provider to: {provider_name}")
 
-        # 检查是否为 "provider/model" 格式
-        if "/" in provider_name:
-            logger.info(f"Detected provider/model format: {provider_name}")
-            success = self._set_provider_from_string(provider_name)
-        else:
-            # 原有逻辑：直接查找配置
-            success = self.set_current_config(provider_name)
+        success = self.set_current_config(provider_name)
 
         if success:
             logger.info(f"Provider set successfully to: {provider_name}")
@@ -894,7 +785,11 @@ class LLMProvider(ILLMService):
                 f"LLM config not found: {config_name}. Available configs: {list(self._configs.keys())}",
             )
 
-        llm_config = provider_config.config.__dict__
+        if provider_config.raw_config:
+            llm_config = provider_config.raw_config.copy()
+        else:
+            llm_config = provider_config.config.__dict__
+
         llm_config["workspace_path"] = self.workspace_path
 
         # 使用工厂创建客户端（KISS 原则：委托给专门的工厂）
