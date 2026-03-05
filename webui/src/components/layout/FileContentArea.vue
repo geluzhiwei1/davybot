@@ -4,111 +4,275 @@
 */
 
 <template>
-  <div class="file-content-area">
-    <el-tabs v-if="hasFiles" :model-value="activeFileId || ''" type="card" class="file-tabs" closable
-      @tab-remove="closeFile" @tab-change="handleTabChange">
-      <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
-        <template #label>
-          <span class="tab-label">
-            <el-icon>
-              <Document v-if="isGenericFile(file) || isPDFFile(file) || isHTMLFile(file)" />
-              <Picture v-else-if="isImageFile(file)" />
-              <VideoPlay v-else-if="isVideoFile(file)" />
-              <Headset v-else-if="isAudioFile(file)" />
-              <Document v-else />
-            </el-icon>
-            {{ file.name }}
-            <span v-if="file.isDirty" class="dirty-indicator">●</span>
-          </span>
-        </template>
-      </el-tab-pane>
-    </el-tabs>
-
-    <el-card class="content-card" shadow="never" v-loading="isLoading">
-      <div v-if="activeFile" class="active-file-content">
-        <!-- HTML 文件的标签页 -->
-        <el-tabs v-if="isHTMLFile(activeFile)" v-model="htmlActiveTab" type="border-card" class="html-editor-tabs">
-          <el-tab-pane name="preview">
-            <template #label>
-              <span>预览</span>
-            </template>
-            <div class="html-preview-wrapper">
-              <HTMLViewer :model-value="activeFile.content" :filename="activeFile.name" class="html-viewer-wrapper" />
-            </div>
-          </el-tab-pane>
-          <el-tab-pane name="edit">
-            <template #label>
-              <span>编辑</span>
-            </template>
-            <div class="html-edit-wrapper">
-              <NativeCodeMirror v-model="editableContent" :file-path="activeFile.name" :theme="editorTheme"
-                :line-numbers="true" :bracket-matching="true" :close-brackets="true" :search="true" language="html"
-                class="code-editor-wrapper" @change="handleContentChange" />
-            </div>
-          </el-tab-pane>
-        </el-tabs>
-
-        <!-- HTML 编辑模式下的保存按钮 -->
-        <div v-if="isHTMLFile(activeFile) && htmlActiveTab === 'edit'" class="floating-save-button">
-          <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
-            保存
-          </el-button>
-        </div>
-
-        <!-- Markdown 文件的保存按钮 -->
-        <div v-if="isMarkdownFile(activeFile)" class="toolbar-simple">
-          <el-button @click="handleSave" :loading="isSaving" :disabled="!isContentModified" type="success" size="small">
-            保存
-          </el-button>
-        </div>
-
-        <!-- 其他文件类型的保存按钮 -->
-        <div
-          v-if="!isHTMLFile(activeFile) && !isMarkdownFile(activeFile) && (isTextFile(activeFile) || isCodeFile(activeFile))"
-          class="toolbar-simple">
-          <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
-            保存
-          </el-button>
-        </div>
-
-        <div v-show="isMarkdownFile(activeFile)" ref="vditorRef" class="editor-container"></div>
-        <ImageViewer v-if="imageFiles.length > 0" :images="allImageFiles" :initial-index="currentImageIndex"
-          :visible="imageViewerVisible" @update:visible="imageViewerVisible = $event" />
-        <div v-show="isImageFile(activeFile)" class="image-preview-container">
-          <el-image :src="activeFile.content" :alt="activeFile.name" fit="contain" class="image-preview"
-            style="cursor: pointer;" @click="openImageViewer" />
-          <div class="open-viewer-overlay" @click="openImageViewer">
-            <el-icon :size="16">
-              <ZoomIn />
-            </el-icon>
-            <span>打开查看器</span>
-            <span v-if="allImageFiles.length > 1" class="image-hint">
-              ({{ currentImageIndex + 1 }} / {{ allImageFiles.length }})
+  <!-- 正常显示的文件内容区域 -->
+  <div class="file-content-area-wrapper">
+    <div class="file-content-area">
+      <el-tabs v-if="hasFiles" :model-value="activeFileId || ''" type="card" class="file-tabs" closable
+        @tab-remove="closeFile" @tab-change="handleTabChange">
+        <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
+          <template #label>
+            <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)">
+              <el-icon>
+                <Document v-if="isGenericFile(file) || isPDFFile(file) || isHTMLFile(file)" />
+                <Picture v-else-if="isImageFile(file)" />
+                <VideoPlay v-else-if="isVideoFile(file)" />
+                <Headset v-else-if="isAudioFile(file)" />
+                <Document v-else />
+              </el-icon>
+              {{ file.name }}
+              <span v-if="file.isDirty" class="dirty-indicator">●</span>
             </span>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
+
+      <!-- Tab 右键菜单 -->
+      <!-- 使用 teleport to="body" 以确保在 Tauri 和全屏模式下都能正常工作 -->
+      <teleport to="body">
+        <div v-if="tabContextMenuVisible" class="tab-context-menu"
+          :style="{ left: tabContextMenuPosition.x + 'px', top: tabContextMenuPosition.y + 'px' }">
+          <div class="context-menu-item" @click="handlePageFullscreen">
+            <el-icon>
+              <FullScreen />
+            </el-icon>
+            <span>{{ isPageFullscreen ? '退出全屏' : '全屏' }}</span>
+          </div>
+          <!-- 浏览器全屏在 Tauri 中不可用，使用 v-if 隐藏 -->
+          <div v-if="!isTauri()" class="context-menu-item" @click="handleFullscreen">
+            <el-icon>
+              <Monitor />
+            </el-icon>
+            <span>{{ isBrowserFullscreen ? '退出全屏' : '全屏' }}</span>
+          </div>
+          <div class="context-menu-divider"></div>
+          <div class="context-menu-item" @click="handleCloseTab">
+            <el-icon>
+              <Close />
+            </el-icon>
+            <span>关闭</span>
+          </div>
+          <div class="context-menu-item danger" @click="handleCloseAllTabs">
+            <el-icon>
+              <CloseBold />
+            </el-icon>
+            <span>关闭所有</span>
           </div>
         </div>
-        <video v-show="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview">
-          您的浏览器不支持视频播放。
-        </video>
-        <audio v-show="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview">
-          您的浏览器不支持音频播放。
-        </audio>
-        <NativeCodeMirror v-show="isCodeFile(activeFile) && !isHTMLFile(activeFile)" v-model="editableContent"
-          :file-path="activeFile.name" :theme="editorTheme" :line-numbers="true" :bracket-matching="true"
-          :close-brackets="true" :search="true" class="code-editor-wrapper" @change="handleContentChange" />
-        <CSVEditor v-show="isCSVFile(activeFile)" v-model="editableContent" class="csv-editor-wrapper"
-          @change="handleContentChange" />
-        <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content" :filename="activeFile.name"
-          class="pdf-viewer-wrapper" />
-        <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
-          :autosize="{ minRows: 10 }" @input="handleContentChange" />
-        <pre
-          v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isTextFile(activeFile)"
-          class="readonly-content"><code>{{ activeFile.content }}</code></pre>
-      </div>
-      <el-empty v-else description="没有打开的文件" />
-    </el-card>
+      </teleport>
+
+      <el-card class="content-card" shadow="never" v-loading="isLoading">
+        <div v-if="activeFile" class="active-file-content">
+          <!-- HTML 文件的标签页 -->
+          <el-tabs v-if="isHTMLFile(activeFile)" v-model="htmlActiveTab" type="border-card" class="html-editor-tabs">
+            <el-tab-pane name="preview">
+              <template #label>
+                <span>预览</span>
+              </template>
+              <div class="html-preview-wrapper">
+                <HTMLViewer :model-value="activeFile.content" :filename="activeFile.name" class="html-viewer-wrapper" />
+              </div>
+            </el-tab-pane>
+            <el-tab-pane name="edit">
+              <template #label>
+                <span>编辑</span>
+              </template>
+              <div class="html-edit-wrapper">
+                <NativeCodeMirror v-model="editableContent" :file-path="activeFile.name" :theme="editorTheme"
+                  :line-numbers="true" :bracket-matching="true" :close-brackets="true" :search="true" language="html"
+                  class="code-editor-wrapper" @change="handleContentChange" />
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+
+          <!-- HTML 编辑模式下的保存按钮 -->
+          <div v-if="isHTMLFile(activeFile) && htmlActiveTab === 'edit'" class="floating-save-button">
+            <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
+              保存
+            </el-button>
+          </div>
+
+          <!-- Markdown 文件的保存按钮 -->
+          <div v-if="isMarkdownFile(activeFile)" class="toolbar-simple">
+            <el-button @click="handleSave" :loading="isSaving" :disabled="!isContentModified" type="success"
+              size="small">
+              保存
+            </el-button>
+          </div>
+
+          <!-- 其他文件类型的保存按钮 -->
+          <div
+            v-if="!isHTMLFile(activeFile) && !isMarkdownFile(activeFile) && (isTextFile(activeFile) || isCodeFile(activeFile))"
+            class="toolbar-simple">
+            <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
+              保存
+            </el-button>
+          </div>
+
+          <div v-show="isMarkdownFile(activeFile)" ref="vditorRef" class="editor-container"></div>
+          <ImageViewer v-if="imageFiles.length > 0" :images="allImageFiles" :initial-index="currentImageIndex"
+            :visible="imageViewerVisible" @update:visible="imageViewerVisible = $event" />
+          <div v-show="isImageFile(activeFile)" class="image-preview-container">
+            <el-image :src="activeFile.content" :alt="activeFile.name" fit="contain" class="image-preview"
+              style="cursor: pointer;" @click="openImageViewer" />
+            <div class="open-viewer-overlay" @click="openImageViewer">
+              <el-icon :size="16">
+                <ZoomIn />
+              </el-icon>
+              <span>打开查看器</span>
+              <span v-if="allImageFiles.length > 1" class="image-hint">
+                ({{ currentImageIndex + 1 }} / {{ allImageFiles.length }})
+              </span>
+            </div>
+          </div>
+          <video v-show="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview">
+            您的浏览器不支持视频播放。
+          </video>
+          <audio v-show="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview">
+            您的浏览器不支持音频播放。
+          </audio>
+          <NativeCodeMirror v-show="isCodeFile(activeFile) && !isHTMLFile(activeFile)" v-model="editableContent"
+            :file-path="activeFile.name" :theme="editorTheme" :line-numbers="true" :bracket-matching="true"
+            :close-brackets="true" :search="true" class="code-editor-wrapper" @change="handleContentChange" />
+          <CSVEditor v-show="isCSVFile(activeFile)" v-model="editableContent" class="csv-editor-wrapper"
+            @change="handleContentChange" />
+          <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content" :filename="activeFile.name"
+            class="pdf-viewer-wrapper" />
+          <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
+            :autosize="{ minRows: 10 }" @input="handleContentChange" />
+          <pre
+            v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isTextFile(activeFile)"
+            class="readonly-content"><code>{{ activeFile.content }}</code></pre>
+        </div>
+        <el-empty v-else description="没有打开的文件" />
+      </el-card>
+    </div>
   </div>
+
+  <!-- 全屏 teleport 容器 - 传送到 body 以完全脱离父容器 -->
+  <teleport to="body">
+    <transition name="fullscreen-fade">
+      <div v-if="isPageFullscreen" class="page-fullscreen-overlay">
+        <div class="file-content-area">
+          <!-- 全屏退出按钮 -->
+          <div class="fullscreen-exit-btn">
+            <el-button @click="handlePageFullscreen" circle :icon="Close" title="退出全屏" />
+          </div>
+
+          <!-- 完全复制 tabs 结构 -->
+          <el-tabs v-if="hasFiles" :model-value="activeFileId || ''" type="card" class="file-tabs" closable
+            @tab-remove="closeFile" @tab-change="handleTabChange">
+            <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
+              <template #label>
+                <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)">
+                  <el-icon>
+                    <Document v-if="isGenericFile(file) || isPDFFile(file) || isHTMLFile(file)" />
+                    <Picture v-else-if="isImageFile(file)" />
+                    <VideoPlay v-else-if="isVideoFile(file)" />
+                    <Headset v-else-if="isAudioFile(file)" />
+                    <Document v-else />
+                  </el-icon>
+                  {{ file.name }}
+                  <span v-if="file.isDirty" class="dirty-indicator">●</span>
+                </span>
+              </template>
+            </el-tab-pane>
+          </el-tabs>
+
+          <!-- 完全复制内容卡片 -->
+          <el-card class="content-card" shadow="never" v-loading="isLoading">
+            <div v-if="activeFile" class="active-file-content">
+              <!-- HTML 文件 -->
+              <div v-if="isHTMLFile(activeFile)" class="html-editor-tabs">
+                <el-tabs v-model="htmlActiveTab" type="border-card">
+                  <el-tab-pane name="preview">
+                    <template #label><span>预览</span></template>
+                    <div class="html-preview-wrapper">
+                      <HTMLViewer :model-value="activeFile.content" :filename="activeFile.name" />
+                    </div>
+                  </el-tab-pane>
+                  <el-tab-pane name="edit">
+                    <template #label><span>编辑</span></template>
+                    <div class="html-edit-wrapper">
+                      <NativeCodeMirror v-model="editableContent" :file-path="activeFile.name" :theme="editorTheme"
+                        :line-numbers="true" :bracket-matching="true" :close-brackets="true" :search="true"
+                        language="html" @change="handleContentChange" />
+                    </div>
+                  </el-tab-pane>
+                </el-tabs>
+                <div v-if="htmlActiveTab === 'edit'" class="floating-save-button">
+                  <el-button @click="handleSave" :loading="isSaving" type="success" size="small">保存</el-button>
+                </div>
+              </div>
+
+              <!-- 保存按钮 -->
+              <div v-if="isMarkdownFile(activeFile)" class="toolbar-simple">
+                <el-button @click="handleSave" :loading="isSaving" :disabled="!isContentModified" type="success"
+                  size="small">保存</el-button>
+              </div>
+
+              <div
+                v-if="!isHTMLFile(activeFile) && !isMarkdownFile(activeFile) && (isTextFile(activeFile) || isCodeFile(activeFile))"
+                class="toolbar-simple">
+                <el-button @click="handleSave" :loading="isSaving" type="success" size="small">保存</el-button>
+              </div>
+
+              <!-- Markdown 编辑器 -->
+              <div v-show="isMarkdownFile(activeFile)" ref="vditorRefFullscreen" class="editor-container"></div>
+
+              <!-- 图片查看器 -->
+              <ImageViewer v-if="imageFiles.length > 0" :images="allImageFiles" :initial-index="currentImageIndex"
+                :visible="imageViewerVisible" @update:visible="imageViewerVisible = $event" />
+
+              <!-- 图片预览 -->
+              <div v-show="isImageFile(activeFile)" class="image-preview-container">
+                <el-image :src="activeFile.content" :alt="activeFile.name" fit="contain" class="image-preview"
+                  style="cursor: pointer;" @click="openImageViewer" />
+                <div class="open-viewer-overlay" @click="openImageViewer">
+                  <el-icon :size="16">
+                    <ZoomIn />
+                  </el-icon>
+                  <span>打开查看器</span>
+                  <span v-if="allImageFiles.length > 1" class="image-hint">({{ currentImageIndex + 1 }} / {{
+                    allImageFiles.length }})</span>
+                </div>
+              </div>
+
+              <!-- 视频/音频 -->
+              <video v-show="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview"></video>
+              <audio v-show="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview"></audio>
+
+              <!-- 代码编辑器 -->
+              <NativeCodeMirror v-show="isCodeFile(activeFile) && !isHTMLFile(activeFile)" v-model="editableContent"
+                :file-path="activeFile.name" :theme="editorTheme" :line-numbers="true" :bracket-matching="true"
+                :close-brackets="true" :search="true" class="code-editor-wrapper" @change="handleContentChange" />
+
+              <!-- CSV 编辑器 -->
+              <CSVEditor v-show="isCSVFile(activeFile)" v-model="editableContent" class="csv-editor-wrapper"
+                @change="handleContentChange" />
+
+              <!-- PDF 查看器 -->
+              <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content"
+                :filename="activeFile.name" class="pdf-viewer-wrapper" />
+
+              <!-- HTML 预览 -->
+              <HTMLViewer v-if="isHTMLFile(activeFile) && htmlActiveTab === 'preview'" :model-value="activeFile.content"
+                :filename="activeFile.name" />
+
+              <!-- 文本编辑器 -->
+              <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
+                :autosize="{ minRows: 10 }" @input="handleContentChange" />
+
+              <!-- 只读内容 -->
+              <pre
+                v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isTextFile(activeFile)"
+                class="readonly-content"><code>{{ activeFile.content }}</code></pre>
+            </div>
+            <el-empty v-else description="没有打开的文件" />
+          </el-card>
+        </div>
+      </div>
+    </transition>
+  </teleport>
 </template>
 
 <script setup lang="ts">
@@ -118,13 +282,14 @@ import 'vditor/dist/index.css'
 import { useThemeStore } from '@/stores/theme'
 import { ElTabs, ElTabPane, ElCard, ElButton, ElIcon, ElImage, ElInput, ElEmpty } from 'element-plus'
 // ElTabs 和 ElTabPane 已经在上面导入了
-import { Document, VideoPlay, Headset, Picture, ZoomIn } from '@element-plus/icons-vue'
+import { Document, VideoPlay, Headset, Picture, ZoomIn, FullScreen, Close, CloseBold, Monitor } from '@element-plus/icons-vue'
 // View 和 Edit 图标用于 Markdown 文件的编辑器切换
 import NativeCodeMirror from '@/components/editor/NativeCodeMirror.vue'
 import CSVEditor from '@/components/editor/CSVEditor.vue'
 import ImageViewer from '@/components/chat/ImageViewer.vue'
 import PDFViewer from '@/components/editor/PDFViewer.vue'
 import HTMLViewer from '@/components/editor/HTMLViewer.vue'
+import { isTauri } from '@/utils/platform'
 
 interface File {
   id: string
@@ -155,9 +320,18 @@ const isSaving = ref(false)
 const isLoading = ref(false)
 const editableContent = ref('')
 const vditorRef = ref<HTMLDivElement | null>(null)
+const vditorRefFullscreen = ref<HTMLDivElement | null>(null) // 全屏模式下的 Vditor ref
 const vditor = ref<Vditor | null>(null)
 const vditorInitialized = ref(false)
+const vditorInitFullscreen = ref(false) // 记录 Vditor 初始化时的全屏状态
 const isDirty = ref(false)  // 本地 dirty 状态，用于显示保存按钮状态
+
+// Tab 右键菜单状态
+const tabContextMenuVisible = ref(false)
+const tabContextMenuPosition = ref({ x: 0, y: 0 })
+const selectedTabFile = ref<File | null>(null)
+const isPageFullscreen = ref(false)  // 全屏状态
+const isBrowserFullscreen = ref(false)  // 浏览器全屏状态
 
 // ✅ 暴露刷新方法给父组件
 const refreshAllFiles = () => {
@@ -185,38 +359,6 @@ const isContentModified = computed(() => {
 const hasFiles = computed(() => props.files.length > 0)
 const activeFile = computed(() => props.files.find(f => f.id === props.activeFileId) || null)
 const editorTheme = computed(() => (themeStore.theme === 'dark' ? 'one-dark' : 'light'))
-
-// 调试：显示当前文件类型检测结果
-const fileTypeDebug = computed(() => {
-  if (!activeFile.value) return 'No file'
-  return {
-    name: activeFile.value.name,
-    type: activeFile.value.type,
-    isMarkdown: isMarkdownFile(activeFile.value),
-    isHTML: isHTMLFile(activeFile.value),
-    isPDF: isPDFFile(activeFile.value),
-    isCode: isCodeFile(activeFile.value),
-    isCSV: isCSVFile(activeFile.value),
-    isImage: isImageFile(activeFile.value),
-    isVideo: isVideoFile(activeFile.value),
-    isAudio: isAudioFile(activeFile.value),
-    isText: isTextFile(activeFile.value),
-    viewer: getViewerType(activeFile.value)
-  }
-})
-
-function getViewerType(file: File): string {
-  if (isMarkdownFile(file)) return 'Vditor'
-  if (isHTMLFile(file)) return htmlActiveTab.value === 'edit' ? 'CodeMirror (HTML)' : 'HTMLViewer'
-  if (isPDFFile(file)) return 'PDFViewer'
-  if (isCodeFile(file)) return 'CodeMirror'
-  if (isCSVFile(file)) return 'CSVEditor'
-  if (isImageFile(file)) return 'Image'
-  if (isVideoFile(file)) return 'Video'
-  if (isAudioFile(file)) return 'Audio'
-  if (isTextFile(file)) return 'Textarea'
-  return 'Readonly'
-}
 
 // Image files for navigation
 const allImageFiles = computed(() => {
@@ -296,6 +438,86 @@ const closeFile = (fileId: string | number) => {
   emit('close-file', fileId as string)
 }
 
+// Tab 右键菜单处理
+const handleTabContextMenu = (event: MouseEvent, file: File) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  selectedTabFile.value = file
+
+  // 使用视口坐标（与 SidePanel 保持一致）
+  tabContextMenuPosition.value = {
+    x: event.clientX,
+    y: event.clientY
+  }
+
+  tabContextMenuVisible.value = true
+}
+
+const closeTabContextMenu = () => {
+  tabContextMenuVisible.value = false
+  selectedTabFile.value = null
+}
+
+// 全屏切换（CSS级别，占满视口）
+const handlePageFullscreen = () => {
+  closeTabContextMenu()
+  isPageFullscreen.value = !isPageFullscreen.value
+}
+
+// 浏览器全屏切换（API级别）
+// 注意：此功能在 Tauri 环境中不可用，菜单项会被隐藏
+const handleFullscreen = () => {
+  closeTabContextMenu()
+
+  // 在 Tauri 环境中不执行
+  if (isTauri()) {
+    console.warn('浏览器全屏功能在 Tauri 环境中不可用，请使用全屏')
+    return
+  }
+
+  // 检查 Fullscreen API 是否可用
+  if (!document.fullscreenEnabled) {
+    console.error('当前浏览器不支持全屏 API')
+    return
+  }
+
+  const element = document.querySelector('.file-content-area')
+  if (!element) return
+
+  if (!document.fullscreenElement) {
+    element.requestFullscreen().catch(err => {
+      console.error('进入全屏失败:', err)
+    })
+  } else {
+    document.exitFullscreen()
+  }
+}
+
+// 监听全屏状态变化
+const handleFullscreenChange = () => {
+  isBrowserFullscreen.value = !!document.fullscreenElement
+}
+
+// 关闭当前 tab
+const handleCloseTab = () => {
+  const file = selectedTabFile.value // 先保存引用
+  closeTabContextMenu()
+
+  if (file) {
+    closeFile(file.id)
+  }
+}
+
+// 关闭所有 tabs
+const handleCloseAllTabs = () => {
+  closeTabContextMenu()
+
+  props.files.forEach(file => {
+    emit('close-file', file.id)
+  })
+}
+
 const openImageViewer = () => {
   imageViewerVisible.value = true
 }
@@ -321,7 +543,7 @@ const handleSave = async () => {
     if (isMarkdownFile(activeFile.value) && vditor.value) {
       contentToSave = vditor.value.getValue()
     }
-    await emit('save-file', activeFile.value.id, contentToSave)
+    emit('save-file', activeFile.value.id, contentToSave)
 
     // 保存成功后重置 dirty 状态
     isDirty.value = false
@@ -339,9 +561,48 @@ const handleSave = async () => {
   }
 }
 
+// 监听全局点击事件，用于关闭右键菜单
+onMounted(() => {
+  document.addEventListener('click', handleGlobalClick)
+  // 只在非 Tauri 环境中监听浏览器全屏状态变化
+  if (!isTauri()) {
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+  }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleGlobalClick)
+  // 移除全屏状态变化监听（如果注册了）
+  if (!isTauri()) {
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+})
+
+const handleGlobalClick = (event: Event) => {
+  if (tabContextMenuVisible.value) {
+    const target = event.target as HTMLElement
+    const contextMenu = document.querySelector('.tab-context-menu')
+    if (contextMenu && !contextMenu.contains(target)) {
+      closeTabContextMenu()
+    }
+  }
+}
+
 // Vditor initialization
 const initVditor = () => {
-  if (!vditorRef.value || !activeFile.value || !isMarkdownFile(activeFile.value)) {
+  // 根据全屏状态选择正确的 ref
+  const targetRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
+
+  if (!targetRef) {
+    console.error('[initVditor] 无法找到目标 DOM 元素，全屏模式:', isPageFullscreen.value)
+    return
+  }
+
+  if (!activeFile.value) {
+    return
+  }
+
+  if (!isMarkdownFile(activeFile.value)) {
     return
   }
 
@@ -355,9 +616,7 @@ const initVditor = () => {
   }
 
   // 首次初始化
-  const startTime = performance.now()
-
-  vditor.value = new Vditor(vditorRef.value, {
+  vditor.value = new Vditor(targetRef, {
     theme: themeStore.theme === 'dark' ? 'dark' : 'classic',
     mode: 'wysiwyg',
     height: '100%',
@@ -393,6 +652,8 @@ const initVditor = () => {
     },
     after: () => {
       vditorInitialized.value = true
+      // 记录初始化时的全屏状态
+      vditorInitFullscreen.value = isPageFullscreen.value
     },
   })
 }
@@ -421,11 +682,18 @@ watch(activeFile, (newFile, oldFile) => {
 
   // 只在切换到Markdown文件时初始化/更新Vditor
   if (isMarkdownFile(newFile)) {
-    if (!vditorInitialized.value) {
-      // 首次打开Markdown文件，初始化Vditor
+    // 检查是否需要重新初始化：
+    // 1. 还没有初始化过
+    // 2. 全屏状态发生了变化（需要切换到不同的 DOM 元素）
+    const needReinit = !vditorInitialized.value ||
+                       isPageFullscreen.value !== vditorInitFullscreen.value
+
+    if (needReinit) {
+      // 强制重新初始化到正确的 DOM 元素
+      vditorInitialized.value = false
       nextTick(initVditor)
-    } else if (oldFile && oldFile.id !== newFile.id) {
-      // 切换到不同的Markdown文件，更新内容
+    } else if (vditor.value) {
+      // 已初始化且全屏状态一致，只更新内容
       nextTick(() => {
         if (vditor.value) {
           vditor.value.setValue(newFile.content)
@@ -444,12 +712,38 @@ watch(() => activeFile.value?.content, (newContent) => {
   }
 }, { immediate: true })
 
+// 监听全屏状态变化
+watch(isPageFullscreen, (newVal, oldVal) => {
+  // 只在状态真正改变时处理
+  if (newVal === oldVal) return
+
+  // 如果当前是 Markdown 文件，需要重新初始化 Vditor
+  if (activeFile.value && isMarkdownFile(activeFile.value)) {
+    // 重置初始化标志
+    vditorInitialized.value = false
+
+    // 使用双重 nextTick 确保 teleport 的 DOM 完全渲染
+    nextTick(() => {
+      nextTick(() => {
+        initVditor()
+      })
+    })
+  }
+})
+
 onUnmounted(() => {
   vditor.value?.destroy()
 })
 </script>
 
 <style scoped>
+/* 包裹层 - 用于建立定位上下文 */
+.file-content-area-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .file-content-area {
   display: flex;
   flex-direction: column;
@@ -457,14 +751,92 @@ onUnmounted(() => {
   background-color: var(--el-bg-color-page);
 }
 
+/* 全屏覆盖层 - teleport 到 body */
+.page-fullscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99999;
+  background-color: var(--el-bg-color-page);
+  overflow: auto;
+}
+
+/* 全屏退出按钮 */
+.fullscreen-exit-btn {
+  position: absolute;
+  top: 12px;
+  right: 20px;
+  z-index: 100;
+}
+
+/* 过渡动画 */
+.fullscreen-fade-enter-active,
+.fullscreen-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fullscreen-fade-enter-from,
+.fullscreen-fade-leave-to {
+  opacity: 0;
+}
+
 .file-tabs {
   flex-shrink: 0;
+}
+
+/* Tab 右键菜单样式 */
+.tab-context-menu {
+  position: fixed;
+  /* 使用 fixed 定位，配合 teleport to="body" */
+  background-color: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.3);
+  padding: 4px 0;
+  z-index: 9999;
+  /* 在 body 中需要足够高的 z-index */
+  min-width: 150px;
+  pointer-events: auto;
+}
+
+.tab-context-menu .context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+}
+
+.tab-context-menu .context-menu-item:hover {
+  background-color: var(--el-fill-color-light);
+}
+
+.tab-context-menu .context-menu-item.danger {
+  color: var(--el-color-danger);
+}
+
+.tab-context-menu .context-menu-item.danger:hover {
+  background-color: var(--el-color-danger-light-9);
+}
+
+.tab-context-menu .context-menu-divider {
+  height: 1px;
+  background-color: var(--el-border-color);
+  margin: 4px 0;
 }
 
 .tab-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  cursor: pointer;
 }
 
 .dirty-indicator {

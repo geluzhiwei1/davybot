@@ -709,6 +709,71 @@ class ToolMessageHandle:
             # 返回具体的错误信息，而不仅仅是 False
             return {"error": str(e), "tool_call_id": tool_call_id, "success": False}
 
+    async def handle_followup_cancel(self, tool_call_id: str, reason: str) -> bool:
+        """处理前端发来的追问取消
+
+        Args:
+            tool_call_id: 工具调用ID
+            reason: 取消原因 (user_cancelled, timeout, skipped)
+
+        Returns:
+            是否成功处理
+
+        """
+        if hasattr(self, "_pending_followup_responses") and tool_call_id in self._pending_followup_responses:
+            future = self._pending_followup_responses[tool_call_id]
+            if not future.done():
+                # 取消Future
+                future.cancel()
+
+                self.logger.info(
+                    f"Followup cancelled for tool_call_id: {tool_call_id}, reason: {reason}",
+                )
+
+                # 发送工具调用结果事件（取消）
+                try:
+                    result = {
+                        "type": "followup_response",
+                        "reason": reason,
+                        "user_response": f"Cancelled: {reason}",
+                        "status": "cancelled",
+                    }
+
+                    await emit_typed_event(
+                        TaskEventType.TOOL_CALL_RESULT,
+                        {
+                            "tool_name": "ask_followup_question",
+                            "result": result,
+                            "is_error": True,
+                            "tool_call_id": tool_call_id,
+                        },
+                        self._event_bus,
+                        task_id=self.task_node.task_node_id,
+                        source="tool_message_handler",
+                    )
+                except Exception as event_error:
+                    # 记录事件发送失败，但不中断取消流程
+                    self.logger.error(
+                        f"Failed to send followup cancel event: {event_error}",
+                        exc_info=True,
+                        context={
+                            "tool_call_id": tool_call_id,
+                            "task_id": self.task_node.task_node_id,
+                        },
+                    )
+                    # 不中断：取消已经完成，只是事件发送失败
+
+                # 清理资源
+                del self._pending_followup_responses[tool_call_id]
+
+                return True
+
+            self.logger.warning(f"Future already done for tool_call_id: {tool_call_id}")
+            return False
+
+        self.logger.warning(f"No pending followup for tool_call_id: {tool_call_id}")
+        return False
+
     def _try_fix_malformed_json(self, json_str: str, function_name: str) -> dict | None:
         """尝试修复常见的 LLM JSON 生成错误
 
@@ -733,9 +798,9 @@ class ToolMessageHandle:
                     content = todos_match.group(1)
                     # 移除所有 ] 符号和前导逗号
                     items = []
-                    for line in content.split(','):
+                    for line in content.split(","):
                         # 清理每一行
-                        cleaned = re.sub(r'\s*\]\s*', '', line.strip())
+                        cleaned = re.sub(r"\s*\]\s*", "", line.strip())
                         if cleaned:
                             items.append(cleaned)
 
@@ -743,8 +808,8 @@ class ToolMessageHandle:
                         return {"todos": items}
 
             # 通用修复：移除数组元素前的 ]
-            fixed = re.sub(r'\]\s*,', ',', json_str)
-            fixed = re.sub(r'\]\s+', ' ', fixed)
+            fixed = re.sub(r"\]\s*,", ",", json_str)
+            fixed = re.sub(r"\]\s+", " ", fixed)
 
             # 尝试解析修复后的 JSON
             return json.loads(fixed)
