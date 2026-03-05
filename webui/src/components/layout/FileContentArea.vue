@@ -11,9 +11,8 @@
         @tab-remove="closeFile" @tab-change="handleTabChange">
         <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
           <template #label>
-            <span class="tab-label"
-                  @contextmenu.prevent="handleTabContextMenu($event, file)"
-                  @dblclick="handleTabDoubleClick(file)">
+            <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)"
+              @dblclick="handleTabDoubleClick(file)">
               <el-icon>
                 <Document v-if="isGenericFile(file) || isPDFFile(file) || isHTMLFile(file)" />
                 <Picture v-else-if="isImageFile(file)" />
@@ -93,6 +92,13 @@
             </el-button>
           </div>
 
+          <!-- Drawio XML 编辑模式下的保存按钮 -->
+          <div v-if="isDrawioFile(activeFile) && drawioActiveTab === 'xml'" class="floating-save-button">
+            <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
+              保存
+            </el-button>
+          </div>
+
           <!-- Markdown 文件的保存按钮 -->
           <div v-if="isMarkdownFile(activeFile)" class="toolbar-simple">
             <el-button @click="handleSave" :loading="isSaving" :disabled="!isContentModified" type="success"
@@ -102,18 +108,18 @@
           </div>
 
           <!-- 其他文件类型的保存按钮 -->
-          <div
+          <!-- <div
             v-if="!isHTMLFile(activeFile) && !isMarkdownFile(activeFile) && (isTextFile(activeFile) || isCodeFile(activeFile))"
             class="toolbar-simple">
             <el-button @click="handleSave" :loading="isSaving" type="success" size="small">
               保存
             </el-button>
-          </div>
+          </div> -->
 
           <div v-show="isMarkdownFile(activeFile)" ref="vditorRef" class="editor-container"></div>
           <ImageViewer v-if="imageFiles.length > 0" :images="allImageFiles" :initial-index="currentImageIndex"
             :visible="imageViewerVisible" @update:visible="imageViewerVisible = $event" />
-          <div v-show="isImageFile(activeFile)" class="image-preview-container">
+          <div v-if="isImageFile(activeFile)" class="image-preview-container">
             <el-image :src="activeFile.content" :alt="activeFile.name" fit="contain" class="image-preview"
               style="cursor: pointer;" @click="openImageViewer" />
             <div class="open-viewer-overlay" @click="openImageViewer">
@@ -126,10 +132,10 @@
               </span>
             </div>
           </div>
-          <video v-show="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview">
+          <video v-if="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview">
             您的浏览器不支持视频播放。
           </video>
-          <audio v-show="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview">
+          <audio v-if="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview">
             您的浏览器不支持音频播放。
           </audio>
           <NativeCodeMirror v-show="isCodeFile(activeFile) && !isHTMLFile(activeFile)" v-model="editableContent"
@@ -139,10 +145,28 @@
             @change="handleContentChange" />
           <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content" :filename="activeFile.name"
             class="pdf-viewer-wrapper" />
-          <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
-            :autosize="{ minRows: 10 }" @input="handleContentChange" />
+          <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
+            class="drawio-editor-tabs">
+            <el-tab-pane name="drawio">
+              <template #label><span>drawio</span></template>
+              <div class="drawio-preview-wrapper">
+                <DrawioEditor v-model="editableContent" :filename="activeFile.name" class="drawio-viewer-wrapper"
+                  @change="handleContentChange" @save="handleSave" />
+              </div>
+            </el-tab-pane>
+            <el-tab-pane name="xml">
+              <template #label><span>xml</span></template>
+              <div class="drawio-edit-wrapper">
+                <NativeCodeMirror v-model="editableContent" :file-path="activeFile.name" :theme="editorTheme"
+                  :line-numbers="true" :bracket-matching="true" :close-brackets="true" :search="true" language="xml"
+                  class="code-editor-wrapper" @change="handleContentChange" />
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+          <!-- <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
+            :autosize="{ minRows: 10 }" @input="handleContentChange" /> -->
           <pre
-            v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isTextFile(activeFile)"
+            v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isDrawioFile(activeFile) && !isTextFile(activeFile)"
             class="readonly-content"><code>{{ activeFile.content }}</code></pre>
         </div>
         <el-empty v-else description="没有打开的文件" />
@@ -165,9 +189,8 @@
             @tab-remove="closeFile" @tab-change="handleTabChange">
             <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
               <template #label>
-                <span class="tab-label"
-                      @contextmenu.prevent="handleTabContextMenu($event, file)"
-                      @dblclick="handleTabDoubleClick(file)">
+                <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)"
+                  @dblclick="handleTabDoubleClick(file)">
                   <el-icon>
                     <Document v-if="isGenericFile(file) || isPDFFile(file) || isHTMLFile(file)" />
                     <Picture v-else-if="isImageFile(file)" />
@@ -214,11 +237,11 @@
                   size="small">保存</el-button>
               </div>
 
-              <div
+              <!-- <div
                 v-if="!isHTMLFile(activeFile) && !isMarkdownFile(activeFile) && (isTextFile(activeFile) || isCodeFile(activeFile))"
                 class="toolbar-simple">
                 <el-button @click="handleSave" :loading="isSaving" type="success" size="small">保存</el-button>
-              </div>
+              </div> -->
 
               <!-- Markdown 编辑器 -->
               <div v-show="isMarkdownFile(activeFile)" ref="vditorRefFullscreen" class="editor-container"></div>
@@ -228,7 +251,7 @@
                 :visible="imageViewerVisible" @update:visible="imageViewerVisible = $event" />
 
               <!-- 图片预览 -->
-              <div v-show="isImageFile(activeFile)" class="image-preview-container">
+              <div v-if="isImageFile(activeFile)" class="image-preview-container">
                 <el-image :src="activeFile.content" :alt="activeFile.name" fit="contain" class="image-preview"
                   style="cursor: pointer;" @click="openImageViewer" />
                 <div class="open-viewer-overlay" @click="openImageViewer">
@@ -242,8 +265,8 @@
               </div>
 
               <!-- 视频/音频 -->
-              <video v-show="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview"></video>
-              <audio v-show="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview"></audio>
+              <video v-if="isVideoFile(activeFile)" :src="activeFile.content" controls class="media-preview"></video>
+              <audio v-if="isAudioFile(activeFile)" :src="activeFile.content" controls class="media-preview"></audio>
 
               <!-- 代码编辑器 -->
               <NativeCodeMirror v-show="isCodeFile(activeFile) && !isHTMLFile(activeFile)" v-model="editableContent"
@@ -258,17 +281,41 @@
               <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content"
                 :filename="activeFile.name" class="pdf-viewer-wrapper" />
 
+              <!-- Drawio 编辑器 -->
+              <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
+                class="drawio-editor-tabs">
+                <el-tab-pane name="drawio">
+                  <template #label>
+                    <span>drawio</span>
+                  </template>
+                  <div class="drawio-preview-wrapper">
+                    <DrawioEditor v-model="editableContent" :filename="activeFile.name" class="drawio-viewer-wrapper"
+                      @change="handleContentChange" @save="handleSave" />
+                  </div>
+                </el-tab-pane>
+                <el-tab-pane name="xml">
+                  <template #label>
+                    <span>xml</span>
+                  </template>
+                  <div class="drawio-edit-wrapper">
+                    <NativeCodeMirror v-model="editableContent" :file-path="activeFile.name" :theme="editorTheme"
+                      :line-numbers="true" :bracket-matching="true" :close-brackets="true" :search="true" language="xml"
+                      class="code-editor-wrapper" @change="handleContentChange" />
+                  </div>
+                </el-tab-pane>
+              </el-tabs>
+
               <!-- HTML 预览 -->
               <HTMLViewer v-if="isHTMLFile(activeFile) && htmlActiveTab === 'preview'" :model-value="activeFile.content"
                 :filename="activeFile.name" />
 
               <!-- 文本编辑器 -->
-              <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
-                :autosize="{ minRows: 10 }" @input="handleContentChange" />
+              <!-- <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
+                :autosize="{ minRows: 10 }" @input="handleContentChange" /> -->
 
               <!-- 只读内容 -->
               <pre
-                v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isTextFile(activeFile)"
+                v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isDrawioFile(activeFile) && !isTextFile(activeFile)"
                 class="readonly-content"><code>{{ activeFile.content }}</code></pre>
             </div>
             <el-empty v-else description="没有打开的文件" />
@@ -293,6 +340,7 @@ import CSVEditor from '@/components/editor/CSVEditor.vue'
 import ImageViewer from '@/components/chat/ImageViewer.vue'
 import PDFViewer from '@/components/editor/PDFViewer.vue'
 import HTMLViewer from '@/components/editor/HTMLViewer.vue'
+import DrawioEditor from '@/components/editor/DrawioEditor.vue'
 import { isTauri } from '@/utils/platform'
 
 interface File {
@@ -320,6 +368,7 @@ const emit = defineEmits<Emits>()
 
 const themeStore = useThemeStore()
 const htmlActiveTab = ref('preview')
+const drawioActiveTab = ref('xml')
 const isSaving = ref(false)
 const isLoading = ref(false)
 const editableContent = ref('')
@@ -429,8 +478,16 @@ function isHTMLFile(file: File): boolean {
   return isHTML
 }
 
+function isDrawioFile(file: File): boolean {
+  return file.name.endsWith('.drawio') ||
+    file.name.endsWith('.dio') ||
+    file.name.endsWith('.xml') && file.name.toLowerCase().includes('drawio') ||
+    file.type === 'application/drawio' ||
+    file.type === 'application/x-drawio'
+}
+
 function isGenericFile(file: File): boolean {
-  return !isMarkdownFile(file) && !isCodeFile(file) && !isImageFile(file) && !isVideoFile(file) && !isAudioFile(file) && !isCSVFile(file) && !isPDFFile(file) && !isHTMLFile(file)
+  return !isMarkdownFile(file) && !isCodeFile(file) && !isImageFile(file) && !isVideoFile(file) && !isAudioFile(file) && !isCSVFile(file) && !isPDFFile(file) && !isHTMLFile(file) && !isDrawioFile(file)
 }
 
 // Event handlers
@@ -696,7 +753,7 @@ watch(activeFile, (newFile, oldFile) => {
     // 1. 还没有初始化过
     // 2. 全屏状态发生了变化（需要切换到不同的 DOM 元素）
     const needReinit = !vditorInitialized.value ||
-                       isPageFullscreen.value !== vditorInitFullscreen.value
+      isPageFullscreen.value !== vditorInitFullscreen.value
 
     if (needReinit) {
       // 强制重新初始化到正确的 DOM 元素
@@ -1082,6 +1139,11 @@ onUnmounted(() => {
   min-height: 400px;
 }
 
+.drawio-editor-wrapper {
+  height: 100%;
+  min-height: 600px;
+}
+
 .html-editor-tabs {
   height: 100%;
   display: flex;
@@ -1108,6 +1170,36 @@ onUnmounted(() => {
 }
 
 .html-preview-wrapper {
+  height: 100%;
+  position: relative;
+}
+
+.drawio-editor-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawio-editor-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+
+.drawio-editor-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.drawio-edit-wrapper {
+  height: 100%;
+  position: relative;
+}
+
+.drawio-edit-wrapper .code-editor-wrapper {
+  height: 100%;
+}
+
+.drawio-preview-wrapper {
   height: 100%;
   position: relative;
 }
