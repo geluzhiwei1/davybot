@@ -3,17 +3,23 @@
 核心的Workspace CRUD操作
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+
+import yaml
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 # 导入服务依赖
 from dawei.api.services import get_workspace_file_service
+from dawei.config import get_dawei_home
+from dawei.storage.storage_provider import StorageProvider
 from dawei.storage.storage import Storage
+from dawei.tools.skill_manager import SkillManager
 from dawei.workspace import workspace_manager
 from dawei.workspace.user_workspace import UserWorkspace
 
@@ -792,3 +798,176 @@ async def update_proxy_config(
             detail=f"Failed to update proxy config: {e!s}",
         )
 
+
+
+# ==================== 统计 API ====================
+
+
+@router.get("/{workspace_id}/stats")
+async def get_workspace_stats(workspace_id: str):
+    """获取工作区统计信息
+
+    包括：
+    - 文件统计（总数量、总大小、类型分布）
+    - 对话统计（对话数量、消息数量）
+    - 任务统计（任务数量）
+    - 技能统计（工作区级技能数量）
+    - Agent 统计（工作区级 agent 数量）
+    - 最后活动时间
+"""
+    # 获取工作区信息
+    workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
+    if not workspace_info:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    workspace_path = workspace_info.get("path")
+    if not workspace_path:
+        raise HTTPException(status_code=404, detail="Workspace path not found")
+
+    workspace_storage = StorageProvider.get_workspace_storage(workspace_path)
+
+    # 统计文件信息
+    total_files = 0
+    total_size = 0
+    file_types = {}
+
+    try:
+        async for item in workspace_storage.list_files(recursive=True, include_hidden=False):
+            if not item["is_dir"]:
+                total_files += 1
+                total_size += item.get("size", 0)
+                ext = item["name"].split(".")[-1].lower() if "." in item["name"] else "no_ext"
+                file_types[ext] = file_types.get(ext, 0) + 1
+    except Exception as e:
+        logger.warning(f"Failed to count files for workspace {workspace_id}: {e}")
+
+    # 统计对话信息
+    conversations_count = 0
+    messages_count = 0
+    last_activity_at = workspace_info.get("created_at", "")
+
+    try:
+        conversations_path = ".dawei/conversations"
+        if await workspace_storage.exists(conversations_path):
+            async for item in workspace_storage.list_files(conversations_path, recursive=False):
+                if item["name"].endswith(".json") and not item["is_dir"]:
+                    conversations_count += 1
+                    try:
+                        conv_content = await workspace_storage.read_file(
+                            f"{conversations_path}/{item['name']}"
+                        )
+                        conv_data = json.loads(conv_content)
+                        messages_count += len(conv_data.get("messages", []))
+                    except (json.JSONDecodeError, OSError, KeyError) as e:
+                        logger.warning(f"Failed to read conversation {item.get('name')}: {e}")
+
+        try:
+            workspace_info_path = ".dawei/workspace.json"
+            if await workspace_storage.exists(workspace_info_path):
+                stat = await workspace_storage.stat(workspace_info_path)
+                if stat and "modified" in stat:
+                    last_activity_at = stat["modified"]
+        except (OSError, KeyError) as e:
+            logger.debug(f"Failed to get workspace last activity: {e}")
+    except Exception as e:
+        logger.warning(f"Failed to count conversations for workspace {workspace_id}: {e}")
+
+    # 统计任务信息
+    tasks_count = 0
+    try:
+        tasks_path = ".dawei/tasks.json"
+        if await workspace_storage.exists(tasks_path):
+            tasks_content = await workspace_storage.read_file(tasks_path)
+            tasks_data = json.loads(tasks_content)
+            tasks_count = len(tasks_data.get("todos", []))
+    except (json.JSONDecodeError, OSError, KeyError) as e:
+        logger.debug(f"Failed to count tasks: {e}")
+
+    # 统计工作区级技能数量 - 使用 SkillManager
+    skills_count = 0
+    try:
+        workspace_root = Path(workspace_path)
+        skills_roots = [workspace_root]
+        skill_manager = SkillManager(skills_roots=skills_roots)
+        skill_manager.discover_skills(force=True)
+        all_skills = skill_manager.get_all_skills()
+        # 统计工作区级技能（scope = "workspace"）
+        skills_count = len([s for s in all_skills if s.scope == "workspace"])
+    except Exception as e:
+        logger.warning(f"Failed to count workspace skills: {e}")
+
+    # 统计工作区级 modes (agents) 数量
+    agents_count = 0
+    try:
+        modes_file = Path(workspace_path) / ".dawei" / "modes.yaml"
+        if modes_file.exists():
+            with open(modes_file, 'r', encoding='utf-8') as f:
+                modes_data = yaml.safe_load(f)
+                if modes_data and isinstance(modes_data, dict):
+                    agents_count = len(modes_data.get('modes', []))
+    except Exception as e:
+        logger.warning(f"Failed to count workspace modes: {e}")
+
+    return {
+        "totalFiles": total_files,
+        "totalSize": total_size,
+        "fileTypes": file_types,
+        "conversationsCount": conversations_count,
+        "messagesCount": messages_count,
+        "tasksCount": tasks_count,
+        "skillsCount": skills_count,
+        "agentsCount": agents_count,
+        "lastActivityAt": last_activity_at,
+    }
+
+
+@router.get("/global-stats")
+async def get_global_stats():
+    """获取全局统计信息（用户级）
+
+    包括：
+    - 工作区总数
+    - 技能总数（全局用户级别）
+    - 已安装的 modes (agents) 总数
+    """
+    system_storage = StorageProvider.get_system_storage()
+
+    # 1. 统计工作区总数
+    workspaces_count = 0
+    try:
+        content = await system_storage.read_file("workspaces.json")
+        data = json.loads(content)
+        workspaces_count = len(data.get("workspaces", []))
+    except Exception as e:
+        logger.warning(f"Failed to count workspaces: {e}")
+
+    # 2. 统计用户级技能总数 - 使用 SkillManager
+    skills_count = 0
+    try:
+        dawei_home = get_dawei_home()
+        skills_roots = [Path(dawei_home)]
+        skill_manager = SkillManager(skills_roots=skills_roots)
+        skill_manager.discover_skills(force=True)
+        all_skills = skill_manager.get_all_skills()
+        # 统计用户级技能（scope = "user"）
+        skills_count = len([s for s in all_skills if s.scope == "user"])
+    except Exception as e:
+        logger.warning(f"Failed to count skills: {e}")
+
+    # 3. 统计用户级 modes (agents) 总数
+    modes_count = 0
+    try:
+        modes_file = Path(get_dawei_home()) / ".dawei" / "modes.yaml"
+        if modes_file.exists():
+            with open(modes_file, 'r', encoding='utf-8') as f:
+                modes_data = yaml.safe_load(f)
+                if modes_data and isinstance(modes_data, dict):
+                    modes_count = len(modes_data.get('modes', []))
+    except Exception as e:
+        logger.warning(f"Failed to count user modes: {e}")
+
+    return {
+        "workspacesCount": workspaces_count,
+        "skillsCount": skills_count,
+        "agentsCount": modes_count,
+    }

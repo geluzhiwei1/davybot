@@ -310,10 +310,25 @@ export class WorkspacesApiService {
     conversationsCount: number;
     messagesCount: number;
     tasksCount: number;
+    skillsCount: number;
+    agentsCount: number;
     lastActivityAt: string;
   }> {
     try {
       return await httpClient.get(`${this.baseUrl}/${workspaceId}/stats`);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 获取全局统计信息（用户级）
+  async getGlobalStats(): Promise<{
+    workspacesCount: number;
+    skillsCount: number;
+    agentsCount: number;
+  }> {
+    try {
+      return await httpClient.get(`${this.baseUrl}/global-stats`);
     } catch (error) {
       throw this.handleError(error);
     }
@@ -1445,6 +1460,7 @@ export const {
   getOpenFiles,
   setActiveWorkspace,
   getWorkspaceStats,
+  getGlobalStats,
   searchWorkspace,
   exportWorkspace,
   importWorkspace,
@@ -1503,6 +1519,7 @@ export const {
   getOpenFiles: workspacesApi.getOpenFiles.bind(workspacesApi),
   setActiveWorkspace: workspacesApi.setActiveWorkspace.bind(workspacesApi),
   getWorkspaceStats: workspacesApi.getWorkspaceStats.bind(workspacesApi),
+  getGlobalStats: workspacesApi.getGlobalStats.bind(workspacesApi),
   searchWorkspace: workspacesApi.searchWorkspace.bind(workspacesApi),
   exportWorkspace: workspacesApi.exportWorkspace.bind(workspacesApi),
   importWorkspace: workspacesApi.importWorkspace.bind(workspacesApi),

@@ -793,6 +793,13 @@
     "platformName": "Dawei智能体平台",
     "description": "管理和访问您的工作区，开始AI智能体协作之旅",
     "myWorkspaces": "我的工作区",
+    "stats": {
+      "totalWorkspaces": "工作区总数",
+      "totalSkills": "用户级技能数量",
+      "totalAgents": "用户级智能体总数",
+      "skills": "技能",
+      "agents": "智能体"
+    },
     "workspaceCount": "{count} 个工作区",
     "createWorkspace": "创建工作区",
     "enter": "进入",

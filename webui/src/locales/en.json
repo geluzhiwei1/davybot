@@ -789,6 +789,13 @@
     "platformName": "Dawei AI Platform",
     "description": "Manage and access your workspaces, start your AI agent collaboration journey",
     "myWorkspaces": "My Workspaces",
+    "stats": {
+      "totalWorkspaces": "Total Workspaces",
+      "totalSkills": "User-level Skills",
+      "totalAgents": "User-level Agents",
+      "skills": "Skills",
+      "agents": "Agents"
+    },
     "workspaceCount": "{count} workspaces",
     "createWorkspace": "Create Workspace",
     "enter": "Enter",

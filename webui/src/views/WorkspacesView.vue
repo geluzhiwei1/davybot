@@ -27,6 +27,41 @@
       </div>
     </div>
 
+    <!-- 全局统计卡片 -->
+    <div class="stats-section" v-loading="isLoadingStats">
+      <div class="stats-grid">
+        <div class="stat-card global-stat">
+          <div class="stat-icon stat-icon-workspace">
+            <el-icon :size="24"><OfficeBuilding /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">{{ t('workspaces.stats.totalWorkspaces') }}</div>
+            <div class="stat-value">{{ globalStats.workspacesCount }}</div>
+          </div>
+        </div>
+
+        <div class="stat-card global-stat">
+          <div class="stat-icon stat-icon-skill">
+            <el-icon :size="24"><Star /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">{{ t('workspaces.stats.totalSkills') }}</div>
+            <div class="stat-value">{{ globalStats.skillsCount }}</div>
+          </div>
+        </div>
+
+        <div class="stat-card global-stat">
+          <div class="stat-icon stat-icon-agent">
+            <el-icon :size="24"><User /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">{{ t('workspaces.stats.totalAgents') }}</div>
+            <div class="stat-value">{{ globalStats.agentsCount }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tool Bar -->
     <div class="toolbar-section">
       <div class="toolbar-left">
@@ -69,6 +104,18 @@
           <p v-if="workspace.description" class="workspace-description">
             {{ workspace.description }}
           </p>
+
+          <!-- 工作区统计信息 -->
+          <div class="workspace-stats" v-if="workspaceStats[workspace.id]">
+            <div class="workspace-stat-item">
+              <el-icon :size="16"><Star /></el-icon>
+              <span>{{ workspaceStats[workspace.id].skillsCount }} {{ t('workspaces.stats.skills') }}</span>
+            </div>
+            <div class="workspace-stat-item">
+              <el-icon :size="16"><User /></el-icon>
+              <span>{{ workspaceStats[workspace.id].agentsCount }} {{ t('workspaces.stats.agents') }}</span>
+            </div>
+          </div>
 
           <div class="card-footer">
             <div class="workspace-date">
@@ -143,11 +190,12 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { OfficeBuilding, Calendar, ArrowRight, FolderOpened, Plus, Edit, Delete } from '@element-plus/icons-vue';
+import { OfficeBuilding, Calendar, ArrowRight, FolderOpened, Plus, Edit, Delete, Star, User } from '@element-plus/icons-vue';
 import WorkspaceFormDialog from '@/components/workspace/WorkspaceFormDialog.vue';
 import WorkspaceDeleteDialog from '@/components/workspace/WorkspaceDeleteDialog.vue';
 import LanguageSelector from '@/components/LanguageSelector.vue';
 import { workspaceService } from '@/services/workspace';
+import { getGlobalStats, getWorkspaceStats } from '@/services/api/services/workspaces';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -161,8 +209,26 @@ interface Workspace {
   createdAt?: string;
 }
 
+interface GlobalStats {
+  workspacesCount: number;
+  skillsCount: number;
+  agentsCount: number;
+}
+
+interface WorkspaceStats {
+  skillsCount: number;
+  agentsCount: number;
+}
+
 const workspaces = ref<Workspace[]>([]);
 const isLoading = ref(true);
+const isLoadingStats = ref(false);
+const globalStats = ref<GlobalStats>({
+  workspacesCount: 0,
+  skillsCount: 0,
+  agentsCount: 0
+});
+const workspaceStats = ref<Record<string, WorkspaceStats>>({});
 const router = useRouter();
 
 // Dialog 状态
@@ -187,6 +253,57 @@ const formatDate = (dateString?: string) => {
   }
 };
 
+// 加载全局统计
+const loadGlobalStats = async () => {
+  try {
+    isLoadingStats.value = true;
+    const stats = await getGlobalStats();
+    globalStats.value = stats;
+  } catch (error) {
+    console.error('Failed to fetch global stats:', error);
+    // 静默失败，不显示错误消息
+  } finally {
+    isLoadingStats.value = false;
+  }
+};
+
+// 加载所有工作区的统计信息
+const loadAllWorkspaceStats = async () => {
+  try {
+    const statsPromises = workspaces.value.map(async (workspace) => {
+      try {
+        const stats = await getWorkspaceStats(workspace.id);
+        return {
+          id: workspace.id,
+          stats: {
+            skillsCount: stats.skillsCount || 0,
+            agentsCount: stats.agentsCount || 0
+          }
+        };
+      } catch (error) {
+        console.error(`Failed to fetch stats for workspace ${workspace.id}:`, error);
+        return {
+          id: workspace.id,
+          stats: {
+            skillsCount: 0,
+            agentsCount: 0
+          }
+        };
+      }
+    });
+
+    const results = await Promise.all(statsPromises);
+    const statsMap: Record<string, WorkspaceStats> = {};
+    results.forEach(({ id, stats }) => {
+      statsMap[id] = stats;
+    });
+    workspaceStats.value = statsMap;
+  } catch (error) {
+    console.error('Failed to fetch workspace stats:', error);
+    // 静默失败，不显示错误消息
+  }
+};
+
 // 加载工作区列表
 const loadWorkspaces = async () => {
   try {
@@ -195,6 +312,8 @@ const loadWorkspaces = async () => {
 
     if (response.success) {
       workspaces.value = response.workspaces || [];
+      // 加载工作区统计
+      await loadAllWorkspaceStats();
     } else {
       workspaces.value = [];
     }
@@ -228,6 +347,7 @@ const showDeleteDialogFn = (workspace: Workspace) => {
 // 工作区创建完成
 const handleWorkspaceCreated = async () => {
   await loadWorkspaces();
+  await loadGlobalStats();
   ElMessage.success(t('workspaces.createdSuccess'));
 };
 
@@ -243,10 +363,12 @@ const handleWorkspaceDeleted = async () => {
   ElMessage.success(t('workspaces.deletedSuccess'));
   // 然后刷新列表
   await loadWorkspaces();
+  await loadGlobalStats();
 };
 
 onMounted(() => {
   loadWorkspaces();
+  loadGlobalStats();
 });
 </script>
 
@@ -259,6 +381,81 @@ onMounted(() => {
     radial-gradient(at 80% 0%, rgba(var(--color-accent-rgb), 0.04) 0px, transparent 50%),
     radial-gradient(at 0% 50%, rgba(var(--color-primary-rgb), 0.03) 0px, transparent 50%);
   overflow-y: auto;
+}
+
+/* ====================
+   STATS SECTION (全局统计卡片)
+   ==================== */
+.stats-section {
+  max-width: 1400px;
+  margin: 0 auto 30px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all var(--duration-base) var(--ease-default);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.stat-icon-workspace {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.stat-icon-skill {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.stat-icon-agent {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #303133;
+  line-height: 1;
 }
 
 /* ====================
@@ -520,6 +717,29 @@ onMounted(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Workspace Stats (工作区统计) */
+.workspace-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: var(--radius-lg);
+}
+
+.workspace-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.workspace-stat-item .el-icon {
+  color: var(--color-primary);
 }
 
 /* Card Footer */
