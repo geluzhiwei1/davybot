@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <div class="tool-call">
@@ -18,36 +18,29 @@
             <div class="tool-id">ID: {{ toolCall.tool_call_id }}</div>
           </div>
           <div class="tool-status">
-            <el-tag
-              :type="toolHelpers.getStatusTagType(toolCall.status)"
-              size="small"
-              effect="light"
-              round
-            >
+            <el-tag :type="toolHelpers.getStatusTagType(toolCall.status)" size="small" effect="light" round>
               {{ toolHelpers.getStatusText(toolCall.status) }}
             </el-tag>
             <div v-if="toolCall.status === 'in_progress'" class="progress-indicator">
-              <el-icon class="is-loading"><Loading /></el-icon>
+              <el-icon class="is-loading">
+                <Loading />
+              </el-icon>
             </div>
           </div>
         </div>
       </template>
-      
+
       <div class="tool-content">
         <!-- 增强执行进度部分 -->
         <div v-if="showProgress" class="enhanced-progress-section">
           <div class="section-header">
             <h4>执行进度</h4>
           </div>
-          
+
           <!-- 总体进度条 -->
           <div class="overall-progress">
-            <el-progress
-              :percentage="toolCall.progress_percentage || 0"
-              :status="toolHelpers.getProgressStatus(toolCall.status)"
-              :stroke-width="8"
-              :show-text="true"
-            />
+            <el-progress :percentage="toolCall.progress_percentage || 0"
+              :status="toolHelpers.getProgressStatus(toolCall.status)" :stroke-width="8" :show-text="true" />
             <div class="progress-time">
               <span v-if="toolCall.execution_time">
                 已用时: {{ toolHelpers.formatExecutionTime(toolCall.execution_time) }}
@@ -57,7 +50,7 @@
               </span>
             </div>
           </div>
-          
+
           <!-- 步骤进度指示器 -->
           <div v-if="toolCall.total_steps && toolCall.total_steps > 1" class="steps-progress">
             <div class="steps-header">
@@ -65,11 +58,8 @@
               <span class="steps-count">{{ (toolCall.current_step_index ?? 0) + 1 }}/{{ toolCall.total_steps }}</span>
             </div>
             <div class="steps-indicator">
-              <div
-                v-for="(step, index) in toolCall.total_steps"
-                :key="index"
-                :class="['step-item', getStepClass(index)]"
-              >
+              <div v-for="(step, index) in toolCall.total_steps" :key="index"
+                :class="['step-item', getStepClass(index)]">
                 <div class="step-number">{{ index + 1 }}</div>
                 <div class="step-line" v-if="index < toolCall.total_steps - 1"></div>
               </div>
@@ -78,27 +68,26 @@
               {{ toolCall.current_step }}
             </div>
           </div>
-          
+
           <!-- 当前步骤 -->
-          <div v-if="toolCall.current_step && (!toolCall.total_steps || toolCall.total_steps <= 1)" class="current-step">
-            <el-icon><Clock /></el-icon>
+          <div v-if="toolCall.current_step && (!toolCall.total_steps || toolCall.total_steps <= 1)"
+            class="current-step">
+            <el-icon>
+              <Clock />
+            </el-icon>
             <span class="step-text">{{ toolCall.current_step }}</span>
           </div>
-          
+
           <!-- 进度历史 -->
           <div v-if="toolCall.progress_history && toolCall.progress_history.length > 0" class="progress-history">
             <div class="history-header">
-              <h4>执行历史</h4>
+              <h4>ToolCall执行历史</h4>
               <el-button size="small" text @click="toggleHistoryExpanded">
                 {{ isHistoryExpanded ? '收起' : '展开' }}
               </el-button>
             </div>
             <div v-show="isHistoryExpanded" class="history-list">
-              <div
-                v-for="(item, index) in toolCall.progress_history"
-                :key="index"
-                class="history-item"
-              >
+              <div v-for="(item, index) in toolCall.progress_history" :key="index" class="history-item">
                 <span class="history-time">{{ formatTime(item.timestamp) }}</span>
                 <span class="history-message">{{ item.message }}</span>
                 <span v-if="item.progress_percentage !== undefined" class="history-progress">
@@ -108,61 +97,42 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 性能指标展示 -->
         <div v-if="showPerformanceMetrics" class="performance-section">
           <div class="section-header">
             <h4>性能指标</h4>
-            <el-button
-              size="small"
-              text
-              @click="togglePerformanceExpanded"
-              :icon="isPerformanceExpanded ? 'Fold' : 'Expand'"
-            >
+            <el-button size="small" text @click="togglePerformanceExpanded"
+              :icon="isPerformanceExpanded ? 'Fold' : 'Expand'">
               {{ isPerformanceExpanded ? '收起' : '展开' }}
             </el-button>
           </div>
-          
+
           <div v-show="isPerformanceExpanded" class="performance-content">
             <!-- 执行时间 -->
             <div v-if="toolCall.execution_time" class="metric-item">
               <div class="metric-label">执行时间</div>
               <div class="metric-value">{{ toolHelpers.formatExecutionTime(toolCall.execution_time) }}</div>
             </div>
-            
+
             <!-- 性能指标 -->
             <div v-if="toolCall.performance_metrics" class="detailed-metrics">
-              <div
-                v-for="(value, key) in toolCall.performance_metrics"
-                :key="key"
-                class="metric-item"
-              >
+              <div v-for="(value, key) in toolCall.performance_metrics" :key="key" class="metric-item">
                 <div class="metric-label">{{ formatMetricLabel(key) }}</div>
                 <div class="metric-value">{{ formatMetricValue(key, value) }}</div>
               </div>
             </div>
           </div>
         </div>
-        
+
         <div class="params-section">
           <div class="section-header" @click="toggleParamsExpanded" :class="{ 'clickable': !isParamsExpanded }">
             <h4>参数</h4>
             <div class="header-actions">
-              <el-button
-                v-if="isParamsExpanded"
-                size="small"
-                text
-                @click.stop="copyParams"
-                :icon="DocumentCopy"
-              >
+              <el-button v-if="isParamsExpanded" size="small" text @click.stop="copyParams" :icon="DocumentCopy">
                 复制
               </el-button>
-              <el-button
-                size="small"
-                text
-                @click.stop="toggleParamsExpanded"
-                :icon="isParamsExpanded ? Fold : Expand"
-              >
+              <el-button size="small" text @click.stop="toggleParamsExpanded" :icon="isParamsExpanded ? Fold : Expand">
                 {{ isParamsExpanded ? '收起' : '展开' }}
               </el-button>
             </div>
@@ -183,21 +153,10 @@
           <div class="section-header" @click="toggleOutputExpanded" :class="{ 'clickable': !isOutputExpanded }">
             <h4>输出</h4>
             <div class="header-actions">
-              <el-button
-                v-if="isOutputExpanded"
-                size="small"
-                text
-                @click.stop="copyOutput"
-                :icon="DocumentCopy"
-              >
+              <el-button v-if="isOutputExpanded" size="small" text @click.stop="copyOutput" :icon="DocumentCopy">
                 复制
               </el-button>
-              <el-button
-                size="small"
-                text
-                @click.stop="toggleOutputExpanded"
-                :icon="isOutputExpanded ? Fold : Expand"
-              >
+              <el-button size="small" text @click.stop="toggleOutputExpanded" :icon="isOutputExpanded ? Fold : Expand">
                 {{ isOutputExpanded ? '收起' : '展开' }}
               </el-button>
             </div>
@@ -216,21 +175,10 @@
           <div class="section-header" @click="toggleErrorExpanded" :class="{ 'clickable': !isErrorExpanded }">
             <h4>错误</h4>
             <div class="header-actions">
-              <el-button
-                v-if="isErrorExpanded"
-                size="small"
-                text
-                @click.stop="copyError"
-                :icon="DocumentCopy"
-              >
+              <el-button v-if="isErrorExpanded" size="small" text @click.stop="copyError" :icon="DocumentCopy">
                 复制
               </el-button>
-              <el-button
-                size="small"
-                text
-                @click.stop="toggleErrorExpanded"
-                :icon="isErrorExpanded ? Fold : Expand"
-              >
+              <el-button size="small" text @click.stop="toggleErrorExpanded" :icon="isErrorExpanded ? Fold : Expand">
                 {{ isErrorExpanded ? '收起' : '展开' }}
               </el-button>
             </div>
@@ -244,41 +192,25 @@
             </div>
           </el-collapse-transition>
         </div>
-        
+
         <div class="tool-actions">
           <!-- 主要操作按钮 -->
           <div class="primary-actions">
-            <el-button
-              v-if="toolCall.status === 'failed'"
-              size="small"
-              type="primary"
-              @click="retryToolCall"
-              :icon="RefreshRight"
-              :loading="isRetrying"
-            >
+            <el-button v-if="toolCall.status === 'failed'" size="small" type="primary" @click="retryToolCall"
+              :icon="RefreshRight" :loading="isRetrying">
               重试
             </el-button>
-            
-            <el-button
-              v-if="toolCall.status === 'in_progress' || toolCall.status === 'started'"
-              size="small"
-              type="danger"
-              @click="cancelToolCall"
-              :icon="Close"
-              :loading="isCancelling"
-            >
+
+            <el-button v-if="toolCall.status === 'in_progress' || toolCall.status === 'started'" size="small"
+              type="danger" @click="cancelToolCall" :icon="Close" :loading="isCancelling">
               取消
             </el-button>
-            
-            <el-button
-              size="small"
-              @click="viewDetails"
-              :icon="View"
-            >
+
+            <el-button size="small" @click="viewDetails" :icon="View">
               查看详情
             </el-button>
           </div>
-          
+
           <!-- 更多操作下拉菜单 -->
           <el-dropdown trigger="click" @command="handleMoreAction">
             <el-button size="small" :icon="MoreFilled" circle />
@@ -472,7 +404,7 @@ const getErrorSummary = () => {
 // 获取步骤样式类
 const getStepClass = (index: number) => {
   if (!props.toolCall.current_step_index) return ''
-  
+
   if (index < props.toolCall.current_step_index) {
     return 'completed'
   } else if (index === props.toolCall.current_step_index) {
@@ -569,11 +501,11 @@ const exportToolCall = () => {
     executionTime: props.toolCall.execution_time,
     timestamp: new Date().toISOString()
   }
-  
+
   const dataStr = JSON.stringify(exportData, null, 2)
   const blob = new Blob([dataStr], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
-  
+
   const a = document.createElement('a')
   a.href = url
   a.download = `tool-call-${props.toolCall.tool_call_id}.json`
@@ -581,7 +513,7 @@ const exportToolCall = () => {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  
+
   ElMessage.success('工具调用记录已导出')
 }
 
@@ -822,16 +754,16 @@ const shareToolCall = async () => {
   .tool-header {
     gap: 8px;
   }
-  
+
   .tool-icon {
     width: 32px;
     height: 32px;
   }
-  
+
   .tool-info h3 {
     font-size: 14px;
   }
-  
+
   .tool-id {
     font-size: 11px;
   }

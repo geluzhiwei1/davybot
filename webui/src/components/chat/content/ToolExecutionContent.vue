@@ -31,7 +31,7 @@
       <!-- 工具输入 -->
       <div v-if="block.toolInput" class="tool-input-section compact-detail-block">
         <div class="section-header">
-          <span>工具输入</span>
+          <span>参数</span>
         </div>
         <div class="section-content compact-mt-sm">
           <pre class="compact-pre">{{ toolHelpers.formatToolInput(block.toolInput) }}</pre>
@@ -73,7 +73,7 @@
       <!-- 进度历史 -->
       <el-collapse v-if="block.progressHistory && block.progressHistory.length > 0"
         class="progress-history-collapse compact-collapse">
-        <el-collapse-item name="history" title="执行历史">
+        <el-collapse-item name="history" title="进度">
           <div class="progress-history-list">
             <div v-for="(entry, index) in block.progressHistory" :key="index" class="history-entry">
               <span class="history-time">{{ formatTimestamp(entry.timestamp, 'time') }}</span>
