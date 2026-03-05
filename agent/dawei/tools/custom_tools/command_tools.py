@@ -155,31 +155,67 @@ def _build_enhanced_env() -> dict[str, str]:
 
     The DAWEI paths are added to the beginning of PATH for higher priority.
 
+    Platform-specific behavior:
+    - Windows: Adds PATH, PATHEXT, and Appended PATH
+    - Unix/Linux/macOS: Adds PATH and preserves existing variables
+
     Returns:
         Enhanced environment dictionary with updated PATH
 
     """
+    import sys
+
     env = os.environ.copy()
     dawei_paths = []
+
+    # Platform-specific bin subdirectories
+    if sys.platform == "win32":
+        # Windows-specific bin directories
+        bin_subdirs = [
+            "bin",
+            "Scripts",
+            "scripts",
+            ".local/bin",
+            "Library/bin",
+        ]
+    else:
+        # Unix/Linux/macOS bin directories
+        bin_subdirs = [
+            "bin",
+            "sbin",
+            "scripts",
+            ".local/bin",
+        ]
 
     # Collect all DAWEI_* environment variables that contain paths
     for key, value in os.environ.items():
         if key.startswith("DAWEI_") and isinstance(value, str):
+            # Check if it looks like a path (handles both Unix and Windows paths)
             if "/" in value or "\\" in value:
-                expanded_path = Path(value).expanduser()
-                if expanded_path.is_dir():
-                    dawei_paths.append(str(expanded_path))
-                    for bin_subdir in ["bin", "sbin", "scripts", ".local/bin"]:
-                        bin_path = expanded_path / bin_subdir
-                        if bin_path.is_dir():
-                            dawei_paths.append(str(bin_path))
+                try:
+                    expanded_path = Path(value).expanduser()
+                    if expanded_path.is_dir():
+                        # Add the path itself
+                        dawei_paths.append(str(expanded_path))
 
-    # Update PATH with DAWEI_* paths
+                        # Add platform-specific bin subdirectories
+                        for bin_subdir in bin_subdirs:
+                            bin_path = expanded_path / bin_subdir
+                            if bin_path.is_dir():
+                                dawei_paths.append(str(bin_path))
+                except (OSError, ValueError):
+                    # Skip invalid paths
+                    continue
+
+    # Update PATH with DAWEI_* paths (platform-aware)
     if dawei_paths:
+        path_separator = os.pathsep  # ":" on Unix, ";" on Windows
         current_path = env.get("PATH", "")
-        dawei_path_str = os.pathsep.join(dawei_paths)
+
+        # Add DAWEI paths to the beginning of PATH (higher priority)
+        dawei_path_str = path_separator.join(dawei_paths)
         if current_path:
-            env["PATH"] = f"{dawei_path_str}{os.pathsep}{current_path}"
+            env["PATH"] = f"{dawei_path_str}{path_separator}{current_path}"
         else:
             env["PATH"] = dawei_path_str
 
