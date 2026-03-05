@@ -387,7 +387,11 @@ def sanitize_api_path(absolute_path: str, workspace_name: str | None = None) -> 
     return path_obj.name
 
 
-def sanitize_workspace_response(data: dict, remove_path: bool = True) -> dict:
+def sanitize_workspace_response(
+    data: dict,
+    remove_path: bool = True,
+    keep_full_path: bool = False
+) -> dict:
     """Sanitize workspace API response to remove absolute filesystem paths.
 
     This function recursively processes a dictionary and removes or sanitizes
@@ -396,6 +400,8 @@ def sanitize_workspace_response(data: dict, remove_path: bool = True) -> dict:
     Args:
         data: Response dictionary potentially containing path fields
         remove_path: If True, remove 'path' fields; if False, sanitize them
+        keep_full_path: If True, keep full absolute path for display purposes
+                       (takes precedence over remove_path when both are set)
 
     Returns:
         dict: Sanitized response dictionary
@@ -408,6 +414,9 @@ def sanitize_workspace_response(data: dict, remove_path: bool = True) -> dict:
         >>> sanitize_workspace_response(data, remove_path=False)
         {'id': '123', 'path': 'project', 'name': 'project'}
 
+        >>> sanitize_workspace_response(data, keep_full_path=True)
+        {'id': '123', 'path': '/home/dev007/ws/project', 'name': 'project'}
+
     """
     if isinstance(data, dict):
         sanitized = {}
@@ -415,22 +424,30 @@ def sanitize_workspace_response(data: dict, remove_path: bool = True) -> dict:
             if key == "path" and isinstance(value, str):
                 # Check if it's an absolute path
                 if Path(value).is_absolute():
-                    if remove_path:
+                    if keep_full_path:
+                        # Keep full absolute path for display
+                        sanitized[key] = value
+                    elif remove_path:
                         # Skip this field entirely
                         continue
-                    # Sanitize to basename only
-                    sanitized[key] = sanitize_api_path(value)
+                    else:
+                        # Sanitize to basename only
+                        sanitized[key] = sanitize_api_path(value)
                 else:
                     # Keep relative paths as-is
                     sanitized[key] = value
             else:
                 # Recursively sanitize nested values
-                sanitized[key] = sanitize_workspace_response(value, remove_path)
+                sanitized[key] = sanitize_workspace_response(
+                    value,
+                    remove_path=remove_path,
+                    keep_full_path=keep_full_path
+                )
         return sanitized
 
     if isinstance(data, list):
         # Recursively sanitize list items
-        return [sanitize_workspace_response(item, remove_path) for item in data]
+        return [sanitize_workspace_response(item, remove_path, keep_full_path) for item in data]
 
     # Return primitive types as-is
     return data

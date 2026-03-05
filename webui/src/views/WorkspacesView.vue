@@ -97,7 +97,11 @@
             </div>
             <div class="workspace-meta">
               <h3 class="workspace-name">{{ workspace.display_name || workspace.name }}</h3>
-              <span class="workspace-id">ID: {{ workspace.id.slice(0, 8) }}...</span>
+              <div v-if="workspace.path" class="workspace-path">
+                <el-icon><Folder /></el-icon>
+                {{ workspace.path }}
+              </div>
+              <div class="workspace-id">ID: {{ workspace.id.slice(0, 8) }}...</div>
             </div>
           </div>
 
@@ -190,7 +194,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { OfficeBuilding, Calendar, ArrowRight, FolderOpened, Plus, Edit, Delete, Star, User } from '@element-plus/icons-vue';
+import { OfficeBuilding, Calendar, ArrowRight, FolderOpened, Folder, Plus, Edit, Delete, Star, User } from '@element-plus/icons-vue';
 import WorkspaceFormDialog from '@/components/workspace/WorkspaceFormDialog.vue';
 import WorkspaceDeleteDialog from '@/components/workspace/WorkspaceDeleteDialog.vue';
 import LanguageSelector from '@/components/LanguageSelector.vue';
@@ -205,6 +209,7 @@ interface Workspace {
   name: string;
   display_name?: string;
   description?: string;
+  path?: string;
   created_at?: string;
   createdAt?: string;
 }
@@ -700,6 +705,29 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+.workspace-path {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  margin-bottom: var(--spacing-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(var(--color-primary-rgb), 0.08);
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.workspace-path .el-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
 .workspace-id {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
@@ -757,20 +785,6 @@ onMounted(() => {
   gap: var(--spacing-sm);
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
-}
-
-.enter-button {
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-sm) var(--spacing-lg);
-  font-weight: 500;
-  opacity: 0;
-  transform: translateX(-10px);
-  transition: all var(--duration-base) var(--ease-default);
-}
-
-.workspace-card:hover .enter-button {
-  opacity: 1;
-  transform: translateX(0);
 }
 
 /* 工作区操作按钮 */
@@ -917,11 +931,6 @@ onMounted(() => {
 
   .workspace-card {
     padding: var(--spacing-lg);
-  }
-
-  .enter-button {
-    opacity: 1;
-    transform: translateX(0);
   }
 }
 </style>
