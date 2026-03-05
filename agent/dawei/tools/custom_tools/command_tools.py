@@ -4,6 +4,7 @@
 import json
 import os
 import subprocess
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -146,6 +147,45 @@ def _build_command_result(
     return json.dumps(output, indent=2)
 
 
+def _build_enhanced_env() -> dict[str, str]:
+    """Build environment variables with DAWEI_* paths added to PATH.
+
+    This function collects all DAWEI_* environment variables that contain paths
+    and adds them (and their common bin subdirectories) to the PATH variable.
+
+    The DAWEI paths are added to the beginning of PATH for higher priority.
+
+    Returns:
+        Enhanced environment dictionary with updated PATH
+
+    """
+    env = os.environ.copy()
+    dawei_paths = []
+
+    # Collect all DAWEI_* environment variables that contain paths
+    for key, value in os.environ.items():
+        if key.startswith("DAWEI_") and isinstance(value, str):
+            if "/" in value or "\\" in value:
+                expanded_path = Path(value).expanduser()
+                if expanded_path.is_dir():
+                    dawei_paths.append(str(expanded_path))
+                    for bin_subdir in ["bin", "sbin", "scripts", ".local/bin"]:
+                        bin_path = expanded_path / bin_subdir
+                        if bin_path.is_dir():
+                            dawei_paths.append(str(bin_path))
+
+    # Update PATH with DAWEI_* paths
+    if dawei_paths:
+        current_path = env.get("PATH", "")
+        dawei_path_str = os.pathsep.join(dawei_paths)
+        if current_path:
+            env["PATH"] = f"{dawei_path_str}{os.pathsep}{current_path}"
+        else:
+            env["PATH"] = dawei_path_str
+
+    return env
+
+
 # ============================================================================
 # Execute Command Tool
 # ============================================================================
@@ -205,7 +245,8 @@ class ExecuteCommandTool(CustomBaseTool):
         # Get current working directory (tool_executor has already switched to workspace)
         actual_cwd = os.getcwd()
 
-        # Execute command
+        env = _build_enhanced_env()
+
         result = subprocess.run(
             command,
             shell=shell,
@@ -213,6 +254,7 @@ class ExecuteCommandTool(CustomBaseTool):
             timeout=timeout,
             capture_output=True,
             text=True,
+            env=env,
         )
 
         return _build_command_result(
@@ -406,8 +448,9 @@ class ShellCommandTool(CustomBaseTool):
         # Get current working directory (tool_executor has already switched to workspace)
         actual_cwd = os.getcwd()
 
-        # Execute command
-        result = subprocess.run([command, *args], cwd=actual_cwd, capture_output=True, text=True)
+        env = _build_enhanced_env()
+
+        result = subprocess.run([command, *args], cwd=actual_cwd, capture_output=True, text=True, env=env)
 
         return _build_command_result(
             command=str([command, *args]),
