@@ -628,6 +628,20 @@ export class WorkspacesApiService {
     }
   }
 
+  // 下载文件或目录
+  async downloadFileOrDirectory(
+    workspaceId: string,
+    path: string
+  ): Promise<Blob> {
+    try {
+      return await httpClient.download(`${this.baseUrl}/${workspaceId}/files/download`, {
+        params: { path }
+      });
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   // 获取 LLM 配置设置
   async getLLMSettings(workspaceId: string): Promise<{
     success: boolean;
@@ -1449,6 +1463,7 @@ export const {
   deleteFileOrDirectory,
   copyFileOrDirectory,
   renameFileOrDirectory,
+  downloadFileOrDirectory,
   getLLMSettings,
   getLLMSettingsAllLevels,
   updateLLMSettings,
@@ -1508,6 +1523,7 @@ export const {
   deleteFileOrDirectory: workspacesApi.deleteFileOrDirectory.bind(workspacesApi),
   copyFileOrDirectory: workspacesApi.copyFileOrDirectory.bind(workspacesApi),
   renameFileOrDirectory: workspacesApi.renameFileOrDirectory.bind(workspacesApi),
+  downloadFileOrDirectory: workspacesApi.downloadFileOrDirectory.bind(workspacesApi),
   getLLMSettings: workspacesApi.getLLMSettings.bind(workspacesApi),
   getLLMSettingsAllLevels: workspacesApi.getLLMSettingsAllLevels.bind(workspacesApi),
   updateLLMSettings: workspacesApi.updateLLMSettings.bind(workspacesApi),

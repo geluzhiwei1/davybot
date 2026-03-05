@@ -575,3 +575,94 @@ async def rename_file_or_directory(
     except Exception as e:
         logger.error(f"重命名文件失败 (未知错误): {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to rename file: {e!s}")
+
+
+@router.get("/{workspace_id}/files/download")
+async def download_file_or_directory(
+    workspace_id: str,
+    path: str = Query(..., description="要下载的文件或目录路径"),
+    file_service: Storage = Depends(get_workspace_file_service),
+):
+    """下载文件或目录
+
+    Args:
+        workspace_id: 工作区ID
+        path: 要下载的文件或目录路径
+        file_service: 文件服务依赖
+
+    Returns:
+        文件或目录（打包成zip）的下载响应
+
+    """
+    from fastapi.responses import FileResponse, StreamingResponse
+    import zipfile
+    import io
+
+    # 获取工作区根路径
+    workspace_path = Path(file_service.root_dir)
+
+    # 构建完整路径
+    full_path = workspace_path / path
+
+    # Fast Fail: 检查路径是否存在
+    _validate_path_exists(full_path, f"Path not found: {path}")
+
+    # Fast Fail: 检查路径是否在工作区内（防止路径遍历攻击）
+    _validate_path_safety(workspace_path, full_path)
+
+    try:
+        if full_path.is_file():
+            # 下载单个文件
+            logger.info(f"Downloading file: {full_path}")
+
+            # 获取文件名
+            filename = full_path.name
+
+            # 返回文件响应
+            return FileResponse(
+                path=str(full_path),
+                filename=filename,
+                media_type='application/octet-stream'
+            )
+
+        elif full_path.is_dir():
+            # 下载目录（打包成zip）
+            logger.info(f"Downloading directory as zip: {full_path}")
+
+            # 创建zip文件在内存中
+            zip_buffer = io.BytesIO()
+
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for file_path in full_path.rglob('*'):
+                    if file_path.is_file():
+                        # 计算相对路径
+                        relative_path = file_path.relative_to(full_path)
+                        # 添加到zip
+                        zip_file.write(file_path, relative_path)
+
+            zip_buffer.seek(0)
+
+            # 生成zip文件名
+            dir_name = full_path.name
+            zip_filename = f"{dir_name}.zip"
+
+            # 返回zip文件
+            return StreamingResponse(
+                io.BytesIO(zip_buffer.getvalue()),
+                media_type="application/zip",
+                headers={
+                    "Content-Disposition": f"attachment; filename={zip_filename}"
+                }
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid path type: {path}")
+
+    except PermissionError as e:
+        logger.error(f"下载文件失败 (权限错误): {e}", exc_info=True)
+        raise HTTPException(status_code=403, detail=f"Permission denied: {e!s}")
+    except OSError as e:
+        logger.error(f"下载文件失败 (文件系统错误): {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"File system error: {e!s}")
+    except Exception as e:
+        logger.error(f"下载文件失败 (未知错误): {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to download file: {e!s}")

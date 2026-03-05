@@ -708,6 +708,7 @@
     "delete": "Delete",
     "rename": "Rename",
     "copy": "Copy",
+    "download": "Download",
     "noFiles": "No files",
     "unknown": "Unknown",
     "loadFailed": "Load failed",

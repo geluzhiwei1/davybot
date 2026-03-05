@@ -162,6 +162,12 @@
           </el-icon>
           <span>{{ t('sidePanel.copy') }}</span>
         </div>
+        <div v-if="selectedFileNode" class="context-menu-item" @click.stop.prevent="handleDownload">
+          <el-icon>
+            <Download />
+          </el-icon>
+          <span>{{ t('sidePanel.download') }}</span>
+        </div>
         <div v-if="selectedFileNode" class="context-menu-item danger" @click.stop.prevent="handleDelete">
           <el-icon>
             <Delete />
@@ -184,7 +190,7 @@ import { apiManager } from '@/services/api';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import {
   ChatDotRound, Folder, Document, Plus, Delete,
-  FolderAdd, Edit, CopyDocument, Upload, Refresh, Connection
+  FolderAdd, Edit, CopyDocument, Upload, Refresh, Connection, Download
 } from '@element-plus/icons-vue';
 import UserSettingsDrawer from './UserSettingsDrawer.vue';
 import FileUploadDialog from '@/components/FileUploadDialog.vue';
@@ -197,8 +203,15 @@ const { t } = useI18n();
 
 
 // 点击外部关闭右键菜单
-const handleClickOutside = () => {
-  closeContextMenu();
+const handleClickOutside = (event: Event) => {
+  // 只在菜单可见且点击的是菜单外部时才关闭
+  if (contextMenuVisible.value) {
+    const target = event.target as HTMLElement;
+    const contextMenu = document.querySelector('.context-menu');
+    if (contextMenu && !contextMenu.contains(target)) {
+      closeContextMenu();
+    }
+  }
 };
 
 // Update temporary conversation to real conversation
@@ -296,10 +309,18 @@ const fileTree = ref<unknown[]>([]);
 const filesLoading = ref(false);
 const filesError = ref('');
 
+// 文件树节点类型定义
+interface FileTreeNode {
+  name: string;
+  path: string;
+  type: string;
+  is_directory?: boolean;
+}
+
 // 右键菜单相关
 const contextMenuVisible = ref(false);
 const contextMenuPosition = ref({ x: 0, y: 0 });
-const selectedFileNode = ref<unknown>(null);
+const selectedFileNode = ref<FileTreeNode | null>(null);
 
 // 文件树组件引用
 const fileTreeRef = ref<unknown>(null);
@@ -542,7 +563,7 @@ const handleNodeContextMenu = (event: MouseEvent, data: unknown) => {
   event.preventDefault();
   event.stopPropagation();
 
-  selectedFileNode.value = data;
+  selectedFileNode.value = data as FileTreeNode;
   contextMenuPosition.value = {
     x: event.clientX,
     y: event.clientY
@@ -639,22 +660,26 @@ const handleCreateDirectory = async (parentNode?: unknown) => {
 
 // 重命名文件或目录
 const handleRename = async () => {
+  // 在关闭菜单前保存选中的节点
+  const node = selectedFileNode.value;
   closeContextMenu();
 
-  if (!selectedFileNode.value) return;
+  if (!node) {
+    return;
+  }
 
   try {
     const { value } = await ElMessageBox.prompt('请输入新名称:', '重命名', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputValue: selectedFileNode.value.name,
+      inputValue: node.name,
       inputPattern: /.+/,
       inputErrorMessage: '名称不能为空'
     });
 
-    if (!value || value === selectedFileNode.value.name) return;
+    if (!value || value === node.name) return;
 
-    const oldPath = selectedFileNode.value.path;
+    const oldPath = node.path;
     const pathParts = oldPath.split('/');
     pathParts[pathParts.length - 1] = value;
     const newPath = pathParts.join('/');
@@ -675,22 +700,23 @@ const handleRename = async () => {
 
 // 复制文件或目录
 const handleCopy = async () => {
+  const node = selectedFileNode.value;
   closeContextMenu();
 
-  if (!selectedFileNode.value) return;
+  if (!node) return;
 
   try {
     const { value } = await ElMessageBox.prompt('请输入目标名称:', '复制', {
       confirmButtonText: '复制',
       cancelButtonText: '取消',
-      inputValue: `${selectedFileNode.value.name}_copy`,
+      inputValue: `${node.name}_copy`,
       inputPattern: /.+/,
       inputErrorMessage: '名称不能为空'
     });
 
     if (!value) return;
 
-    const sourcePath = selectedFileNode.value.path;
+    const sourcePath = node.path;
     const pathParts = sourcePath.split('/');
     pathParts[pathParts.length - 1] = value;
     const destinationPath = pathParts.join('/');
@@ -709,15 +735,59 @@ const handleCopy = async () => {
   }
 };
 
-// 删除文件或目录
-const handleDelete = async () => {
+// 下载文件或目录
+const handleDownload = async () => {
+  const node = selectedFileNode.value;
   closeContextMenu();
 
-  if (!selectedFileNode.value) return;
+  if (!node) return;
+
+  try {
+    const isDirectory = node.is_directory || node.type === 'directory';
+
+    // 调用下载 API
+    const blob = await apiManager.getWorkspacesApi().downloadFileOrDirectory(
+      props.workspaceId!,
+      node.path
+    );
+
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    // 设置下载文件名
+    if (isDirectory) {
+      link.download = `${node.name}.zip`;
+    } else {
+      link.download = node.name;
+    }
+
+    // 触发下载
+    document.body.appendChild(link);
+    link.click();
+
+    // 清理
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    ElMessage.success(isDirectory ? '目录下载成功（已打包为 zip）' : '文件下载成功');
+  } catch (error: unknown) {
+    console.error('下载失败:', error);
+    ElMessage.error(error?.response?.data?.detail || '下载失败');
+  }
+};
+
+// 删除文件或目录
+const handleDelete = async () => {
+  const node = selectedFileNode.value;
+  closeContextMenu();
+
+  if (!node) return;
 
   try {
     await ElMessageBox.confirm(
-      `确定要删除 "${selectedFileNode.value.name}" 吗？此操作不可撤销。`,
+      `确定要删除 "${node.name}" 吗？此操作不可撤销。`,
       '确认删除',
       {
         confirmButtonText: '删除',
@@ -729,7 +799,7 @@ const handleDelete = async () => {
 
     await apiManager.getWorkspacesApi().deleteFileOrDirectory(
       props.workspaceId!,
-      selectedFileNode.value.path
+      node.path
     );
 
     ElMessage.success('删除成功');
