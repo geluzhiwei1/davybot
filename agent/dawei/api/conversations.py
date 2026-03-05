@@ -76,8 +76,8 @@ async def get_workspace_conversations(
     workspace_id: str,
     page: int = 1,
     limit: int = 50,
-    sortBy: str = "updatedAt",
-    sortOrder: str = "desc",
+    sort_by: str = "updatedAt",
+    sort_order: str = "desc",
     task_type: str | None = None,  # 新增：按任务类型过滤
 ):
     """Get conversations from a workspace with pagination and filtering support.
@@ -86,8 +86,8 @@ async def get_workspace_conversations(
         workspace_id: Workspace identifier
         page: Page number (default: 1)
         limit: Items per page (default: 50)
-        sortBy: Sort field (default: updatedAt)
-        sortOrder: Sort order asc/desc (default: desc)
+        sort_by: Sort field (default: updatedAt)
+        sort_order: Sort order asc/desc (default: desc)
         task_type: Filter by task type - "user", "scheduled", or None for all (default: None)
     """
     chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
@@ -103,7 +103,7 @@ async def get_workspace_conversations(
                 conversations.append(conversation)
 
     # Sort conversations
-    reverse_order = sortOrder == "desc"
+    reverse_order = sort_order == "desc"
     conversations.sort(key=lambda x: x["lastUpdated"], reverse=reverse_order)
 
     # Pagination
@@ -305,15 +305,8 @@ async def delete_all_workspace_conversations(workspace_id: str):
 
     # 删除所有对话文件
     for conversation_file in conversation_files:
-        try:
-            conversation_file.unlink()
-            deleted_count += 1
-        except (OSError, PermissionError) as e:
-            # Graceful degradation: Continue deleting other files if one fails
-            logger.warning(
-                f"Failed to delete conversation file {conversation_file}: {e}",
-                exc_info=True,
-            )
+        conversation_file.unlink()
+        deleted_count += 1
 
     return {
         "success": True,

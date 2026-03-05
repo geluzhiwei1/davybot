@@ -88,104 +88,78 @@ async def reload_workspace_config(
     success_count = 0
     total_count = 0
 
-    try:
-        # 重新加载 Skills
-        if request.config_type in ["all", "skills"]:
-            total_count += 1
-            try:
-                if workspace.tool_manager and workspace.tool_manager.skill_manager:
-                    # 强制重新发现 skills
-                    workspace.tool_manager.skill_manager.discover_skills(force=request.force)
+    # 重新加载 Skills
+    if request.config_type in ["all", "skills"]:
+        total_count += 1
+        if workspace.tool_manager and workspace.tool_manager.skill_manager:
+            # 强制重新发现 skills
+            workspace.tool_manager.skill_manager.discover_skills(force=request.force)
 
-                    # 重新创建 skills 工具
-                    workspace.tool_manager._skills_tools = workspace.tool_manager._create_skills_tools()
+            # 重新创建 skills 工具
+            workspace.tool_manager._skills_tools = workspace.tool_manager._create_skills_tools()
 
-                    skills_count = len(workspace.tool_manager.skill_manager._skills)
-                    details["skills"] = f"Reloaded {skills_count} skills"
-                    details["skills_count"] = skills_count
-                    success_count += 1
+            skills_count = len(workspace.tool_manager.skill_manager._skills)
+            details["skills"] = f"Reloaded {skills_count} skills"
+            details["skills_count"] = skills_count
+            success_count += 1
 
-                    logger.info(f"[CONFIG_RELOAD] Skills reloaded for workspace {workspace_id}: {skills_count} skills")
-                else:
-                    details["skills"] = "No skill manager found"
-                    details["skills_count"] = 0
-            except Exception as e:
-                logger.error(f"[CONFIG_RELOAD] Failed to reload skills: {e}", exc_info=True)
-                details["skills"] = f"Failed: {str(e)}"
-                details["skills_count"] = 0
-
-        # 重新加载 Modes
-        if request.config_type in ["all", "modes"]:
-            total_count += 1
-            try:
-                if workspace.mode_manager:
-                    # 清除缓存
-                    if hasattr(workspace.mode_manager, 'config_loader'):
-                        workspace.mode_manager.config_loader.clear_cache()
-
-                    # 重新加载所有 modes
-                    await workspace.mode_manager.load_all_modes()
-
-                    modes_count = len(workspace.mode_manager.modes)
-                    details["modes"] = f"Reloaded {modes_count} modes"
-                    details["modes_count"] = modes_count
-                    success_count += 1
-
-                    logger.info(f"[CONFIG_RELOAD] Modes reloaded for workspace {workspace_id}: {modes_count} modes")
-                else:
-                    details["modes"] = "No mode manager found"
-                    details["modes_count"] = 0
-            except Exception as e:
-                logger.error(f"[CONFIG_RELOAD] Failed to reload modes: {e}", exc_info=True)
-                details["modes"] = f"Failed: {str(e)}"
-                details["modes_count"] = 0
-
-        # 重新加载 Tools
-        if request.config_type in ["all", "tools"]:
-            total_count += 1
-            try:
-                if workspace.tool_manager:
-                    # 重新加载工具配置
-                    workspace.tool_manager.reload_tool_configs()
-
-                    # 重新加载 MCP 配置
-                    if workspace.tool_manager.mcp_tool_manager:
-                        workspace.tool_manager.reload_mcp_configs()
-
-                    tool_stats = workspace.tool_manager.get_statistics()
-                    details["tools"] = "Tool configs reloaded"
-                    details["tools_count"] = tool_stats.get("workspace_specific", {}).get("available_tools_count", 0)
-                    success_count += 1
-
-                    logger.info(f"[CONFIG_RELOAD] Tools reloaded for workspace {workspace_id}")
-                else:
-                    details["tools"] = "No tool manager found"
-                    details["tools_count"] = 0
-            except Exception as e:
-                logger.error(f"[CONFIG_RELOAD] Failed to reload tools: {e}", exc_info=True)
-                details["tools"] = f"Failed: {str(e)}"
-                details["tools_count"] = 0
-
-        # 构建响应消息
-        if success_count == total_count:
-            message = f"Successfully reloaded {success_count}/{total_count} configuration type(s)"
-            logger.info(f"[CONFIG_RELOAD] {message} for workspace {workspace_id}")
+            logger.info(f"[CONFIG_RELOAD] Skills reloaded for workspace {workspace_id}: {skills_count} skills")
         else:
-            message = f"Partially reloaded {success_count}/{total_count} configuration type(s)"
-            logger.warning(f"[CONFIG_RELOAD] {message} for workspace {workspace_id}")
+            details["skills"] = "No skill manager found"
+            details["skills_count"] = 0
 
-        return ConfigReloadResponse(
-            success=success_count > 0,
-            message=message,
-            details=details,
-        )
+    # 重新加载 Modes
+    if request.config_type in ["all", "modes"]:
+        total_count += 1
+        if workspace.mode_manager:
+            # 清除缓存
+            if hasattr(workspace.mode_manager, "config_loader"):
+                workspace.mode_manager.config_loader.clear_cache()
 
-    except Exception as e:
-        logger.error(f"[CONFIG_RELOAD] Unexpected error reloading config for workspace {workspace_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=error_detail(
-                ErrorCodes.INTERNAL_ERROR,
-                f"Failed to reload configuration: {str(e)}",
-            ),
-        )
+            # 重新加载所有 modes
+            await workspace.mode_manager.load_all_modes()
+
+            modes_count = len(workspace.mode_manager.modes)
+            details["modes"] = f"Reloaded {modes_count} modes"
+            details["modes_count"] = modes_count
+            success_count += 1
+
+            logger.info(f"[CONFIG_RELOAD] Modes reloaded for workspace {workspace_id}: {modes_count} modes")
+        else:
+            details["modes"] = "No mode manager found"
+            details["modes_count"] = 0
+
+    # 重新加载 Tools
+    if request.config_type in ["all", "tools"]:
+        total_count += 1
+        if workspace.tool_manager:
+            # 重新加载工具配置
+            workspace.tool_manager.reload_tool_configs()
+
+            # 重新加载 MCP 配置
+            if workspace.tool_manager.mcp_tool_manager:
+                workspace.tool_manager.reload_mcp_configs()
+
+            tool_stats = workspace.tool_manager.get_statistics()
+            details["tools"] = "Tool configs reloaded"
+            details["tools_count"] = tool_stats.get("workspace_specific", {}).get("available_tools_count", 0)
+            success_count += 1
+
+            logger.info(f"[CONFIG_RELOAD] Tools reloaded for workspace {workspace_id}")
+        else:
+            details["tools"] = "No tool manager found"
+            details["tools_count"] = 0
+
+    # 构建响应消息
+    if success_count == total_count:
+        message = f"Successfully reloaded {success_count}/{total_count} configuration type(s)"
+        logger.info(f"[CONFIG_RELOAD] {message} for workspace {workspace_id}")
+    else:
+        message = f"Partially reloaded {success_count}/{total_count} configuration type(s)"
+        logger.warning(f"[CONFIG_RELOAD] {message} for workspace {workspace_id}")
+
+    return ConfigReloadResponse(
+        success=success_count > 0,
+        message=message,
+        details=details,
+    )

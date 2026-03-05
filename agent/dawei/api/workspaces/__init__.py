@@ -11,10 +11,10 @@ from fastapi import APIRouter
 # 导入记忆系统API
 from . import memory as memory_api
 from .checkpoints import router as checkpoints_router
-from .config_reload import router as config_reload_router
 
 # 导入各子模块的路由器
 from .config import router as config_router
+from .config_reload import router as config_reload_router
 from .core import get_user_workspace
 from .core import router as core_router
 from .crud import router as crud_router

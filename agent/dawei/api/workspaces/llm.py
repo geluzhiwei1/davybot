@@ -132,21 +132,17 @@ async def get_workspace_llm_settings_all_levels(
     if not workspace.is_initialized():
         await workspace.initialize()
 
-    try:
-        # 每次都重新创建LLMProvider，确保获取最新配置
-        from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
+    # 每次都重新创建LLMProvider，确保获取最新配置
+    from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
 
-        llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
-        await llm_config_manager.initialize()
-        llm_provider = llm_config_manager.llm_provider
+    llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
+    await llm_config_manager.initialize()
+    llm_provider = llm_config_manager.llm_provider
 
-        # 获取带来源信息的所有配置
-        configs_with_source = llm_provider.get_all_configs_with_source()
+    # 获取带来源信息的所有配置
+    configs_with_source = llm_provider.get_all_configs_with_source()
 
-        return {"success": True, "settings": configs_with_source}
-    except Exception as e:
-        logger.exception("Failed to read all LLM settings: ")
-        raise HTTPException(status_code=500, detail=f"Failed to read all LLM settings: {e!s}")
+    return {"success": True, "settings": configs_with_source}
 
 
 @router.get("/{workspace_id}/mode-settings")
@@ -158,44 +154,40 @@ async def get_workspace_llm_settings(
     if not workspace.is_initialized():
         await workspace.initialize()
 
-    try:
-        # 每次都重新创建LLMProvider，确保获取最新配置
-        from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
+    # 每次都重新创建LLMProvider，确保获取最新配置
+    from dawei.workspace.llm_config_manager import WorkspaceLLMConfigManager
 
-        llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
-        await llm_config_manager.initialize()
-        llm_provider = llm_config_manager.llm_provider
+    llm_config_manager = WorkspaceLLMConfigManager(workspace_path=workspace.absolute_path)
+    await llm_config_manager.initialize()
+    llm_provider = llm_config_manager.llm_provider
 
-        # 获取带来源信息的所有配置
-        configs_with_source = llm_provider.get_all_configs_with_source()
+    # 获取带来源信息的所有配置
+    configs_with_source = llm_provider.get_all_configs_with_source()
 
-        # 获取当前配置名称
-        current_config_name = configs_with_source.get("current_config")
+    # 获取当前配置名称
+    current_config_name = configs_with_source.get("current_config")
 
-        # 合并所有配置（用户级+工作区级）
-        all_configs = {}
-        for config in configs_with_source.get("user", []):
-            all_configs[config["name"]] = config["config"]["config"]
-        for config in configs_with_source.get("workspace", []):
-            all_configs[config["name"]] = config["config"]["config"]
+    # 合并所有配置（用户级+工作区级）
+    all_configs = {}
+    for config in configs_with_source.get("user", []):
+        all_configs[config["name"]] = config["config"]["config"]
+    for config in configs_with_source.get("workspace", []):
+        all_configs[config["name"]] = config["config"]["config"]
 
-        # 获取当前配置的详细信息
-        current_config = None
-        if current_config_name and current_config_name in all_configs:
-            current_config = all_configs.get(current_config_name)
+    # 获取当前配置的详细信息
+    current_config = None
+    if current_config_name and current_config_name in all_configs:
+        current_config = all_configs.get(current_config_name)
 
-        return {
-            "success": True,
-            "settings": {
-                "currentApiConfigName": current_config_name,
-                "currentConfig": current_config,
-                "allConfigs": all_configs,
-                "modeApiConfigs": configs_with_source.get("mode_configs", {}),
-            },
-        }
-    except Exception as e:
-        logger.exception("Failed to read LLM settings: ")
-        raise HTTPException(status_code=500, detail=f"Failed to read LLM settings: {e!s}")
+    return {
+        "success": True,
+        "settings": {
+            "currentApiConfigName": current_config_name,
+            "currentConfig": current_config,
+            "allConfigs": all_configs,
+            "modeApiConfigs": configs_with_source.get("mode_configs", {}),
+        },
+    }
 
 
 @router.post("/{workspace_id}/llm-settings")
@@ -207,49 +199,45 @@ async def update_workspace_llm_settings(
     if not workspace.is_initialized():
         await workspace.initialize()
 
-    try:
-        settings_file = workspace.user_config_dir / "settings.json"
+    settings_file = workspace.user_config_dir / "settings.json"
 
-        # 读取现有配置
-        if settings_file.exists():
-            with Path(settings_file).open(encoding="utf-8") as f:
-                settings = json.load(f)
-        else:
-            settings = {"providerProfiles": {}}
+    # 读取现有配置
+    if settings_file.exists():
+        with Path(settings_file).open(encoding="utf-8") as f:
+            settings = json.load(f)
+    else:
+        settings = {"providerProfiles": {}}
 
-        # 更新配置
-        provider_profiles = settings.get("providerProfiles", {})
+    # 更新配置
+    provider_profiles = settings.get("providerProfiles", {})
 
-        if settings_update.currentApiConfigName is not None:
-            provider_profiles["currentApiConfigName"] = settings_update.currentApiConfigName
+    if settings_update.currentApiConfigName is not None:
+        provider_profiles["currentApiConfigName"] = settings_update.currentApiConfigName
 
-        if settings_update.modeApiConfigs is not None:
-            mode_configs = provider_profiles.get("modeApiConfigs", {})
-            mode_configs.update(settings_update.modeApiConfigs)
-            provider_profiles["modeApiConfigs"] = mode_configs
+    if settings_update.modeApiConfigs is not None:
+        mode_configs = provider_profiles.get("modeApiConfigs", {})
+        mode_configs.update(settings_update.modeApiConfigs)
+        provider_profiles["modeApiConfigs"] = mode_configs
 
-        settings["providerProfiles"] = provider_profiles
+    settings["providerProfiles"] = provider_profiles
 
-        # 写入文件
-        with settings_file.open("w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
+    # 写入文件
+    with settings_file.open("w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
 
-        # 清除工作区的llm_manager缓存，强制重新加载配置
-        workspace.llm_manager = None
+    # 清除工作区的llm_manager缓存，强制重新加载配置
+    workspace.llm_manager = None
 
-        logger.info(f"Updated LLM settings for workspace: {workspace.absolute_path}")
+    logger.info(f"Updated LLM settings for workspace: {workspace.absolute_path}")
 
-        return {
-            "success": True,
-            "message": "LLM settings updated successfully",
-            "settings": {
-                "currentApiConfigName": provider_profiles.get("currentApiConfigName"),
-                "modeApiConfigs": settings.get("modeApiConfigs", {}),
-            },
-        }
-    except Exception as e:
-        logger.exception("Failed to update LLM settings: ")
-        raise HTTPException(status_code=500, detail=f"Failed to update LLM settings: {e!s}")
+    return {
+        "success": True,
+        "message": "LLM settings updated successfully",
+        "settings": {
+            "currentApiConfigName": provider_profiles.get("currentApiConfigName"),
+            "modeApiConfigs": settings.get("modeApiConfigs", {}),
+        },
+    }
 
 
 @router.post("/{workspace_id}/llm-providers")
@@ -266,96 +254,90 @@ async def create_llm_provider(
     if not workspace.is_initialized():
         await workspace.initialize()
 
-    try:
-        # 根据 saveLocation 决定保存位置
-        save_location = provider_data.saveLocation or "user"
-        
-        if save_location == "user":
-            # 保存到用户级配置
-            settings_file = Path(get_dawei_home()) / "settings.json"
-        else:
-            # 保存到工作区级配置
-            settings_file = workspace.user_config_dir / "settings.json"
+    # 根据 saveLocation 决定保存位置
+    save_location = provider_data.saveLocation or "user"
 
-        # 读取现有配置
-        if settings_file.exists():
-            with Path(settings_file).open(encoding="utf-8") as f:
-                settings = json.load(f)
-        else:
-            settings = {"providerProfiles": {"apiConfigs": {}, "modeApiConfigs": {}}}
-            # 确保目录存在
-            settings_file.parent.mkdir(parents=True, exist_ok=True)
+    if save_location == "user":
+        # 保存到用户级配置
+        settings_file = Path(get_dawei_home()) / "settings.json"
+    else:
+        # 保存到工作区级配置
+        settings_file = workspace.user_config_dir / "settings.json"
 
-        provider_profiles = settings.setdefault("providerProfiles", {})
-        api_configs = provider_profiles.setdefault("apiConfigs", {})
+    # 读取现有配置
+    if settings_file.exists():
+        with Path(settings_file).open(encoding="utf-8") as f:
+            settings = json.load(f)
+    else:
+        settings = {"providerProfiles": {"apiConfigs": {}, "modeApiConfigs": {}}}
+        # 确保目录存在
+        settings_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # 检查是否已存在同名配置
-        if provider_data.name in api_configs:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Provider '{provider_data.name}' already exists in {save_location}-level config",
-            )
+    provider_profiles = settings.setdefault("providerProfiles", {})
+    api_configs = provider_profiles.setdefault("apiConfigs", {})
 
-        # 创建新的 provider 配置
-        provider_id = str(uuid.uuid4())[:11]  # 生成短 ID
-        provider_config = {
+    # 检查是否已存在同名配置
+    if provider_data.name in api_configs:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Provider '{provider_data.name}' already exists in {save_location}-level config",
+        )
+
+    # 创建新的 provider 配置
+    provider_id = str(uuid.uuid4())[:11]  # 生成短 ID
+    provider_config = {
+        "id": provider_id,
+        "apiProvider": provider_data.apiProvider,
+        "diffEnabled": provider_data.diffEnabled,
+        "todoListEnabled": provider_data.todoListEnabled,
+        "fuzzyMatchThreshold": provider_data.fuzzyMatchThreshold,
+        "rateLimitSeconds": provider_data.rateLimitSeconds,
+        "consecutiveMistakeLimit": provider_data.consecutiveMistakeLimit,
+        "enableReasoningEffort": provider_data.enableReasoningEffort,
+        "toolChoice": provider_data.toolChoice,
+        "temperature": provider_data.temperature,
+    }
+
+    if provider_data.openAiBaseUrl:
+        provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
+    if provider_data.openAiApiKey:
+        provider_config["openAiApiKey"] = provider_data.openAiApiKey
+    if provider_data.openAiModelId:
+        provider_config["openAiModelId"] = provider_data.openAiModelId
+    if provider_data.openAiLegacyFormat is not None:
+        provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
+    if provider_data.openAiCustomModelInfo:
+        provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
+    provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else {}
+
+    # 如果当前没有 currentApiConfigName，则设置为即将创建的 provider
+    if "currentApiConfigName" not in provider_profiles or not provider_profiles.get("currentApiConfigName"):
+        provider_profiles["currentApiConfigName"] = provider_data.name
+
+    # 保存配置
+    api_configs[provider_data.name] = provider_config
+    provider_profiles["apiConfigs"] = api_configs
+    settings["providerProfiles"] = provider_profiles
+
+    with settings_file.open("w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+
+    # 清除工作区的llm_manager缓存，强制重新加载配置
+    workspace.llm_manager = None
+
+    location_name = "用户级" if save_location == "user" else "工作区级"
+    logger.info(f"Created LLM provider '{provider_data.name}' at {location_name} config: {settings_file}")
+
+    return {
+        "success": True,
+        "message": f"LLM provider '{provider_data.name}' created successfully at {location_name} level",
+        "provider": {
+            "name": provider_data.name,
             "id": provider_id,
-            "apiProvider": provider_data.apiProvider,
-            "diffEnabled": provider_data.diffEnabled,
-            "todoListEnabled": provider_data.todoListEnabled,
-            "fuzzyMatchThreshold": provider_data.fuzzyMatchThreshold,
-            "rateLimitSeconds": provider_data.rateLimitSeconds,
-            "consecutiveMistakeLimit": provider_data.consecutiveMistakeLimit,
-            "enableReasoningEffort": provider_data.enableReasoningEffort,
-            "toolChoice": provider_data.toolChoice,
-            "temperature": provider_data.temperature,
-        }
-
-        if provider_data.openAiBaseUrl:
-            provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
-        if provider_data.openAiApiKey:
-            provider_config["openAiApiKey"] = provider_data.openAiApiKey
-        if provider_data.openAiModelId:
-            provider_config["openAiModelId"] = provider_data.openAiModelId
-        if provider_data.openAiLegacyFormat is not None:
-            provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
-        if provider_data.openAiCustomModelInfo:
-            provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
-        provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else {}
-
-        # 如果当前没有 currentApiConfigName，则设置为即将创建的 provider
-        if "currentApiConfigName" not in provider_profiles or not provider_profiles.get("currentApiConfigName"):
-            provider_profiles["currentApiConfigName"] = provider_data.name
-
-        # 保存配置
-        api_configs[provider_data.name] = provider_config
-        provider_profiles["apiConfigs"] = api_configs
-        settings["providerProfiles"] = provider_profiles
-
-        with settings_file.open("w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
-
-        # 清除工作区的llm_manager缓存，强制重新加载配置
-        workspace.llm_manager = None
-
-        location_name = "用户级" if save_location == "user" else "工作区级"
-        logger.info(f"Created LLM provider '{provider_data.name}' at {location_name} config: {settings_file}")
-
-        return {
-            "success": True,
-            "message": f"LLM provider '{provider_data.name}' created successfully at {location_name} level",
-            "provider": {
-                "name": provider_data.name,
-                "id": provider_id,
-                "config": provider_config,
-                "location": save_location,
-            },
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Failed to create LLM provider: ")
-        raise HTTPException(status_code=500, detail=f"Failed to create LLM provider: {e!s}")
+            "config": provider_config,
+            "location": save_location,
+        },
+    }
 
 
 @router.put("/{workspace_id}/llm-providers/{provider_name}")
@@ -368,78 +350,72 @@ async def update_llm_provider(
     if not workspace.is_initialized():
         await workspace.initialize()
 
-    try:
-        settings_file = workspace.user_config_dir / "settings.json"
+    settings_file = workspace.user_config_dir / "settings.json"
 
-        if not settings_file.exists():
-            raise HTTPException(status_code=404, detail="Settings file not found")
+    if not settings_file.exists():
+        raise HTTPException(status_code=404, detail="Settings file not found")
 
-        with Path(settings_file).open(encoding="utf-8") as f:
-            settings = json.load(f)
+    with Path(settings_file).open(encoding="utf-8") as f:
+        settings = json.load(f)
 
-        provider_profiles = settings.get("providerProfiles", {})
-        api_configs = provider_profiles.get("apiConfigs", {})
+    provider_profiles = settings.get("providerProfiles", {})
+    api_configs = provider_profiles.get("apiConfigs", {})
 
-        # 检查 provider 是否存在
-        if provider_name not in api_configs:
-            raise HTTPException(status_code=404, detail=f"Provider '{provider_name}' not found")
+    # 检查 provider 是否存在
+    if provider_name not in api_configs:
+        raise HTTPException(status_code=404, detail=f"Provider '{provider_name}' not found")
 
-        # 更新配置
-        existing_config = api_configs[provider_name]
-        provider_id = existing_config.get("id", str(uuid.uuid4())[:11])
+    # 更新配置
+    existing_config = api_configs[provider_name]
+    provider_id = existing_config.get("id", str(uuid.uuid4())[:11])
 
-        provider_config = {
+    provider_config = {
+        "id": provider_id,
+        "apiProvider": provider_data.apiProvider,
+        "diffEnabled": provider_data.diffEnabled,
+        "todoListEnabled": provider_data.todoListEnabled,
+        "fuzzyMatchThreshold": provider_data.fuzzyMatchThreshold,
+        "rateLimitSeconds": provider_data.rateLimitSeconds,
+        "consecutiveMistakeLimit": provider_data.consecutiveMistakeLimit,
+        "enableReasoningEffort": provider_data.enableReasoningEffort,
+        "toolChoice": provider_data.toolChoice,
+        "temperature": provider_data.temperature,
+    }
+
+    if provider_data.openAiBaseUrl:
+        provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
+    if provider_data.openAiApiKey:
+        provider_config["openAiApiKey"] = provider_data.openAiApiKey
+    if provider_data.openAiModelId:
+        provider_config["openAiModelId"] = provider_data.openAiModelId
+    if provider_data.openAiLegacyFormat is not None:
+        provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
+    if provider_data.openAiCustomModelInfo:
+        provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
+    # 使用前端传来的 openAiHeaders，如果没有则使用现有配置的值
+    provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else existing_config.get("openAiHeaders", {})
+
+    api_configs[provider_name] = provider_config
+    provider_profiles["apiConfigs"] = api_configs
+    settings["providerProfiles"] = provider_profiles
+
+    with settings_file.open("w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+
+    # 清除工作区的llm_manager缓存，强制重新加载配置
+    workspace.llm_manager = None
+
+    logger.info(f"Updated LLM provider: {provider_name}")
+
+    return {
+        "success": True,
+        "message": f"LLM provider '{provider_name}' updated successfully",
+        "provider": {
+            "name": provider_name,
             "id": provider_id,
-            "apiProvider": provider_data.apiProvider,
-            "diffEnabled": provider_data.diffEnabled,
-            "todoListEnabled": provider_data.todoListEnabled,
-            "fuzzyMatchThreshold": provider_data.fuzzyMatchThreshold,
-            "rateLimitSeconds": provider_data.rateLimitSeconds,
-            "consecutiveMistakeLimit": provider_data.consecutiveMistakeLimit,
-            "enableReasoningEffort": provider_data.enableReasoningEffort,
-            "toolChoice": provider_data.toolChoice,
-            "temperature": provider_data.temperature,
-        }
-
-        if provider_data.openAiBaseUrl:
-            provider_config["openAiBaseUrl"] = provider_data.openAiBaseUrl
-        if provider_data.openAiApiKey:
-            provider_config["openAiApiKey"] = provider_data.openAiApiKey
-        if provider_data.openAiModelId:
-            provider_config["openAiModelId"] = provider_data.openAiModelId
-        if provider_data.openAiLegacyFormat is not None:
-            provider_config["openAiLegacyFormat"] = provider_data.openAiLegacyFormat
-        if provider_data.openAiCustomModelInfo:
-            provider_config["openAiCustomModelInfo"] = provider_data.openAiCustomModelInfo
-        # 使用前端传来的 openAiHeaders，如果没有则使用现有配置的值
-        provider_config["openAiHeaders"] = provider_data.openAiHeaders if provider_data.openAiHeaders is not None else existing_config.get("openAiHeaders", {})
-
-        api_configs[provider_name] = provider_config
-        provider_profiles["apiConfigs"] = api_configs
-        settings["providerProfiles"] = provider_profiles
-
-        with settings_file.open("w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
-
-        # 清除工作区的llm_manager缓存，强制重新加载配置
-        workspace.llm_manager = None
-
-        logger.info(f"Updated LLM provider: {provider_name}")
-
-        return {
-            "success": True,
-            "message": f"LLM provider '{provider_name}' updated successfully",
-            "provider": {
-                "name": provider_name,
-                "id": provider_id,
-                "config": provider_config,
-            },
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Failed to update LLM provider: ")
-        raise HTTPException(status_code=500, detail=f"Failed to update LLM provider: {e!s}")
+            "config": provider_config,
+        },
+    }
 
 
 @router.post("/{workspace_id}/llm-providers/test")
@@ -523,38 +499,37 @@ async def test_llm_provider(
                     "message": f"Tool Call 支持正常 (temperature={test_temperature}, tool_choice={test_tool_choice or 'auto'})",
                     "model": model_id,
                 }
-            else:
-                # 没有返回 tool call，可能是模型不支持或没有强制要求
-                # 尝试强制要求 tool call（仅在用户没有设置 tool_choice 时）
-                if not test_tool_choice:
-                    try:
-                        all_tool_calls_force = []
-                        async for chunk in llm_api.create_message(
-                            messages=test_messages,
-                            tools=test_tools,
-                            tool_choice="required",
-                            temperature=test_temperature,
-                        ):
-                            if isinstance(chunk, CompleteMessage):
-                                if chunk.tool_calls:
-                                    all_tool_calls_force.extend(chunk.tool_calls)
+            # 没有返回 tool call，可能是模型不支持或没有强制要求
+            # 尝试强制要求 tool call（仅在用户没有设置 tool_choice 时）
+            if not test_tool_choice:
+                try:
+                    all_tool_calls_force = []
+                    async for chunk in llm_api.create_message(
+                        messages=test_messages,
+                        tools=test_tools,
+                        tool_choice="required",
+                        temperature=test_temperature,
+                    ):
+                        if isinstance(chunk, CompleteMessage):
+                            if chunk.tool_calls:
+                                all_tool_calls_force.extend(chunk.tool_calls)
 
-                        if all_tool_calls_force:
-                            return {
-                                "success": True,
-                                "supported": True,
-                                "message": f"Tool Call 支持正常 (强制模式, temperature={test_temperature})",
-                                "model": model_id,
-                            }
-                    except Exception:
-                        pass
+                    if all_tool_calls_force:
+                        return {
+                            "success": True,
+                            "supported": True,
+                            "message": f"Tool Call 支持正常 (强制模式, temperature={test_temperature})",
+                            "model": model_id,
+                        }
+                except Exception:
+                    pass
 
-                return {
-                    "success": True,
-                    "supported": False,
-                    "message": f"该模型不支持 Tool Call 或未返回 tool call (temperature={test_temperature}, tool_choice={test_tool_choice or 'auto'})",
-                    "model": model_id,
-                }
+            return {
+                "success": True,
+                "supported": False,
+                "message": f"该模型不支持 Tool Call 或未返回 tool call (temperature={test_temperature}, tool_choice={test_tool_choice or 'auto'})",
+                "model": model_id,
+            }
 
         except Exception as e:
             logger.exception("test_llm_provider")
@@ -589,77 +564,68 @@ async def delete_llm_provider(
     if not workspace.is_initialized():
         await workspace.initialize()
 
-    try:
-        # 确定 provider 在哪个配置文件中
-        workspace_settings_file = workspace.user_config_dir / "settings.json"
-        user_settings_file = Path(get_dawei_home()) / "settings.json"
+    # 确定 provider 在哪个配置文件中
+    workspace_settings_file = workspace.user_config_dir / "settings.json"
+    user_settings_file = Path(get_dawei_home()) / "settings.json"
 
-        # 查找 provider：先工作区，后用户级
-        settings_file = None
-        source = None
+    # 查找 provider：先工作区，后用户级
+    settings_file = None
 
-        # 检查工作区级配置
-        if workspace_settings_file.exists():
-            with workspace_settings_file.open(encoding="utf-8") as f:
-                workspace_settings = json.load(f)
-            workspace_api_configs = workspace_settings.get("providerProfiles", {}).get("apiConfigs", {})
-            if provider_name in workspace_api_configs:
-                settings_file = workspace_settings_file
-                settings = workspace_settings
-                source = "workspace"
+    # 检查工作区级配置
+    if workspace_settings_file.exists():
+        with workspace_settings_file.open(encoding="utf-8") as f:
+            workspace_settings = json.load(f)
+        workspace_api_configs = workspace_settings.get("providerProfiles", {}).get("apiConfigs", {})
+        if provider_name in workspace_api_configs:
+            settings_file = workspace_settings_file
+            settings = workspace_settings
 
-        # 如果工作区级没找到，检查用户级配置
-        if not settings_file and user_settings_file.exists():
-            with user_settings_file.open(encoding="utf-8") as f:
-                user_settings = json.load(f)
-            user_api_configs = user_settings.get("providerProfiles", {}).get("apiConfigs", {})
-            if provider_name in user_api_configs:
-                settings_file = user_settings_file
-                settings = user_settings
-                source = "user"
+    # 如果工作区级没找到，检查用户级配置
+    if not settings_file and user_settings_file.exists():
+        with user_settings_file.open(encoding="utf-8") as f:
+            user_settings = json.load(f)
+        user_api_configs = user_settings.get("providerProfiles", {}).get("apiConfigs", {})
+        if provider_name in user_api_configs:
+            settings_file = user_settings_file
+            settings = user_settings
 
-        # 如果都没找到，报错
-        if not settings_file:
-            raise HTTPException(status_code=404, detail=f"Provider '{provider_name}' not found")
+    # 如果都没找到，报错
+    if not settings_file:
+        raise HTTPException(status_code=404, detail=f"Provider '{provider_name}' not found")
 
-        provider_profiles = settings.get("providerProfiles", {})
-        api_configs = provider_profiles.get("apiConfigs", {})
+    provider_profiles = settings.get("providerProfiles", {})
+    api_configs = provider_profiles.get("apiConfigs", {})
 
-        # 在删除前获取 provider 的 id
-        deleted_provider_id = api_configs[provider_name].get("id")
+    # 在删除前获取 provider 的 id
+    deleted_provider_id = api_configs[provider_name].get("id")
 
-        # 删除配置
-        del api_configs[provider_name]
+    # 删除配置
+    del api_configs[provider_name]
 
-        # 如果是当前默认配置,清除默认设置
-        if provider_profiles.get("currentApiConfigName") == provider_name:
-            provider_profiles["currentApiConfigName"] = None
+    # 如果是当前默认配置,清除默认设置
+    if provider_profiles.get("currentApiConfigName") == provider_name:
+        provider_profiles["currentApiConfigName"] = None
 
-        # 清除 modeApiConfigs 中的引用
-        mode_configs = provider_profiles.get("modeApiConfigs", {})
-        if deleted_provider_id:
-            for mode, config_id in list(mode_configs.items()):
-                if config_id == deleted_provider_id:
-                    mode_configs[mode] = None
+    # 清除 modeApiConfigs 中的引用
+    mode_configs = provider_profiles.get("modeApiConfigs", {})
+    if deleted_provider_id:
+        for mode, config_id in list(mode_configs.items()):
+            if config_id == deleted_provider_id:
+                mode_configs[mode] = None
 
-        provider_profiles["apiConfigs"] = api_configs
-        provider_profiles["modeApiConfigs"] = mode_configs
-        settings["providerProfiles"] = provider_profiles
+    provider_profiles["apiConfigs"] = api_configs
+    provider_profiles["modeApiConfigs"] = mode_configs
+    settings["providerProfiles"] = provider_profiles
 
-        with settings_file.open("w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
+    with settings_file.open("w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
 
-        # 清除工作区的llm_manager缓存，强制重新加载配置
-        workspace.llm_manager = None
+    # 清除工作区的llm_manager缓存，强制重新加载配置
+    workspace.llm_manager = None
 
-        logger.info(f"Deleted LLM provider: {provider_name} from {settings_file}")
+    logger.info(f"Deleted LLM provider: {provider_name} from {settings_file}")
 
-        return {
-            "success": True,
-            "message": f"LLM provider '{provider_name}' deleted successfully",
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Failed to delete LLM provider: ")
-        raise HTTPException(status_code=500, detail=f"Failed to delete LLM provider: {e!s}")
+    return {
+        "success": True,
+        "message": f"LLM provider '{provider_name}' deleted successfully",
+    }

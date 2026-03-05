@@ -156,15 +156,11 @@ async def load_workspace_config(workspace: UserWorkspace) -> WorkspaceConfig:
         logger.info(f"Config file not found, using defaults: {config_file}")
         return WorkspaceConfig()
 
-    try:
-        with Path(config_file).open(encoding="utf-8") as f:
-            config_dict = json.load(f)
+    with Path(config_file).open(encoding="utf-8") as f:
+        config_dict = json.load(f)
 
-        # 使用 WorkspaceConfig.from_dict 合并默认值
-        return WorkspaceConfig.from_dict(config_dict)
-    except (OSError, json.JSONDecodeError) as e:
-        logger.error(f"Failed to load config file: {e}", exc_info=True)
-        return WorkspaceConfig()
+    # 使用 WorkspaceConfig.from_dict 合并默认值
+    return WorkspaceConfig.from_dict(config_dict)
 
 
 async def save_workspace_config(workspace: UserWorkspace, config: WorkspaceConfig) -> None:
@@ -190,28 +186,20 @@ async def save_workspace_config(workspace: UserWorkspace, config: WorkspaceConfi
 @router.get("/{workspace_id}/config")
 async def get_workspace_config(workspace_id: str) -> WorkspaceConfigResponse:
     """获取工作区配置"""
-    try:
-        workspace = get_user_workspace(workspace_id)
+    workspace = get_user_workspace(workspace_id)
 
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
 
-        config = await load_workspace_config(workspace)
+    config = await load_workspace_config(workspace)
 
-        # 转换为字典返回（兼容前端）
-        return WorkspaceConfigResponse(
-            success=True,
-            config=config.model_dump_custom(),
-            message=None,
-        )
-
-    except (OSError, json.JSONDecodeError, AttributeError, KeyError) as e:
-        logger.error(f"Failed to get workspace config: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get workspace config: {e!s}",
-        )
+    # 转换为字典返回（兼容前端）
+    return WorkspaceConfigResponse(
+        success=True,
+        config=config.model_dump_custom(),
+        message=None,
+    )
 
 
 @router.put("/{workspace_id}/config")
@@ -220,79 +208,56 @@ async def update_workspace_config(
     config_update: WorkspaceConfigUpdate,
 ) -> WorkspaceConfigResponse:
     """更新工作区配置"""
-    try:
-        workspace = get_user_workspace(workspace_id)
+    workspace = get_user_workspace(workspace_id)
 
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
 
-        # 加载当前配置
-        current_config = await load_workspace_config(workspace)
+    # 加载当前配置
+    current_config = await load_workspace_config(workspace)
 
-        # 更新配置（只更新提供的字段）
-        update_dict = config_update.model_dump(exclude_unset=True)
-        for key, value in update_dict.items():
-            if value is not None and isinstance(value, dict):
-                # 合并配置节的字段
-                current_section = getattr(current_config, key)
-                # 更新配置节（保留未指定的字段）
-                for sub_key, sub_value in value.items():
-                    setattr(current_section, sub_key, sub_value)
+    # 更新配置（只更新提供的字段）
+    update_dict = config_update.model_dump(exclude_unset=True)
+    for key, value in update_dict.items():
+        if value is not None and isinstance(value, dict):
+            # 合并配置节的字段
+            current_section = getattr(current_config, key)
+            # 更新配置节（保留未指定的字段）
+            for sub_key, sub_value in value.items():
+                setattr(current_section, sub_key, sub_value)
 
-        # 保存配置
-        await save_workspace_config(workspace, current_config)
+    # 保存配置
+    await save_workspace_config(workspace, current_config)
 
-        logger.info(f"Workspace config updated for workspace {workspace_id}")
+    logger.info(f"Workspace config updated for workspace {workspace_id}")
 
-        return WorkspaceConfigResponse(
-            success=True,
-            config=current_config.model_dump_custom(),
-            message="Workspace configuration updated successfully",
-        )
-
-    except (
-        OSError,
-        json.JSONDecodeError,
-        AttributeError,
-        KeyError,
-        ValueError,
-        TypeError,
-    ) as e:
-        logger.error(f"Failed to update workspace config: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update workspace config: {e!s}",
-        )
+    return WorkspaceConfigResponse(
+        success=True,
+        config=current_config.model_dump_custom(),
+        message="Workspace configuration updated successfully",
+    )
 
 
 @router.post("/{workspace_id}/config/reset")
 async def reset_workspace_config(workspace_id: str) -> WorkspaceConfigResponse:
     """重置工作区配置为默认值"""
-    try:
-        workspace = get_user_workspace(workspace_id)
+    workspace = get_user_workspace(workspace_id)
 
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
 
-        # 使用默认配置（WorkspaceConfig 默认值）
-        default_config = WorkspaceConfig()
+    # 使用默认配置（WorkspaceConfig 默认值）
+    default_config = WorkspaceConfig()
 
-        # 保存默认配置
-        await save_workspace_config(workspace, default_config)
+    # 保存默认配置
+    await save_workspace_config(workspace, default_config)
 
-        logger.info(f"Workspace config reset to defaults for workspace {workspace_id}")
+    logger.info(f"Workspace config reset to defaults for workspace {workspace_id}")
 
-        return WorkspaceConfigResponse(
-            success=True,
-            config=default_config.model_dump_custom(),
-            message="Workspace configuration reset to defaults",
-        )
-
-    except (OSError, json.JSONDecodeError, AttributeError, KeyError) as e:
-        logger.error(f"Failed to reset workspace config: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to reset workspace config: {e!s}",
-        )
+    return WorkspaceConfigResponse(
+        success=True,
+        config=default_config.model_dump_custom(),
+        message="Workspace configuration reset to defaults",
+    )

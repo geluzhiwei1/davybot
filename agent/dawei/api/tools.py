@@ -123,39 +123,36 @@ async def list_commands(workspace: str | None = None, reload: bool = False) -> d
         HTTPException: If command listing fails
 
     """
-    try:
-        cmd_mgr = get_command_manager()
+    cmd_mgr = get_command_manager()
 
-        # Only update workspace context if a valid workspace path is provided
-        # Ignore "default" workspace string as it's not a real path
-        if workspace and workspace != "default":
-            _update_workspace_context(cmd_mgr, workspace)
-            if reload:
-                cmd_mgr.reload()
-        elif reload:
-            # Reload without changing workspace context
+    # Only update workspace context if a valid workspace path is provided
+    # Ignore "default" workspace string as it's not a real path
+    if workspace and workspace != "default":
+        _update_workspace_context(cmd_mgr, workspace)
+        if reload:
             cmd_mgr.reload()
+    elif reload:
+        # Reload without changing workspace context
+        cmd_mgr.reload()
 
-        commands = cmd_mgr.get_all_commands()
-        commands_list = [_format_command_for_response(name, cmd) for name, cmd in commands.items()]
+    commands = cmd_mgr.get_all_commands()
+    commands_list = [_format_command_for_response(name, cmd) for name, cmd in commands.items()]
 
-        # Log for debugging
-        import logging
+    # Log for debugging
+    import logging
 
-        logger = logging.getLogger(__name__)
-        logger.info(f"[API] Returning {len(commands_list)} slash commands (workspace={workspace}, reload={reload})")
-        if len(commands_list) == 0:
-            logger.warning("[API] No slash commands found! Built-in commands may not be registered.")
+    logger = logging.getLogger(__name__)
+    logger.info(f"[API] Returning {len(commands_list)} slash commands (workspace={workspace}, reload={reload})")
+    if len(commands_list) == 0:
+        logger.warning("[API] No slash commands found! Built-in commands may not be registered.")
 
-        return {
-            "success": True,
-            "total": len(commands_list),
-            "commands": commands_list,
-            "workspace": workspace,
-            "reload": reload,
-        }
-    except (OSError, json.JSONDecodeError, AttributeError, KeyError) as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list commands: {e!s}")
+    return {
+        "success": True,
+        "total": len(commands_list),
+        "commands": commands_list,
+        "workspace": workspace,
+        "reload": reload,
+    }
 
 
 @router.get("/commands/{command_name}")
@@ -173,22 +170,17 @@ async def get_command(command_name: str, workspace: str | None = None) -> dict[s
         HTTPException: If command not found (404) or retrieval fails (500)
 
     """
-    try:
-        cmd_mgr = get_command_manager()
-        _update_workspace_context(cmd_mgr, workspace)
+    cmd_mgr = get_command_manager()
+    _update_workspace_context(cmd_mgr, workspace)
 
-        cmd = cmd_mgr.get_command(command_name)
-        if not cmd:
-            raise HTTPException(status_code=404, detail=f"Command '/{command_name}' not found")
+    cmd = cmd_mgr.get_command(command_name)
+    if not cmd:
+        raise HTTPException(status_code=404, detail=f"Command '/{command_name}' not found")
 
-        command_data = _format_command_for_response(cmd.name, cmd)
-        command_data["content"] = cmd.content
+    command_data = _format_command_for_response(cmd.name, cmd)
+    command_data["content"] = cmd.content
 
-        return {"success": True, "command": command_data}
-    except HTTPException:
-        raise
-    except (OSError, json.JSONDecodeError, AttributeError, KeyError) as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get command: {e!s}")
+    return {"success": True, "command": command_data}
 
 
 @router.post("/commands/reload")
@@ -207,20 +199,17 @@ async def reload_commands(workspace: str | None = None) -> dict[str, Any]:
         HTTPException: If reload fails
 
     """
-    try:
-        cmd_mgr = get_command_manager()
-        _update_workspace_context(cmd_mgr, workspace)
+    cmd_mgr = get_command_manager()
+    _update_workspace_context(cmd_mgr, workspace)
 
-        commands = cmd_mgr.reload()
+    commands = cmd_mgr.reload()
 
-        return {
-            "success": True,
-            "message": "Commands reloaded successfully",
-            "total": len(commands),
-            "workspace": workspace,
-        }
-    except (OSError, json.JSONDecodeError, AttributeError) as e:
-        raise HTTPException(status_code=500, detail=f"Failed to reload commands: {e!s}")
+    return {
+        "success": True,
+        "message": "Commands reloaded successfully",
+        "total": len(commands),
+        "workspace": workspace,
+    }
 
 
 @router.post("/commands/execute")
@@ -246,23 +235,13 @@ async def execute_command(
         HTTPException: If command execution fails
 
     """
-    try:
-        tool = get_slash_command_tool()
+    tool = get_slash_command_tool()
 
-        if workspace:
-            tool.command_manager.workspace_root = Path(workspace)
-            tool.command_manager.reload()
+    if workspace:
+        tool.command_manager.workspace_root = Path(workspace)
+        tool.command_manager.reload()
 
-        result_json = tool._run(command, args)
-        result = json.loads(result_json)
+    result_json = tool._run(command, args)
+    result = json.loads(result_json)
 
-        return {"success": result.get("status") == "success", "result": result}
-    except (
-        OSError,
-        json.JSONDecodeError,
-        AttributeError,
-        KeyError,
-        ValueError,
-        TypeError,
-    ) as e:
-        raise HTTPException(status_code=500, detail=f"Failed to execute command: {e!s}")
+    return {"success": result.get("status") == "success", "result": result}

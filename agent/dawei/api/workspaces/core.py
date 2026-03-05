@@ -10,15 +10,14 @@ from typing import Any
 from urllib.parse import urlparse
 
 import yaml
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 # 导入服务依赖
 from dawei.api.services import get_workspace_file_service
 from dawei.config import get_dawei_home
-from dawei.storage.storage_provider import StorageProvider
 from dawei.storage.storage import Storage
+from dawei.storage.storage_provider import StorageProvider
 from dawei.tools.skill_manager import SkillManager
 from dawei.workspace import workspace_manager
 from dawei.workspace.user_workspace import UserWorkspace
@@ -171,17 +170,16 @@ async def get_workspace_files_or_content(
         content_type = mime_types.get(file_ext, "application/octet-stream")
 
         return Response(content=content, media_type=content_type)
-    else:
-        # Return text file
-        try:
-            content = await storage.read_file(path)
-        except UnicodeDecodeError:
-            # If text decoding fails, fall back to binary
-            logger.warning(f"Failed to decode file {path} as text, trying binary mode")
-            content = await storage.read_binary_file(path)
-            return Response(content=content, media_type="application/octet-stream")
+    # Return text file
+    try:
+        content = await storage.read_file(path)
+    except UnicodeDecodeError:
+        # If text decoding fails, fall back to binary
+        logger.warning(f"Failed to decode file {path} as text, trying binary mode")
+        content = await storage.read_binary_file(path)
+        return Response(content=content, media_type="application/octet-stream")
 
-        return {"success": True, "type": "file", "path": path, "content": content}
+    return {"success": True, "type": "file", "path": path, "content": content}
 
 
 @router.post("/{workspace_id}/files")
@@ -399,7 +397,7 @@ async def get_mode_rules(
             relative_dir = str(rules_abs_path.relative_to(workspace_path))
         except ValueError as e:
             # 规则目录不在工作区内，这是配置错误
-            logger.error(
+            logger.exception(
                 f"Rules directory {rules_abs_path} is not within workspace {workspace_path}"
             )
             raise HTTPException(
@@ -544,7 +542,7 @@ async def update_mode_rules(
             relative_dir = str(Path(rules_dir).relative_to(Path(workspace.absolute_path)))
         except ValueError as e:
             # 规则目录不在工作区内，这是配置错误
-            logger.error(
+            logger.exception(
                 f"Rules directory {rules_dir} is not within workspace {workspace.absolute_path}"
             )
             raise HTTPException(
@@ -750,10 +748,10 @@ async def get_workspace_stats(workspace_id: str):
     agents_count = 0
     modes_file = Path(workspace_path) / ".dawei" / "modes.yaml"
     if modes_file.exists():
-        with open(modes_file, 'r', encoding='utf-8') as f:
+        with modes_file.open(encoding="utf-8") as f:
             modes_data = yaml.safe_load(f)
             if modes_data and isinstance(modes_data, dict):
-                agents_count = len(modes_data.get('modes', []))
+                agents_count = len(modes_data.get("modes", []))
 
     return {
         "totalFiles": total_files,
@@ -796,10 +794,10 @@ async def get_global_stats():
     modes_count = 0
     modes_file = Path(get_dawei_home()) / ".dawei" / "modes.yaml"
     if modes_file.exists():
-        with open(modes_file, 'r', encoding='utf-8') as f:
+        with modes_file.open(encoding="utf-8") as f:
             modes_data = yaml.safe_load(f)
             if modes_data and isinstance(modes_data, dict):
-                modes_count = len(modes_data.get('modes', []))
+                modes_count = len(modes_data.get("modes", []))
 
     return {
         "workspacesCount": workspaces_count,

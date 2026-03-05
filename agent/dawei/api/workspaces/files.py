@@ -124,35 +124,24 @@ async def create_file_or_directory(
     # Fast Fail: 检查路径是否已存在
     _validate_path_not_exists(full_path, f"Path already exists: {data.path}")
 
-    try:
-        # 创建文件或目录
-        if data.is_directory:
-            # 创建目录
-            full_path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Created directory: {full_path}")
-        else:
-            # 确保父目录存在
-            full_path.parent.mkdir(parents=True, exist_ok=True)
+    # 创建文件或目录
+    if data.is_directory:
+        # 创建目录
+        full_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created directory: {full_path}")
+    else:
+        # 确保父目录存在
+        full_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # 创建文件
-            full_path.write_text(data.content, encoding="utf-8")
-            logger.info(f"Created file: {full_path}")
+        # 创建文件
+        full_path.write_text(data.content, encoding="utf-8")
+        logger.info(f"Created file: {full_path}")
 
-        return {
-            "success": True,
-            "message": f"{'Directory' if data.is_directory else 'File'} created successfully",
-            "path": data.path,
-        }
-
-    except OSError as e:
-        logger.error(f"创建文件失败 (文件系统错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"File system error: {e!s}")
-    except UnicodeEncodeError as e:
-        logger.error(f"创建文件失败 (编码错误): {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Encoding error: {e!s}")
-    except Exception as e:
-        logger.error(f"创建文件失败 (未知错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to create file: {e!s}")
+    return {
+        "success": True,
+        "message": f"{'Directory' if data.is_directory else 'File'} created successfully",
+        "path": data.path,
+    }
 
 
 @router.get("/{workspace_id}/file-tree")
@@ -164,51 +153,44 @@ async def get_workspace_file_tree(
     file_service: Storage = Depends(get_workspace_file_service),
 ):
     """获取工作区的文件树结构"""
-    try:
-        files = await file_service.list_directory(
-            path=path,
-            recursive=True,
-            include_hidden=include_hidden,
-            max_depth=max_depth,
+    files = await file_service.list_directory(
+        path=path,
+        recursive=True,
+        include_hidden=include_hidden,
+        max_depth=max_depth,
+    )
+
+    # Fast Fail: 验证文件列表数据
+    if not isinstance(files, list):
+        raise HTTPException(status_code=500, detail="Invalid file data format received from storage")
+
+    # 构建扁平化的文件树列表（兼容前端现有格式）
+    flat_tree = []
+    for file in files:
+        # Fast Fail: 验证单个文件数据
+        if not isinstance(file, dict) or "path" not in file or "name" not in file:
+            raise HTTPException(status_code=500, detail=f"Invalid file data structure: {file}")
+
+        path_parts = file["path"].split("/")
+        level = len(path_parts) - 1
+        flat_tree.append(
+            {
+                "id": file["path"],  # 添加 id 字段，使用 path 作为 id
+                "name": file["name"],
+                "path": file["path"],
+                "type": ("directory" if file["is_directory"] else "file"),  # 使用 directory 而不是 folder
+                "level": level,
+                "size": file.get("size", 0),
+                "createdAt": file.get("created_at", ""),
+                "updatedAt": file.get("updated_at", ""),
+                "children": [],  # 添加 children 字段
+            },
         )
 
-        # Fast Fail: 验证文件列表数据
-        if not isinstance(files, list):
-            raise ValueError("Invalid file data format received from storage")
+    # 按路径排序，确保文件夹在前，文件在后
+    flat_tree.sort(key=lambda x: (x["path"], x["type"] == "file"))
 
-        # 构建扁平化的文件树列表（兼容前端现有格式）
-        flat_tree = []
-        for file in files:
-            # Fast Fail: 验证单个文件数据
-            if not isinstance(file, dict) or "path" not in file or "name" not in file:
-                raise ValueError(f"Invalid file data structure: {file}")
-
-            path_parts = file["path"].split("/")
-            level = len(path_parts) - 1
-            flat_tree.append(
-                {
-                    "id": file["path"],  # 添加 id 字段，使用 path 作为 id
-                    "name": file["name"],
-                    "path": file["path"],
-                    "type": ("directory" if file["is_directory"] else "file"),  # 使用 directory 而不是 folder
-                    "level": level,
-                    "size": file.get("size", 0),
-                    "createdAt": file.get("created_at", ""),
-                    "updatedAt": file.get("updated_at", ""),
-                    "children": [],  # 添加 children 字段
-                },
-            )
-
-        # 按路径排序，确保文件夹在前，文件在后
-        flat_tree.sort(key=lambda x: (x["path"], x["type"] == "file"))
-
-        return {"success": True, "fileTree": flat_tree}
-    except (ValueError, TypeError) as e:
-        logger.exception("获取文件树失败 (数据格式错误): ")
-        raise HTTPException(status_code=400, detail=f"Invalid data format: {e!s}")
-    except Exception as e:
-        logger.error(f"获取文件树失败 (服务错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get file tree: {e!s}")
+    return {"success": True, "fileTree": flat_tree}
 
 
 # --- 文件上传API ---
@@ -246,42 +228,31 @@ async def upload_file(
     # Fast Fail: 验证目标目录安全性
     _validate_path_safety(workspace_path, target_dir)
 
-    try:
-        # 确保目标目录存在
-        target_dir.mkdir(parents=True, exist_ok=True)
+    # 确保目标目录存在
+    target_dir.mkdir(parents=True, exist_ok=True)
 
-        # 构建文件路径（支持文件夹上传时的相对路径）
-        file_path = target_dir / file.filename
+    # 构建文件路径（支持文件夹上传时的相对路径）
+    file_path = target_dir / file.filename
 
-        # 验证最终路径安全性，防止路径遍历攻击
-        _validate_path_safety(workspace_path, file_path)
+    # 验证最终路径安全性，防止路径遍历攻击
+    _validate_path_safety(workspace_path, file_path)
 
-        # 检查文件是否已存在
-        if file_path.exists():
-            logger.warning(f"File already exists, will overwrite: {file_path}")
+    # 检查文件是否已存在
+    if file_path.exists():
+        logger.warning(f"File already exists, will overwrite: {file_path}")
 
-        # 保存文件
-        with Path(file_path).open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    # 保存文件
+    with Path(file_path).open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
-        logger.info(f"File uploaded successfully: {file_path}")
+    logger.info(f"File uploaded successfully: {file_path}")
 
-        return {
-            "success": True,
-            "message": "File uploaded successfully",
-            "filename": file.filename,
-            "path": str(file_path.relative_to(workspace_path)),
-        }
-
-    except OSError as e:
-        logger.error(f"文件上传失败 (文件系统错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"File system error: {e!s}")
-    except OSError as e:
-        logger.error(f"文件上传失败 (I/O错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"I/O error: {e!s}")
-    except Exception as e:
-        logger.error(f"文件上传失败 (未知错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to upload file: {e!s}")
+    return {
+        "success": True,
+        "message": "File uploaded successfully",
+        "filename": file.filename,
+        "path": str(file_path.relative_to(workspace_path)),
+    }
 
 
 @router.post("/{workspace_id}/files/upload-folder")
@@ -353,18 +324,11 @@ async def upload_folder(
             )
             logger.info(f"File uploaded successfully: {file_path}")
 
-        except OSError as e:
-            error_msg = f"File system error: {e!s}"
-            errors.append(f"{file.filename}: {error_msg}")
-            logger.error(f"{file.filename}: {error_msg}", exc_info=True)
-        except OSError as e:
-            error_msg = f"I/O error: {e!s}"
-            errors.append(f"{file.filename}: {error_msg}")
-            logger.error(f"{file.filename}: {error_msg}", exc_info=True)
         except Exception as e:
-            error_msg = f"Unknown error: {e!s}"
+            # Non-critical operation: log and continue with next file
+            error_msg = str(e)
             errors.append(f"{file.filename}: {error_msg}")
-            logger.error(f"{file.filename}: {error_msg}", exc_info=True)
+            logger.warning(f"{file.filename}: {error_msg}")
 
     logger.info(
         f"Folder upload completed: {len(uploaded_files)} files uploaded, {len(errors)} errors",
@@ -407,32 +371,21 @@ async def delete_file_or_directory(
     # Fast Fail: 检查路径是否在工作区内（防止路径遍历攻击）
     _validate_path_safety(workspace_path, full_path)
 
-    try:
-        # 删除文件或目录
-        if full_path.is_file():
-            full_path.unlink()
-            logger.info(f"Deleted file: {full_path}")
-        elif full_path.is_dir():
-            shutil.rmtree(full_path)
-            logger.info(f"Deleted directory: {full_path}")
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid path type: {path}")
+    # 删除文件或目录
+    if full_path.is_file():
+        full_path.unlink()
+        logger.info(f"Deleted file: {full_path}")
+    elif full_path.is_dir():
+        shutil.rmtree(full_path)
+        logger.info(f"Deleted directory: {full_path}")
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid path type: {path}")
 
-        return {
-            "success": True,
-            "message": f"{'Directory' if full_path.is_dir() else 'File'} deleted successfully",
-            "path": path,
-        }
-
-    except PermissionError as e:
-        logger.error(f"删除文件失败 (权限错误): {e}", exc_info=True)
-        raise HTTPException(status_code=403, detail=f"Permission denied: {e!s}")
-    except OSError as e:
-        logger.error(f"删除文件失败 (文件系统错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"File system error: {e!s}")
-    except Exception as e:
-        logger.error(f"删除文件失败 (未知错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to delete file: {e!s}")
+    return {
+        "success": True,
+        "message": f"{'Directory' if full_path.is_dir() else 'File'} deleted successfully",
+        "path": path,
+    }
 
 
 class CopyFileRequest(BaseModel):
@@ -479,38 +432,27 @@ async def copy_file_or_directory(
         f"Destination path already exists: {data.destination_path}",
     )
 
-    try:
-        # 复制文件或目录
-        if source_path.is_file():
-            # 确保目标目录存在
-            destination_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_path, destination_path)
-            logger.info(f"Copied file: {source_path} -> {destination_path}")
-        elif source_path.is_dir():
-            shutil.copytree(source_path, destination_path)
-            logger.info(f"Copied directory: {source_path} -> {destination_path}")
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid source path type: {data.source_path}",
-            )
+    # 复制文件或目录
+    if source_path.is_file():
+        # 确保目标目录存在
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, destination_path)
+        logger.info(f"Copied file: {source_path} -> {destination_path}")
+    elif source_path.is_dir():
+        shutil.copytree(source_path, destination_path)
+        logger.info(f"Copied directory: {source_path} -> {destination_path}")
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid source path type: {data.source_path}",
+        )
 
-        return {
-            "success": True,
-            "message": f"{'Directory' if source_path.is_dir() else 'File'} copied successfully",
-            "source": data.source_path,
-            "destination": data.destination_path,
-        }
-
-    except PermissionError as e:
-        logger.error(f"复制文件失败 (权限错误): {e}", exc_info=True)
-        raise HTTPException(status_code=403, detail=f"Permission denied: {e!s}")
-    except OSError as e:
-        logger.error(f"复制文件失败 (文件系统错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"File system error: {e!s}")
-    except Exception as e:
-        logger.error(f"复制文件失败 (未知错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to copy file: {e!s}")
+    return {
+        "success": True,
+        "message": f"{'Directory' if source_path.is_dir() else 'File'} copied successfully",
+        "source": data.source_path,
+        "destination": data.destination_path,
+    }
 
 
 class RenameFileRequest(BaseModel):
@@ -554,27 +496,16 @@ async def rename_file_or_directory(
     # Fast Fail: 检查新路径是否已存在
     _validate_path_not_exists(new_path, f"Destination path already exists: {data.new_path}")
 
-    try:
-        # 重命名文件或目录
-        old_path.rename(new_path)
-        logger.info(f"Renamed: {old_path} -> {new_path}")
+    # 重命名文件或目录
+    old_path.rename(new_path)
+    logger.info(f"Renamed: {old_path} -> {new_path}")
 
-        return {
-            "success": True,
-            "message": f"{'Directory' if old_path.is_dir() else 'File'} renamed successfully",
-            "old_path": data.old_path,
-            "new_path": data.new_path,
-        }
-
-    except PermissionError as e:
-        logger.error(f"重命名文件失败 (权限错误): {e}", exc_info=True)
-        raise HTTPException(status_code=403, detail=f"Permission denied: {e!s}")
-    except OSError as e:
-        logger.error(f"重命名文件失败 (文件系统错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"File system error: {e!s}")
-    except Exception as e:
-        logger.error(f"重命名文件失败 (未知错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to rename file: {e!s}")
+    return {
+        "success": True,
+        "message": f"{'Directory' if old_path.is_dir() else 'File'} renamed successfully",
+        "old_path": data.old_path,
+        "new_path": data.new_path,
+    }
 
 
 @router.get("/{workspace_id}/files/download")
@@ -594,9 +525,10 @@ async def download_file_or_directory(
         文件或目录（打包成zip）的下载响应
 
     """
-    from fastapi.responses import FileResponse, StreamingResponse
-    import zipfile
     import io
+    import zipfile
+
+    from fastapi.responses import FileResponse, StreamingResponse
 
     # 获取工作区根路径
     workspace_path = Path(file_service.root_dir)
@@ -610,59 +542,47 @@ async def download_file_or_directory(
     # Fast Fail: 检查路径是否在工作区内（防止路径遍历攻击）
     _validate_path_safety(workspace_path, full_path)
 
-    try:
-        if full_path.is_file():
-            # 下载单个文件
-            logger.info(f"Downloading file: {full_path}")
+    if full_path.is_file():
+        # 下载单个文件
+        logger.info(f"Downloading file: {full_path}")
 
-            # 获取文件名
-            filename = full_path.name
+        # 获取文件名
+        filename = full_path.name
 
-            # 返回文件响应
-            return FileResponse(
-                path=str(full_path),
-                filename=filename,
-                media_type='application/octet-stream'
-            )
+        # 返回文件响应
+        return FileResponse(
+            path=str(full_path),
+            filename=filename,
+            media_type="application/octet-stream"
+        )
 
-        elif full_path.is_dir():
-            # 下载目录（打包成zip）
-            logger.info(f"Downloading directory as zip: {full_path}")
+    if full_path.is_dir():
+        # 下载目录（打包成zip）
+        logger.info(f"Downloading directory as zip: {full_path}")
 
-            # 创建zip文件在内存中
-            zip_buffer = io.BytesIO()
+        # 创建zip文件在内存中
+        zip_buffer = io.BytesIO()
 
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for file_path in full_path.rglob('*'):
-                    if file_path.is_file():
-                        # 计算相对路径
-                        relative_path = file_path.relative_to(full_path)
-                        # 添加到zip
-                        zip_file.write(file_path, relative_path)
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for file_path in full_path.rglob("*"):
+                if file_path.is_file():
+                    # 计算相对路径
+                    relative_path = file_path.relative_to(full_path)
+                    # 添加到zip
+                    zip_file.write(file_path, relative_path)
 
-            zip_buffer.seek(0)
+        zip_buffer.seek(0)
 
-            # 生成zip文件名
-            dir_name = full_path.name
-            zip_filename = f"{dir_name}.zip"
+        # 生成zip文件名
+        dir_name = full_path.name
+        zip_filename = f"{dir_name}.zip"
 
-            # 返回zip文件
-            return StreamingResponse(
-                io.BytesIO(zip_buffer.getvalue()),
-                media_type="application/zip",
-                headers={
-                    "Content-Disposition": f"attachment; filename={zip_filename}"
-                }
-            )
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid path type: {path}")
-
-    except PermissionError as e:
-        logger.error(f"下载文件失败 (权限错误): {e}", exc_info=True)
-        raise HTTPException(status_code=403, detail=f"Permission denied: {e!s}")
-    except OSError as e:
-        logger.error(f"下载文件失败 (文件系统错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"File system error: {e!s}")
-    except Exception as e:
-        logger.error(f"下载文件失败 (未知错误): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to download file: {e!s}")
+        # 返回zip文件
+        return StreamingResponse(
+            io.BytesIO(zip_buffer.getvalue()),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename={zip_filename}"
+            }
+        )
+    raise HTTPException(status_code=400, detail=f"Invalid path type: {path}")

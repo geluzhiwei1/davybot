@@ -13,6 +13,7 @@ dawei server start --reload
 
 # Alternative: Using python -m (if dawei command is not found)
 python -m dawei.cli.dawei server start --reload
+# uv run uvicorn "dawei.debug_main:app"
 
 # Start with custom host and port
 dawei server start --host 0.0.0.0 --port 8465

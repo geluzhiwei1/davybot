@@ -12,7 +12,7 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from dawei.config import get_dawei_home
@@ -91,13 +91,9 @@ def save_privacy_config(config: PrivacyConfig) -> None:
     """
     config_path = get_privacy_config_path()
 
-    try:
-        with config_path.open("w", encoding="utf-8") as f:
-            json.dump(config.model_dump(), f, indent=2, ensure_ascii=False)
-        logger.info(f"Privacy config saved to {config_path}")
-    except OSError as e:
-        logger.error(f"Failed to save privacy config: {e}")
-        raise
+    with config_path.open("w", encoding="utf-8") as f:
+        json.dump(config.model_dump(), f, indent=2, ensure_ascii=False)
+    logger.info(f"Privacy config saved to {config_path}")
 
 
 # ============================================================================
@@ -108,25 +104,14 @@ def save_privacy_config(config: PrivacyConfig) -> None:
 @router.get("/config", response_model=PrivacyConfigResponse)
 async def get_privacy_settings() -> PrivacyConfigResponse:
     """获取隐私配置"""
-    try:
-        config = load_privacy_config()
-        return PrivacyConfigResponse(success=True, config=config)
-    except Exception as e:
-        logger.error(f"Failed to get privacy config: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to load privacy config: {str(e)}")
+    config = load_privacy_config()
+    return PrivacyConfigResponse(success=True, config=config)
 
 
 @router.put("/config", response_model=PrivacyConfigResponse)
 async def update_privacy_settings(config: PrivacyConfig) -> PrivacyConfigResponse:
     """更新隐私配置"""
-    try:
-        save_privacy_config(config)
-        return PrivacyConfigResponse(
-            success=True, config=config, message="Privacy configuration updated successfully"
-        )
-    except OSError as e:
-        logger.error(f"Failed to save privacy config: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to save privacy config: {str(e)}")
-    except Exception as e:
-        logger.error(f"Unexpected error updating privacy config: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    save_privacy_config(config)
+    return PrivacyConfigResponse(
+        success=True, config=config, message="Privacy configuration updated successfully"
+    )

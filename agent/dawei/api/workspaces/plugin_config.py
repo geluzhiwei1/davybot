@@ -111,78 +111,64 @@ async def list_all_plugin_configs(
     Returns:
         所有插件的配置信息，包括 schema 和当前值
     """
-    try:
-        # 扫描插件目录
-        plugins_dir = workspace.workspace_path / ".dawei" / "plugins"
+    # 扫描插件目录
+    plugins_dir = workspace.workspace_path / ".dawei" / "plugins"
 
-        plugins: dict[str, dict[str, Any]] = {}
+    plugins: dict[str, dict[str, Any]] = {}
 
-        if plugins_dir.exists():
-            for plugin_path in plugins_dir.iterdir():
-                if not plugin_path.is_dir():
-                    continue
+    if plugins_dir.exists():
+        for plugin_path in plugins_dir.iterdir():
+            if not plugin_path.is_dir():
+                continue
 
-                plugin_id = plugin_path.name
+            plugin_id = plugin_path.name
 
-                # 读取 plugin.yaml 获取配置 schema
-                plugin_yaml = plugin_path / "plugin.yaml"
-                if not plugin_yaml.exists():
-                    continue
+            # 读取 plugin.yaml 获取配置 schema
+            plugin_yaml = plugin_path / "plugin.yaml"
+            if not plugin_yaml.exists():
+                continue
 
-                try:
-                    import json
+            import json
 
-                    import yaml
+            import yaml
 
-                    plugin_meta = yaml.safe_load(plugin_yaml.read_text(encoding="utf-8"))
-                except Exception:
-                    # Skip plugin if config cannot be loaded
-                    # nosec B112 - Intentional skip for corrupted plugin configs
-                    logger.debug(f"Skipping plugin {plugin_id} due to config load error")
-                    continue
+            plugin_meta = yaml.safe_load(plugin_yaml.read_text(encoding="utf-8"))
 
-                # Construct plugin_id with version to match config file naming (e.g., feishu-channel@0.1.0)
-                plugin_version = plugin_meta.get("version", "")
-                if plugin_version:
-                    plugin_id = f"{plugin_id}@{plugin_version}"
+            # Construct plugin_id with version to match config file naming (e.g., feishu-channel@0.1.0)
+            plugin_version = plugin_meta.get("version", "")
+            if plugin_version:
+                plugin_id = f"{plugin_id}@{plugin_version}"
 
-                # Handle config_schema file reference
-                config_schema_value = plugin_meta.get("config_schema")
-                if isinstance(config_schema_value, str):
-                    # It's a file path, load JSON from it
-                    schema_path = plugin_path / config_schema_value
-                    if schema_path.exists():
-                        try:
-                            with schema_path.open(encoding="utf-8") as f:
-                                plugin_meta["config_schema"] = json.load(f)
-                        except Exception as e:
-                            logger.exception(f"Failed to load config_schema from {schema_path}: {e}")
-                            plugin_meta["config_schema"] = {}
-                    else:
-                        logger.warning(f"config_schema file not found: {schema_path}")
-                        plugin_meta["config_schema"] = {}
+            # Handle config_schema file reference
+            config_schema_value = plugin_meta.get("config_schema")
+            if isinstance(config_schema_value, str):
+                # It's a file path, load JSON from it
+                schema_path = plugin_path / config_schema_value
+                if schema_path.exists():
+                    with schema_path.open(encoding="utf-8") as f:
+                        plugin_meta["config_schema"] = json.load(f)
+                else:
+                    logger.warning(f"config_schema file not found: {schema_path}")
+                    plugin_meta["config_schema"] = {}
 
-                schema_to_use = plugin_meta.get("config_schema", {})
+            schema_to_use = plugin_meta.get("config_schema", {})
 
-                # 加载当前配置
-                config = manager.load_plugin_config(plugin_id)
+            # 加载当前配置
+            config = manager.load_plugin_config(plugin_id)
 
-                # Return inner settings to frontend (层级结构中提取 settings)
-                settings = config.get("settings", {})
+            # Return inner settings to frontend (层级结构中提取 settings)
+            settings = config.get("settings", {})
 
-                # 直接返回原始 schema，不做任何转换
-                plugins[plugin_id] = {
-                    "schema": schema_to_use,
-                    "config": settings,
-                }
+            # 直接返回原始 schema，不做任何转换
+            plugins[plugin_id] = {
+                "schema": schema_to_use,
+                "config": settings,
+            }
 
-        return PluginListResponse(
-            success=True,
-            plugins=plugins,
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list plugin configs: {str(e)}")
+    return PluginListResponse(
+        success=True,
+        plugins=plugins,
+    )
 
 
 @router.get("/schema")
@@ -193,13 +179,26 @@ async def get_plugin_schema(
     manager: PluginConfigManager = Depends(get_plugin_manager),
 ) -> PluginConfigResponse:
     """获取单个插件的配置 schema"""
-    try:
-        # 获取插件列表
-        list_response = await list_all_plugin_configs(workspace_id, workspace, manager)
+    # 获取插件列表
+    list_response = await list_all_plugin_configs(workspace_id, workspace, manager)
 
-        # 尝试直接查找
-        if plugin_id in list_response.plugins:
-            plugin_info = list_response.plugins[plugin_id]
+    # 尝试直接查找
+    if plugin_id in list_response.plugins:
+        plugin_info = list_response.plugins[plugin_id]
+        return PluginConfigResponse(
+            success=True,
+            config_schema=plugin_info.get("schema"),
+            config=plugin_info.get("config", {}),
+            existing_config=plugin_info.get("config", {}),  # 添加此行
+            form_config=plugin_info.get("form_config"),
+        )
+
+    # 如果带版本号（如 dingtalk-channel@0.1.0），尝试提取名称查找
+    if "@" in plugin_id:
+        plugin_name = plugin_id.split("@", maxsplit=1)[0]
+        logger.debug(f"Plugin ID '{plugin_id}' not found, trying name '{plugin_name}'")
+        if plugin_name in list_response.plugins:
+            plugin_info = list_response.plugins[plugin_name]
             return PluginConfigResponse(
                 success=True,
                 config_schema=plugin_info.get("schema"),
@@ -208,28 +207,9 @@ async def get_plugin_schema(
                 form_config=plugin_info.get("form_config"),
             )
 
-        # 如果带版本号（如 dingtalk-channel@0.1.0），尝试提取名称查找
-        if "@" in plugin_id:
-            plugin_name = plugin_id.split("@", maxsplit=1)[0]
-            logger.debug(f"Plugin ID '{plugin_id}' not found, trying name '{plugin_name}'")
-            if plugin_name in list_response.plugins:
-                plugin_info = list_response.plugins[plugin_name]
-                return PluginConfigResponse(
-                    success=True,
-                    config_schema=plugin_info.get("schema"),
-                    config=plugin_info.get("config", {}),
-                    existing_config=plugin_info.get("config", {}),  # 添加此行
-                    form_config=plugin_info.get("form_config"),
-                )
-
-        # 仍然找不到，返回 404
-        available_plugins = list(list_response.plugins.keys())
-        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found. Available plugins: {available_plugins}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get plugin schema: {str(e)}")
+    # 仍然找不到，返回 404
+    available_plugins = list(list_response.plugins.keys())
+    raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found. Available plugins: {available_plugins}")
 
 
 @router.get("/config")
@@ -240,44 +220,38 @@ async def get_plugin_config(
     manager: PluginConfigManager = Depends(get_plugin_manager),
 ) -> PluginConfigResponse:
     """获取插件当前配置"""
-    try:
-        # 获取插件列表
-        list_response = await list_all_plugin_configs(workspace_id, workspace, manager)
+    # 获取插件列表
+    list_response = await list_all_plugin_configs(workspace_id, workspace, manager)
 
-        # 确定实际使用的 plugin_id
+    # 确定实际使用的 plugin_id
+    actual_plugin_id = plugin_id
+    found = False
+
+    if plugin_id in list_response.plugins:
         actual_plugin_id = plugin_id
-        found = False
-
-        if plugin_id in list_response.plugins:
-            actual_plugin_id = plugin_id
+        found = True
+    elif "@" in plugin_id:
+        plugin_name = plugin_id.split("@", maxsplit=1)[0]
+        if plugin_name in list_response.plugins:
+            actual_plugin_id = plugin_name
             found = True
-        elif "@" in plugin_id:
-            plugin_name = plugin_id.split("@", maxsplit=1)[0]
-            if plugin_name in list_response.plugins:
-                actual_plugin_id = plugin_name
-                found = True
 
-        if not found:
-            raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
 
-        config = manager.load_plugin_config(actual_plugin_id)
-        plugin_info = list_response.plugins[actual_plugin_id]
+    config = manager.load_plugin_config(actual_plugin_id)
+    plugin_info = list_response.plugins[actual_plugin_id]
 
-        # Return inner settings to frontend (层级结构中提取 settings)
-        settings = config.get("settings", {})
+    # Return inner settings to frontend (层级结构中提取 settings)
+    settings = config.get("settings", {})
 
-        return PluginConfigResponse(
-            success=True,
-            config_schema=plugin_info.get("schema"),
-            config=settings,
-            existing_config=settings,
-            form_config=plugin_info.get("form_config"),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get plugin config: {str(e)}")
+    return PluginConfigResponse(
+        success=True,
+        config_schema=plugin_info.get("schema"),
+        config=settings,
+        existing_config=settings,
+        form_config=plugin_info.get("form_config"),
+    )
 
 
 @router.put("/config")
@@ -288,73 +262,66 @@ async def update_plugin_config(
     manager: PluginConfigManager = Depends(get_plugin_manager),
 ) -> PluginConfigResponse:
     """更新插件配置"""
-    try:
-        # 获取插件列表
-        list_response = await list_all_plugin_configs(
-            workspace_id,
-            workspace,
-            manager,
-        )
+    # 获取插件列表
+    list_response = await list_all_plugin_configs(
+        workspace_id,
+        workspace,
+        manager,
+    )
 
-        # 确定实际使用的 plugin_id
+    # 确定实际使用的 plugin_id
+    actual_plugin_id = request.plugin_id
+    found = False
+
+    if request.plugin_id in list_response.plugins:
         actual_plugin_id = request.plugin_id
-        found = False
-
-        if request.plugin_id in list_response.plugins:
-            actual_plugin_id = request.plugin_id
+        found = True
+    elif "@" in request.plugin_id:
+        plugin_name = request.plugin_id.split("@")[0]
+        if plugin_name in list_response.plugins:
+            actual_plugin_id = plugin_name
             found = True
-        elif "@" in request.plugin_id:
-            plugin_name = request.plugin_id.split("@")[0]
-            if plugin_name in list_response.plugins:
-                actual_plugin_id = plugin_name
-                found = True
 
-        if not found:
-            raise HTTPException(status_code=404, detail=f"Plugin '{request.plugin_id}' not found")
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Plugin '{request.plugin_id}' not found")
 
-        plugin_info = list_response.plugins[actual_plugin_id]
-        schema = plugin_info.get("schema")
+    plugin_info = list_response.plugins[actual_plugin_id]
+    schema = plugin_info.get("schema")
 
-        # 添加日志
-        logger.info(f"[PLUGIN CONFIG SAVE] plugin_id={actual_plugin_id}")
-        logger.info(f"[PLUGIN CONFIG SAVE] request.config={request.config}")
-        logger.info(f"[PLUGIN CONFIG SAVE] request.config type={type(request.config)}")
-        logger.info(f"[PLUGIN CONFIG SAVE] request.config keys={list(request.config.keys()) if request.config else 'None'}")
+    # 添加日志
+    logger.info(f"[PLUGIN CONFIG SAVE] plugin_id={actual_plugin_id}")
+    logger.info(f"[PLUGIN CONFIG SAVE] request.config={request.config}")
+    logger.info(f"[PLUGIN CONFIG SAVE] request.config type={type(request.config)}")
+    logger.info(f"[PLUGIN CONFIG SAVE] request.config keys={list(request.config.keys()) if request.config else 'None'}")
 
-        # 验证配置
-        is_valid = validate_config_against_schema(request.config, schema)
+    # 验证配置
+    is_valid = validate_config_against_schema(request.config, schema)
 
-        if not is_valid:
-            logger.error(f"[PLUGIN CONFIG SAVE] Validation failed!")
-            raise HTTPException(status_code=400, detail="Configuration validation failed. Please check your input values.")
+    if not is_valid:
+        logger.error("[PLUGIN CONFIG SAVE] Validation failed!")
+        raise HTTPException(status_code=400, detail="Configuration validation failed. Please check your input values.")
 
-        # 加载现有配置，合并后保存（保持层级结构）
-        existing_config = manager.load_plugin_config(actual_plugin_id)
-        full_config = {
-            "enabled": existing_config.get("enabled", True),
-            "activated": existing_config.get("activated", False),
-            "version": existing_config.get("version"),
-            "settings": request.config,
-        }
+    # 加载现有配置，合并后保存（保持层级结构）
+    existing_config = manager.load_plugin_config(actual_plugin_id)
+    full_config = {
+        "enabled": existing_config.get("enabled", True),
+        "activated": existing_config.get("activated", False),
+        "version": existing_config.get("version"),
+        "settings": request.config,
+    }
 
-        # 保存配置
-        manager.save_plugin_config(actual_plugin_id, full_config)
-        logger.info(f"[PLUGIN CONFIG SAVE] Saved successfully")
+    # 保存配置
+    manager.save_plugin_config(actual_plugin_id, full_config)
+    logger.info("[PLUGIN CONFIG SAVE] Saved successfully")
 
-        return PluginConfigResponse(
-            success=True,
-            config_schema=schema,
-            config=request.config,
-            existing_config=request.config,
-            form_config=plugin_info.get("form_config"),
-            message="Configuration updated successfully",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"[PLUGIN CONFIG SAVE] Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to update plugin config: {str(e)}")
+    return PluginConfigResponse(
+        success=True,
+        config_schema=schema,
+        config=request.config,
+        existing_config=request.config,
+        form_config=plugin_info.get("form_config"),
+        message="Configuration updated successfully",
+    )
 
 
 @router.post("/config/reset")
@@ -365,60 +332,54 @@ async def reset_plugin_config(
     manager: PluginConfigManager = Depends(get_plugin_manager),
 ) -> PluginConfigResponse:
     """重置插件配置为默认值"""
-    try:
-        # 获取插件列表
-        list_response = await list_all_plugin_configs(
-            workspace_id,
-            workspace,
-            manager,
-        )
+    # 获取插件列表
+    list_response = await list_all_plugin_configs(
+        workspace_id,
+        workspace,
+        manager,
+    )
 
-        # 确定实际使用的 plugin_id
+    # 确定实际使用的 plugin_id
+    actual_plugin_id = request.plugin_id
+    found = False
+
+    if request.plugin_id in list_response.plugins:
         actual_plugin_id = request.plugin_id
-        found = False
-
-        if request.plugin_id in list_response.plugins:
-            actual_plugin_id = request.plugin_id
+        found = True
+    elif "@" in request.plugin_id:
+        plugin_name = request.plugin_id.split("@")[0]
+        if plugin_name in list_response.plugins:
+            actual_plugin_id = plugin_name
             found = True
-        elif "@" in request.plugin_id:
-            plugin_name = request.plugin_id.split("@")[0]
-            if plugin_name in list_response.plugins:
-                actual_plugin_id = plugin_name
-                found = True
 
-        if not found:
-            raise HTTPException(status_code=404, detail=f"Plugin '{request.plugin_id}' not found")
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Plugin '{request.plugin_id}' not found")
 
-        plugin_info = list_response.plugins[actual_plugin_id]
-        schema = plugin_info.get("schema")
+    plugin_info = list_response.plugins[actual_plugin_id]
+    schema = plugin_info.get("schema")
 
-        # 提取默认值
-        defaults = {}
-        for field in schema.get("properties", {}).values():
-            if "default" in field:
-                defaults[field["name"]] = field["default"]
+    # 提取默认值
+    defaults = {}
+    for field in schema.get("properties", {}).values():
+        if "default" in field:
+            defaults[field["name"]] = field["default"]
 
-        # 加载现有配置，保持层级结构
-        existing_config = manager.load_plugin_config(actual_plugin_id)
-        full_config = {
-            "enabled": existing_config.get("enabled", True),
-            "activated": existing_config.get("activated", False),
-            "version": existing_config.get("version"),
-            "settings": defaults,
-        }
+    # 加载现有配置，保持层级结构
+    existing_config = manager.load_plugin_config(actual_plugin_id)
+    full_config = {
+        "enabled": existing_config.get("enabled", True),
+        "activated": existing_config.get("activated", False),
+        "version": existing_config.get("version"),
+        "settings": defaults,
+    }
 
-        # 保存默认配置
-        manager.save_plugin_config(actual_plugin_id, full_config)
+    # 保存默认配置
+    manager.save_plugin_config(actual_plugin_id, full_config)
 
-        return PluginConfigResponse(
-            success=True,
-            config_schema=schema,
-            config=defaults,
-            form_config=plugin_info.get("form_config"),
-            message="Configuration reset to defaults",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to reset plugin config: {str(e)}")
+    return PluginConfigResponse(
+        success=True,
+        config_schema=schema,
+        config=defaults,
+        form_config=plugin_info.get("form_config"),
+        message="Configuration reset to defaults",
+    )

@@ -15,7 +15,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from dawei.entity.scheduled_task import ScheduleType, ScheduledTask, TriggerStatus
+from dawei.entity.scheduled_task import ScheduledTask, ScheduleType, TriggerStatus
 from dawei.logg.logging import get_logger
 from dawei.tools.scheduler import scheduler_manager
 from dawei.workspace import workspace_manager
@@ -106,7 +106,7 @@ async def create_scheduled_task(workspace_id: str, task: dict[str, Any]):
 
             # 验证表达式有效性
             try:
-                cron = croniter(task["cron_expression"])
+                croniter(task["cron_expression"])
             except ValueError as e:
                 raise HTTPException(
                     status_code=400,
@@ -374,7 +374,7 @@ async def get_task_executions(
                     "triggered_at": conv_data.get("metadata", {}).get("triggered_at"),
                 }
                 executions.append(execution)
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load conversation {file_path}: {e}")
             continue
 
