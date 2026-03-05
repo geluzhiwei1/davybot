@@ -5,8 +5,11 @@
 
 This module provides browser automation capabilities using Playwright's synchronous API.
 Requires playwright to be installed: pip install playwright
+
+Note: Playwright sync API is executed in a thread pool to avoid blocking the async event loop.
 """
 
+import asyncio
 import contextlib
 import json
 from pathlib import Path
@@ -136,11 +139,7 @@ class BrowserActionTool(CustomBaseTool):
     """
     args_schema: type[BaseModel] = BrowserActionInput
 
-    @safe_tool_operation(
-        "browser_action",
-        fallback_value='{"action": "error", "status": "error", "message": "Failed to execute browser action"}',
-    )
-    def _run(
+    def _run_sync(
         self,
         action: str,
         selector: str | None = None,
@@ -150,7 +149,10 @@ class BrowserActionTool(CustomBaseTool):
         timeout: int = 30000,
         screenshot_path: str | None = None,
     ) -> str:
-        """Perform browser action using Playwright."""
+        """Synchronous implementation of browser action using Playwright.
+
+        This method runs in a separate thread to avoid blocking the async event loop.
+        """
         result = {"action": action, "status": "success"}
 
         try:
@@ -225,6 +227,60 @@ class BrowserActionTool(CustomBaseTool):
             result["message"] = f"Action failed: {e!s}"
 
         return json.dumps(result, indent=2, ensure_ascii=False)
+
+    @safe_tool_operation(
+        "browser_action",
+        fallback_value='{"action": "error", "status": "error", "message": "Failed to execute browser action"}',
+    )
+    def _run(
+        self,
+        action: str,
+        selector: str | None = None,
+        value: str | None = None,
+        url: str | None = None,
+        wait_for: str | None = None,
+        timeout: int = 30000,
+        screenshot_path: str | None = None,
+    ) -> str:
+        """Perform browser action using Playwright.
+
+        This method runs the synchronous Playwright code in a thread pool executor
+        to avoid blocking the async event loop and prevent the error:
+        "It looks like you are using Playwright Sync API inside the asyncio loop."
+        """
+        # Check if we're in an async context (event loop running)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're in an async context, run in thread pool
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(
+                        self._run_sync,
+                        action,
+                        selector,
+                        value,
+                        url,
+                        wait_for,
+                        timeout,
+                        screenshot_path,
+                    )
+                    return future.result(timeout=timeout / 1000 + 10)  # Add 10s buffer
+        except RuntimeError:
+            # No event loop running, execute directly
+            pass
+
+        # Not in async context, execute directly
+        return self._run_sync(
+            action,
+            selector,
+            value,
+            url,
+            wait_for,
+            timeout,
+            screenshot_path,
+        )
 
 
 # Enhanced Browser Actions with more specific tools

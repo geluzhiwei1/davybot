@@ -3,7 +3,6 @@
 
 import ast
 import logging
-import os
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -53,6 +52,11 @@ class ReadFileTool(CustomBaseTool):
 
         # 处理路径：如果以 @ 开头，去掉 @
         clean_path = file_path.lstrip("@") if file_path.startswith("@") else file_path
+
+        # ✅ Fast fail: Handle special case where path is "." (current directory)
+        # Path(".").name returns "", which breaks the sanitization logic
+        if clean_path in (".", "", "./"):
+            return "Error: Cannot read directory, please specify a file path"
 
         # Sanitize filename to prevent directory traversal
         sanitized_filename = sanitize_filename(Path(clean_path).name)
@@ -159,28 +163,34 @@ class ListFilesTool(CustomBaseTool):
         # 处理路径：如果以 @ 开头，去掉 @
         clean_path = path.lstrip("@") if path.startswith("@") else path
 
-        # Sanitize path to prevent directory traversal
-        sanitized_filename = sanitize_filename(Path(clean_path).name)
-
-        # Reconstruct path with sanitized filename
-        dir_name = str(Path(clean_path).parent) if Path(clean_path).parent != Path() else ""
-        clean_path = str(Path(dir_name) / sanitized_filename) if dir_name else sanitized_filename
-
-        # 如果有工作区路径，使用安全路径连接
-        if workspace_path:
-            try:
-                # Don't restrict extensions for directory listing
-                full_path = safe_path_join(
-                    workspace_path,
-                    clean_path,
-                    allow_absolute=False,
-                    allowed_extensions=None,
-                )
-            except (PathTraversalError, ValueError) as e:
-                logger.exception("Path validation failed: ")
-                return f"Error: Invalid path - {e!s}"
+        # ✅ Fast fail: Handle special case where path is "." (current directory)
+        # Path(".").name returns "", which breaks the sanitization logic
+        if clean_path in (".", "", "./"):
+            # Use workspace root directly
+            full_path = workspace_path if workspace_path else "."
         else:
-            full_path = clean_path
+            # Sanitize path to prevent directory traversal
+            sanitized_filename = sanitize_filename(Path(clean_path).name)
+
+            # Reconstruct path with sanitized filename
+            dir_name = str(Path(clean_path).parent) if Path(clean_path).parent != Path() else ""
+            clean_path = str(Path(dir_name) / sanitized_filename) if dir_name else sanitized_filename
+
+            # 如果有工作区路径，使用安全路径连接
+            if workspace_path:
+                try:
+                    # Don't restrict extensions for directory listing
+                    full_path = safe_path_join(
+                        workspace_path,
+                        clean_path,
+                        allow_absolute=False,
+                        allowed_extensions=None,
+                    )
+                except (PathTraversalError, ValueError) as e:
+                    logger.exception("Path validation failed: ")
+                    return f"Error: Invalid path - {e!s}"
+            else:
+                full_path = clean_path
 
         if not Path(full_path).exists():
             return f"Error: Path not found at {Path(full_path).name}"
@@ -192,7 +202,14 @@ class ListFilesTool(CustomBaseTool):
 
         if recursive:
             for root, _dirs, files in Path(full_path).walk():
-                level = str(root).replace(str(full_path), "").count(os.sep)
+                # ✅ Cross-platform: Use Path.parts for platform-independent path depth calculation
+                # Calculate relative path depth for proper indentation
+                try:
+                    relative = root.relative_to(full_path)
+                    level = len(relative.parts) - 1 if relative.parts else 0
+                except ValueError:
+                    # root is not relative to full_path (shouldn't happen)
+                    level = 0
                 indent = " " * 2 * level
                 result.append(f"{indent}{root.name}/")
                 subindent = " " * 2 * (level + 1)
@@ -240,29 +257,35 @@ class ListCodeDefinitionsTool(CustomBaseTool):
         # 处理路径：如果以 @ 开头，去掉 @
         clean_path = path.lstrip("@") if path.startswith("@") else path
 
-        # Sanitize filename to prevent directory traversal
-        sanitized_filename = sanitize_filename(Path(clean_path).name)
-
-        # Reconstruct path with sanitized filename
-        dir_name = str(Path(clean_path).parent) if Path(clean_path).parent != Path() else ""
-        clean_path = str(Path(dir_name) / sanitized_filename) if dir_name else sanitized_filename
-
-        # 如果有工作区路径，使用安全路径连接
-        if workspace_path:
-            try:
-                # Only allow Python files for code definitions
-                allowed_extensions: set[str] = {".py"}
-                full_path = safe_path_join(
-                    workspace_path,
-                    clean_path,
-                    allow_absolute=False,
-                    allowed_extensions=allowed_extensions,
-                )
-            except (PathTraversalError, ValueError) as e:
-                logger.exception("Path validation failed: ")
-                return f"Error: Invalid file path - {e!s}"
+        # ✅ Fast fail: Handle special case where path is "." (current directory)
+        # Path(".").name returns "", which breaks the sanitization logic
+        if clean_path in (".", "", "./"):
+            # Use workspace root directly
+            full_path = workspace_path if workspace_path else "."
         else:
-            full_path = clean_path
+            # Sanitize filename to prevent directory traversal
+            sanitized_filename = sanitize_filename(Path(clean_path).name)
+
+            # Reconstruct path with sanitized filename
+            dir_name = str(Path(clean_path).parent) if Path(clean_path).parent != Path() else ""
+            clean_path = str(Path(dir_name) / sanitized_filename) if dir_name else sanitized_filename
+
+            # 如果有工作区路径，使用安全路径连接
+            if workspace_path:
+                try:
+                    # Only allow Python files for code definitions
+                    allowed_extensions: set[str] = {".py"}
+                    full_path = safe_path_join(
+                        workspace_path,
+                        clean_path,
+                        allow_absolute=False,
+                        allowed_extensions=allowed_extensions,
+                    )
+                except (PathTraversalError, ValueError) as e:
+                    logger.exception("Path validation failed: ")
+                    return f"Error: Invalid file path - {e!s}"
+            else:
+                full_path = clean_path
 
         if not Path(full_path).exists():
             return f"Error: Path not found at {Path(full_path).name}"
