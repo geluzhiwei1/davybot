@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <div class="tool-call-content compact-content">
@@ -9,20 +9,11 @@
       <el-collapse-item name="1" class="tool-item">
         <template #title>
           <div class="collapse-title compact-header">
-            <el-icon><Tools /></el-icon>
-            <span>Tool Call: <code class="compact-code">{{ block.toolCall.tool_name }}</code></span>
-            <el-tag
-              :type="statusType"
-              size="small"
-              effect="light"
-              round
-              class="status-tag compact-tag"
-            >
-              {{ toolHelpers.getStatusText(block.toolCall.status) }}
-            </el-tag>
-            <div v-if="block.toolCall.status === 'in_progress'" class="progress-indicator">
-              <el-icon class="is-loading"><Loading /></el-icon>
-            </div>
+            <el-icon>
+              <Tools />
+            </el-icon>
+            <span>调用工具: <code class="compact-code">{{ block.toolCall.tool_name }}</code></span>
+            <!-- ✅ 移除状态标签：工具调用请求不显示状态，只在 tool 消息的执行结果中显示 -->
           </div>
         </template>
 
@@ -31,15 +22,6 @@
             <h4 class="compact-detail-title">Input:</h4>
             <div class="input-content">
               <pre class="compact-pre"><code>{{ toolHelpers.formatToolInput(block.toolCall.tool_input) }}</code></pre>
-              <el-button
-                size="small"
-                text
-                @click="copyInput"
-                :icon="DocumentCopy"
-                class="copy-button compact-btn"
-              >
-                复制
-              </el-button>
             </div>
           </div>
 
@@ -48,20 +30,19 @@
             <h4 class="compact-detail-title">执行进度</h4>
             <div class="progress-info-content">
               <!-- 进度条 -->
-              <div v-if="block.toolCall.progress_percentage !== undefined" class="progress-bar-container compact-progress">
-                <el-progress
-                  :percentage="block.toolCall.progress_percentage"
-                  :status="toolHelpers.getProgressStatus(block.toolCall.status)"
-                  :stroke-width="4"
-                  :show-text="false"
-                  class="compact-progress-bar"
-                />
+              <div v-if="block.toolCall.progress_percentage !== undefined"
+                class="progress-bar-container compact-progress">
+                <el-progress :percentage="block.toolCall.progress_percentage"
+                  :status="toolHelpers.getProgressStatus(block.toolCall.status)" :stroke-width="4" :show-text="false"
+                  class="compact-progress-bar" />
                 <span class="progress-text compact-progress-text">{{ block.toolCall.progress_percentage }}%</span>
               </div>
 
               <!-- 当前步骤 -->
               <div v-if="block.toolCall.current_step" class="current-step-info compact-stats">
-                <el-icon><Clock /></el-icon>
+                <el-icon>
+                  <Clock />
+                </el-icon>
                 <span class="step-text compact-text-truncate">
                   <template v-if="block.toolCall.total_steps && block.toolCall.current_step_index !== undefined">
                     步骤 {{ block.toolCall.current_step_index + 1 }}/{{ block.toolCall.total_steps }}:
@@ -72,13 +53,17 @@
 
               <!-- 执行时间 -->
               <div v-if="block.toolCall.execution_time" class="execution-time-info compact-stats">
-                <el-icon><Timer /></el-icon>
+                <el-icon>
+                  <Timer />
+                </el-icon>
                 <span>执行时间: {{ toolHelpers.formatExecutionTime(block.toolCall.execution_time) }}</span>
               </div>
 
               <!-- 预计剩余时间 -->
               <div v-if="block.toolCall.estimated_remaining_time" class="estimated-time-info compact-stats">
-                <el-icon><Clock /></el-icon>
+                <el-icon>
+                  <Clock />
+                </el-icon>
                 <span>预计剩余: {{ toolHelpers.formatExecutionTime(block.toolCall.estimated_remaining_time) }}</span>
               </div>
             </div>
@@ -88,15 +73,6 @@
             <h4 class="compact-detail-title">Output:</h4>
             <div class="output-content">
               <pre class="compact-pre"><code>{{ toolHelpers.formatToolOutput(block.toolCall.output) }}</code></pre>
-              <el-button
-                size="small"
-                text
-                @click="copyOutput"
-                :icon="DocumentCopy"
-                class="copy-button compact-btn"
-              >
-                复制
-              </el-button>
             </div>
           </div>
 
@@ -104,26 +80,15 @@
             <h4 class="compact-detail-title">Error:</h4>
             <div class="error-content">
               <pre class="compact-pre">{{ block.toolCall.error }}</pre>
-              <el-button
-                size="small"
-                text
-                @click="copyError"
-                :icon="DocumentCopy"
-                class="copy-button compact-btn"
-              >
-                复制
-              </el-button>
             </div>
           </div>
 
           <!-- 操作按钮 - 与主消息气泡一致 -->
           <div class="tool-actions assistant-actions">
-            <el-button
-              size="small"
-              circle
-              @click="copyToolCall"
-            >
-              <el-icon><DocumentCopy /></el-icon>
+            <el-button size="small" circle @click="copyToolCall">
+              <el-icon>
+                <DocumentCopy />
+              </el-icon>
             </el-button>
           </div>
         </div>
@@ -136,7 +101,6 @@
 import { ref, computed } from 'vue'
 import {
   Tools,
-  Loading,
   DocumentCopy,
   Clock,
   Timer
@@ -145,7 +109,6 @@ import {
   ElCollapse,
   ElCollapseItem,
   ElIcon,
-  ElTag,
   ElButton,
   ElMessage
 } from 'element-plus'
@@ -171,10 +134,6 @@ const showProgressInfo = computed(() => {
     props.block.toolCall.execution_time,
     props.block.toolCall.estimated_remaining_time
   )
-})
-
-const statusType = computed(() => {
-  return toolHelpers.getStatusTagType(props.block.toolCall.status)
 })
 
 const copyInput = async () => {

@@ -36,6 +36,8 @@
         <div v-show="activeTab === 'conversations'" class="tab-panel">
           <div class="panel-content">
             <div class="conversation-actions">
+              <el-button :icon="Refresh" @click="loadConversations" size="small" :title="t('sidePanel.refresh')">
+              </el-button>
               <el-button type="primary" :icon="Plus" @click="handleNewChat" class="flex-1" size="small">{{
                 t('sidePanel.newConversation') }}</el-button>
               <el-button type="danger" :icon="Delete" @click="handleDeleteAllConversations" class="flex-1"

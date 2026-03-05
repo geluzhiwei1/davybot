@@ -108,7 +108,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 # Import API routers
-from dawei.api import conversations, skills, system, tools, websocket, workspaces
+from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces
 from dawei.api.exception_handlers import register_exception_handlers
 from dawei.websocket.handlers.chat import ConnectHandler
 from dawei.websocket.ws_server import websocket_server
@@ -327,6 +327,7 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     app.include_router(system.router)
     app.include_router(skills.router)
     app.include_router(scheduled_tasks.router)
+    app.include_router(checkpoints.router)
 
     # Register unified exception handlers
     register_exception_handlers(app)

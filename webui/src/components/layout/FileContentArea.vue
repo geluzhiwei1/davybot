@@ -11,7 +11,9 @@
         @tab-remove="closeFile" @tab-change="handleTabChange">
         <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
           <template #label>
-            <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)">
+            <span class="tab-label"
+                  @contextmenu.prevent="handleTabContextMenu($event, file)"
+                  @dblclick="handleTabDoubleClick(file)">
               <el-icon>
                 <Document v-if="isGenericFile(file) || isPDFFile(file) || isHTMLFile(file)" />
                 <Picture v-else-if="isImageFile(file)" />
@@ -163,7 +165,9 @@
             @tab-remove="closeFile" @tab-change="handleTabChange">
             <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
               <template #label>
-                <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)">
+                <span class="tab-label"
+                      @contextmenu.prevent="handleTabContextMenu($event, file)"
+                      @dblclick="handleTabDoubleClick(file)">
                   <el-icon>
                     <Document v-if="isGenericFile(file) || isPDFFile(file) || isHTMLFile(file)" />
                     <Picture v-else-if="isImageFile(file)" />
@@ -452,6 +456,12 @@ const handleTabContextMenu = (event: MouseEvent, file: File) => {
   }
 
   tabContextMenuVisible.value = true
+}
+
+// Tab 双击处理 - 切换全屏
+const handleTabDoubleClick = (file: File) => {
+  // 双击切换全屏状态
+  isPageFullscreen.value = !isPageFullscreen.value
 }
 
 const closeTabContextMenu = () => {

@@ -903,12 +903,12 @@
 
         <!-- 定时任务管理 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.scheduledTasks')" name="scheduled-tasks">
-          <ScheduledTasksPanel v-if="props.workspaceId" :workspace-id="props.workspaceId" />
+          <ScheduledTasksPanel v-if="props.workspaceId && activeTab === 'scheduled-tasks'" :workspace-id="props.workspaceId" />
         </el-tab-pane>
 
         <!-- 检查点管理 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.checkpoints')" name="checkpoints">
-          <CheckpointPanel v-if="props.workspaceId" :workspace-id="props.workspaceId" />
+          <CheckpointPanel v-if="props.workspaceId && activeTab === 'checkpoints'" :workspace-id="props.workspaceId" />
         </el-tab-pane>
       </el-tabs>
     </div>

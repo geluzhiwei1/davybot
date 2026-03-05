@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <el-scrollbar ref="scrollbarRef" class="message-area">
@@ -11,8 +11,8 @@
         <div name="chatUserMsg" v-if="message.role === 'user'" class="user-message-container">
           <div class="user-avatar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
             </svg>
           </div>
           <div class="message-content-wrapper">
@@ -21,24 +21,20 @@
               <span class="message-sender">你</span>
               <span class="message-time">{{ formatTimestamp(message.timestamp, 'time') }}</span>
             </div>
-            <div
-              class="user-card"
-              :class="{
-                'collapsed': !isUserExpanded(message.id) && !shouldAlwaysExpandUserMessage(message),
-                'always-expand': shouldAlwaysExpandUserMessage(message)
-              }"
-              :data-summary="getUserMessageSummary(message)"
-              @click="!shouldAlwaysExpandUserMessage(message) && toggleUserExpand(message.id)"
-            >
+            <div class="user-card" :class="{
+              'collapsed': !isUserExpanded(message.id) && !shouldAlwaysExpandUserMessage(message),
+              'always-expand': shouldAlwaysExpandUserMessage(message)
+            }" :data-summary="getUserMessageSummary(message)"
+              @click="!shouldAlwaysExpandUserMessage(message) && toggleUserExpand(message.id)">
               <!-- 内容区域 -->
               <el-collapse-transition>
-                <div v-show="isUserExpanded(message.id) || shouldAlwaysExpandUserMessage(message)" class="user-message-content">
-                  <div v-for="(contentBlock, index) in message.content" :key="`${message.id}-${contentBlock.type}-${index}`">
-                    <div v-if="contentBlock.type === ContentType.TEXT"
-                      class="user-text-block"
+                <div v-show="isUserExpanded(message.id) || shouldAlwaysExpandUserMessage(message)"
+                  class="user-message-content">
+                  <div v-for="(contentBlock, index) in message.content"
+                    :key="`${message.id}-${contentBlock.type}-${index}`">
+                    <div v-if="contentBlock.type === ContentType.TEXT" class="user-text-block"
                       :title="contentBlock.text">{{ contentBlock.text }}</div>
-                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT"
-                      class="user-text-block"
+                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="user-text-block"
                       :title="(contentBlock as unknown).text">{{ (contentBlock as unknown).text }}</div>
                   </div>
                 </div>
@@ -46,19 +42,13 @@
 
               <!-- 操作按钮 -->
               <div class="message-actions user-actions" @click.stop>
-                <el-button
-                  size="small"
-                  circle
-                  @click.stop="copyMessage(message)"
-                >
-                  <el-icon><DocumentCopy /></el-icon>
+                <el-button size="small" circle @click.stop="copyMessage(message)">
+                  <el-icon>
+                    <DocumentCopy />
+                  </el-icon>
                 </el-button>
-                <el-button
-                  v-if="!shouldAlwaysExpandUserMessage(message)"
-                  size="small"
-                  circle
-                  @click.stop="toggleUserExpand(message.id)"
-                >
+                <el-button v-if="!shouldAlwaysExpandUserMessage(message)" size="small" circle
+                  @click.stop="toggleUserExpand(message.id)">
                   <el-icon :class="{ 'rotate-180': isUserExpanded(message.id) }">
                     <ArrowDown />
                   </el-icon>
@@ -74,7 +64,7 @@
           <div class="message-content-wrapper">
             <!-- 头部：头像 + 发送者信息 -->
             <div class="assistant-header-row">
-              <div class="assistant-avatar">小</div>
+              <div class="assistant-avatar">智能体</div>
               <div class="message-sender">
                 大微
                 <span class="message-time">{{ formatTimestamp(message.timestamp, 'time') }}</span>
@@ -87,94 +77,72 @@
               <ReasoningContent :block="block" />
             </div>
 
-            <!-- 独立的工具调用气泡 -->
-            <div v-for="(block, index) in getToolCallBlocks(message)" :key="`toolcall-${message.id}-${index}`"
-              class="independent-bubble tool-call-bubble">
-              <ToolCallContent :block="block" :key="block.toolCall?.tool_call_id" />
-            </div>
-
             <!-- 主消息气泡（包含文本和其他内容） -->
             <div v-if="getOtherBlocks(message).length > 0" class="message-card assistant-card">
               <div class="assistant-message-content">
-                <CollapsibleMessage
-                  ref="collapsibleMsgRefs"
-                  :max-height="400"
-                  :collapsed="!isMessageExpanded(message.id, 'assistant')"
-                >
-                  <div v-for="(contentBlock, index) in getOtherBlocks(message)" :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
-                    <TextContent
-                      v-if="contentBlock.type === ContentType.TEXT"
-                      :block="contentBlock"
-                      :is-streaming="isMessageStreaming(message)"
-                      :messageId="message.id"
-                    />
+                <CollapsibleMessage ref="collapsibleMsgRefs" :max-height="400"
+                  :collapsed="!isMessageExpanded(message.id, 'assistant')">
+                  <div v-for="(contentBlock, index) in getOtherBlocks(message)"
+                    :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
+                    <TextContent v-if="contentBlock.type === ContentType.TEXT" :block="contentBlock"
+                      :is-streaming="isMessageStreaming(message)" :messageId="message.id" />
                     <ErrorContent v-else-if="contentBlock.type === ContentType.ERROR" :block="contentBlock"
                       :key="`error-${contentBlock.type}`" />
-                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{ (contentBlock as unknown).text }}</div>
-                    <ToolExecutionContent v-else-if="contentBlock.type === ContentType.TOOL_EXECUTION" :block="contentBlock"
-                      :key="contentBlock.toolCallId" />
+                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{
+                      contentBlock.text }}</div>
+                    <ToolExecutionContent v-else-if="contentBlock.type === ContentType.TOOL_EXECUTION"
+                      :block="contentBlock" :key="contentBlock.toolCallId" />
                     <UnknownContent v-else :block="contentBlock" :key="`unknown-${contentBlock.type}`" />
                   </div>
                 </CollapsibleMessage>
               </div>
               <!-- 操作按钮 -->
               <div class="message-actions assistant-actions">
-                <el-button
-                  size="small"
-                  circle
-                  @click="copyMessage(message)"
-                >
-                  <el-icon><DocumentCopy /></el-icon>
+                <el-button size="small" circle @click="copyMessage(message)">
+                  <el-icon>
+                    <DocumentCopy />
+                  </el-icon>
                 </el-button>
-                <el-button
-                  size="small"
-                  circle
-                  @click="toggleMessageExpand(message.id)"
-                >
+                <el-button size="small" circle @click="toggleMessageExpand(message.id)">
                   <el-icon :class="{ 'rotate-180': isMessageExpanded(message.id, 'assistant') }">
                     <ArrowDown />
                   </el-icon>
                 </el-button>
                 <!-- Markdown/纯文本切换按钮 -->
-                <el-button
-                  size="small"
-                  circle
-                  @click="toggleMarkdownMode(message.id)"
-                  :title="getMessageModeTitle(message.id)"
-                >
+                <el-button size="small" circle @click="toggleMarkdownMode(message.id)"
+                  :title="getMessageModeTitle(message.id)">
                   {{ getMessageModeIcon(message.id) }}
                 </el-button>
               </div>
             </div>
+
+            <!-- 独立的工具调用气泡 -->
+            <div v-for="(block, index) in getToolCallBlocks(message)" :key="`toolcall-${message.id}-${index}`"
+              class="independent-bubble tool-call-bubble">
+              <ToolCallContent :block="block" :key="block.toolCall?.tool_call_id" />
+            </div>
           </div>
         </div>
 
-
         <!-- 工具消息 -->
         <div name="chatToolMsg" v-else-if="message.role === 'tool'" class="tool-message-container">
-          <div class="tool-avatar">T</div>
+          <div class="tool-avatar">工具执行</div>
           <div class="message-content-wrapper">
             <div class="message-card tool-card" :class="{ 'collapsed': !isToolExpanded(message.id) }">
               <!-- 可点击的头部 -->
-              <div class="tool-card-header" @click="toggleToolExpand(message.id)" :class="{ 'clickable': !isToolExpanded(message.id) }">
+              <div class="tool-card-header" @click="toggleToolExpand(message.id)"
+                :class="{ 'clickable': !isToolExpanded(message.id) }">
                 <div class="tool-header-info">
-                  <span class="tool-icon-text">🔧</span>
-                  <span class="tool-title-text">工具消息</span>
-                  <span v-if="getToolMessageSummary(message)" class="tool-summary">{{ getToolMessageSummary(message) }}</span>
+                  <span v-if="getToolMessageSummary(message)" class="tool-summary">{{ getToolMessageSummary(message)
+                    }}</span>
                 </div>
                 <div class="tool-header-actions">
-                  <el-button
-                    size="small"
-                    circle
-                    @click.stop="copyMessage(message)"
-                  >
-                    <el-icon><DocumentCopy /></el-icon>
+                  <el-button size="small" circle @click.stop="copyMessage(message)">
+                    <el-icon>
+                      <DocumentCopy />
+                    </el-icon>
                   </el-button>
-                  <el-button
-                    size="small"
-                    circle
-                    @click.stop="toggleToolExpand(message.id)"
-                  >
+                  <el-button size="small" circle @click.stop="toggleToolExpand(message.id)">
                     <el-icon :class="{ 'rotate-180': isToolExpanded(message.id) }">
                       <ArrowDown />
                     </el-icon>
@@ -185,12 +153,16 @@
               <!-- 可折叠的内容区域 -->
               <el-collapse-transition>
                 <div v-show="isToolExpanded(message.id)" class="tool-message-content">
-                  <div v-for="(contentBlock, index) in message.content" :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
-                    <TextContent name="textContent" v-if="contentBlock.type === ContentType.TEXT" :block="contentBlock" :messageId="message.id" />
-                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{ (contentBlock as unknown).text }}</div>
-                    <ToolCallContent name="toolContent" v-else-if="contentBlock.type === ContentType.TOOL_CALL" :block="contentBlock"
-                      :key="contentBlock.toolCall?.tool_call_id" />
-                    <ToolExecutionContent name="toolExecutionContent" v-else-if="contentBlock.type === ContentType.TOOL_EXECUTION" :block="contentBlock"
+                  <div v-for="(contentBlock, index) in message.content"
+                    :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
+                    <TextContent name="textContent" v-if="contentBlock.type === ContentType.TEXT" :block="contentBlock"
+                      :messageId="message.id" />
+                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{
+                      contentBlock.text }}</div>
+                    <ToolCallContent name="toolContent" v-else-if="contentBlock.type === ContentType.TOOL_CALL"
+                      :block="contentBlock" :key="contentBlock.toolCall?.tool_call_id" />
+                    <ToolExecutionContent name="toolExecutionContent"
+                      v-else-if="contentBlock.type === ContentType.TOOL_EXECUTION" :block="contentBlock"
                       :key="contentBlock.toolCallId" />
                     <UnknownContent v-else :block="contentBlock" :key="`unknown-${contentBlock.type}`" />
                   </div>
@@ -203,12 +175,10 @@
         <!-- 系统消息（错误等） -->
         <div v-else-if="message.role === 'system'" class="system-message-container">
           <div class="message-content-wrapper">
-            <div
-              class="message-card system-card"
-              :class="{ 'collapsed': !isMessageExpanded(message.id, 'system') }"
-            >
+            <div class="message-card system-card" :class="{ 'collapsed': !isMessageExpanded(message.id, 'system') }">
               <!-- 折叠状态：显示摘要 -->
-              <div v-if="!isMessageExpanded(message.id, 'system')" class="system-summary" @click="toggleMessageExpand(message.id)">
+              <div v-if="!isMessageExpanded(message.id, 'system')" class="system-summary"
+                @click="toggleMessageExpand(message.id)">
                 <span class="error-icon">⚠️</span>
                 <span class="summary-text">{{ getSystemMessageSummary(message) }}</span>
               </div>
@@ -216,10 +186,13 @@
               <!-- 展开状态：显示完整内容 -->
               <el-collapse-transition>
                 <div v-show="isMessageExpanded(message.id, 'system')" class="system-message-content">
-                  <div v-for="(contentBlock, index) in message.content" :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
+                  <div v-for="(contentBlock, index) in message.content"
+                    :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
                     <ErrorContent v-if="contentBlock.type === ContentType.ERROR" :block="contentBlock" />
-                    <TextContent v-else-if="contentBlock.type === ContentType.TEXT" :block="contentBlock" :messageId="message.id" />
-                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{ (contentBlock as unknown).text }}</div>
+                    <TextContent v-else-if="contentBlock.type === ContentType.TEXT" :block="contentBlock"
+                      :messageId="message.id" />
+                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{
+                      contentBlock.text }}</div>
                     <UnknownContent v-else :block="contentBlock" />
                   </div>
                 </div>
@@ -227,18 +200,12 @@
 
               <!-- 操作按钮：仅在展开状态显示 -->
               <div v-show="isMessageExpanded(message.id, 'system')" class="message-actions system-actions" @click.stop>
-                <el-button
-                  size="small"
-                  circle
-                  @click="copyMessage(message)"
-                >
-                  <el-icon><DocumentCopy /></el-icon>
+                <el-button size="small" circle @click="copyMessage(message)">
+                  <el-icon>
+                    <DocumentCopy />
+                  </el-icon>
                 </el-button>
-                <el-button
-                  size="small"
-                  circle
-                  @click="toggleMessageExpand(message.id)"
-                >
+                <el-button size="small" circle @click="toggleMessageExpand(message.id)">
                   <el-icon :class="{ 'rotate-180': isMessageExpanded(message.id, 'system') }">
                     <ArrowDown />
                   </el-icon>
@@ -544,6 +511,7 @@ const getSystemMessageSummary = (message: ChatMessage) => {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -567,7 +535,8 @@ const getSystemMessageSummary = (message: ChatMessage) => {
   gap: 8px;
   margin-bottom: 8px;
   padding-bottom: 8px;
-  justify-content: flex-end; /* 右对齐 */
+  justify-content: flex-end;
+  /* 右对齐 */
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
@@ -603,8 +572,13 @@ const getSystemMessageSummary = (message: ChatMessage) => {
 }
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .user-avatar svg {
@@ -783,7 +757,8 @@ const getSystemMessageSummary = (message: ChatMessage) => {
   border-radius: 10px;
   backdrop-filter: blur(10px);
   overflow: hidden;
-  padding: 0 !important;  /* 确保无内边距 */
+  padding: 0 !important;
+  /* 确保无内边距 */
 }
 
 .tool-card.collapsed {
@@ -806,7 +781,8 @@ const getSystemMessageSummary = (message: ChatMessage) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0 !important;  /* 统一简化 padding */
+  padding: 8px 0 !important;
+  /* 统一简化 padding */
   gap: 12px;
   transition: all 0.2s ease;
 }
@@ -1073,10 +1049,14 @@ const getSystemMessageSummary = (message: ChatMessage) => {
 }
 
 @keyframes typing {
-  0%, 60%, 100% {
+
+  0%,
+  60%,
+  100% {
     opacity: 0.3;
     transform: scale(0.8);
   }
+
   30% {
     opacity: 1;
     transform: scale(1.2);
@@ -1242,4 +1222,3 @@ const getSystemMessageSummary = (message: ChatMessage) => {
   border-color: rgba(239, 68, 68, 0.3);
 }
 </style>
-

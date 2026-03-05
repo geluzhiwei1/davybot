@@ -326,6 +326,10 @@ export const useMessageStore = defineStore('messages', () => {
   const addMessages = (newMessages: ChatMessage[]): void => {
     const workspaceId = getCurrentWorkspaceId()
     const currentMessages = getCurrentMessages()
+
+    // ✅ 回填历史工具调用状态（修复 unknown 状态问题）
+    backfillHistoricalToolCallStatus(newMessages)
+
     workspaceMessages.value.set(workspaceId, [...currentMessages, ...newMessages])
   }
 
@@ -715,7 +719,13 @@ export const useMessageStore = defineStore('messages', () => {
       const toolCallId = toolCall.tool_call_id || toolCall.id || uuidv4()
       const toolName = toolCall.function?.name || toolCall.name || 'unknown'
       const toolInput = toolCall.function?.arguments || toolCall.arguments || toolCall.input || {}
-      const status = toolCall.status || 'completed'
+
+      // ✅ 修复：更严格的状态判断，避免字符串 "null"/"undefined" 被当作有效值
+      let status = 'completed' // 默认状态
+      if (toolCall.status && typeof toolCall.status === 'string' && toolCall.status !== 'null' && toolCall.status !== 'undefined') {
+        status = toolCall.status as 'started' | 'in_progress' | 'completed' | 'failed'
+      }
+
       const output = toolCall.output
       const error = toolCall.error
 
@@ -1015,14 +1025,24 @@ export const useMessageStore = defineStore('messages', () => {
     if (toolResult && typeof toolResult === 'object') {
       const resultData = toolResult.result || toolResult.output || content
 
+      // ✅ 修复：使用结果内容推断状态，而不是仅依赖 success 字段
+      // 因为后端数据中，即使失败（result包含"Error:"），success字段仍为true
+      let inferredStatus: 'completed' | 'failed' | 'unknown' = 'completed'
+      if (typeof resultData === 'string') {
+        if (resultData.startsWith('Error:') || resultData.startsWith('error:')) {
+          inferredStatus = 'failed'
+        }
+      }
+
       contentBlocks.push({
         type: ContentType.TOOL_EXECUTION,
         toolName: toolName,
         toolCallId: toolCallId,
-        status: toolResult.success !== false ? 'completed' : 'failed',
+        status: inferredStatus,
         input: {},
-        output: resultData,
-        error: toolResult.success === false ? (toolResult.error || 'Tool execution failed') : undefined,
+        result: resultData,
+        isError: inferredStatus === 'failed',
+        errorMessage: inferredStatus === 'failed' ? (typeof resultData === 'string' ? resultData : 'Tool execution failed') : undefined,
         startTime: backendMsg.timestamp,
         endTime: backendMsg.timestamp
       } as ToolExecutionContentBlock)
@@ -1090,6 +1110,151 @@ export const useMessageStore = defineStore('messages', () => {
     }
   }
 
+  /**
+   * 从工具返回的 content 推断工具调用状态
+   */
+  const inferToolStatusFromContent = (
+    content: string | object
+  ): 'completed' | 'failed' | 'unknown' => {
+    try {
+      let result: unknown = undefined
+
+      if (typeof content === 'string') {
+        // 尝试解析 JSON
+        try {
+          const parsed = JSON.parse(content) as { result?: unknown; success?: boolean }
+          result = parsed.result
+        } catch {
+          // 不是 JSON，直接使用 content
+          result = content
+        }
+      } else if (typeof content === 'object' && content !== null) {
+        result = (content as { result?: unknown }).result
+      }
+
+      // ✅ 修复：安全地生成预览，处理 undefined/null
+      let resultPreview = ''
+      if (result === undefined || result === null) {
+        resultPreview = '(empty)'
+      } else if (typeof result === 'string') {
+        resultPreview = result.substring(0, 100)
+      } else {
+        const strResult = JSON.stringify(result)
+        resultPreview = strResult ? strResult.substring(0, 100) : '(empty)'
+      }
+
+      // 检查 result 是否包含错误信息
+      if (typeof result === 'string') {
+        if (result.startsWith('Error:') || result.startsWith('error:')) {
+          logger.debug(`[inferToolStatusFromContent] Detected error in result: ${resultPreview}`)
+          return 'failed'
+        }
+        // 如果有正常内容，认为完成
+        if (result.trim().length > 0) {
+          // 如果是错误信息（虽然不以 Error: 开头），返回 failed
+          if (result.includes('失败') || result.includes('错误') || result.includes('Error') || result.includes('error')) {
+            logger.debug(`[inferToolStatusFromContent] Detected error in result (keywords): ${resultPreview}`)
+            return 'failed'
+          }
+          logger.debug(`[inferToolStatusFromContent] Detected success: ${resultPreview}`)
+          return 'completed'
+        }
+      }
+
+      // 如果 result 是对象，检查是否包含错误字段
+      if (typeof result === 'object' && result !== null) {
+        const resultObj = result as Record<string, unknown>
+        if (resultObj.success === false || resultObj.isError === true || resultObj.error) {
+          logger.debug(`[inferToolStatusFromContent] Detected error in object result`)
+          return 'failed'
+        }
+        // 有对象结果，认为完成
+        logger.debug(`[inferToolStatusFromContent] Detected success (object): ${resultPreview}`)
+        return 'completed'
+      }
+
+      // ✅ 如果 result 为空或 undefined，默认认为完成（大部分工具执行是成功的）
+      if (result === undefined || result === null || result === '') {
+        logger.debug(`[inferToolStatusFromContent] Empty result, assuming success`)
+        return 'completed'
+      }
+
+      logger.warn(`[inferToolStatusFromContent] Unknown result type: ${typeof result}, preview: ${resultPreview}`)
+      return 'unknown'
+    } catch (error) {
+      logger.warn('[inferToolStatusFromContent] Error inferring status:', error)
+      return 'unknown'
+    }
+  }
+
+  /**
+   * 回填历史工具调用的状态
+   *
+   * 遍历所有消息，从 tool 消息的 content 推断状态并回填到对应的 tool_call
+   */
+  const backfillHistoricalToolCallStatus = (messages: ChatMessage[]): void => {
+    logger.debug('[backfillHistoricalToolCallStatus] Starting backfill for', messages.length, 'messages')
+
+    // 创建 tool_call_id -> tool消息content 的映射
+    const toolResultMap = new Map<string, { content: string | object; status: 'completed' | 'failed' | 'unknown' }>()
+
+    // 第一次遍历：收集所有 tool 消息
+    for (const msg of messages) {
+      if (msg.role === MessageRole.TOOL) {
+        // 查找 TOOL_EXECUTION content block
+        const toolExecBlock = msg.content?.find(
+          block => block.type === ContentType.TOOL_EXECUTION
+        ) as ToolExecutionContentBlock | undefined
+
+        if (toolExecBlock && toolExecBlock.toolCallId) {
+          const content = toolExecBlock.result !== undefined ?
+                         toolExecBlock.result :
+                         (toolExecBlock.errorMessage || '')
+          const inferredStatus = inferToolStatusFromContent(content as string | object)
+          toolResultMap.set(toolExecBlock.toolCallId, {
+            content: toolExecBlock.result as string | object || '',
+            status: inferredStatus
+          })
+          logger.debug(`[backfillHistoricalToolCallStatus] Tool message: ${toolExecBlock.toolCallId} -> ${inferredStatus}`)
+        }
+      }
+    }
+
+    // 第二次遍历：回填 tool_call 的 status
+    for (const msg of messages) {
+      if (msg.role === MessageRole.ASSISTANT) {
+        // 查找 TOOL_CALL content blocks
+        const toolCallBlocks = msg.content?.filter(
+          block => block.type === ContentType.TOOL_CALL
+        )
+
+        if (toolCallBlocks && toolCallBlocks.length > 0) {
+          for (const block of msg.content || []) {
+            if (block.type === ContentType.TOOL_CALL) {
+              const toolCall = block as { toolCall: { tool_call_id: string; status?: string } }
+              const toolCallId = toolCall.toolCall.tool_call_id
+
+              logger.debug(`[backfillHistoricalToolCallStatus] Checking tool call: ${toolCallId}, current status: ${toolCall.toolCall.status}`)
+
+              // ✅ 始终尝试从 tool 消息推断状态（因为初始状态可能是默认值）
+              const toolResult = toolResultMap.get(toolCallId)
+              if (toolResult) {
+                const oldStatus = toolCall.toolCall.status
+                toolCall.toolCall.status = toolResult.status
+
+                logger.debug(`[backfillHistoricalToolCallStatus] ✓ Backfilled status for ${toolCallId}: ${oldStatus} -> ${toolResult.status}`)
+              } else {
+                logger.warn(`[backfillHistoricalToolCallStatus] ✗ No tool result found for ${toolCallId}`)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    logger.debug('[backfillHistoricalToolCallStatus] Backfill completed, toolResultMap size:', toolResultMap.size)
+  }
+
   // --- 返回store接口 ---
 
   return {
@@ -1134,5 +1299,8 @@ export const useMessageStore = defineStore('messages', () => {
     getOrCreateAssistantMessage,
     convertBackendMessageToChatMessage,
     createSafeMessageHandler,
+
+    // 工具调用状态推断
+    backfillHistoricalToolCallStatus,
   }
 })
