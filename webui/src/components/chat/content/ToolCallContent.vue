@@ -170,17 +170,17 @@ const copyToolCall = async () => {
 @import './compact-styles.css';
 
 /* ============================================================================
-   极简工具调用气泡样式 - 内容优先,无边框
+   工具调用组件特定样式
    ============================================================================ */
 
-/* 工具调用容器 - 完全透明 */
+/* 工具调用容器 - 透明无边框 */
 .tool-call-content {
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
 }
 
-/* 折叠面板 - 隐藏边框 */
+/* 折叠面板 - 极简样式 */
 .tool-collapse {
   border: none !important;
 }
@@ -209,16 +209,14 @@ const copyToolCall = async () => {
   border: none !important;
 }
 
-/* 折叠箭头 - 弱化显示 */
 .tool-collapse :deep(.el-collapse-item__arrow) {
   color: #cbd5e1;
   margin-left: 6px;
 }
 
-/* 内容区域 - 无边框 */
+/* 内容区域 */
 .tool-details {
   padding: 0;
-  border: none;
 }
 
 .detail-block {
@@ -229,7 +227,7 @@ const copyToolCall = async () => {
   margin-top: 0 !important;
 }
 
-/* 标题 - 弱化显示 */
+/* 标题样式覆盖 */
 .compact-detail-title {
   font-size: 11px;
   font-weight: 600;
@@ -239,7 +237,7 @@ const copyToolCall = async () => {
   letter-spacing: normal;
 }
 
-/* 代码块 - 最小化边框 */
+/* 代码块样式覆盖 */
 .compact-pre {
   background: #f8fafc !important;
   border: 1px solid #f1f5f9 !important;
@@ -250,32 +248,7 @@ const copyToolCall = async () => {
   line-height: 1.5;
 }
 
-.compact-pre code {
-  font-family: 'JetBrains Mono', 'Monaco', 'Menlo', monospace;
-  font-size: 12px;
-}
-
-/* 进度信息 - 极简样式 */
-.progress-info-block {
-  background: transparent !important;
-  border: none !important;
-  padding: 4px 0 !important;
-}
-
-/* 错误块 - 轻量样式 */
-.error-block .compact-detail-title {
-  color: #f87171;
-}
-
-.error-block .compact-pre {
-  background: #fef2f2 !important;
-  border: 1px solid #fee2e2 !important;
-  color: #dc2626;
-}
-
-/* ============================================================================
-   操作按钮 - 极简样式
-   ============================================================================ */
+/* 操作按钮 */
 .tool-actions.assistant-actions {
   padding: 6px 0 0 0;
   background: transparent;
@@ -299,34 +272,12 @@ const copyToolCall = async () => {
   border-color: #e2e8f0;
 }
 
-/* 箭头旋转动画 */
-.rotate-180 {
-  transform: rotate(180deg);
-}
-
 .assistant-actions .el-icon {
   transition: transform 0.3s ease;
   font-size: 14px;
 }
 
-/* 标签样式 - 弱化 */
-.compact-tag {
-  font-size: 11px;
-  padding: 2px 6px;
-  border: none;
-  opacity: 0.8;
-}
-
-/* 代码标签 - 弱化 */
-.compact-code {
-  background: transparent;
-  border: none;
-  color: #475569;
-  padding: 0;
-  font-size: 13px;
-}
-
-/* 图标样式 - 弱化 */
+/* 图标样式 */
 .collapse-title .el-icon {
   color: #94a3b8;
   font-size: 14px;

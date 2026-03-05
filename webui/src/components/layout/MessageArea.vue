@@ -64,7 +64,7 @@
           <div class="message-content-wrapper">
             <!-- 头部：头像 + 发送者信息 -->
             <div class="assistant-header-row">
-              <div class="assistant-avatar">智能体</div>
+              <div class="assistant-avatar">智体</div>
               <div class="message-sender">
                 大微
                 <span class="message-time">{{ formatTimestamp(message.timestamp, 'time') }}</span>
@@ -126,7 +126,7 @@
 
         <!-- 工具消息 -->
         <div name="chatToolMsg" v-else-if="message.role === 'tool'" class="tool-message-container">
-          <div class="tool-avatar">工具执行</div>
+          <div class="tool-avatar">工具</div>
           <div class="message-content-wrapper">
             <div class="message-card tool-card" :class="{ 'collapsed': !isToolExpanded(message.id) }">
               <!-- 可点击的头部 -->

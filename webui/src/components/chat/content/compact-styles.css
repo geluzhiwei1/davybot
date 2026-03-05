@@ -428,3 +428,99 @@
     color: #94a3b8;
   }
 }
+
+/* ----------------------------------------------------------------------------
+   工具组件通用样式
+   ---------------------------------------------------------------------------- */
+/* 通用字体类 */
+.font-mono {
+  font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.font-xs {
+  font-size: var(--modern-font-xs);
+}
+
+.font-sm {
+  font-size: var(--modern-font-sm);
+}
+
+.font-md {
+  font-size: var(--modern-font-md);
+}
+
+/* 工具ID标签样式 */
+.tool-id-badge {
+  font-size: var(--modern-font-xs);
+  color: var(--el-text-color-secondary);
+  font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background-color: var(--el-fill-color-light);
+  padding: 2px 6px;
+  border-radius: var(--modern-radius-sm);
+  border: 1px solid var(--el-border-color-light);
+}
+
+/* 统一错误样式 */
+.error-block {
+  background: var(--modern-color-danger-light);
+  border: 1px solid var(--modern-color-danger-light);
+  border-radius: var(--modern-radius-md);
+  padding: var(--modern-spacing-md);
+}
+
+.error-block .compact-detail-title {
+  color: var(--modern-color-danger);
+}
+
+.error-block .compact-pre {
+  background: #fff !important;
+  color: var(--modern-color-danger);
+  border-color: #fecaca !important;
+}
+
+/* 流式输出样式 */
+.stream-output {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: var(--modern-color-success-light);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--modern-radius-md);
+  padding: var(--modern-spacing-md);
+}
+
+.stream-output-content {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: var(--modern-bg-surface);
+  border-radius: var(--modern-radius-sm);
+  padding: var(--modern-spacing-sm);
+}
+
+.stream-line {
+  display: flex;
+  gap: var(--modern-spacing-sm);
+  padding: var(--modern-spacing-xs) 0;
+  font-size: var(--modern-font-xs);
+  line-height: 1.4;
+}
+
+.stream-line:not(:last-child) {
+  border-bottom: 1px solid var(--modern-border-light);
+}
+
+.stream-index {
+  color: var(--modern-color-success);
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 24px;
+}
+
+.stream-text {
+  color: var(--el-text-color-primary);
+  font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  word-break: break-all;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+  flex: 1;
+}
