@@ -44,3 +44,7 @@ test-results/
 # Dev test files (should not be committed)
 public/test-plugin-*.html
 test-json-schema-form.html
+
+# Drawio editor (large external dependency - 148MB)
+# To update: rm -rf public/drawio && cp -r ../../deps/drawio/src/main/webapp public/drawio
+public/drawio

@@ -182,6 +182,11 @@ jobs:
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
         shell: bash
 
+      # ========== Prepare drawio resources ==========
+      - name: Prepare drawio resources
+        working-directory: ./webui
+        run: bash scripts/prepare-drawio.sh
+
       # ========== Build frontend ==========
       - name: Build frontend
         working-directory: ./webui
@@ -225,6 +230,9 @@ jobs:
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
 
+          # Copy drawio (diagram editor)
+          cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
+
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -247,6 +255,7 @@ jobs:
           - davybot                  : Main application (${ARCH} binary)
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
+            - drawio/                : Draw.io diagram editor (148 MB)
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/uv               : UV package manager
@@ -316,6 +325,9 @@ jobs:
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
 
+          # Copy drawio (diagram editor)
+          cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
+
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -337,6 +349,7 @@ jobs:
           - davybot.exe              : Main application
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
+            - drawio/                : Draw.io diagram editor (148 MB)
             - python-env/            : Python runtime environment (Windows venv)
               - Scripts/python.exe   : Python interpreter
               - Scripts/uv.exe       : UV package manager
@@ -387,6 +400,9 @@ jobs:
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
 
+          # Copy drawio (diagram editor)
+          cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
+
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -409,6 +425,7 @@ jobs:
           - davybot                  : Main application (${ARCH} binary)
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
+            - drawio/                : Draw.io diagram editor (148 MB)
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/uv               : UV package manager
@@ -575,6 +592,7 @@ jobs:
           - Standalone operation - works offline
           - Portable ZIP versions require no installation
           - Multi-architecture support (Intel and Apple Silicon for macOS)
+          - **Draw.io diagram editor included** (148 MB) - Create and edit diagrams visually
 
           ### Quick Start (Portable)
 
