@@ -222,3 +222,21 @@ class LocalFileSystemStorage(Storage):
             raise
         except Exception as e:
             raise OSError(f"Could not read binary file at path: {path}. Error: {e}")
+
+    async def stat(self, path: str) -> dict[str, Any] | None:
+        """Get file or directory metadata (size, modification time, etc.)"""
+        safe_path = self._get_safe_path(path)
+        try:
+            if not safe_path.exists():
+                return None
+
+            stat_info = safe_path.stat()
+            return {
+                "size": stat_info.st_size,
+                "modified": stat_info.st_mtime,
+                "created": stat_info.st_ctime,
+                "is_directory": safe_path.is_dir(),
+                "is_file": safe_path.is_file(),
+            }
+        except Exception:
+            return None

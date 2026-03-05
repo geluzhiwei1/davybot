@@ -65,3 +65,7 @@ class Storage(ABC):
     @abstractmethod
     async def read_binary_file(self, path: str) -> bytes:
         """Reads the content of a binary file (e.g., images, PDFs)."""
+
+    @abstractmethod
+    async def stat(self, path: str) -> dict[str, Any] | None:
+        """Get file or directory metadata (size, modification time, etc.)"""

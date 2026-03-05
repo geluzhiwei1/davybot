@@ -151,68 +151,37 @@ async def get_workspace_files_or_content(
 
     if is_binary:
         # Return binary file
-        try:
-            content = await storage.read_binary_file(path)
+        content = await storage.read_binary_file(path)
 
-            # Determine MIME type
-            mime_types = {
-                ".png": "image/png",
-                ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg",
-                ".gif": "image/gif",
-                ".bmp": "image/bmp",
-                ".ico": "image/x-icon",
-                ".svg": "image/svg+xml",
-                ".webp": "image/webp",
-                ".pdf": "application/pdf",
-                ".zip": "application/zip",
-                ".tar": "application/x-tar",
-                ".gz": "application/gzip",
-            }
-            content_type = mime_types.get(file_ext, "application/octet-stream")
+        # Determine MIME type
+        mime_types = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".bmp": "image/bmp",
+            ".ico": "image/x-icon",
+            ".svg": "image/svg+xml",
+            ".webp": "image/webp",
+            ".pdf": "application/pdf",
+            ".zip": "application/zip",
+            ".tar": "application/x-tar",
+            ".gz": "application/gzip",
+        }
+        content_type = mime_types.get(file_ext, "application/octet-stream")
 
-            return Response(content=content, media_type=content_type)
-        except (OSError, PermissionError) as e:
-            # Filesystem error - fast fail
-            logger.error(f"Filesystem error reading binary file {path}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to read file: {e!s}")
-        except Exception as e:
-            # Unexpected error - fast fail
-            logger.critical(f"Unexpected error reading binary file {path}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Internal server error")
+        return Response(content=content, media_type=content_type)
     else:
         # Return text file
         try:
             content = await storage.read_file(path)
-            return {"success": True, "type": "file", "path": path, "content": content}
         except UnicodeDecodeError:
             # If text decoding fails, fall back to binary
             logger.warning(f"Failed to decode file {path} as text, trying binary mode")
-            try:
-                content = await storage.read_binary_file(path)
-                return Response(content=content, media_type="application/octet-stream")
-            except (OSError, PermissionError) as e:
-                # Filesystem error - fast fail
-                logger.error(
-                    f"Filesystem error reading file {path} in binary mode: {e}",
-                    exc_info=True,
-                )
-                raise HTTPException(status_code=500, detail=f"Failed to read file: {e!s}")
-            except Exception as e:
-                # Unexpected error - fast fail
-                logger.critical(
-                    f"Unexpected error reading file {path} in binary mode: {e}",
-                    exc_info=True,
-                )
-                raise HTTPException(status_code=500, detail="Internal server error")
-        except (OSError, PermissionError) as e:
-            # Filesystem error - fast fail
-            logger.error(f"Filesystem error reading file {path}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to read file: {e!s}")
-        except Exception as e:
-            # Unexpected error - fast fail
-            logger.critical(f"Unexpected error reading file {path}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Internal server error")
+            content = await storage.read_binary_file(path)
+            return Response(content=content, media_type="application/octet-stream")
+
+        return {"success": True, "type": "file", "path": path, "content": content}
 
 
 @router.post("/{workspace_id}/files")
@@ -278,78 +247,64 @@ async def get_workspace_modes(
         HTTPException: If mode retrieval fails
 
     """
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
 
-        # 如果要求强制重新加载，清除缓存
-        if reload:
-            workspace.mode_manager.reload_configs()
-            logger.info(f"Forced reload of mode configurations for workspace: {workspace.absolute_path}")
+    # 如果要求强制重新加载，清除缓存
+    if reload:
+        workspace.mode_manager.reload_configs()
+        logger.info(f"Forced reload of mode configurations for workspace: {workspace.absolute_path}")
 
-        logger.info(f"Getting modes for workspace: {workspace.absolute_path}")
-        modes_dict = workspace.mode_manager.get_all_modes()
+    logger.info(f"Getting modes for workspace: {workspace.absolute_path}")
+    modes_dict = workspace.mode_manager.get_all_modes()
 
-        # 动态获取内置模式的固定顺序
-        from dawei.mode import get_builtin_modes, get_default_mode
+    # 动态获取内置模式的固定顺序
+    from dawei.mode import get_builtin_modes, get_default_mode
 
-        builtin_mode_order = get_builtin_modes()
-        default_mode = get_default_mode()
+    builtin_mode_order = get_builtin_modes()
+    default_mode = get_default_mode()
 
-        # 分离 system modes 和自定义 modes
-        system_modes = []
-        custom_modes = []
+    # 分离 system modes 和自定义 modes
+    system_modes = []
+    custom_modes = []
 
-        for mode_slug, mode_info in modes_dict.items():
-            # 获取配置来源信息
-            config_sources = workspace.mode_manager.get_config_sources(mode_slug)
-            source = "system" if config_sources.get("builtin") else ("workspace" if config_sources.get("workspace") else "user")
+    for mode_slug, mode_info in modes_dict.items():
+        # 获取配置来源信息
+        config_sources = workspace.mode_manager.get_config_sources(mode_slug)
+        source = "system" if config_sources.get("builtin") else ("workspace" if config_sources.get("workspace") else "user")
 
-            mode_data = {
-                "slug": getattr(mode_info, "slug", mode_slug),
-                "name": getattr(mode_info, "name", mode_slug),
-                "description": getattr(mode_info, "description", ""),
-                "is_default": mode_slug == default_mode,
-                "source": source,
-                # 包含完整的模式配置信息
-                "role_definition": getattr(mode_info, "role_definition", ""),
-                "when_to_use": getattr(mode_info, "when_to_use", ""),
-                "groups": getattr(mode_info, "groups", []),
-                "custom_instructions": getattr(mode_info, "custom_instructions", ""),
-            }
+        mode_data = {
+            "slug": getattr(mode_info, "slug", mode_slug),
+            "name": getattr(mode_info, "name", mode_slug),
+            "description": getattr(mode_info, "description", ""),
+            "is_default": mode_slug == default_mode,
+            "source": source,
+            # 包含完整的模式配置信息
+            "role_definition": getattr(mode_info, "role_definition", ""),
+            "when_to_use": getattr(mode_info, "when_to_use", ""),
+            "groups": getattr(mode_info, "groups", []),
+            "custom_instructions": getattr(mode_info, "custom_instructions", ""),
+        }
 
-            # 如果是内置 system mode（在 builtin_mode_order 中且 source 为 system），按固定顺序添加
-            if source == "system" and mode_slug in builtin_mode_order:
-                system_modes.append((builtin_mode_order.index(mode_slug), mode_data))
-            else:
-                # 自定义 modes（user/workspace）暂存，按 slug 字母顺序排序
-                custom_modes.append((mode_slug, mode_data))
+        # 如果是内置 system mode（在 builtin_mode_order 中且 source 为 system），按固定顺序添加
+        if source == "system" and mode_slug in builtin_mode_order:
+            system_modes.append((builtin_mode_order.index(mode_slug), mode_data))
+        else:
+            # 自定义 modes（user/workspace）暂存，按 slug 字母顺序排序
+            custom_modes.append((mode_slug, mode_data))
 
-        # 排序 system modes（按内置顺序）和 custom modes（按 slug 字母顺序）
-        system_modes.sort(key=lambda x: x[0])
-        custom_modes.sort(key=lambda x: x[0])
+    # 排序 system modes（按内置顺序）和 custom modes（按 slug 字母顺序）
+    system_modes.sort(key=lambda x: x[0])
+    custom_modes.sort(key=lambda x: x[0])
 
-        # 合并：system modes 在前，custom modes 在后
-        mode_list = [mode[1] for mode in system_modes] + [mode[1] for mode in custom_modes]
+    # 合并：system modes 在前，custom modes 在后
+    mode_list = [mode[1] for mode in system_modes] + [mode[1] for mode in custom_modes]
 
-        logger.info(
-            f"Found {len(mode_list)} modes ({len(system_modes)} system, {len(custom_modes)} custom)",
-        )
-        return {"success": True, "modes": mode_list}
-
-    except (OSError, PermissionError) as e:
-        # Filesystem error during workspace initialization
-        logger.error(f"Failed to initialize workspace for modes: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to access workspace: {e!s}")
-    except (AttributeError, KeyError) as e:
-        # Mode manager error - fast fail
-        logger.error(f"Failed to get workspace modes: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get modes: {e!s}")
-    except Exception as e:
-        # Unexpected error - fast fail
-        logger.critical(f"Unexpected error getting workspace modes: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    logger.info(
+        f"Found {len(mode_list)} modes ({len(system_modes)} system, {len(custom_modes)} custom)",
+    )
+    return {"success": True, "modes": mode_list}
 
 
 @router.delete("/{workspace_id}/modes/{mode_slug}")
@@ -380,38 +335,22 @@ async def delete_workspace_mode(
         HTTPException: 500 - 服务器错误
 
     """
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
+
+    logger.info(f"Deleting mode {mode_slug} from workspace {workspace_id}")
+
+    # 尝试删除模式（默认为 workspace 级别）
     try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+        workspace.mode_manager.delete_mode(mode_slug, level="workspace")
+    except ValueError as e:
+        # 尝试删除内置模式或模式不存在
+        logger.warning(f"Failed to delete mode {mode_slug}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
-        logger.info(f"Deleting mode {mode_slug} from workspace {workspace_id}")
-
-        # 尝试删除模式（默认为 workspace 级别）
-        try:
-            workspace.mode_manager.delete_mode(mode_slug, level="workspace")
-        except ValueError as e:
-            # 尝试删除内置模式或模式不存在
-            logger.warning(f"Failed to delete mode {mode_slug}: {e}")
-            raise HTTPException(status_code=400, detail=str(e))
-
-        logger.info(f"Successfully deleted mode {mode_slug} from workspace {workspace_id}")
-        return {"success": True, "message": f"Mode '{mode_slug}' deleted successfully"}
-
-    except HTTPException:
-        raise
-    except (OSError, PermissionError) as e:
-        # Filesystem error during mode deletion
-        logger.error(f"Failed to delete mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to delete mode: {e!s}")
-    except (AttributeError, KeyError) as e:
-        # Mode manager error - fast fail
-        logger.error(f"Mode manager error deleting mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to delete mode: {e!s}")
-    except Exception as e:
-        # Unexpected error - fast fail
-        logger.critical(f"Unexpected error deleting mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    logger.info(f"Successfully deleted mode {mode_slug} from workspace {workspace_id}")
+    return {"success": True, "message": f"Mode '{mode_slug}' deleted successfully"}
 
 
 @router.get("/{workspace_id}/modes/{mode_slug}/rules", response_model=ModeRulesResponse)
@@ -435,65 +374,41 @@ async def get_mode_rules(
         HTTPException: 500 - 服务器错误
 
     """
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
 
-        logger.info(f"Getting rules for mode {mode_slug} from workspace {workspace_id}")
+    logger.info(f"Getting rules for mode {mode_slug} from workspace {workspace_id}")
 
-        # 获取模式配置（包含所有规则文件）
-        mode_info = workspace.mode_manager.get_mode_info(mode_slug)
+    # 获取模式配置（包含所有规则文件）
+    mode_info = workspace.mode_manager.get_mode_info(mode_slug)
 
-        # 获取所有规则文件字典
-        rules_dict = mode_info.rules if mode_info else {}
+    # 获取所有规则文件字典
+    rules_dict = mode_info.rules if mode_info else {}
 
-        # 获取规则目录路径
-        rules_dir = workspace.mode_manager._find_rules_directory(mode_slug)
+    # 获取规则目录路径
+    rules_dir = workspace.mode_manager._find_rules_directory(mode_slug)
 
-        # 将路径转换为相对路径（如果可能）
-        relative_dir = None
-        if rules_dir:
-            try:
-                workspace_path = Path(workspace.absolute_path)
-                rules_abs_path = Path(rules_dir)
-                # 尝试转换为相对于工作区的路径
-                try:
-                    relative_dir = str(rules_abs_path.relative_to(workspace_path))
-                except ValueError as e:
-                    # 规则目录不在工作区内，这是配置错误
-                    logger.error(
-                        f"Rules directory {rules_abs_path} is not within workspace {workspace_path}"
-                    )
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Rules directory must be within workspace path: {e}",
-                    )
-            except Exception as e:
-                # 其他意外错误 - fast fail
-                logger.error(f"Failed to convert rules dir to relative path: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to process rules directory: {e!s}",
-                )
+    # 将路径转换为相对路径（如果可能）
+    relative_dir = None
+    if rules_dir:
+        workspace_path = Path(workspace.absolute_path)
+        rules_abs_path = Path(rules_dir)
+        # 尝试转换为相对于工作区的路径
+        try:
+            relative_dir = str(rules_abs_path.relative_to(workspace_path))
+        except ValueError as e:
+            # 规则目录不在工作区内，这是配置错误
+            logger.error(
+                f"Rules directory {rules_abs_path} is not within workspace {workspace_path}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rules directory must be within workspace path: {e}",
+            )
 
-        logger.info(f"Successfully retrieved {len(rules_dict)} rules files for mode {mode_slug}")
-        return ModeRulesResponse(success=True, rules=rules_dict, directory=relative_dir)
-
-    except HTTPException:
-        raise
-    except (OSError, PermissionError) as e:
-        # Filesystem error during rules retrieval
-        logger.error(f"Failed to get rules for mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get rules: {e!s}")
-    except (AttributeError, KeyError) as e:
-        # Mode manager error - fast fail
-        logger.error(f"Mode manager error getting rules for mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get rules: {e!s}")
-    except Exception as e:
-        # Unexpected error - fast fail
-        logger.critical(f"Unexpected error getting rules for mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    logger.info(f"Successfully retrieved {len(rules_dict)} rules files for mode {mode_slug}")
+    return ModeRulesResponse(success=True, rules=rules_dict, directory=relative_dir)
 
 
 @router.put("/{workspace_id}/modes/{mode_slug}", response_model=ModeResponse)
@@ -522,66 +437,50 @@ async def update_mode(
         HTTPException: 500 - 服务器错误
 
     """
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
+
+    logger.info(f"Updating mode {mode_slug} in workspace {workspace_id}")
+
+    # 将请求数据转换为字典
+    mode_data = {
+        "slug": request_data.slug,
+        "name": request_data.name,
+        "description": request_data.description,
+        "roleDefinition": request_data.roleDefinition,
+        "whenToUse": request_data.whenToUse,
+        "groups": request_data.groups or [],
+    }
+
+    if request_data.customInstructions:
+        mode_data["customInstructions"] = request_data.customInstructions
+
+    # 更新模式
     try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+        updated_mode = workspace.mode_manager.update_mode(mode_slug, mode_data, level="workspace")
+    except ValueError as e:
+        # 尝试更新内置模式或模式不存在
+        logger.warning(f"Failed to update mode {mode_slug}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
-        logger.info(f"Updating mode {mode_slug} in workspace {workspace_id}")
+    # 转换模式对象为字典
+    mode_dict = {
+        "slug": updated_mode.slug,
+        "name": updated_mode.name,
+        "description": updated_mode.description,
+        "roleDefinition": updated_mode.role_definition,
+        "whenToUse": updated_mode.when_to_use,
+        "groups": updated_mode.groups,
+        "customInstructions": updated_mode.custom_instructions,
+    }
 
-        # 将请求数据转换为字典
-        mode_data = {
-            "slug": request_data.slug,
-            "name": request_data.name,
-            "description": request_data.description,
-            "roleDefinition": request_data.roleDefinition,
-            "whenToUse": request_data.whenToUse,
-            "groups": request_data.groups or [],
-        }
-
-        if request_data.customInstructions:
-            mode_data["customInstructions"] = request_data.customInstructions
-
-        # 更新模式
-        try:
-            updated_mode = workspace.mode_manager.update_mode(mode_slug, mode_data, level="workspace")
-        except ValueError as e:
-            # 尝试更新内置模式或模式不存在
-            logger.warning(f"Failed to update mode {mode_slug}: {e}")
-            raise HTTPException(status_code=400, detail=str(e))
-
-        # 转换模式对象为字典
-        mode_dict = {
-            "slug": updated_mode.slug,
-            "name": updated_mode.name,
-            "description": updated_mode.description,
-            "roleDefinition": updated_mode.role_definition,
-            "whenToUse": updated_mode.when_to_use,
-            "groups": updated_mode.groups,
-            "customInstructions": updated_mode.custom_instructions,
-        }
-
-        logger.info(f"Successfully updated mode {mode_slug} in workspace {workspace_id}")
-        return ModeResponse(
-            success=True,
-            message=f"Mode '{mode_slug}' updated successfully",
-            mode=mode_dict,
-        )
-
-    except HTTPException:
-        raise
-    except (OSError, PermissionError) as e:
-        # Filesystem error during mode update
-        logger.error(f"Failed to update mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update mode: {e!s}")
-    except (AttributeError, KeyError) as e:
-        # Mode manager error - fast fail
-        logger.error(f"Mode manager error updating mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update mode: {e!s}")
-    except Exception as e:
-        # Unexpected error - fast fail
-        logger.critical(f"Unexpected error updating mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    logger.info(f"Successfully updated mode {mode_slug} in workspace {workspace_id}")
+    return ModeResponse(
+        success=True,
+        message=f"Mode '{mode_slug}' updated successfully",
+        mode=mode_dict,
+    )
 
 
 @router.put("/{workspace_id}/modes/{mode_slug}/rules", response_model=ModeRulesResponse)
@@ -610,70 +509,54 @@ async def update_mode_rules(
         HTTPException: 500 - 服务器错误
 
     """
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
+
+    logger.info(f"Updating rules for mode {mode_slug} in workspace {workspace_id}")
+
+    # 更新模式规则（支持多个文件）
     try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+        for filename, content in request_data.rules.items():
+            workspace.mode_manager.update_mode_rules(
+                mode_slug=mode_slug,
+                rules_content=content,
+                rules_filename=filename,
+                level="workspace",
+            )
+            logger.debug(f"Updated rules file {filename}.md for mode {mode_slug}")
+    except ValueError as e:
+        # 尝试更新内置模式的规则
+        logger.warning(f"Failed to update rules for mode {mode_slug}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
-        logger.info(f"Updating rules for mode {mode_slug} in workspace {workspace_id}")
+    logger.info(f"Successfully updated {len(request_data.rules)} rules file(s) for mode {mode_slug} in workspace {workspace_id}")
 
-        # 更新模式规则（支持多个文件）
+    # 返回更新后的所有规则
+    mode_info = workspace.mode_manager.get_mode_info(mode_slug)
+    rules_dict = mode_info.rules if mode_info else {}
+    rules_dir = workspace.mode_manager._find_rules_directory(mode_slug)
+
+    # 将绝对路径转换为相对路径
+    relative_dir = None
+    if rules_dir and workspace.absolute_path:
         try:
-            for filename, content in request_data.rules.items():
-                workspace.mode_manager.update_mode_rules(
-                    mode_slug=mode_slug,
-                    rules_content=content,
-                    rules_filename=filename,
-                    level="workspace",
-                )
-                logger.debug(f"Updated rules file {filename}.md for mode {mode_slug}")
+            relative_dir = str(Path(rules_dir).relative_to(Path(workspace.absolute_path)))
         except ValueError as e:
-            # 尝试更新内置模式的规则
-            logger.warning(f"Failed to update rules for mode {mode_slug}: {e}")
-            raise HTTPException(status_code=400, detail=str(e))
+            # 规则目录不在工作区内，这是配置错误
+            logger.error(
+                f"Rules directory {rules_dir} is not within workspace {workspace.absolute_path}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rules directory must be within workspace path: {e}",
+            )
 
-        logger.info(f"Successfully updated {len(request_data.rules)} rules file(s) for mode {mode_slug} in workspace {workspace_id}")
-
-        # 返回更新后的所有规则
-        mode_info = workspace.mode_manager.get_mode_info(mode_slug)
-        rules_dict = mode_info.rules if mode_info else {}
-        rules_dir = workspace.mode_manager._find_rules_directory(mode_slug)
-
-        # 将绝对路径转换为相对路径
-        relative_dir = None
-        if rules_dir and workspace.absolute_path:
-            try:
-                relative_dir = str(Path(rules_dir).relative_to(Path(workspace.absolute_path)))
-            except ValueError as e:
-                # 规则目录不在工作区内，这是配置错误
-                logger.error(
-                    f"Rules directory {rules_dir} is not within workspace {workspace.absolute_path}"
-                )
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Rules directory must be within workspace path: {e}",
-                )
-
-        return ModeRulesResponse(
-            success=True,
-            rules=rules_dict,
-            directory=relative_dir,
-        )
-
-    except HTTPException:
-        raise
-    except (OSError, PermissionError) as e:
-        # Filesystem error during rules update
-        logger.error(f"Failed to update rules for mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update rules: {e!s}")
-    except (AttributeError, KeyError) as e:
-        # Mode manager error - fast fail
-        logger.error(f"Mode manager error updating rules for mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update rules: {e!s}")
-    except Exception as e:
-        # Unexpected error - fast fail
-        logger.critical(f"Unexpected error updating rules for mode {mode_slug}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    return ModeRulesResponse(
+        success=True,
+        rules=rules_dict,
+        directory=relative_dir,
+    )
 
 
 # --- 代理配置路由 ---
@@ -716,28 +599,20 @@ async def get_proxy_config(
     workspace: UserWorkspace = Depends(get_user_workspace),
 ):
     """获取工作区代理配置"""
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
 
-        # 确保settings已加载
-        if workspace.workspace_settings is None:
-            await workspace._load_settings()
+    # 确保settings已加载
+    if workspace.workspace_settings is None:
+        await workspace._load_settings()
 
-        # 返回代理配置
-        return {
-            "http_proxy": workspace.workspace_settings.http_proxy,
-            "https_proxy": workspace.workspace_settings.https_proxy,
-            "no_proxy": workspace.workspace_settings.no_proxy,
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to get proxy config: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get proxy config: {e!s}",
-        )
+    # 返回代理配置
+    return {
+        "http_proxy": workspace.workspace_settings.http_proxy,
+        "https_proxy": workspace.workspace_settings.https_proxy,
+        "no_proxy": workspace.workspace_settings.no_proxy,
+    }
 
 
 @router.put("/{workspace_id}/proxy")
@@ -747,56 +622,48 @@ async def update_proxy_config(
     workspace: UserWorkspace = Depends(get_user_workspace),
 ):
     """更新工作区代理配置"""
-    try:
-        # 确保工作区已初始化
-        if not workspace.is_initialized():
-            await workspace.initialize()
+    # 确保工作区已初始化
+    if not workspace.is_initialized():
+        await workspace.initialize()
 
-        # 确保settings已加载
-        if workspace.workspace_settings is None:
-            await workspace._load_settings()
+    # 确保settings已加载
+    if workspace.workspace_settings is None:
+        await workspace._load_settings()
 
-        # 验证并更新代理配置
-        updated_fields = set()
-        if "http_proxy" in proxy_update:
-            _validate_proxy_url(proxy_update["http_proxy"], "http_proxy")
-            workspace.workspace_settings.http_proxy = proxy_update["http_proxy"]
-            updated_fields.add("httpProxy")
-        if "https_proxy" in proxy_update:
-            _validate_proxy_url(proxy_update["https_proxy"], "https_proxy")
-            workspace.workspace_settings.https_proxy = proxy_update["https_proxy"]
-            updated_fields.add("httpsProxy")
-        if "no_proxy" in proxy_update:
-            # no_proxy 不需要URL验证（它是逗号分隔的域名列表）
-            workspace.workspace_settings.no_proxy = proxy_update["no_proxy"]
-            updated_fields.add("noProxy")
+    # 验证并更新代理配置
+    updated_fields = set()
+    if "http_proxy" in proxy_update:
+        _validate_proxy_url(proxy_update["http_proxy"], "http_proxy")
+        workspace.workspace_settings.http_proxy = proxy_update["http_proxy"]
+        updated_fields.add("httpProxy")
+    if "https_proxy" in proxy_update:
+        _validate_proxy_url(proxy_update["https_proxy"], "https_proxy")
+        workspace.workspace_settings.https_proxy = proxy_update["https_proxy"]
+        updated_fields.add("httpsProxy")
+    if "no_proxy" in proxy_update:
+        # no_proxy 不需要URL验证（它是逗号分隔的域名列表）
+        workspace.workspace_settings.no_proxy = proxy_update["no_proxy"]
+        updated_fields.add("noProxy")
 
-        # 增量保存配置（只保存 proxy 字段，不影响其他配置）
-        await workspace._save_settings(only_fields=updated_fields)
+    # 增量保存配置（只保存 proxy 字段，不影响其他配置）
+    await workspace._save_settings(only_fields=updated_fields)
 
-        logger.info(f"Proxy config updated for workspace {workspace_id}")
+    logger.info(f"Proxy config updated for workspace {workspace_id}")
 
-        # 重新加载 LLM 配置以应用新的 proxy 设置
-        if workspace.llm_manager:
-            try:
-                workspace.llm_manager.reload_configs()
-                logger.info(f"LLM configs reloaded after proxy update for workspace {workspace_id}")
-            except Exception as e:
-                logger.warning(f"Failed to reload LLM configs after proxy update: {e}")
+    # 重新加载 LLM 配置以应用新的 proxy 设置
+    if workspace.llm_manager:
+        try:
+            workspace.llm_manager.reload_configs()
+            logger.info(f"LLM configs reloaded after proxy update for workspace {workspace_id}")
+        except Exception as e:
+            logger.warning(f"Failed to reload LLM configs after proxy update: {e}")
 
-        # 返回更新后的代理配置
-        return {
-            "http_proxy": workspace.workspace_settings.http_proxy,
-            "https_proxy": workspace.workspace_settings.https_proxy,
-            "no_proxy": workspace.workspace_settings.no_proxy,
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to update proxy config: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update proxy config: {e!s}",
-        )
+    # 返回更新后的代理配置
+    return {
+        "http_proxy": workspace.workspace_settings.http_proxy,
+        "https_proxy": workspace.workspace_settings.https_proxy,
+        "no_proxy": workspace.workspace_settings.no_proxy,
+    }
 
 
 
@@ -814,7 +681,7 @@ async def get_workspace_stats(workspace_id: str):
     - 技能统计（工作区级技能数量）
     - Agent 统计（工作区级 agent 数量）
     - 最后活动时间
-"""
+    """
     # 获取工作区信息
     workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
     if not workspace_info:
@@ -831,82 +698,62 @@ async def get_workspace_stats(workspace_id: str):
     total_size = 0
     file_types = {}
 
-    try:
-        async for item in workspace_storage.list_files(recursive=True, include_hidden=False):
-            if not item["is_dir"]:
-                total_files += 1
-                total_size += item.get("size", 0)
-                ext = item["name"].split(".")[-1].lower() if "." in item["name"] else "no_ext"
-                file_types[ext] = file_types.get(ext, 0) + 1
-    except Exception as e:
-        logger.warning(f"Failed to count files for workspace {workspace_id}: {e}")
+    files = await workspace_storage.list_directory(path="", recursive=True, include_hidden=False)
+    for item in files:
+        if not item["is_directory"]:
+            total_files += 1
+            total_size += item.get("size", 0)
+            ext = item["name"].split(".")[-1].lower() if "." in item["name"] else "no_ext"
+            file_types[ext] = file_types.get(ext, 0) + 1
 
     # 统计对话信息
     conversations_count = 0
     messages_count = 0
     last_activity_at = workspace_info.get("created_at", "")
 
-    try:
-        conversations_path = ".dawei/conversations"
-        if await workspace_storage.exists(conversations_path):
-            async for item in workspace_storage.list_files(conversations_path, recursive=False):
-                if item["name"].endswith(".json") and not item["is_dir"]:
-                    conversations_count += 1
-                    try:
-                        conv_content = await workspace_storage.read_file(
-                            f"{conversations_path}/{item['name']}"
-                        )
-                        conv_data = json.loads(conv_content)
-                        messages_count += len(conv_data.get("messages", []))
-                    except (json.JSONDecodeError, OSError, KeyError) as e:
-                        logger.warning(f"Failed to read conversation {item.get('name')}: {e}")
+    conversations_path = ".dawei/conversations"
+    if await workspace_storage.exists(conversations_path):
+        conv_files = await workspace_storage.list_directory(path=conversations_path, recursive=False, include_hidden=False)
+        for item in conv_files:
+            if item["name"].endswith(".json") and not item["is_directory"]:
+                conversations_count += 1
+                conv_content = await workspace_storage.read_file(
+                    f"{conversations_path}/{item['name']}"
+                )
+                conv_data = json.loads(conv_content)
+                messages_count += len(conv_data.get("messages", []))
 
-        try:
-            workspace_info_path = ".dawei/workspace.json"
-            if await workspace_storage.exists(workspace_info_path):
-                stat = await workspace_storage.stat(workspace_info_path)
-                if stat and "modified" in stat:
-                    last_activity_at = stat["modified"]
-        except (OSError, KeyError) as e:
-            logger.debug(f"Failed to get workspace last activity: {e}")
-    except Exception as e:
-        logger.warning(f"Failed to count conversations for workspace {workspace_id}: {e}")
+    # 获取最后修改时间
+    workspace_info_path = ".dawei/workspace.json"
+    if await workspace_storage.exists(workspace_info_path):
+        stat = await workspace_storage.stat(workspace_info_path)
+        if stat and "modified" in stat:
+            last_activity_at = stat["modified"]
 
     # 统计任务信息
     tasks_count = 0
-    try:
-        tasks_path = ".dawei/tasks.json"
-        if await workspace_storage.exists(tasks_path):
-            tasks_content = await workspace_storage.read_file(tasks_path)
-            tasks_data = json.loads(tasks_content)
-            tasks_count = len(tasks_data.get("todos", []))
-    except (json.JSONDecodeError, OSError, KeyError) as e:
-        logger.debug(f"Failed to count tasks: {e}")
+    tasks_path = ".dawei/tasks.json"
+    if await workspace_storage.exists(tasks_path):
+        tasks_content = await workspace_storage.read_file(tasks_path)
+        tasks_data = json.loads(tasks_content)
+        tasks_count = len(tasks_data.get("todos", []))
 
     # 统计工作区级技能数量 - 使用 SkillManager
-    skills_count = 0
-    try:
-        workspace_root = Path(workspace_path)
-        skills_roots = [workspace_root]
-        skill_manager = SkillManager(skills_roots=skills_roots)
-        skill_manager.discover_skills(force=True)
-        all_skills = skill_manager.get_all_skills()
-        # 统计工作区级技能（scope = "workspace"）
-        skills_count = len([s for s in all_skills if s.scope == "workspace"])
-    except Exception as e:
-        logger.warning(f"Failed to count workspace skills: {e}")
+    workspace_root = Path(workspace_path)
+    skills_roots = [workspace_root]
+    skill_manager = SkillManager(skills_roots=skills_roots)
+    skill_manager.discover_skills(force=True)
+    all_skills = skill_manager.get_all_skills()
+    skills_count = len([s for s in all_skills if s.scope == "workspace"])
 
     # 统计工作区级 modes (agents) 数量
     agents_count = 0
-    try:
-        modes_file = Path(workspace_path) / ".dawei" / "modes.yaml"
-        if modes_file.exists():
-            with open(modes_file, 'r', encoding='utf-8') as f:
-                modes_data = yaml.safe_load(f)
-                if modes_data and isinstance(modes_data, dict):
-                    agents_count = len(modes_data.get('modes', []))
-    except Exception as e:
-        logger.warning(f"Failed to count workspace modes: {e}")
+    modes_file = Path(workspace_path) / ".dawei" / "modes.yaml"
+    if modes_file.exists():
+        with open(modes_file, 'r', encoding='utf-8') as f:
+            modes_data = yaml.safe_load(f)
+            if modes_data and isinstance(modes_data, dict):
+                agents_count = len(modes_data.get('modes', []))
 
     return {
         "totalFiles": total_files,
@@ -933,38 +780,26 @@ async def get_global_stats():
     system_storage = StorageProvider.get_system_storage()
 
     # 1. 统计工作区总数
-    workspaces_count = 0
-    try:
-        content = await system_storage.read_file("workspaces.json")
-        data = json.loads(content)
-        workspaces_count = len(data.get("workspaces", []))
-    except Exception as e:
-        logger.warning(f"Failed to count workspaces: {e}")
+    content = await system_storage.read_file("workspaces.json")
+    data = json.loads(content)
+    workspaces_count = len(data.get("workspaces", []))
 
     # 2. 统计用户级技能总数 - 使用 SkillManager
-    skills_count = 0
-    try:
-        dawei_home = get_dawei_home()
-        skills_roots = [Path(dawei_home)]
-        skill_manager = SkillManager(skills_roots=skills_roots)
-        skill_manager.discover_skills(force=True)
-        all_skills = skill_manager.get_all_skills()
-        # 统计用户级技能（scope = "user"）
-        skills_count = len([s for s in all_skills if s.scope == "user"])
-    except Exception as e:
-        logger.warning(f"Failed to count skills: {e}")
+    dawei_home = get_dawei_home()
+    skills_roots = [Path(dawei_home)]
+    skill_manager = SkillManager(skills_roots=skills_roots)
+    skill_manager.discover_skills(force=True)
+    all_skills = skill_manager.get_all_skills()
+    skills_count = len([s for s in all_skills if s.scope == "user"])
 
     # 3. 统计用户级 modes (agents) 总数
     modes_count = 0
-    try:
-        modes_file = Path(get_dawei_home()) / ".dawei" / "modes.yaml"
-        if modes_file.exists():
-            with open(modes_file, 'r', encoding='utf-8') as f:
-                modes_data = yaml.safe_load(f)
-                if modes_data and isinstance(modes_data, dict):
-                    modes_count = len(modes_data.get('modes', []))
-    except Exception as e:
-        logger.warning(f"Failed to count user modes: {e}")
+    modes_file = Path(get_dawei_home()) / ".dawei" / "modes.yaml"
+    if modes_file.exists():
+        with open(modes_file, 'r', encoding='utf-8') as f:
+            modes_data = yaml.safe_load(f)
+            if modes_data and isinstance(modes_data, dict):
+                modes_count = len(modes_data.get('modes', []))
 
     return {
         "workspacesCount": workspaces_count,
