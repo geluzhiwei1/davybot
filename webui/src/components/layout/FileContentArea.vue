@@ -157,6 +157,7 @@ const editableContent = ref('')
 const vditorRef = ref<HTMLDivElement | null>(null)
 const vditor = ref<Vditor | null>(null)
 const vditorInitialized = ref(false)
+const isDirty = ref(false)  // 本地 dirty 状态，用于显示保存按钮状态
 
 // ✅ 暴露刷新方法给父组件
 const refreshAllFiles = () => {
@@ -174,10 +175,10 @@ defineExpose({
 // Image viewer state
 const imageViewerVisible = ref(false)
 
-// 内容是否被修改
+// 内容是否被修改（使用本地 dirty 状态）
 const isContentModified = computed(() => {
   if (!activeFile.value) return false
-  return editableContent.value !== activeFile.value.content
+  return isDirty.value
 })
 
 // Computed properties
@@ -300,8 +301,14 @@ const openImageViewer = () => {
 }
 
 const handleContentChange = () => {
+  // 内容被修改，标记为 dirty
+  isDirty.value = true
+  // 通知父组件更新 dirty 状态（用于显示 ● 标记）
   if (activeFile.value) {
-    emit('update-file-content', activeFile.value.id, editableContent.value)
+    const file = props.files.find(f => f.id === activeFile.value!.id)
+    if (file && !file.isDirty) {
+      emit('update-file-content', activeFile.value.id, editableContent.value)
+    }
   }
 }
 
@@ -315,6 +322,9 @@ const handleSave = async () => {
       contentToSave = vditor.value.getValue()
     }
     await emit('save-file', activeFile.value.id, contentToSave)
+
+    // 保存成功后重置 dirty 状态
+    isDirty.value = false
 
     // 保存后对于 Markdown 文件，等待父组件更新 content
     if (isMarkdownFile(activeFile.value)) {
@@ -399,6 +409,11 @@ watch(activeFile, (newFile, oldFile) => {
   // 更新编辑内容
   editableContent.value = newFile.content
 
+  // 重置 dirty 状态（切换到新文件时）
+  if (oldFile && oldFile.id !== newFile.id) {
+    isDirty.value = false
+  }
+
   // 如果是HTML文件，重置tab状态
   if (isHTMLFile(newFile)) {
     htmlActiveTab.value = 'preview'
@@ -424,6 +439,8 @@ watch(activeFile, (newFile, oldFile) => {
 watch(() => activeFile.value?.content, (newContent) => {
   if (newContent !== undefined && newContent !== editableContent.value) {
     editableContent.value = newContent
+    // 注意：不在这里重置 isDirty，因为可能是外部更新
+    // isDirty 只在 handleSave 成功后重置
   }
 }, { immediate: true })
 

@@ -136,33 +136,33 @@
     <!-- 文件右键菜单 -->
     <teleport to="body">
       <div v-if="contextMenuVisible" class="context-menu"
-        :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }" @click.stop>
-        <div class="context-menu-item" @click="handleCreateFile(selectedFileNode)">
+        :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }" @click.stop.prevent>
+        <div class="context-menu-item" @click.stop.prevent="handleCreateFile(selectedFileNode)">
           <el-icon>
             <Document />
           </el-icon>
           <span>{{ t('sidePanel.newFile') }}</span>
         </div>
-        <div class="context-menu-item" @click="handleCreateDirectory(selectedFileNode)">
+        <div class="context-menu-item" @click.stop.prevent="handleCreateDirectory(selectedFileNode)">
           <el-icon>
             <FolderAdd />
           </el-icon>
           <span>{{ t('sidePanel.newDirectory') }}</span>
         </div>
         <div v-if="selectedFileNode" class="context-menu-divider"></div>
-        <div v-if="selectedFileNode" class="context-menu-item" @click="handleRename">
+        <div v-if="selectedFileNode" class="context-menu-item" @click.stop.prevent="handleRename">
           <el-icon>
             <Edit />
           </el-icon>
           <span>{{ t('sidePanel.rename') }}</span>
         </div>
-        <div v-if="selectedFileNode" class="context-menu-item" @click="handleCopy">
+        <div v-if="selectedFileNode" class="context-menu-item" @click.stop.prevent="handleCopy">
           <el-icon>
             <CopyDocument />
           </el-icon>
           <span>{{ t('sidePanel.copy') }}</span>
         </div>
-        <div v-if="selectedFileNode" class="context-menu-item danger" @click="handleDelete">
+        <div v-if="selectedFileNode" class="context-menu-item danger" @click.stop.prevent="handleDelete">
           <el-icon>
             <Delete />
           </el-icon>
