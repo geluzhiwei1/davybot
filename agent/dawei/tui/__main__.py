@@ -149,9 +149,6 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main entry point for dawei.tui"""
-    # Load environment variables from current working directory's .env file
-    # Use find_dotenv() to locate .env from current working directory
-    # Use override=True to ensure DAWEI_HOME from .env takes precedence
     from dotenv import find_dotenv, load_dotenv
 
     env_path = find_dotenv()
@@ -223,7 +220,7 @@ Notes:
     if args.super:
         import os
 
-        os.environ["GEWEI_SUPER_MODE"] = "1"
+        os.environ["DAWEI_SUPER_MODE"] = "1"
         print()
         print("⚠️  WARNING: SUPER MODE ENABLED")
         print("   All security checks will be BYPASSED!")

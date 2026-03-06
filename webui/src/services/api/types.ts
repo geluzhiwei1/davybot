@@ -512,3 +512,143 @@ export interface ScheduledTaskExecutionsResponse {
   page_size: number;
   total_pages: number;
 }
+
+// ============================================================================
+// 安全配置类型
+// ============================================================================
+
+// 用户级安全配置
+export interface UserSecuritySettings {
+  // === 路径安全配置 ===
+  enablePathTraversalProtection: boolean;
+  allowAbsolutePaths: boolean;
+  baseAllowedExtensions: string[];
+  baseDeniedExtensions: string[];
+  maxFileSizeMb: number;
+
+  // === 命令执行安全配置 ===
+  enableCommandWhitelist: boolean;
+  useSystemCommandWhitelist: boolean;
+  baseAllowedCommands: string[];
+  baseDeniedCommands: string[];
+  allowShellCommands: boolean;
+  allowBackgroundCommands: boolean;
+  allowPipeCommands: boolean;
+  commandExecutionTimeout: number;
+
+  // === 沙箱配置 ===
+  enableSandbox: boolean;
+  sandboxMode: 'docker' | 'podman' | 'lightweight' | 'disabled';
+  allowSandboxFallback: boolean;
+  enforceSandbox: boolean;  // 强制所有工作区使用沙箱
+
+  // === 容器运行时选择 ===
+  containerRuntime: 'docker' | 'podman' | 'auto';  // 容器运行时
+
+  // === 容器沙箱细粒度安全控制 ===
+  dropAllCapabilities: boolean;  // 是否移除所有capabilities
+  noNewPrivileges: boolean;  // 是否禁止获得新权限
+  sandboxDisableNetwork: boolean;  // 是否禁用网络访问
+
+  // === 模式权限配置 ===
+  enableModeRestrictions: boolean;
+  planModeAllowWrites: boolean;
+  globallyDisabledModes: string[];
+
+  // === 工具权限配置 ===
+  baseEnabledToolGroups: string[];
+  baseDisabledToolGroups: string[];
+  baseDisabledTools: string[];
+
+  // === 网络安全配置 ===
+  allowNetworkAccess: boolean;
+  baseAllowedDomains: string[];
+  baseDeniedDomains: string[];
+  maxNetworkRequestSize: number;
+
+  // === 资源限制配置 ===
+  maxConcurrentOperations: number;
+  maxMemoryMb: number;
+  maxExecutionTime: number;
+
+  // === 高级安全选项 ===
+  enableSecurityAuditLog: boolean;
+  requireConfirmationForDangerous: boolean;
+  blockExecutableFiles: boolean;
+  allowSymlinksOutsideWorkspace: boolean;
+
+  // === 工作区覆盖控制 ===
+  allowWorkspaceOverridePathSecurity: boolean;
+  allowWorkspaceOverrideCommandSecurity: boolean;
+  allowWorkspaceOverrideSandbox: boolean;
+  allowWorkspaceOverrideToolPermissions: boolean;
+  allowWorkspaceOverrideNetworkSecurity: boolean;
+  allowWorkspaceOverrideResourceLimits: boolean;
+}
+
+// 工作区级安全配置
+export interface WorkspaceSecuritySettings {
+  // === 路径安全配置 ===
+  enablePathTraversalProtection: boolean;
+  allowAbsolutePaths: boolean;
+  allowedFileExtensions: string[];
+  deniedFileExtensions: string[];
+  maxFileSizeMb: number;
+
+  // === 命令执行安全配置 ===
+  enableCommandWhitelist: boolean;
+  useSystemCommandWhitelist: boolean;
+  customAllowedCommands: string[];
+  customDeniedCommands: string[];
+  allowShellCommands: boolean;
+  allowBackgroundCommands: boolean;
+  allowPipeCommands: boolean;
+  commandExecutionTimeout: number;
+
+  // === 沙箱配置 ===
+  enableSandbox: boolean;
+  sandboxMode: 'docker' | 'podman' | 'lightweight' | 'disabled';
+  allowSandboxFallback: boolean;
+
+  // === 容器运行时选择 ===
+  containerRuntime?: 'docker' | 'podman' | 'auto';  // 容器运行时 (可选,未设置时使用用户级配置)
+
+  // === 容器沙箱细粒度安全控制 ===
+  dropAllCapabilities?: boolean;  // 是否移除所有capabilities (可选,未设置时使用用户级配置)
+  noNewPrivileges?: boolean;  // 是否禁止获得新权限 (可选,未设置时使用用户级配置)
+  sandboxDisableNetwork?: boolean;  // 是否禁用网络访问 (可选,未设置时使用用户级配置)
+
+  // === 模式权限配置 ===
+  enableModeRestrictions: boolean;
+  planModeAllowWrites: boolean;
+  restrictedModes: string[];
+
+  // === 工具权限配置 ===
+  enabledToolGroups: string[];
+  disabledToolGroups: string[];
+  disabledTools: string[];
+
+  // === 网络安全配置 ===
+  allowNetworkAccess: boolean;
+  allowedNetworkDomains: string[];
+  deniedNetworkDomains: string[];
+  maxNetworkRequestSize: number;
+
+  // === 资源限制 ===
+  maxConcurrentOperations: number;
+  maxMemoryMb: number;
+  maxExecutionTime: number;
+
+  // === 高级安全选项 ===
+  enableSecurityAuditLog: boolean;
+  requireConfirmationForDangerous: boolean;
+  blockExecutableFiles: boolean;
+  allowSymlinksOutsideWorkspace: boolean;
+}
+
+// 安全配置响应
+export interface SecuritySettingsResponse {
+  success: boolean;
+  settings: UserSecuritySettings | WorkspaceSecuritySettings;
+  message?: string;
+}

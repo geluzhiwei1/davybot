@@ -12,7 +12,7 @@ import os
 logger = logging.getLogger(__name__)
 
 # Environment variable name for super mode
-SUPER_MODE_ENV_VAR = "GEWEI_SUPER_MODE"
+SUPER_MODE_ENV_VAR = "DAWEI_SUPER_MODE"
 
 
 def is_super_mode_enabled() -> bool:

@@ -50,9 +50,8 @@ class PluginManager:
                 logger.debug(f"Workspace plugin path: {workspace_plugin_dir}")
 
         # Tier 2: User plugins
-        from pathlib import Path
-
-        home = Path.home()
+        from dawei.config import get_dawei_home
+        home = get_dawei_home
         # User plugins: ~/.dawei/plugins/
         user_plugin_dir = home / ".dawei" / "plugins"
         if user_plugin_dir.exists():

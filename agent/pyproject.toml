@@ -38,6 +38,7 @@ dependencies = [
     "croniter>=3.0.0",
     "playwright>=1.40.0",
     "mcp>=0.1.0",
+    "docker",
 ]
 
 [project.optional-dependencies]
@@ -68,7 +69,6 @@ instant_message = [
 ]
 
 all = [
-    "docker",
     "prometheus_client"
 ]
 [project.urls]

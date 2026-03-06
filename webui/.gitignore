@@ -40,6 +40,7 @@ __screenshots__/
 target/
 playwright-report/
 test-results/
+webui/src-tauri/resources/
 
 # Dev test files (should not be committed)
 public/test-plugin-*.html

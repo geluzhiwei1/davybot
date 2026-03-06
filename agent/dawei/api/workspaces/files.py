@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # 导入服务依赖
 from dawei.api.services import get_workspace_file_service
@@ -395,6 +395,25 @@ class CopyFileRequest(BaseModel):
     destination_path: str
 
 
+class MoveFileRequest(BaseModel):
+    """移动文件或目录请求"""
+
+    source_path: str = Field(alias="sourcePath", description="源文件路径")
+    target_path: str = Field(alias="targetPath", description="目标文件路径")
+    overwrite: bool = Field(default=False, description="是否覆盖已存在的文件")
+
+    model_config = {
+        "populate_by_name": True,
+        "json_schema_extra": {
+            "example": {
+                "sourcePath": "path/to/file.txt",
+                "targetPath": "new/location/file.txt",
+                "overwrite": False
+            }
+        }
+    }
+
+
 @router.post("/{workspace_id}/files/copy")
 async def copy_file_or_directory(
     workspace_id: str,
@@ -452,6 +471,76 @@ async def copy_file_or_directory(
         "message": f"{'Directory' if source_path.is_dir() else 'File'} copied successfully",
         "source": data.source_path,
         "destination": data.destination_path,
+    }
+
+
+@router.post("/{workspace_id}/files/move")
+async def move_file_or_directory(
+    workspace_id: str,
+    data: MoveFileRequest,
+    file_service: Storage = Depends(get_workspace_file_service),
+):
+    """移动文件或目录
+
+    Args:
+        workspace_id: 工作区ID
+        data: 包含源路径、目标路径和覆盖标志的请求数据
+        file_service: 文件服务依赖
+
+    Returns:
+        移动结果
+
+    """
+    # 获取工作区根路径
+    workspace_path = Path(file_service.root_dir)
+
+    # 构建完整路径
+    source_path = workspace_path / data.source_path
+    target_path = workspace_path / data.target_path
+
+    # Fast Fail: 检查源路径是否存在
+    _validate_path_exists(source_path, f"Source path not found: {data.source_path}")
+
+    # Fast Fail: 检查路径是否在工作区内（防止路径遍历攻击）
+    _validate_path_safety(workspace_path, source_path)
+    _validate_path_safety(workspace_path, target_path)
+
+    # 检查目标路径是否已存在
+    if target_path.exists():
+        if data.overwrite:
+            # 删除现有目标
+            if target_path.is_file():
+                target_path.unlink()
+            elif target_path.is_dir():
+                shutil.rmtree(target_path)
+            logger.info(f"Removed existing target for overwrite: {target_path}")
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Target path already exists: {data.target_path}. Use overwrite=true to replace.",
+            )
+
+    # 确保目标目录存在
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 移动文件或目录
+    try:
+        shutil.move(str(source_path), str(target_path))
+        logger.info(f"Moved: {source_path} -> {target_path}")
+    except Exception as e:
+        logger.error(f"Failed to move {source_path} to {target_path}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to move file: {str(e)}",
+        ) from e
+
+    return {
+        "success": True,
+        "message": f"{'Directory' if source_path.is_dir() else 'File'} moved successfully",
+        "sourcePath": data.source_path,
+        "targetPath": data.target_path,
+        "size": target_path.stat().st_size if target_path.is_file() else 0,
+        "movedAt": Path(target_path).stat().st_mtime if target_path.exists() else None,
     }
 
 

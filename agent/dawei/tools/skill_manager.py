@@ -17,6 +17,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dawei.config import get_dawei_home
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,8 +89,8 @@ class SkillManager:
             current_mode: 当前模式（用于mode-specific skills）
 
         """
-        # 默认roots：全局user目录
-        self.skills_roots = skills_roots or [Path.home()]
+        # 默认roots：DAWEI_HOME目录
+        self.skills_roots = skills_roots or [get_dawei_home()]
         self.current_mode = current_mode
 
         # skill注册表: name -> list[Skill]

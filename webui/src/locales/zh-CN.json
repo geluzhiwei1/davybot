@@ -183,7 +183,8 @@
       "privacy": "隐私配置",
       "proxy": "代理设置",
       "scheduledTasks": "定时任务",
-      "checkpoints": "检查点"
+      "checkpoints": "检查点",
+      "security": "安全设置"
     },
     "proxy": {
       "title": "代理配置说明",
@@ -290,7 +291,6 @@
       "memory": "记忆系统配置",
       "memoryEnabled": "启用记忆系统",
       "virtualPageSize": "虚拟页面大小",
-      "maxActivePages": "最大活动页面数",
       "defaultEnergy": "默认能量值",
       "energyDecayRate": "能量衰减率",
       "minEnergyThreshold": "最小能量阈值",
@@ -785,6 +785,72 @@
       "vueVersion": "Vue版本",
       "elementVersion": "Element版本",
       "homepage": "主页"
+    },
+    "security": {
+      "title": "全局安全设置",
+      "description": "配置您的全局默认安全策略。这些设置将作为所有工作区的默认值，工作区可以根据您的配置进行覆盖。",
+      "saveSuccess": "安全设置保存成功",
+      "saveError": "安全设置保存失败",
+      "resetSuccess": "安全设置已重置为默认值",
+      "resetError": "安全设置重置失败",
+      "overrideControls": {
+        "title": "工作区覆盖控制",
+        "allowPathOverride": "允许工作区覆盖路径安全设置",
+        "allowPathOverrideHelp": "如果禁用，所有工作区必须使用您的路径安全配置",
+        "allowCommandOverride": "允许工作区覆盖命令执行安全设置",
+        "allowCommandOverrideHelp": "如果禁用，所有工作区必须使用您的命令执行安全配置",
+        "allowSandboxOverride": "允许工作区覆盖沙箱配置",
+        "allowSandboxOverrideHelp": "如果禁用，所有工作区必须使用您的沙箱配置",
+        "enforceSandbox": "强制所有工作区使用沙箱",
+        "enforceSandboxHelp": "启用后，工作区无法禁用沙箱隔离",
+        "allowToolOverride": "允许工作区覆盖工具权限设置",
+        "allowToolOverrideHelp": "如果禁用，所有工作区必须使用您的工具权限配置",
+        "allowNetworkOverride": "允许工作区覆盖网络安全设置",
+        "allowNetworkOverrideHelp": "如果禁用，所有工作区必须使用您的网络安全配置",
+        "allowResourceOverride": "允许工作区覆盖资源限制设置",
+        "allowResourceOverrideHelp": "如果禁用，所有工作区必须使用您的资源限制配置"
+      },
+      "pathSecurity": {
+        "title": "路径安全配置"
+      },
+      "commandSecurity": {
+        "title": "命令执行安全配置"
+      },
+      "sandbox": {
+        "title": "沙箱配置",
+        "enableSandbox": "启用沙箱隔离",
+        "enableSandboxHelp": "启用沙箱以隔离命令执行环境，提高安全性",
+        "sandboxMode": "沙箱模式",
+        "sandboxModeHelp": "选择沙箱类型：Docker容器、轻量级沙箱或禁用",
+        "allowFallback": "允许沙箱降级",
+        "allowFallbackHelp": "当Docker沙箱不可用时，自动降级到轻量级沙箱",
+        "enforceSandbox": "强制所有工作区使用沙箱",
+        "enforceSandboxHelp": "启用后，所有工作区都无法禁用沙箱",
+        "dropAllCapabilities": "移除所有capabilities",
+        "dropAllCapabilitiesHelp": "移除所有Linux capabilities以提高安全性。如果禁用，容器将保留默认capabilities（更兼容但安全性降低）",
+        "noNewPrivileges": "禁止获得新权限",
+        "noNewPrivilegesHelp": "防止进程通过setuid或setgid程序提升权限。启用后可防止权限提升攻击（更安全）",
+        "sandboxDisableNetwork": "禁用网络访问",
+        "sandboxDisableNetworkHelp": "禁用容器的网络访问以防止网络攻击。启用后更安全，但会限制某些需要网络的功能",
+        "containerRuntime": "容器运行时",
+        "containerRuntimeHelp": "选择容器运行时：自动检测、Docker 或 Podman",
+        "detectButton": "检测运行时"
+      },
+      "modePermissions": {
+        "title": "模式权限配置"
+      },
+      "toolPermissions": {
+        "title": "工具权限配置"
+      },
+      "network": {
+        "title": "网络安全配置"
+      },
+      "resource": {
+        "title": "资源限制配置"
+      },
+      "advanced": {
+        "title": "高级安全选项"
+      }
     }
   },
   "workspaces": {
@@ -814,7 +880,7 @@
     "loadFailed": "加载工作区列表失败"
   },
   "scheduledTasks": {
-    "title": "定时任务",
+    "title": "标题",
     "createTask": "创建任务",
     "editTask": "编辑任务",
     "noTasks": "暂无定时任务",
@@ -851,7 +917,6 @@
     "optional": "可选",
     "executionHistory": "执行历史",
     "conversationId": "会话ID",
-    "title": "标题",
     "triggeredAt": "触发时间",
     "messageCount": "消息数",
     "createSuccess": "任务创建成功",

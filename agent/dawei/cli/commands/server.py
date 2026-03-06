@@ -235,7 +235,7 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill,
 
         # Set super mode environment variable
         if super_mode:
-            os.environ["GEWEI_SUPER_MODE"] = "1"
+            os.environ["DAWEI_SUPER_MODE"] = "1"
 
         # Create FastAPI app
         app = create_app()

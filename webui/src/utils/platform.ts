@@ -46,7 +46,7 @@ export function getApiBaseUrl(): string {
   // Force Web mode in development (Vite dev server)
   // This ensures we always use the Vite proxy in development
   if (import.meta.env.DEV) {
-    const devUrl = '/api';
+    const devUrl = ''; // Use empty string - paths will be proxied based on their prefix
     return devUrl;
   }
 

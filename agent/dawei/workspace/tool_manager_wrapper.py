@@ -122,7 +122,8 @@ class WorkspaceToolManager:
         roots.append(Path(self.absolute_path))
 
         # Level 2: User 级别
-        roots.append(Path.home())
+        from dawei.config import get_dawei_home
+        roots.append(get_dawei_home())
 
         logger.info(f"Initializing SkillManager with {len(roots)} roots: {roots}")
 

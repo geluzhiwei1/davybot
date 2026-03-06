@@ -10,6 +10,8 @@ import os
 import sys
 from pathlib import Path
 
+from dawei.config import get_dawei_home
+
 
 def get_pid_file_path(port: int, pid_dir: Path | None = None) -> Path:
     """Get the PID file path for a given port.
@@ -22,9 +24,9 @@ def get_pid_file_path(port: int, pid_dir: Path | None = None) -> Path:
         Path to PID file
     """
     if pid_dir is None:
-        # Default to ~/.dawei/run
-        home_dir = Path.home()
-        pid_dir = home_dir / ".dawei" / "run"
+        # Default to DAWEI_HOME/run
+        dawei_home = get_dawei_home()
+        pid_dir = dawei_home / "run"
 
     # Create directory if it doesn't exist
     pid_dir.mkdir(parents=True, exist_ok=True)
@@ -210,9 +212,9 @@ def create_log_file(log_dir: Path | None = None, port: int = 8465) -> Path:
         Path to log file
     """
     if log_dir is None:
-        # Default to ~/.dawei/logs
-        home_dir = Path.home()
-        log_dir = home_dir / ".dawei" / "logs"
+        # Default to DAWEI_HOME/logs
+        dawei_home = get_dawei_home()
+        log_dir = dawei_home / "logs"
 
     # Create directory if it doesn't exist
     log_dir.mkdir(parents=True, exist_ok=True)

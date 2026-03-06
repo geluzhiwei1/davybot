@@ -93,9 +93,11 @@
                     </div>
                     <el-tree ref="fileTreeRef" :data="nestedFileTree" :props="defaultProps" node-key="path" lazy
                       :load="loadTreeNode" @node-click="handleTreeNodeClick" @node-contextmenu="handleNodeContextMenu"
-                      :expand-on-click-node="false" :highlight-current="true">
+                      :expand-on-click-node="false" :highlight-current="true" draggable :allow-drag="allowDrag"
+                      :allow-drop="allowDrop" @node-drag-start="handleDragStart" @node-drag-end="handleDragEnd"
+                      @node-drop="handleDrop">
                       <template #default="{ node, data }">
-                        <span class="custom-tree-node">
+                        <span class="custom-tree-node" :class="{ 'is-dragging': isDragging }">
                           <span class="tree-node-label">
                             <el-icon v-if="data.is_directory || data.type === 'directory'">
                               <Folder />
@@ -326,6 +328,10 @@ const selectedFileNode = ref<FileTreeNode | null>(null);
 
 // 文件树组件引用
 const fileTreeRef = ref<unknown>(null);
+
+// 拖拽相关状态
+const isDragging = ref(false);
+const draggedNode = ref<FileTreeNode | null>(null);
 
 // el-tree 组件的默认 props 配置（懒加载模式）
 const defaultProps = {
@@ -558,6 +564,77 @@ const handleTreeNodeClick = (data: unknown, _node: unknown) => {
     emit('open-file', { path: data.path, name: data.name });
   }
   // 如果是目录，Element Plus Tree 会自动触发懒加载，无需手动处理
+};
+
+// 拖拽相关函数
+// 允许拖拽的节点判断
+const allowDrag = (draggingNode: unknown) => {
+  // 所有文件和文件夹都可以拖拽
+  return true;
+};
+
+// 允许放置的节点判断
+const allowDrop = (draggingNode: unknown, dropNode: unknown, type: string) => {
+  const dropData = dropNode.data as FileTreeNode;
+  const isDropDirectory = dropData.is_directory || dropData.type === 'directory';
+
+  if (type === 'inner') {
+    // 只能放置在文件夹内
+    return isDropDirectory;
+  } else {
+    // 'before' 和 'after' 类型不允许(只允许拖入文件夹)
+    return false;
+  }
+};
+
+// 拖拽开始
+const handleDragStart = (node: unknown, event: DragEvent) => {
+  isDragging.value = true;
+  draggedNode.value = node.data as FileTreeNode;
+};
+
+// 拖拽结束
+const handleDragEnd = (node: unknown, event: DragEvent) => {
+  isDragging.value = false;
+  draggedNode.value = null;
+};
+
+// 处理放置
+const handleDrop = async (
+  draggingNode: unknown,
+  dropNode: unknown,
+  dropType: string,
+  event: DragEvent
+) => {
+  const dragData = draggingNode.data as FileTreeNode;
+  const dropData = dropNode.data as FileTreeNode;
+
+  // 只有放置在文件夹内部('inner')才执行移动
+  if (dropType === 'inner' && (dropData.is_directory || dropData.type === 'directory')) {
+    try {
+      // 构建目标路径: 目标文件夹 + 原文件名
+      const sourcePath = dragData.path;
+      const targetPath = `${dropData.path}/${dragData.name}`;
+
+      // 调用后端 API 移动文件
+      await apiManager.getFilesApi().moveFile(props.workspaceId, {
+        sourcePath,
+        targetPath
+      });
+
+      ElMessage.success(`已移动 "${dragData.name}" 到 "${dropData.name}"`);
+
+      // 刷新文件树
+      await handleRefreshFiles();
+    } catch (error) {
+      console.error('[Drag] Failed to move file:', error);
+      ElMessage.error(error?.response?.data?.detail || '移动文件失败');
+    }
+  }
+
+  // 重置拖拽状态
+  isDragging.value = false;
+  draggedNode.value = null;
 };
 
 // 右键菜单处理
@@ -1218,6 +1295,12 @@ defineExpose({
   justify-content: space-between;
   width: 100%;
   flex: 1;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.custom-tree-node.is-dragging {
+  opacity: 0.5;
+  background-color: var(--el-fill-color-light);
 }
 
 .tree-node-label {
@@ -1235,6 +1318,18 @@ defineExpose({
   gap: 4px;
   opacity: 0;
   transition: opacity 0.2s;
+}
+
+/* 拖拽时的视觉反馈 */
+:deep(.el-tree-node__content.is-dragging) {
+  opacity: 0.5;
+  background-color: var(--el-fill-color-light);
+}
+
+/* 拖拽进入可放置区域的高亮 */
+:deep(.el-tree-node__content.drag-over) {
+  background-color: var(--el-color-primary-light-9);
+  border: 2px dashed var(--el-color-primary);
 }
 
 :deep(.el-tree-node__content:hover) .tree-node-actions {

@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dawei.config import get_dawei_home
 from dawei.core.decorators import safe_system_operation
 
 # Import MCP SDK (required dependency)
@@ -154,8 +155,8 @@ class MCPConfigLoader:
     @safe_system_operation("load_user_mcp_configs", fallback_value={})
     def load_user_mcp_configs(self) -> dict[str, MCPConfig]:
         """加载用户级MCP配置"""
-        user_home = Path.home()
-        user_config_dir = user_home / ".dawei" / "configs"
+        dawei_home = get_dawei_home()
+        user_config_dir = dawei_home / "configs"
 
         if not user_config_dir.exists():
             logger.debug(f"User config directory not found: {user_config_dir}")

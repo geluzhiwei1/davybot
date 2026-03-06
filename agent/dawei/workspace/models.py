@@ -129,6 +129,9 @@ class WorkspaceSettings:
     https_proxy: str = ""
     no_proxy: str = ""
 
+    # 安全配置（工作区级）
+    security: dict[str, Any] = field(default_factory=dict)
+
     def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         from dataclasses import asdict
@@ -174,6 +177,7 @@ class WorkspaceSettings:
             http_proxy=config_dict.get("httpProxy", ""),
             https_proxy=config_dict.get("httpsProxy", ""),
             no_proxy=config_dict.get("noProxy", ""),
+            security=config_dict.get("security", {}),
         )
 
 

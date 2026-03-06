@@ -25,6 +25,7 @@ from .models import *
 from .plugin_config import router as plugin_config_router
 from .plugins import router as plugins_router
 from .ui_settings import router as ui_settings_router
+from . import security as security_api
 
 # 创建主路由器
 router = APIRouter(prefix="/api/workspaces")
@@ -45,6 +46,13 @@ router.include_router(plugin_config_router)
 # 注册记忆系统路由器
 # Note: Memory router has its own prefix with workspace_id: /api/workspaces/{workspace_id}/memory
 router.include_router(memory_api.router)
+
+# 注册安全配置路由器
+# Note: Security router has prefix with workspace_id: /api/workspaces/{workspace_id}/security-settings
+router.include_router(
+    security_api.router,
+    prefix="/{workspace_id}/security-settings"
+)
 
 # 导出
 __all__ = ["router"]

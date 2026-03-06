@@ -1,26 +1,34 @@
 # Copyright (c) 2025 格律至微
 # SPDX-License-Identifier: AGPL-3.0-only
 
-"""Docker沙箱管理器 - 提供容器化的命令执行环境
+"""容器沙箱管理器 - 提供容器化的命令执行环境
 
-该模块实现了基于Docker的命令隔离执行，包括：
+该模块实现了基于容器（Docker/Podman）的命令隔离执行，包括：
 - 容器创建和销毁
 - 资源限制（CPU、内存、磁盘、网络）
 - 安全配置（只读文件系统、capabilities降级）
 - 审计日志
+- 支持 Docker 和 Podman 运行时
 
 依赖: docker-py (pip install docker)
+
+运行时支持:
+- Docker: 默认，通过 Docker daemon
+- Podman: 兼容 Docker API，设置 DOCKER_HOST=unix:///run/podman/podman.sock
 """
 
 import asyncio
 import json
+import os
 import shutil
+import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from typing import Literal
 
 import docker
 
@@ -46,32 +54,152 @@ class SandboxConfig:
     cpu_period: int = 100000  # CPU周期
     pids_limit: int = 100  # 进程数限制
     timeout: int = 30  # Execution timeout (seconds)
-    network_disabled: bool = True  # Disable network
+    network_disabled: bool = True  # Disable network (可通过sandbox_disable_network配置)
     read_only_root: bool = True  # Read-only root filesystem
     tmpfs_size: str = "100m"  # Temporary filesystem size
 
     # Workspace mount configuration
     workspace_mount_mode: str = "ro"  # ro = read-only, rw = read-write
 
+    # === 容器运行时配置 ===
+    container_runtime: Literal['docker', 'podman', 'auto'] = 'auto'  # 容器运行时选择
+
+    # === 细粒度安全控制 ===
+    drop_all_capabilities: bool = True  # 是否移除所有capabilities
+    no_new_privileges: bool = True  # 是否禁止获得新权限
+    sandbox_disable_network: bool = True  # 是否禁用网络（与UserSecuritySettings保持一致）
+
 
 class SandboxManager:
-    """Docker sandbox manager"""
+    """容器沙箱管理器 - 支持 Docker 和 Podman"""
 
     def __init__(self, config: SandboxConfig | None = None):
         self.config = config or SandboxConfig()
+        self.runtime = self._detect_runtime()
+        self.client = self._init_client()
+
+    def _detect_runtime(self) -> str:
+        """检测可用的容器运行时"""
+        if self.config.container_runtime != 'auto':
+            # 用户明确指定了运行时
+            runtime = self.config.container_runtime
+            if self._check_runtime_available(runtime):
+                logger.info(f"[SANDBOX] 使用指定的运行时: {runtime}")
+                return runtime
+            else:
+                logger.warning(f"[SANDBOX] 指定的运行时 {runtime} 不可用，尝试自动检测")
+                # 继续自动检测
+
+        # 自动检测：优先 Podman（更安全），其次 Docker
+        for runtime in ['podman', 'docker']:
+            if self._check_runtime_available(runtime):
+                logger.info(f"[SANDBOX] 自动检测到运行时: {runtime}")
+                return runtime
+
+        # 都不可用，返回 docker（后续会在 _init_client 中报错）
+        logger.warning("[SANDBOX] 未检测到可用的容器运行时")
+        return 'docker'
+
+    def _check_runtime_available(self, runtime: str) -> bool:
+        """检查运行时是否可用"""
+        try:
+            if runtime == 'podman':
+                # 检查 Podman
+                result = subprocess.run(
+                    ['podman', '--version'],
+                    capture_output=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    # 检查 Podman API socket
+                    socket_paths = [
+                        '/run/podman/podman.sock',
+                        '/run/user/{}/podman/podman.sock'.format(os.getuid()),
+                        '~/.local/share/containers/podman.sock'
+                    ]
+                    for sock_path in socket_paths:
+                        sock_path = os.path.expanduser(sock_path)
+                        if os.path.exists(sock_path):
+                            logger.debug(f"[SANDBOX] 找到 Podman socket: {sock_path}")
+                            return True
+                    logger.debug("[SANDBOX] Podman 已安装但未找到 socket")
+                    return False
+            elif runtime == 'docker':
+                # 检查 Docker
+                result = subprocess.run(
+                    ['docker', '--version'],
+                    capture_output=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    # 检查 Docker daemon
+                    client = docker.from_env()
+                    client.ping()
+                    logger.debug("[SANDBOX] Docker daemon 可用")
+                    return True
+        except (subprocess.TimeoutExpired, FileNotFoundError, docker.errors.DockerException):
+            pass
+        except Exception as e:
+            logger.debug(f"[SANDBOX] 检查 {runtime} 时出错: {e}")
+
+        return False
+
+    def _init_client(self):
+        """初始化容器客户端"""
+        runtime = self.runtime
+
+        if runtime == 'podman':
+            # 使用 Podman
+            # Podman API socket 位置
+            socket_paths = [
+                '/run/podman/podman.sock',
+                '/run/user/{}/podman/podman.sock'.format(os.getuid()),
+                os.path.expanduser('~/.local/share/containers/podman.sock')
+            ]
+
+            podman_socket = None
+            for sock_path in socket_paths:
+                if os.path.exists(sock_path):
+                    podman_socket = f'unix://{sock_path}'
+                    break
+
+            if not podman_socket:
+                raise DockerConnectionError(
+                    "Podman socket 未找到。请确保 Podman 服务正在运行:\n"
+                    "  systemctl start --user podman.socket\n"
+                    "  或: sudo systemctl start podman.socket"
+                )
+
+            # 设置环境变量
+            os.environ['DOCKER_HOST'] = podman_socket
+            logger.info(f"[SANDBOX] 使用 Podman: {podman_socket}")
 
         try:
-            self.client = docker.from_env()
-            # Test connection
-            self.client.ping()
-            logger.info("[SANDBOX] Docker connection successful")
+            client = docker.from_env()
+            # 测试连接
+            client.ping()
+
+            # 获取版本信息以确认运行时
+            try:
+                version = client.version()
+                if runtime == 'podman' or 'podman' in version.get('Components', [{}])[0].get('Name', '').lower():
+                    logger.info(f"[SANDBOX] Podman 连接成功 (版本: {version.get('Version', 'unknown')})")
+                else:
+                    logger.info(f"[SANDBOX] Docker 连接成功 (版本: {version.get('Version', 'unknown')})")
+            except Exception:
+                logger.info(f"[SANDBOX] {runtime.capitalize()} 连接成功")
+
+            return client
+
         except docker.errors.DockerException as e:
-            logger.exception("[SANDBOX] Docker连接失败: ")
-            raise DockerConnectionError(f"Docker daemon不可用: {e}")
+            logger.exception(f"[SANDBOX] {runtime.capitalize()} 连接失败: ")
+            raise DockerConnectionError(
+                f"{runtime.capitalize()} daemon 不可用: {e}\n"
+                f"请确保 {runtime} 已安装并正在运行。"
+            )
         except (OSError, ConnectionError) as e:
-            # Network or OS-level errors (e.g., Docker socket not found)
-            logger.exception("[SANDBOX] Docker连接错误: ")
-            raise DockerConnectionError(f"无法连接到Docker: {e}")
+            logger.exception(f"[SANDBOX] {runtime.capitalize()} 连接错误: ")
+            raise DockerConnectionError(f"无法连接到 {runtime}: {e}")
 
     def execute_command(
         self,
@@ -144,6 +272,13 @@ class SandboxManager:
             if self.config.timeout > 0:
                 timeout_cmd = f"timeout {self.config.timeout}s"
 
+            # 准备安全选项
+            cap_drop_option = ["ALL"] if self.config.drop_all_capabilities else []
+            security_opt = ["no-new-privileges"] if self.config.no_new_privileges else []
+
+            # 网络配置：sandbox_disable_network 优先级高于 network_disabled
+            network_disabled = self.config.sandbox_disable_network if hasattr(self.config, 'sandbox_disable_network') else self.config.network_disabled
+
             # 使用run方法（自动删除容器）
             try:
                 output = self.client.containers.run(
@@ -155,11 +290,11 @@ class SandboxManager:
                     cpu_quota=self.config.cpu_quota,
                     cpu_period=self.config.cpu_period,
                     pids_limit=self.config.pids_limit,
-                    network_disabled=self.config.network_disabled,
+                    network_disabled=network_disabled,
                     read_only=self.config.read_only_root,
-                    # 安全选项
-                    cap_drop=["ALL"],  # 移除所有capabilities
-                    security_opt=["no-new-privileges"],
+                    # 安全选项（根据配置动态设置）
+                    cap_drop=cap_drop_option,  # 根据配置决定是否移除所有capabilities
+                    security_opt=security_opt,  # 根据配置决定是否禁止获得新权限
                     # 自动删除容器
                     remove=True,
                     # 捕获输出
@@ -184,10 +319,10 @@ class SandboxManager:
                         cpu_quota=self.config.cpu_quota,
                         cpu_period=self.config.cpu_period,
                         pids_limit=self.config.pids_limit,
-                        network_disabled=self.config.network_disabled,
+                        network_disabled=network_disabled,
                         read_only=self.config.read_only_root,
-                        cap_drop=["ALL"],
-                        security_opt=["no-new-privileges"],
+                        cap_drop=cap_drop_option,  # 根据配置决定
+                        security_opt=security_opt,  # 根据配置决定
                         remove=True,
                         stdout=True,
                         stderr=True,
@@ -328,9 +463,13 @@ class SandboxManager:
             "exit_code": exit_code,
             "execution_time_ms": execution_time,
             "sandbox_config": {
+                "runtime": self.runtime,
                 "image": self.config.image,
                 "memory_limit": self.config.memory_limit,
                 "timeout": self.config.timeout,
+                "drop_all_capabilities": self.config.drop_all_capabilities,
+                "no_new_privileges": self.config.no_new_privileges,
+                "sandbox_disable_network": self.config.sandbox_disable_network if hasattr(self.config, 'sandbox_disable_network') else self.config.network_disabled,
             },
         }
 

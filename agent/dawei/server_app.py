@@ -101,38 +101,22 @@ logging.basicConfig(
     handlers=[UTF8StreamHandler()],
 )
 
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 # Import API routers
-from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces
+from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces, users
 from dawei.api.exception_handlers import register_exception_handlers
 from dawei.websocket.handlers.chat import ConnectHandler
 from dawei.websocket.ws_server import websocket_server
 from dawei.api import market
 from dawei.api import privacy
 from dawei.api import scheduled_tasks
+from dawei.api import container_runtime
+from dawei.config import get_dawei_home
 
-# Load environment variables
-cwd_env = Path(".env")
-
-if cwd_env.exists():
-    load_dotenv(cwd_env, override=True)
-
-
-def get_dawei_home() -> Path:
-    """Get the DAWEI_HOME directory path.
-
-    Returns:
-        Path: DAWEI_HOME directory path (default: ~/.dawei)
-    """
-    dawei_home = os.getenv("DAWEI_HOME")
-    if dawei_home:
-        return Path(dawei_home)
-    return Path.home() / ".dawei"
 
 
 def record_server_start(host: str, port: int) -> None:
@@ -323,6 +307,7 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     app.include_router(tools.router)
     app.include_router(websocket.router)
     app.include_router(workspaces.router)
+    app.include_router(users.router)  # User settings including security
     app.include_router(conversations.router)
     app.include_router(system.router)
     app.include_router(skills.router)
@@ -339,6 +324,13 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     # Privacy Configuration API
     app.include_router(privacy.router)
     print("[Dawei Server] ✓ Privacy Configuration API router registered")
+
+    # Container Runtime Detection API
+    app.include_router(container_runtime.router)
+    print("[Dawei Server] ✓ Container Runtime Detection API router registered")
+
+    # User Settings API (including security)
+    print("[Dawei Server] ✓ User Settings API router registered (including /users/me/security)")
 
     # Add monitoring endpoints
     @app.get("/api/stats/llm")

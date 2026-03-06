@@ -38,6 +38,7 @@ from typing import Any
 
 from dawei.sandbox.command_whitelist import CommandWhitelist
 from dawei.sandbox.sandbox_manager import SandboxConfig, SandboxManager
+from dawei.core.super_mode import is_super_mode_enabled, log_security_bypass
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,16 @@ class SecureCommandExecutor:
             - workspace: str (可选) - 工作区路径
 
         """
+        # === 超级模式检查 ===
+        # 当 DAWEI_SUPER_MODE=1 时，跳过所有安全检查，直接在本机执行
+        if is_super_mode_enabled():
+            log_security_bypass("command_execution", f"command={command}, workspace={workspace_path}")
+            logger.warning(
+                f"[SUPER MODE] 直接在本机执行命令（跳过沙箱和白名单）: {command[:50]}..."
+            )
+            # 直接使用 subprocess 执行，无任何限制
+            return self._execute_with_subprocess_unsafe(command, workspace_path)
+
         logger.info(f"[SECURE_EXECUTOR] 执行命令: {command[:50]}...")
 
         # 1. 验证命令白名单
@@ -304,6 +315,122 @@ class SecureCommandExecutor:
             # (permissions, OS errors, etc.) - catch-all is appropriate here
             execution_time = int((time.time() - start_time) * 1000)
             logger.error(f"[SECURE_EXECUTOR] Subprocess执行失败: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"Subprocess execution failed: {e}",
+                "stdout": "",
+                "stderr": str(e),
+                "exit_code": -1,
+                "execution_time": execution_time,
+            }
+
+    def _execute_with_subprocess_unsafe(self, command: str, workspace_path: Path) -> dict[str, Any]:
+        """使用subprocess执行(无任何安全限制)
+
+        ⚠️ DANGER: 此方法跳过所有安全检查:
+        - 不验证命令白名单
+        - 不检查路径安全性
+        - 不使用沙箱隔离
+        - 不限制命令参数
+
+        仅在超级模式(DAWEI_SUPER_MODE=1)下使用
+        """
+        start_time = time.time()
+
+        try:
+            # 直接解析命令，不做任何验证
+            args = shlex.split(command)
+
+            logger.warning(
+                f"[SUPER MODE] 执行不安全命令: args={args}, cwd={workspace_path}"
+            )
+
+            # 准备环境变量 - 继承系统完整环境（不只是PATH）
+            env = os.environ.copy()
+
+            # 不做任何限制，直接执行
+            result = subprocess.run(
+                args,
+                cwd=workspace_path,
+                capture_output=True,
+                text=True,
+                timeout=30,  # 保留超时以防止无限等待
+                env=env,
+            )
+
+            execution_time = int((time.time() - start_time) * 1000)
+
+            logger.warning(
+                f"[SUPER MODE] 命令执行完成: exit_code={result.returncode}, time={execution_time}ms"
+            )
+
+            return {
+                "success": True,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "exit_code": result.returncode,
+                "execution_time": execution_time,
+                "workspace": str(workspace_path),
+            }
+
+        except subprocess.TimeoutExpired:
+            execution_time = int((time.time() - start_time) * 1000)
+            logger.error("[SUPER MODE] 命令执行超时")
+            return {
+                "success": False,
+                "error": "Command timeout",
+                "stdout": "",
+                "stderr": "Command execution timeout (30s)",
+                "exit_code": -1,
+                "execution_time": execution_time,
+            }
+        except FileNotFoundError as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            logger.error(f"[SUPER MODE] 命令未找到: {e}")
+            return {
+                "success": False,
+                "error": f"Command not found: {e}",
+                "stdout": "",
+                "stderr": str(e),
+                "exit_code": -1,
+                "execution_time": execution_time,
+            }
+        except subprocess.PermissionError as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            logger.error(f"[SUPER MODE] 权限错误: {e}")
+            return {
+                "success": False,
+                "error": f"Permission denied: {e}",
+                "stdout": "",
+                "stderr": str(e),
+                "exit_code": -1,
+                "execution_time": execution_time,
+            }
+        except OSError as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            logger.error(f"[SUPER MODE] 系统错误: {e}")
+            return {
+                "success": False,
+                "error": f"System error: {e}",
+                "stdout": "",
+                "stderr": str(e),
+                "exit_code": -1,
+                "execution_time": execution_time,
+            }
+        except (shlex.Error, ValueError) as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            logger.error(f"[SUPER MODE] 命令解析错误: {e}")
+            return {
+                "success": False,
+                "error": f"Command parsing error: {e}",
+                "stdout": "",
+                "stderr": str(e),
+                "exit_code": -1,
+                "execution_time": execution_time,
+            }
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            logger.error(f"[SUPER MODE] Subprocess执行失败: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": f"Subprocess execution failed: {e}",

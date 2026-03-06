@@ -94,7 +94,7 @@ def tui_cmd(ctx, workspace, llm, mode, refresh_rate, theme, super):
 
         # Set super mode environment variable
         if super_mode:
-            os.environ["GEWEI_SUPER_MODE"] = "1"
+            os.environ["DAWEI_SUPER_MODE"] = "1"
 
         # Prepare arguments for TUI
         # Build sys.argv with only the arguments that have values

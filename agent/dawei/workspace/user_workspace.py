@@ -579,7 +579,7 @@ class UserWorkspace:
           工作区设置 "allowedCommands": [] 时，会覆盖为 []
         """
         # 1. 先加载全局配置作为基础
-        global_settings_path = Path.home() / ".dawei" / "configs" / "settings.json"
+        global_settings_path = get_dawei_home() / "configs" / "settings.json"
         global_settings_dict = {}
 
         if global_settings_path.exists():

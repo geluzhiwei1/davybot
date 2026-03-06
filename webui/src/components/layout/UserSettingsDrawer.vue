@@ -121,6 +121,14 @@
           </el-form-item>
         </el-tab-pane>
 
+        <!-- 安全设置 Tab -->
+        <el-tab-pane :label="t('userSettings.tabs.security')" name="security">
+          <SecuritySettingsTab
+            v-model="securitySettings"
+            @update:model-value="handleSecuritySettingsUpdate"
+          />
+        </el-tab-pane>
+
         <!-- 关于 Tab -->
         <el-tab-pane :label="t('userSettings.tabs.about')" name="about">
           <div class="about-section">
@@ -153,6 +161,8 @@ import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { User, Link } from '@element-plus/icons-vue';
 import elementPlusVersion from 'element-plus/package.json';
+import SecuritySettingsTab from '@/components/user/SecuritySettingsTab.vue';
+import type { UserSecuritySettings } from '@/services/api/types';
 
 const { t } = useI18n();
 
@@ -183,6 +193,16 @@ const preferences = ref({
   codeTheme: 'github-light',
   notificationsEnabled: true,
   autoSave: true
+});
+
+// 安全配置
+const securitySettings = ref<UserSecuritySettings>({
+  enablePathTraversalProtection: true,
+  allowAbsolutePaths: false,
+  baseAllowedExtensions: ['.py', '.txt', '.md', '.json'],
+  baseDeniedExtensions: ['.exe', '.dll', '.so'],
+  maxFileSizeMb: 100,
+  // ... 其他默认值
 });
 
 const fontMarks = {
@@ -299,6 +319,10 @@ const applyTheme = () => {
 
 const resetShortcuts = () => {
   ElMessage.info(t('userSettings.shortcuts.resetSuccess'));
+};
+
+const handleSecuritySettingsUpdate = (value: UserSecuritySettings) => {
+  securitySettings.value = value;
 };
 
 const handleClose = () => {
