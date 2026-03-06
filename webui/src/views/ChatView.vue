@@ -27,6 +27,9 @@
 
         <!-- 下部按钮 -->
         <div class="bottom-buttons">
+          <el-tooltip :content="t('knowledge.title')" placement="right">
+            <el-button :icon="Grid" @click="handleOpenKnowledgeDrawer" text circle />
+          </el-tooltip>
           <el-tooltip :content="t('workspaceSettings.title')" placement="right">
             <el-button :icon="Setting" @click="handleOpenSettings" text circle />
           </el-tooltip>
@@ -133,6 +136,9 @@
     <WorkspaceSettingsDrawer v-model="isSettingsDrawerVisible" :workspace-id="chatStore.workspaceId"
       :initial-tab="initialSettingsTab" />
 
+    <!-- 知识库抽屉 -->
+    <KnowledgeDrawer v-model="isKnowledgeDrawerVisible" :workspace-id="chatStore.workspaceId ?? undefined" />
+
     <!-- 追问问题对话框 -->
     <FollowupQuestionDialog v-model:visible="showFollowupDialog" :question="followupData.question"
       :suggestions="followupData.suggestions" :tool-call-id="followupData.toolCallId" :task-id="followupData.taskId"
@@ -159,7 +165,7 @@ import { appConfig } from '@/config/app.config';
 import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
-import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User } from '@element-plus/icons-vue';
+import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User, Grid } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { useMobile } from '@/composables/useMobile';
 
@@ -181,6 +187,7 @@ import UserInputArea from '@/components/layout/UserInputArea.vue';
 import ServerStatusIndicator from '@/components/ServerStatusIndicator.vue';
 import BottomBar from '@/components/layout/BottomBar.vue';
 import WorkspaceSettingsDrawer from '@/components/layout/WorkspaceSettingsDrawer.vue';
+import KnowledgeDrawer from '@/components/layout/KnowledgeDrawer.vue';
 import UserSettingsDrawer from '@/components/layout/UserSettingsDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
@@ -229,6 +236,7 @@ const sidePanelRef = ref<InstanceType<typeof SidePanel> | null>(null);
 const isSidePanelCollapsed = ref(false);
 const isChatPanelCollapsed = ref(false);
 const isSettingsDrawerVisible = ref(false);
+const isKnowledgeDrawerVisible = ref(false);
 const isUserSettingsVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
@@ -560,6 +568,10 @@ const handleOpenSettings = () => {
   isSettingsDrawerVisible.value = true;
 };
 
+// 打开知识库抽屉
+const handleOpenKnowledgeDrawer = () => {
+  isKnowledgeDrawerVisible.value = true;
+};
 
 // 用户设置
 const handleUserSettings = () => {

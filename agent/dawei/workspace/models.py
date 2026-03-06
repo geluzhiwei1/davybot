@@ -9,11 +9,12 @@
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from typing import Any, Literal
+from datetime import datetime
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from dawei.core.datetime_compat import UTC
 from dawei.entity.system_info import (
     SystemEnvironments,
     UserUIContext,
@@ -374,10 +375,10 @@ class WorkspaceConfig(BaseModel):
         # 更新提供的配置节
         update_data = {}
         for key in cls.model_fields:
-            if key in config_dict and isinstance(config_Dict[key], dict):
+            if key in config_dict and isinstance(config_dict[key], dict):
                 # 合并配置节（保留默认值只更新提供的字段）
                 default_section = getattr(default_config, key).model_dump()
-                update_data[key] = {**default_section, **config_Dict[key]}
+                update_data[key] = {**default_section, **config_dict[key]}
 
         # 特殊处理：插件配置从独立文件加载
         # 插件配置保存在 .dawei/plugins/{plugin_id}.json

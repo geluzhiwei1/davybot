@@ -109,6 +109,8 @@ from fastapi.staticfiles import StaticFiles
 
 # Import API routers
 from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces, users
+from dawei.api import knowledge_bases  # Multi-knowledge base support
+from dawei.api import knowledge_documents  # Knowledge documents, search, and RAG
 from dawei.api.exception_handlers import register_exception_handlers
 from dawei.websocket.handlers.chat import ConnectHandler
 from dawei.websocket.ws_server import websocket_server
@@ -204,7 +206,7 @@ async def lifespan(app: FastAPI):
         print("[Dawei Server] ✓ DaweiMem memory system is enabled")
 
         dawei_home = Path(os.getenv("DAWEI_HOME", "~/.dawei")).expanduser()
-        workspaces_root = dawei_home 
+        workspaces_root = dawei_home
 
         if workspaces_root.exists():
             initialized_count = 0
@@ -227,9 +229,19 @@ async def lifespan(app: FastAPI):
                 "[Dawei Server] ℹ Workspaces root not found, memory DBs will be created on demand",
             )
     except ImportError as e:
-        print(f"[Dawei Server] ⚠ Memory system module not available: {e}")
+        print(f"[Dawei Server] ⚠ DaweiMem memory system module not available: {e}")
     except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to initialize memory system: {e}")
+        print(f"[Dawei Server] ⚠ Failed to initialize DaweiMem memory system: {e}")
+
+    # Initialize Knowledge Base Manager (Multi-tenancy support)
+    try:
+        from dawei.knowledge.init import initialize_knowledge_base_manager
+        kb_manager = initialize_knowledge_base_manager()
+        print("[Dawei Server] ✓ Knowledge Base Manager initialized (Multi-tenancy support enabled)")
+    except ImportError as e:
+        print(f"[Dawei Server] ⚠ Knowledge Base Manager module not available: {e}")
+    except Exception as e:
+        print(f"[Dawei Server] ⚠ Failed to initialize Knowledge Base Manager: {e}")
 
     # Initialize Scheduler Manager
     try:
@@ -262,6 +274,22 @@ async def lifespan(app: FastAPI):
         print(f"[Dawei Server] ⚠ Scheduler module not available during shutdown: {e}")
     except Exception as e:
         print(f"[Dawei Server] ⚠ Failed to shutdown scheduler: {e}")
+
+    # Cleanup knowledge base embedding managers
+    try:
+        from dawei.core.dependency_container import DEPENDENCY_CONTAINER
+        try:
+            from dawei.knowledge.base_manager import KnowledgeBaseManager
+            kb_manager = DEPENDENCY_CONTAINER.get_service("KnowledgeBaseManager")
+            kb_manager.cleanup_embedding_managers()
+            print("[Dawei Server] ✓ Knowledge base embedding managers cleaned up")
+        except ValueError:
+            # Knowledge base manager not initialized, skip
+            pass
+    except ImportError as e:
+        print(f"[Dawei Server] ⚠ Knowledge base module not available during shutdown: {e}")
+    except Exception as e:
+        print(f"[Dawei Server] ⚠ Failed to cleanup embedding managers: {e}")
 
 
 def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
@@ -314,6 +342,14 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     app.include_router(skills.router)
     app.include_router(scheduled_tasks.router)
     app.include_router(checkpoints.router)
+
+    # Knowledge Base Management API (Multi-tenancy support)
+    app.include_router(knowledge_bases.router)
+    print("[Dawei Server] ✓ Knowledge Base Management API router registered")
+
+    # Knowledge Documents, Search, and RAG API
+    app.include_router(knowledge_documents.router)
+    print("[Dawei Server] ✓ Knowledge Documents, Search, and RAG API router registered")
 
     # Register unified exception handlers
     register_exception_handlers(app)

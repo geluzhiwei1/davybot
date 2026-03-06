@@ -155,12 +155,16 @@ const showEnergy = ref(true)
 // Derived graph data using local nodes
 const graphDataWithPositions = computed(() => ({
   nodes: localNodes.value,
-  links: props.graphData.links
+  links: props.graphData?.links || []
 }))
 
 // Initialize local nodes from props (deep copy to avoid mutating original)
 function initializeLocalNodes() {
   // Only update when node structure changes (not when positions change)
+  if (!props.graphData?.nodes) {
+    localNodes.value = []
+    return
+  }
   localNodes.value = props.graphData.nodes.map(node => ({
     ...node
   }))
@@ -168,6 +172,7 @@ function initializeLocalNodes() {
 
 // Recompute layout when graph structure changes
 watch(() => props.graphData, () => {
+  if (!props.graphData) return
   initializeLocalNodes()
   computeForceLayout()
 }, { deep: true })
@@ -180,14 +185,16 @@ onMounted(() => {
   }
 
   // Initial force-directed layout
-  initializeLocalNodes()
-  computeForceLayout()
+  if (props.graphData) {
+    initializeLocalNodes()
+    computeForceLayout()
+  }
 })
 
 // Compute force-directed layout
 function computeForceLayout() {
   const nodes = localNodes.value
-  const links = props.graphData.links
+  const links = props.graphData?.links || []
 
   if (nodes.length === 0) return
 

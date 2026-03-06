@@ -113,8 +113,25 @@ class DependencyContainer:
         """Get all registered service configurations"""
         return self._services.copy()
 
+    def get_service(self, service_name: str) -> Any:
+        """Get service by name (string-based lookup)"""
+        with self._lock:
+            if service_name in self._singletons:
+                return self._singletons[service_name]
+
+            if service_name in self._services:
+                service_config = self._services[service_name]
+                if service_config.factory:
+                    instance = service_config.factory()
+                    if service_config.singleton:
+                        self._singletons[service_name] = instance
+                    return instance
+
+            raise ValueError(f"Service '{service_name}' not found")
+
 
 # Global container instance
+DEPENDENCY_CONTAINER = DependencyContainer()
 _global_container: DependencyContainer | None = None
 
 

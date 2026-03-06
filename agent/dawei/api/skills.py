@@ -1,5 +1,4 @@
 """技能API端点
-from typing import List, Dict
 
 提供技能列表、搜索和详情查询
 """
@@ -8,6 +7,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
+from typing import List, Dict
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel

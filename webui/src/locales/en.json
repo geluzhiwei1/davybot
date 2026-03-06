@@ -40,7 +40,9 @@
     "extractSuccess": "Successfully extracted {count} memories",
     "extractEmpty": "No conversation found. Please chat with Agent first.",
     "extractError": "Failed to extract memories",
-    "refreshSuccess": "Refreshed successfully"
+    "refreshSuccess": "Refreshed successfully",
+    "energy": "Energy",
+    "actions": "Actions"
   },
   "common": {
     "save": "Save",
@@ -1089,5 +1091,31 @@
         }
       }
     }
+  },
+  "knowledge": {
+    "title": "Knowledge Base",
+    "description": "Manage and search your knowledge base",
+    "uploadDocument": "Upload Document",
+    "settings": "Settings",
+    "documents": "Documents",
+    "search": "Search",
+    "uploadTip": "Supports PDF, DOCX, TXT, MD formats, max 100MB per file",
+    "uploadSuccess": "Document uploaded successfully",
+    "uploadFailed": "Failed to upload document",
+    "invalidFileType": "Unsupported file type",
+    "fileTooLarge": "File size exceeds 100MB limit",
+    "loadFailed": "Failed to load document list",
+    "loadDocumentFailed": "Failed to load document content",
+    "reindexSuccess": "Reindex successful",
+    "reindexFailed": "Reindex failed",
+    "deleteSuccess": "Delete successful",
+    "deleteFailed": "Delete failed",
+    "enterQuery": "Enter your query",
+    "searchFailed": "Search failed",
+    "settingsSaved": "Settings saved successfully",
+    "saveSettingsFailed": "Failed to save settings",
+    "refresh": "Refresh",
+    "lastIndexed": "Last Indexed",
+    "reindexConfirm": "Are you sure you want to reindex document \"{name}\"?"
   }
 }

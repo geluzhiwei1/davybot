@@ -1,20 +1,16 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
-  <el-drawer
-    v-model="visible"
-    :title="t('userSettings.title')"
-    direction="ltr"
-    :size="'80%'"
-    class="user-settings-drawer"
-    @close="handleClose"
-  >
+  <el-drawer v-model="visible" :title="t('userSettings.title')" direction="rtl" :size="'80%'"
+    class="user-settings-drawer" @close="handleClose">
     <template #header>
       <div class="drawer-header">
-        <el-icon :size="20"><User /></el-icon>
+        <el-icon :size="20">
+          <User />
+        </el-icon>
         <span class="drawer-title">{{ t('userSettings.title') }}</span>
       </div>
     </template>
@@ -31,21 +27,12 @@
               <el-input v-model="userProfile.email" :placeholder="t('userSettings.profile.emailPlaceholder')" />
             </el-form-item>
             <el-form-item :label="t('userSettings.profile.bio')">
-              <el-input
-                v-model="userProfile.bio"
-                type="textarea"
-                :rows="3"
-                :placeholder="t('userSettings.profile.bioPlaceholder')"
-              />
+              <el-input v-model="userProfile.bio" type="textarea" :rows="3"
+                :placeholder="t('userSettings.profile.bioPlaceholder')" />
             </el-form-item>
             <el-form-item :label="t('userSettings.profile.timezone')">
               <el-select v-model="userProfile.timezone" :placeholder="t('userSettings.profile.timezone')" filterable>
-                <el-option
-                  v-for="tz in timezones"
-                  :key="tz.value"
-                  :label="tz.label"
-                  :value="tz.value"
-                />
+                <el-option v-for="tz in timezones" :key="tz.value" :label="tz.label" :value="tz.value" />
               </el-select>
             </el-form-item>
             <el-form-item :label="t('userSettings.profile.language')">
@@ -123,26 +110,30 @@
 
         <!-- 安全设置 Tab -->
         <el-tab-pane :label="t('userSettings.tabs.security')" name="security">
-          <SecuritySettingsTab
-            v-model="securitySettings"
-            @update:model-value="handleSecuritySettingsUpdate"
-          />
+          <SecuritySettingsTab v-model="securitySettings" @update:model-value="handleSecuritySettingsUpdate" />
         </el-tab-pane>
 
         <!-- 关于 Tab -->
         <el-tab-pane :label="t('userSettings.tabs.about')" name="about">
           <div class="about-section">
-            <el-result icon="success" :title="t('userSettings.about.title')" :sub-title="t('userSettings.about.subtitle')">
+            <el-result icon="success" :title="t('userSettings.about.title')"
+              :sub-title="t('userSettings.about.subtitle')">
               <template #extra>
                 <el-descriptions :column="1" border>
-                  <el-descriptions-item :label="t('userSettings.about.version')">v{{ appVersion }}</el-descriptions-item>
-                  <el-descriptions-item :label="t('userSettings.about.buildTime')">{{ buildTime }}</el-descriptions-item>
-                  <el-descriptions-item :label="t('userSettings.about.vueVersion')">{{ vueVersion }}</el-descriptions-item>
-                  <el-descriptions-item :label="t('userSettings.about.elementVersion')">{{ elementVersion }}</el-descriptions-item>
+                  <el-descriptions-item :label="t('userSettings.about.version')">v{{ appVersion
+                    }}</el-descriptions-item>
+                  <el-descriptions-item :label="t('userSettings.about.buildTime')">{{ buildTime
+                    }}</el-descriptions-item>
+                  <el-descriptions-item :label="t('userSettings.about.vueVersion')">{{ vueVersion
+                    }}</el-descriptions-item>
+                  <el-descriptions-item :label="t('userSettings.about.elementVersion')">{{ elementVersion
+                    }}</el-descriptions-item>
                   <el-descriptions-item :label="t('userSettings.about.homepage')">
                     <a href="https://github.com/geluzhiwei1/davybot" target="_blank" class="github-link">
                       https://github.com/geluzhiwei1/davybot
-                      <el-icon><Link /></el-icon>
+                      <el-icon>
+                        <Link />
+                      </el-icon>
                     </a>
                   </el-descriptions-item>
                 </el-descriptions>

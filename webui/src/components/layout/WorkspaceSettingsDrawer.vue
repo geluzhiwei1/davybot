@@ -1,6 +1,6 @@
 /* eslint-disable */
 <template>
-  <el-drawer v-model="visible" :title="t('workspaceSettings.title')" direction="ltr" :size="'80%'"
+  <el-drawer v-model="visible" :title="t('workspaceSettings.title')" direction="rtl" :size="'80%'"
     class="workspace-settings-drawer" @close="handleClose">
     <template #header>
       <div class="drawer-header">
@@ -338,7 +338,7 @@
                 <div style="width: 280px; display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 600; font-size: 14px;">{{ t('workspaceSettings.skills.editor.files')
-                    }}</span>
+                      }}</span>
                     <el-button size="small" @click="refreshSkillFileTree" :icon="Refresh">
                       {{ t('workspaceSettings.skills.editor.refresh') }}
                     </el-button>
@@ -777,7 +777,7 @@
 
                 <el-form-item>
                   <el-button @click="loadUIEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                    }}</el-button>
+                  }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -842,7 +842,7 @@
 
                 <el-form-item>
                   <el-button @click="loadSystemEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                    }}</el-button>
+                  }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>

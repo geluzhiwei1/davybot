@@ -40,7 +40,9 @@
     "extractSuccess": "成功提取 {count} 条记忆",
     "extractEmpty": "未找到对话记录，请先与 Agent 对话",
     "extractError": "提取记忆失败",
-    "refreshSuccess": "刷新成功"
+    "refreshSuccess": "刷新成功",
+    "energy": "能量",
+    "actions": "操作"
   },
   "common": {
     "save": "保存",

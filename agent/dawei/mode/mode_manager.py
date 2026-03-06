@@ -219,7 +219,7 @@ class ModeConfigLoader:
                             rules_content = f.read()
                         # 使用文件名（含扩展名）作为 key
                         file_key = rules_file.name
-                        rules_Dict[file_key] = rules_content
+                        rules_dict[file_key] = rules_content
                         logger.debug(
                             f"Loaded rules file {file_key} for mode {mode_slug} from {rules_file}",
                         )
