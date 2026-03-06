@@ -628,10 +628,20 @@ const handleSave = async () => {
   }
 }
 
-// 监听全局点击事件，用于关闭右键菜单
+const handleKeyDown = (event: KeyboardEvent) => {
+  // 检查是否按下了 Ctrl+S 或 Cmd+S (Mac)
+  if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+    // 只有当有活动文件且内容被修改时才触发保存
+    if (activeFile.value && isDirty.value) {
+      event.preventDefault() // 阻止浏览器默认保存行为
+      handleSave()
+    }
+  }
+}
+
 onMounted(() => {
   document.addEventListener('click', handleGlobalClick)
-  // 只在非 Tauri 环境中监听浏览器全屏状态变化
+  document.addEventListener('keydown', handleKeyDown)
   if (!isTauri()) {
     document.addEventListener('fullscreenchange', handleFullscreenChange)
   }
@@ -639,7 +649,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleGlobalClick)
-  // 移除全屏状态变化监听（如果注册了）
+  document.removeEventListener('keydown', handleKeyDown)
   if (!isTauri()) {
     document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }
