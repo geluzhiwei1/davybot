@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 # 导入统一的日志配置
@@ -27,14 +27,28 @@ class DatabaseConfig(BaseSettings):
         extra="allow",
     )
 
-    # SQLite 配置
-    url: str = Field(default="sqlite:///./data/dawei.db")
-    path: str = Field(default="./data/dawei.db")
+    # SQLite 配置 - 使用 get_dawei_home() 确保用户级路径
+    # 注意：这些字段会被 model_validator 自动设置
+    url: str = Field(default="")
+    path: str = Field(default="")
 
     # 连接池配置（SQLite 不需要，但保留接口兼容性）
     echo: bool = Field(default=False)
     pool_size: int = Field(default=1)  # SQLite 单连接
     max_overflow: int = Field(default=0)
+
+    @model_validator(mode='after')
+    def set_default_paths(self):
+        """设置默认路径，使用 get_dawei_home()"""
+        dawei_home = get_dawei_home()
+
+        if not self.path:
+            self.path = str(dawei_home / "data" / "dawei.db")
+
+        if not self.url:
+            self.url = f"sqlite:///{self.path}"
+
+        return self
 
 
 class RedisConfig(BaseSettings):

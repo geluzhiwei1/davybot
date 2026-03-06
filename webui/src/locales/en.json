@@ -1116,6 +1116,16 @@
     "saveSettingsFailed": "Failed to save settings",
     "refresh": "Refresh",
     "lastIndexed": "Last Indexed",
-    "reindexConfirm": "Are you sure you want to reindex document \"{name}\"?"
+    "reindexConfirm": "Are you sure you want to reindex document \"{name}\"?",
+    "chunkSize": "Chunk Size",
+    "chunkOverlap": "Chunk Overlap",
+    "embeddingModel": "Embedding Model",
+    "chunkStrategy": "Chunking Strategy",
+    "extractionStrategy": "Extraction Strategy",
+    "extractionStrategyHint": "Select the method for extracting entities and relations from documents",
+    "ruleBased": "Rule-based",
+    "llm": "LLM-based",
+    "nerModel": "NER Model",
+    "auto": "Auto"
   }
 }

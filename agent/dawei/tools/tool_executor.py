@@ -127,29 +127,29 @@ class ToolExecutor(IToolCallService):
             self._callbacks_initialized = True
             self.logger.info("[TOOL_EXECUTOR] Task manager callbacks initialized")
 
-    def inject_knowledge_service(self, knowledge_service) -> None:
-        """Inject KnowledgeService into all knowledge tools.
+    def inject_knowledge_base_id(self, knowledge_base_id: str) -> None:
+        """Inject knowledge base ID into all knowledge tools.
 
         This method is called by Agent during initialization to inject the
-        KnowledgeService instance into all tools that require it.
+        knowledge base ID into all tools that require it.
 
         Args:
-            knowledge_service: KnowledgeService instance to inject
+            knowledge_base_id: Knowledge base ID to inject
 
         """
         injected_count = 0
 
         for tool_name, tool_instance in self.tools.items():
-            # Check if tool has knowledge_service attribute
-            if hasattr(tool_instance, 'knowledge_service'):
-                tool_instance.knowledge_service = knowledge_service
+            # Check if tool has knowledge_base_id attribute
+            if hasattr(tool_instance, 'knowledge_base_id'):
+                tool_instance.knowledge_base_id = knowledge_base_id
                 injected_count += 1
-                self.logger.info(f"[TOOL_EXECUTOR] Injected knowledge_service into {tool_name}")
+                self.logger.info(f"[TOOL_EXECUTOR] Injected knowledge_base_id into {tool_name}")
 
         if injected_count > 0:
-            self.logger.info(f"[TOOL_EXECUTOR] Successfully injected knowledge_service into {injected_count} tools")
+            self.logger.info(f"[TOOL_EXECUTOR] Successfully injected knowledge_base_id into {injected_count} tools")
         else:
-            self.logger.warning("[TOOL_EXECUTOR] No knowledge tools found to inject service")
+            self.logger.warning("[TOOL_EXECUTOR] No knowledge tools found to inject knowledge_base_id")
 
     def _load_tools(self):
         """Load all tools from tool manager."""

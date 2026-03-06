@@ -153,7 +153,9 @@ class GraphEntity(BaseModel):
     id: str
     type: str
     name: str
+    description: str | None = None
     properties: Dict[str, Any] = Field(default_factory=dict)
+    base_id: str | None = None
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -165,6 +167,8 @@ class GraphRelation(BaseModel):
     to_entity: str
     relation_type: str
     properties: Dict[str, Any] = Field(default_factory=dict)
+    weight: float = 1.0
+    base_id: str | None = None
     created_at: datetime = Field(default_factory=datetime.now)
 
 

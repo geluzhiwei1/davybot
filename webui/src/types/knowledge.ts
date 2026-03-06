@@ -14,6 +14,9 @@ export type RetrievalMode = 'vector' | 'graph' | 'fulltext' | 'hybrid'
 /** 分块策略 */
 export type ChunkingStrategy = 'fixed_size' | 'recursive' | 'semantic' | 'markdown' | 'code'
 
+/** 知识抽取策略 */
+export type ExtractionStrategy = 'rule_based' | 'llm' | 'ner_model' | 'auto'
+
 /** 知识库状态 */
 export type KnowledgeBaseStatus = 'active' | 'archived' | 'deleting'
 
@@ -29,6 +32,7 @@ export interface KnowledgeBaseSettings {
   vector_weight: number
   graph_weight: number
   fulltext_weight: number
+  extraction_strategy: ExtractionStrategy
   enable_graph: boolean
   enable_fulltext: boolean
   auto_reindex: boolean

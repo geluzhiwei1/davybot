@@ -72,7 +72,7 @@ class VirtualContextManager:
     Usage:
         vcm = VirtualContextManager(
             base_context_manager=context_manager,
-            db_path="~/.dawei/memory.db"
+            db_path="memory.db"
         )
         await vcm.create_page(session_id, content, summary)
         await vcm.page_in(session_id, query="database configuration")

@@ -139,7 +139,7 @@ class MemoryGraph:
     - Event-driven updates via event_bus (NOTE: CORE_EVENT_BUS has been removed)
 
     Usage:
-        graph = MemoryGraph(db_path="~/.dawei/memory.db")
+        graph = MemoryGraph(db_path="memory.db")
         await graph.add_memory(memory_entry)
         memories = await graph.query_temporal(subject="User")
         related = await graph.retrieve_associative(["Python"], hops=2)

@@ -319,3 +319,14 @@ class EmbeddingService:
             Query embedding
         """
         return await self.manager.embed_single(query)
+
+    async def embed_single(self, text: str) -> List[float]:
+        """Embed single text
+
+        Args:
+            text: Text string
+
+        Returns:
+            Embedding vector
+        """
+        return await self.manager.embed_single(text)

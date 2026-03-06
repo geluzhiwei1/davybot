@@ -38,11 +38,11 @@ class KnowledgeSearchTool(CustomBaseTool):
     to enhance its responses with domain-specific knowledge and document citations.
     """
 
-    def __init__(self, knowledge_service=None):
+    def __init__(self, knowledge_base_id: str = None):
         """Initialize knowledge search tool
 
         Args:
-            knowledge_service: KnowledgeService instance for searching
+            knowledge_base_id: Knowledge base ID to search
         """
         super().__init__()
         self.name = "search_knowledge"
@@ -53,7 +53,7 @@ class KnowledgeSearchTool(CustomBaseTool):
             "Returns relevant document chunks with similarity scores and citations."
         )
         self.args_schema = KnowledgeSearchInput
-        self.knowledge_service = knowledge_service
+        self.knowledge_base_id = knowledge_base_id
 
     @safe_tool_operation(
         "knowledge_search",
@@ -71,7 +71,8 @@ class KnowledgeSearchTool(CustomBaseTool):
             Formatted search results with citations in markdown format
         """
         try:
-            from dawei.knowledge.models import RetrievalMode
+            from dawei.knowledge.models import RetrievalMode, RetrievalQuery
+            from dawei.knowledge.init import get_knowledge_base_manager
 
             # Validate and convert mode string to enum
             try:
@@ -80,16 +81,40 @@ class KnowledgeSearchTool(CustomBaseTool):
                 valid_modes = [m.value for m in RetrievalMode]
                 return f"Error: Invalid retrieval mode '{mode}'. Valid modes: {', '.join(valid_modes)}"
 
-            # Check if knowledge service is available
-            if self.knowledge_service is None:
-                return "Error: Knowledge service is not initialized. Please enable knowledge base in configuration."
+            # Check if knowledge_base_id is available
+            if self.knowledge_base_id is None:
+                return "Error: Knowledge base is not configured. Please enable knowledge base in configuration."
 
-            # Call knowledge service
-            results = await self.knowledge_service.search_knowledge(
+            # Get knowledge base manager and search
+            manager = get_knowledge_base_manager()
+
+            # Get vector store and embedding manager for this knowledge base
+            from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever
+
+            # Get embedding manager
+            embedding_service = manager.get_embedding_manager(self.knowledge_base_id, "MINILM")
+
+            # Get vector store
+            base_storage_path = manager.get_base_storage_path(self.knowledge_base_id)
+            from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+            vector_store = SQLiteVecVectorStore(
+                db_path=str(base_storage_path / "vectors.db"),
+                dimension=384,
+            )
+
+            # Initialize retriever
+            retriever = HybridRetriever(
+                vector_store=vector_store,
+                embedding_manager=embedding_service,
+            )
+
+            # Execute search
+            retrieval_query = RetrievalQuery(
                 query=query,
                 mode=mode_enum,
                 top_k=top_k,
             )
+            results = await retriever.retrieve(retrieval_query)
 
             # Format and return results
             return self._format_results(results, query)
@@ -179,11 +204,11 @@ class KnowledgeRAGTool(CustomBaseTool):
     for LLM prompt enhancement.
     """
 
-    def __init__(self, knowledge_service=None):
+    def __init__(self, knowledge_base_id: str = None):
         """Initialize knowledge RAG tool
 
         Args:
-            knowledge_service: KnowledgeService instance
+            knowledge_base_id: Knowledge base ID to query
         """
         super().__init__()
         self.name = "query_knowledge_rag"
@@ -193,7 +218,7 @@ class KnowledgeRAGTool(CustomBaseTool):
             "Use this when you need comprehensive context for answering complex questions."
         )
         self.args_schema = KnowledgeRAGInput
-        self.knowledge_service = knowledge_service
+        self.knowledge_base_id = knowledge_base_id
 
     @safe_tool_operation(
         "knowledge_rag",
@@ -210,11 +235,40 @@ class KnowledgeRAGTool(CustomBaseTool):
             Formatted RAG context with citations
         """
         try:
-            if self.knowledge_service is None:
-                return "Error: Knowledge service is not initialized."
+            from dawei.knowledge.init import get_knowledge_base_manager
+            from dawei.knowledge.retrieval.rag_pipeline import RAGPipeline
+
+            if self.knowledge_base_id is None:
+                return "Error: Knowledge base is not configured."
+
+            # Get knowledge base manager
+            manager = get_knowledge_base_manager()
+
+            # Get embedding manager and vector store
+            embedding_service = manager.get_embedding_manager(self.knowledge_base_id, "MINILM")
+            base_storage_path = manager.get_base_storage_path(self.knowledge_base_id)
+
+            from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+            from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever
+
+            vector_store = SQLiteVecVectorStore(
+                db_path=str(base_storage_path / "vectors.db"),
+                dimension=384,
+            )
+
+            # Initialize retriever and RAG pipeline
+            retriever = HybridRetriever(
+                vector_store=vector_store,
+                embedding_manager=embedding_service,
+            )
+
+            rag_pipeline = RAGPipeline(
+                retriever=retriever,
+                embedding_service=embedding_service,
+            )
 
             # Query with context
-            result = await self.knowledge_service.query_with_context(
+            result = await rag_pipeline.query_with_context(
                 query=query,
                 max_context_length=max_context_length,
             )

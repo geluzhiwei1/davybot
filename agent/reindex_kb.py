@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Re-index documents in knowledge base 11"""
+"""Re-index documents in a knowledge base"""
 
 import asyncio
 import sys
 import os
+import argparse
 from pathlib import Path
 
 # IMPORTANT: Set HF mirror BEFORE importing anything
@@ -20,23 +21,27 @@ from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
 from dawei.knowledge.models import VectorDocument
 
 
-async def reindex_kb():
-    """Re-index all documents in knowledge base 11"""
+async def reindex_kb(base_id: str):
+    """Re-index all documents in the specified knowledge base
+
+    Args:
+        base_id: Knowledge base ID (e.g., "kb_aa2a0527")
+    """
 
     # Initialize manager
     knowledge_path = get_dawei_home() / "knowledge"
     manager = KnowledgeBaseManager(root_path=str(knowledge_path))
 
     # Get knowledge base
-    kb = manager.get_base("kb_aa2a0527")
+    kb = manager.get_base(base_id)
     if not kb:
-        print("❌ Knowledge base not found")
+        print(f"❌ Knowledge base '{base_id}' not found")
         return
 
     print(f"✅ Found knowledge base: {kb.name}")
 
     # Get uploads directory
-    base_storage_path = manager._get_storage_path("kb_aa2a0527")
+    base_storage_path = manager._get_storage_path(base_id)
     uploads_dir = base_storage_path / "uploads"
     vector_db_path = base_storage_path / "vectors.db"
 
@@ -52,7 +57,7 @@ async def reindex_kb():
     await vector_store.initialize()
 
     # Get embedding service
-    embedding_service = manager.get_embedding_manager("kb_aa2a0527", model_type="MINILM")
+    embedding_service = manager.get_embedding_manager(base_id, model_type="MINILM")
 
     # Process each file
     for file_path in files:
@@ -109,7 +114,7 @@ async def reindex_kb():
                         **metadata_copy,
                         "document_id": chunk.document_id,
                         "chunk_index": chunk.chunk_index,
-                        "base_id": "kb_aa2a0527",
+                        "base_id": base_id,
                         "file_name": file_path.name,
                     },
                 )
@@ -140,4 +145,56 @@ async def reindex_kb():
 
 
 if __name__ == "__main__":
-    asyncio.run(reindex_kb())
+    parser = argparse.ArgumentParser(
+        description="Re-index documents in a knowledge base",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Re-index a specific knowledge base
+  %(prog)s kb_aa2a0527
+
+  # List all available knowledge bases
+  %(prog)s --list
+        """
+    )
+    parser.add_argument(
+        "base_id",
+        nargs="?",
+        help="Knowledge base ID to re-index (e.g., kb_aa2a0527)"
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List all available knowledge bases and exit"
+    )
+
+    args = parser.parse_args()
+
+    # Handle --list flag
+    if args.list:
+        knowledge_path = get_dawei_home() / "knowledge"
+        manager = KnowledgeBaseManager(root_path=str(knowledge_path))
+
+        print("📚 Available Knowledge Bases:")
+        print("-" * 60)
+
+        bases = manager.list_bases()
+        if not bases:
+            print("❌ No knowledge bases found")
+            sys.exit(1)
+
+        for base in bases:
+            print(f"  ID: {base.id}")
+            print(f"  Name: {base.name}")
+            print(f"  Description: {base.description or 'N/A'}")
+            print(f"  Documents: {base.stats.total_documents}")
+            print("-" * 60)
+
+        sys.exit(0)
+
+    # Validate base_id argument
+    if not args.base_id:
+        parser.error("base_id is required (or use --list to see available bases)")
+
+    # Run re-indexing
+    asyncio.run(reindex_kb(args.base_id))

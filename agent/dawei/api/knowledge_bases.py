@@ -354,6 +354,162 @@ async def upload_document_to_base(
     await vector_store.add(vector_docs)
     logger.info(f"Added {len(vector_docs)} chunks to vector store")
 
+    # Index in full-text search
+    try:
+        fulltext_store = manager.get_fulltext_store(base_id)
+        await fulltext_store.initialize()
+        await fulltext_store.add_documents(chunks)
+        logger.info(f"Added {len(chunks)} chunks to full-text index")
+    except Exception as e:
+        logger.warning(f"Failed to index full-text search: {e}")
+        # Non-fatal, continue with graph indexing
+
+    # Index in graph store with knowledge extraction
+    try:
+        graph_store = manager.get_graph_store(base_id)
+        await graph_store.initialize()
+
+        from dawei.knowledge.models import GraphEntity, GraphRelation
+        from dawei.knowledge.extraction import (
+            ExtractionFactory,
+            ExtractionStrategyType,
+        )
+
+        # Create document entity
+        doc_entity = GraphEntity(
+            id=f"doc_{document.id}",
+            type="document",
+            name=file.filename,
+            description=f"Document: {file.filename}",
+            properties={
+                "file_size": document.metadata.file_size,
+                "file_type": document.metadata.file_type,
+            },
+            base_id=base_id,
+        )
+        await graph_store.add_entity(doc_entity)
+
+        # Get extraction strategy from knowledge base settings
+        extraction_strategy = kb.settings.extraction_strategy or "rule_based"
+
+        # Create extractor
+        extractor = ExtractionFactory.create(extraction_strategy)
+
+        # Extract entities and relations from each chunk
+        total_entities = 1  # Start with document entity
+        total_relations = 0
+        entity_id_map = {}  # Map entity names to graph IDs
+
+        for i, chunk in enumerate(chunks):
+            # Create chunk entity
+            chunk_entity = GraphEntity(
+                id=chunk.id,
+                type="chunk",
+                name=f"Chunk {i}",
+                description=chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content,
+                properties={
+                    "chunk_index": i,
+                    "document_id": chunk.document_id,
+                    "content": chunk.content,
+                },
+                base_id=base_id,
+            )
+            await graph_store.add_entity(chunk_entity)
+            total_entities += 1
+
+            # Document -> chunk relation
+            doc_chunk_relation = GraphRelation(
+                id=f"rel_{doc_entity.id}_{chunk.id}",
+                from_entity=doc_entity.id,
+                to_entity=chunk.id,
+                relation_type="contains",
+                properties={"order": i},
+                base_id=base_id,
+            )
+            await graph_store.add_relation(doc_chunk_relation)
+            total_relations += 1
+
+            # Knowledge extraction from chunk content
+            try:
+                extraction_result = await extractor.extract(
+                    chunk.content,
+                    chunk_id=chunk.id,
+                    document_id=document.id,
+                )
+
+                # Add extracted entities
+                for entity in extraction_result.entities:
+                    # Create unique ID for entity (based on name)
+                    entity_id = f"entity_{hash(entity.name)}_{base_id}"
+
+                    # Store mapping for relations
+                    if entity.name not in entity_id_map:
+                        entity_id_map[entity.name] = entity_id
+
+                        # Create graph entity
+                        graph_entity = GraphEntity(
+                            id=entity_id,
+                            type=entity.type,
+                            name=entity.name,
+                            description=entity.properties.get("description", ""),
+                            properties={
+                                **entity.properties,
+                                "confidence": entity.confidence,
+                                "source": "extraction",
+                            },
+                            base_id=base_id,
+                        )
+                        await graph_store.add_entity(graph_entity)
+                        total_entities += 1
+
+                    # Chunk -> entity relation (mentions)
+                    chunk_entity_relation = GraphRelation(
+                        id=f"rel_{chunk.id}_{entity_id_map[entity.name]}",
+                        from_entity=chunk.id,
+                        to_entity=entity_id_map[entity.name],
+                        relation_type="mentions",
+                        properties={
+                            "confidence": entity.confidence,
+                            "strategy": extraction_strategy,
+                        },
+                        base_id=base_id,
+                    )
+                    await graph_store.add_relation(chunk_entity_relation)
+                    total_relations += 1
+
+                # Add extracted relations
+                for relation in extraction_result.relations:
+                    from_id = entity_id_map.get(relation.from_entity)
+                    to_id = entity_id_map.get(relation.to_entity)
+
+                    if from_id and to_id:
+                        graph_relation = GraphRelation(
+                            id=f"rel_{from_id}_{to_id}_{relation.relation_type}",
+                            from_entity=from_id,
+                            to_entity=to_id,
+                            relation_type=relation.relation_type,
+                            properties={
+                                **relation.properties,
+                                "confidence": relation.confidence,
+                                "strategy": extraction_strategy,
+                            },
+                            base_id=base_id,
+                        )
+                        await graph_store.add_relation(graph_relation)
+                        total_relations += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to extract knowledge from chunk {i}: {e}")
+                # Non-fatal, continue with next chunk
+
+        logger.info(
+            f"Graph indexing complete: {total_entities} entities, "
+            f"{total_relations} relations (strategy: {extraction_strategy})"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to index graph: {e}")
+        # Non-fatal, continue
+
     # Update knowledge base stats
     kb.stats.total_documents += 1
     kb.stats.total_chunks += len(chunks)
@@ -641,9 +797,6 @@ async def search_in_base(
             },
         )
 
-    # Initialize vector store for this knowledge base
-    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
-
     base_storage_path = manager._get_storage_path(base_id)
     vector_db_path = base_storage_path / "vectors.db"
 
@@ -665,40 +818,67 @@ async def search_in_base(
             },
         )
 
+    start_time = time.time()
+
+    # Initialize stores
+    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+
     vector_store = SQLiteVecVectorStore(
         db_path=str(vector_db_path),
         dimension=kb.settings.embedding_dimension,
     )
     await vector_store.initialize()
 
-    # Get embedding manager
-    embedding_service = manager.get_embedding_manager(base_id, model_type="MINILM")
+    fulltext_store = None
+    graph_store = None
 
-    # Perform search
-    start_time = time.time()
+    try:
+        fulltext_store = manager.get_fulltext_store(base_id)
+        await fulltext_store.initialize()
+    except Exception as e:
+        logger.warning(f"Failed to initialize fulltext store: {e}")
 
-    # Generate query embedding
-    query_embedding = await embedding_service.embed_query(query)
+    try:
+        graph_store = manager.get_graph_store(base_id)
+        await graph_store.initialize()
+    except Exception as e:
+        logger.warning(f"Failed to initialize graph store: {e}")
 
-    # Search vector store
-    from dawei.knowledge.models import VectorSearchResult
+    # Use HybridRetriever
+    from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever
+    from dawei.knowledge.models import RetrievalQuery
 
-    search_results = await vector_store.search(
-        query_embedding=query_embedding,
-        top_k=top_k,
+    retriever = HybridRetriever(
+        vector_store=vector_store,
+        fulltext_store=fulltext_store,
+        graph_store=graph_store,
+        embedding_manager=manager.get_embedding_manager(base_id, model_type="MINILM"),
     )
+
+    # Create retrieval query
+    retrieval_query = RetrievalQuery(
+        query=query,
+        mode=mode,
+        top_k=top_k,
+        vector_weight=kb.settings.vector_weight,
+        graph_weight=kb.settings.graph_weight,
+        fulltext_weight=kb.settings.fulltext_weight,
+    )
+
+    # Execute search
+    search_result = await retriever.retrieve(retrieval_query)
 
     latency_ms = (time.time() - start_time) * 1000
 
-    # Convert to response format (search_results is already a list)
+    # Convert to response format
     results = []
-    for result in search_results:
+    for result in search_result.results:
         results.append(
             {
                 "id": result.id,
                 "content": result.content,
                 "score": result.score,
-                "source": "vector",
+                "source": result.source,
                 "metadata": result.metadata,
             }
         )
@@ -712,9 +892,9 @@ async def search_in_base(
             "top_k": top_k,
             "results": results,
             "total_count": len(results),
-            "vector_count": len(results),
-            "graph_count": 0,
-            "fulltext_count": 0,
+            "vector_count": search_result.vector_count,
+            "graph_count": search_result.graph_count,
+            "fulltext_count": search_result.fulltext_count,
             "latency_ms": round(latency_ms, 2),
         },
     )

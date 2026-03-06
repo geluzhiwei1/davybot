@@ -390,6 +390,49 @@ class KnowledgeBaseManager:
         logger.info(f"Created new embedding manager for {base_id} with model {model_type}")
         return embedding_service
 
+    def get_fulltext_store(self, base_id: str):
+        """Get or create full-text store for a knowledge base
+
+        Args:
+            base_id: Knowledge base ID
+
+        Returns:
+            SQLiteFTSStore instance
+        """
+        from dawei.knowledge.fulltext.sqlite_fts_store import SQLiteFTSStore
+
+        base_storage_path = self._get_storage_path(base_id)
+        fulltext_db_path = base_storage_path / "fulltext.db"
+
+        fulltext_store = SQLiteFTSStore(db_path=str(fulltext_db_path))
+
+        # Initialize if not exists
+        if not fulltext_db_path.exists():
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.run_until_complete(fulltext_store.initialize())
+            except RuntimeError:
+                # No event loop, run in new thread
+                import asyncio
+                asyncio.run(fulltext_store.initialize())
+
+        return fulltext_store
+
+    def get_graph_store(self, base_id: str):
+        """Get or create graph store for a knowledge base
+
+        Args:
+            base_id: Knowledge base ID
+
+        Returns:
+            None (graph store disabled temporarily)
+        """
+        # TODO: Implement graph store with full abstract method implementations
+        # For now, return None to disable graph functionality
+        logger.warning(f"Graph store is temporarily disabled for knowledge base {base_id}")
+        return None
+
     def list_base_documents(
         self, base_id: str, skip: int = 0, limit: int = 10
     ) -> Dict[str, Any]:

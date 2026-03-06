@@ -220,43 +220,37 @@ class Agent:
                 # Plan workflow is optional, continue without it
 
         # 【新增】Knowledge 系统（可选）
-        self.knowledge_service = None
+        self.knowledge_base_id = None
         self.knowledge_degraded = False
         if is_knowledge_enabled(self.user_workspace):
             try:
-                from dawei.knowledge.service import KnowledgeService
+                from dawei.knowledge.init import get_knowledge_base_manager
 
-                workspace_id = self.user_workspace.workspace_id or str(self.user_workspace.uuid)
-                workspace_path = str(self.user_workspace.absolute_path)
+                # Get knowledge base manager and default base
+                manager = get_knowledge_base_manager()
+                default_base = manager.get_default_base()
 
-                # Build knowledge config from settings
-                knowledge_config = self.config.knowledge
+                if default_base:
+                    self.knowledge_base_id = default_base.id
+                    self.logger.info(
+                        f"Knowledge system enabled, using default knowledge base: {default_base.id} ({default_base.name})"
+                    )
+                else:
+                    # Create default knowledge base if it doesn't exist
+                    from dawei.knowledge.base_models import KnowledgeBaseCreate
 
-                # Create KnowledgeService
-                self.knowledge_service = KnowledgeService(
-                    workspace_id=workspace_id,
-                    config={
-                        "vector_store": {
-                            "type": knowledge_config.vector_store_type,
-                            "db_path": f"{workspace_path}/.dawei/knowledge_vectors.db",
-                            "dimension": knowledge_config.dimension,
-                        },
-                        "chunking": {
-                            "chunk_size": knowledge_config.chunk_size,
-                            "chunk_overlap": knowledge_config.chunk_overlap,
-                        },
-                        "embeddings": {
-                            "model_name": knowledge_config.embedding_model,
-                        },
-                        "retrieval": {
-                            "default_top_k": knowledge_config.default_top_k,
-                            "default_mode": knowledge_config.retrieval_mode,
-                        },
-                    }
-                )
-
-                # Initialize service (async, will be completed in Agent.initialize())
-                self.logger.info("Knowledge service created, will be initialized during Agent.initialize()")
+                    default_base = manager.create_base(
+                        KnowledgeBaseCreate(
+                            name="默认知识库",
+                            description="Agent 默认知识库",
+                            is_default=True,
+                            settings={},
+                        )
+                    )
+                    self.knowledge_base_id = default_base.id
+                    self.logger.info(
+                        f"Created default knowledge base for Agent: {default_base.id}"
+                    )
 
             except Exception as e:
                 # Fast Fail: Knowledge system is explicitly enabled but failed to initialize
@@ -265,7 +259,7 @@ class Agent:
                     exc_info=True,
                 )
                 self.knowledge_degraded = True
-                self.knowledge_service = None
+                self.knowledge_base_id = None
 
         # 统计信息
         self.tool_usage: Dict[str, ToolUsage] = {}
@@ -409,26 +403,19 @@ class Agent:
         if hasattr(self.execution_engine, "initialize"):
             await self.execution_engine.initialize()
 
-        # 【新增】初始化 KnowledgeService（异步）
-        if self.knowledge_service is not None:
+        # Inject knowledge_base_id into tools if knowledge system is enabled
+        if self.knowledge_base_id is not None:
             try:
-                await self.knowledge_service.initialize()
-                self.logger.info("Knowledge service initialized successfully")
-
-                # 注入到 ToolExecutor
                 if hasattr(self.execution_engine, "tool_call_service"):
                     tool_call_service = self.execution_engine.tool_call_service
-                    if hasattr(tool_call_service, "inject_knowledge_service"):
-                        tool_call_service.inject_knowledge_service(self.knowledge_service)
-                        self.logger.info("Knowledge service injected into tools")
-
+                    if hasattr(tool_call_service, "inject_knowledge_base_id"):
+                        tool_call_service.inject_knowledge_base_id(self.knowledge_base_id)
+                        self.logger.info(f"Knowledge base ID {self.knowledge_base_id} injected into tools")
             except Exception as e:
-                self.logger.error(
-                    f"Failed to initialize knowledge service: {e}. Knowledge features will be disabled.",
+                self.logger.warning(
+                    f"Failed to inject knowledge_base_id into tools: {e}",
                     exc_info=True,
                 )
-                self.knowledge_degraded = True
-                self.knowledge_service = None
 
         # 标记为已初始化
         self._initialized = True

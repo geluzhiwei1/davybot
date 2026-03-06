@@ -174,26 +174,66 @@ class HybridRetriever:
             List of graph search results
         """
         if not self.graph_store:
+            logger.debug("Graph store not initialized, skipping graph search")
             return []
 
         try:
-            # Extract entities from query (simplified)
-            # In production, use NER to extract entities
-            entities = self._extract_entities(query.query)
+            # Extract entities from query
+            entities = await self._extract_entities(query.query)
+
+            if not entities:
+                logger.debug(f"No entities extracted from query: {query.query}")
+                # Fallback: search entities by name/description
+                entity_matches = await self.graph_store.search_entities(
+                    query=query.query,
+                    limit=query.top_k,
+                )
+
+                if not entity_matches:
+                    logger.debug("No matching entities found in graph")
+                    return []
+
+                entities = [entity_id for entity_id, score in entity_matches]
 
             results = []
 
-            for entity in entities:
-                # Find neighbors
+            for entity_id in entities:
+                # Get the entity itself
+                entity = await self.graph_store.get_entity(entity_id)
+                if not entity:
+                    continue
+
+                # Add entity as a result if it has content
+                if entity.properties.get("content"):
+                    score = self._calculate_graph_relevance(entity, query.query)
+                    results.append(
+                        RetrievalResult(
+                            id=entity.id,
+                            content=entity.properties.get("content", ""),
+                            score=score,
+                            source="graph",
+                            metadata={
+                                "entity_id": entity.id,
+                                "entity_type": entity.type,
+                                "entity_name": entity.name,
+                                **entity.properties
+                            },
+                        )
+                    )
+
+                # Find neighbors for broader context
                 neighbors = await self.graph_store.find_neighbors(
-                    entity_id=entity,
+                    entity_id=entity_id,
                     hops=2,
                 )
 
-                # Convert to RetrievalResult
                 for neighbor in neighbors:
+                    # Skip if neighbor doesn't have content
+                    if not neighbor.properties.get("content"):
+                        continue
+
                     # Score based on proximity and relevance
-                    score = self._calculate_graph_relevance(neighbor, query.query)
+                    score = self._calculate_graph_relevance(neighbor, query.query) * 0.9  # Slightly lower score for neighbors
 
                     results.append(
                         RetrievalResult(
@@ -201,17 +241,30 @@ class HybridRetriever:
                             content=neighbor.properties.get("content", neighbor.name),
                             score=score,
                             source="graph",
-                            metadata=neighbor.properties,
+                            metadata={
+                                "entity_id": neighbor.id,
+                                "entity_type": neighbor.type,
+                                "entity_name": neighbor.name,
+                                **neighbor.properties
+                            },
                         )
                     )
 
-            # Sort by score
+            # Sort by score and deduplicate
             results.sort(key=lambda x: x.score, reverse=True)
 
-            return results[: query.top_k]
+            # Remove duplicates (by ID)
+            seen = set()
+            unique_results = []
+            for result in results:
+                if result.id not in seen:
+                    seen.add(result.id)
+                    unique_results.append(result)
+
+            return unique_results[: query.top_k]
 
         except Exception as e:
-            logger.error(f"Graph search failed: {e}")
+            logger.error(f"Graph search failed: {e}", exc_info=True)
             return []
 
     async def _fulltext_search(self, query: RetrievalQuery) -> List[RetrievalResult]:
@@ -318,16 +371,20 @@ class HybridRetriever:
             for result_id in sorted_ids
         ]
 
-    def _extract_entities(self, query: str) -> List[str]:
+    async def _extract_entities(self, query: str) -> List[str]:
         """Extract entities from query (simplified)
 
         In production, use NER model or regex patterns.
-        """
-        # Simplified: extract capitalized words
-        import re
 
-        words = re.findall(r"\b[A-Z][a-z]+\b", query)
-        return list(set(words))
+        Args:
+            query: Search query text
+
+        Returns:
+            List of potential entity IDs
+        """
+        # For now, return empty list to trigger fallback to search_entities
+        # This method can be enhanced later with NER
+        return []
 
     def _calculate_graph_relevance(self, entity: GraphEntity, query: str) -> float:
         """Calculate relevance score for graph entity

@@ -9,6 +9,7 @@ from pathlib import Path
 from dawei.core.dependency_container import DEPENDENCY_CONTAINER
 from dawei.knowledge.base_manager import KnowledgeBaseManager
 from dawei.config.settings import get_settings
+from dawei import get_dawei_home
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,9 @@ def initialize_knowledge_base_manager() -> KnowledgeBaseManager:
         KnowledgeBaseManager instance
     """
     try:
-        # Get knowledge base root path
+        # Get knowledge base root path - use get_dawei_home() for user-level path
         settings = get_settings()
-        knowledge_root = Path(getattr(settings, 'KNOWLEDGE_BASE_PATH', '~/.dawei/knowledge'))
-        knowledge_root = knowledge_root.expanduser()
+        knowledge_root = get_dawei_home() / "knowledge"
 
         # Create manager
         manager = KnowledgeBaseManager(root_path=knowledge_root)

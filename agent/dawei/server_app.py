@@ -110,7 +110,6 @@ from fastapi.staticfiles import StaticFiles
 # Import API routers
 from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces, users
 from dawei.api import knowledge_bases  # Multi-knowledge base support
-from dawei.api import knowledge_documents  # Knowledge documents, search, and RAG
 from dawei.api.exception_handlers import register_exception_handlers
 from dawei.websocket.handlers.chat import ConnectHandler
 from dawei.websocket.ws_server import websocket_server
@@ -346,10 +345,6 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     # Knowledge Base Management API (Multi-tenancy support)
     app.include_router(knowledge_bases.router)
     print("[Dawei Server] ✓ Knowledge Base Management API router registered")
-
-    # Knowledge Documents, Search, and RAG API
-    app.include_router(knowledge_documents.router)
-    print("[Dawei Server] ✓ Knowledge Documents, Search, and RAG API router registered")
 
     # Register unified exception handlers
     register_exception_handlers(app)

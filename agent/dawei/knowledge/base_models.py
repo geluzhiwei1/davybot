@@ -39,6 +39,12 @@ class KnowledgeBaseSettings(BaseModel):
     graph_weight: float = Field(default=0.3, ge=0.0, le=1.0)
     fulltext_weight: float = Field(default=0.2, ge=0.0, le=1.0)
 
+    # Knowledge extraction settings
+    extraction_strategy: str = Field(
+        default="rule_based",
+        description="Entity/relation extraction strategy: rule_based, llm, ner_model, auto"
+    )
+
     # Advanced settings
     enable_graph: bool = True
     enable_fulltext: bool = True
@@ -55,7 +61,7 @@ class KnowledgeBaseStats(BaseModel):
     indexed_documents: int = 0
     storage_size_bytes: int = 0
     last_indexed_at: Optional[datetime] = None
-    last_updated_at: datetime = Field(default_factory=datetime.now)
+    last_updated_at: Optional[datetime] = Field(default_factory=datetime.now)
 
 
 class KnowledgeBase(BaseModel):

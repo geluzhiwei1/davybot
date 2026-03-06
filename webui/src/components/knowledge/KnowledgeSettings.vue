@@ -313,19 +313,12 @@
       :title="t('knowledge.settings')"
       width="500px"
     >
-      <el-form :model="settings" label-width="140px">
+      <el-form :model="settings" label-width="160px">
         <el-form-item :label="t('knowledge.chunkSize')">
           <el-input-number v-model="settings.chunkSize" :min="100" :max="2000" :step="50" />
         </el-form-item>
         <el-form-item :label="t('knowledge.chunkOverlap')">
           <el-input-number v-model="settings.chunkOverlap" :min="0" :max="500" :step="10" />
-        </el-form-item>
-        <el-form-item :label="t('knowledge.embeddingModel')">
-          <el-select v-model="settings.embeddingModel" style="width: 100%;">
-            <el-option label="all-MiniLM-L6-v2 (384维)" value="minilm" />
-            <el-option label="BGE-M3 (1024维)" value="bge-m3" />
-            <el-option label="jina-embeddings-v4 (768维)" value="jina-v4" />
-          </el-select>
         </el-form-item>
         <el-form-item :label="t('knowledge.chunkStrategy')">
           <el-select v-model="settings.chunkStrategy" style="width: 100%;">
@@ -333,6 +326,45 @@
             <el-option label="Recursive" value="recursive" />
             <el-option label="Semantic" value="semantic" />
             <el-option label="Markdown" value="markdown" />
+          </el-select>
+        </el-form-item>
+        <el-divider />
+        <el-form-item :label="t('knowledge.extractionStrategy')">
+          <el-select v-model="settings.extractionStrategy" style="width: 100%;">
+            <el-option :label="t('knowledge.ruleBased')" value="rule_based">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ t('knowledge.ruleBased') }}</span>
+                <el-tag size="small" type="success">⚡⚡⚡</el-tag>
+              </div>
+            </el-option>
+            <el-option :label="t('knowledge.llm')" value="llm">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ t('knowledge.llm') }}</span>
+                <el-tag size="small" type="warning">⚡ ⭐⭐⭐⭐</el-tag>
+              </div>
+            </el-option>
+            <el-option :label="t('knowledge.nerModel')" value="ner_model">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ t('knowledge.nerModel') }}</span>
+                <el-tag size="small" type="info">⚡⚡ ⭐⭐⭐⭐</el-tag>
+              </div>
+            </el-option>
+            <el-option :label="t('knowledge.auto')" value="auto">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ t('knowledge.auto') }}</span>
+                <el-tag size="small" type="primary">🔮</el-tag>
+              </div>
+            </el-option>
+          </el-select>
+          <div style="margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary);">
+            {{ t('knowledge.extractionStrategyHint') }}
+          </div>
+        </el-form-item>
+        <el-form-item :label="t('knowledge.embeddingModel')">
+          <el-select v-model="settings.embeddingModel" style="width: 100%;">
+            <el-option label="all-MiniLM-L6-v2 (384维)" value="minilm" />
+            <el-option label="BGE-M3 (1024维)" value="bge-m3" />
+            <el-option label="jina-embeddings-v4 (768维)" value="jina-v4" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -377,7 +409,7 @@ import {
   UploadFilled
 } from '@element-plus/icons-vue'
 import { knowledgeApi, knowledgeBasesApi } from '@/services/api/knowledge'
-import type { DocumentInfo, SearchResult, Stats, KnowledgeBase } from '@/types/knowledge'
+import type { DocumentInfo, SearchResult, Stats, KnowledgeBase, ExtractionStrategy } from '@/types/knowledge'
 import { logger } from '@/utils/logger'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import KnowledgeBaseManager from './KnowledgeBaseManager.vue'
@@ -436,10 +468,11 @@ const uploadFileList = ref([])
 
 // 设置
 const settings = ref({
-  chunkSize: 512,
-  chunkOverlap: 50,
+  chunkSize: 1000,
+  chunkOverlap: 200,
   embeddingModel: 'minilm',
-  chunkStrategy: 'recursive'
+  chunkStrategy: 'recursive',
+  extractionStrategy: 'rule_based' as ExtractionStrategy
 })
 
 // 计算属性
@@ -508,6 +541,16 @@ const showUploadDialog = () => {
 }
 
 const showSettings = () => {
+  // 从当前知识库加载设置
+  if (currentBase.value?.settings) {
+    settings.value = {
+      chunkSize: currentBase.value.settings.chunk_size,
+      chunkOverlap: currentBase.value.settings.chunk_overlap,
+      embeddingModel: currentBase.value.settings.embedding_model,
+      chunkStrategy: currentBase.value.settings.chunk_strategy,
+      extractionStrategy: currentBase.value.settings.extraction_strategy || 'rule_based'
+    }
+  }
   settingsDialogVisible.value = true
 }
 
@@ -653,7 +696,39 @@ const copyContext = async () => {
 
 const saveSettings = async () => {
   try {
-    await knowledgeApi.updateSettings(settings.value)
+    // 更新知识库设置
+    if (selectedBaseId.value && currentBase.value) {
+      await knowledgeBasesApi.updateBase(selectedBaseId.value, {
+        settings: {
+          chunk_size: settings.value.chunkSize,
+          chunk_overlap: settings.value.chunkOverlap,
+          chunk_strategy: settings.value.chunkStrategy,
+          embedding_model: settings.value.embeddingModel,
+          embedding_dimension: settings.value.embeddingModel === 'bge-m3' ? 1024 :
+                            settings.value.embeddingModel === 'jina-v4' ? 768 : 384,
+          extraction_strategy: settings.value.extractionStrategy,
+          default_top_k: 5,
+          default_mode: 'hybrid',
+          vector_weight: 0.5,
+          graph_weight: 0.3,
+          fulltext_weight: 0.2,
+          enable_graph: true,
+          enable_fulltext: true,
+          auto_reindex: false
+        }
+      })
+
+      // 更新本地currentBase
+      currentBase.value.settings = {
+        ...currentBase.value.settings,
+        chunk_size: settings.value.chunkSize,
+        chunk_overlap: settings.value.chunkOverlap,
+        chunk_strategy: settings.value.chunkStrategy,
+        embedding_model: settings.value.embeddingModel,
+        extraction_strategy: settings.value.extractionStrategy
+      }
+    }
+
     ElMessage.success(t('knowledge.settingsSaved'))
     settingsDialogVisible.value = false
   } catch (error) {
