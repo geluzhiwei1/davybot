@@ -146,8 +146,10 @@ export const knowledgeApi = {
   /**
    * 搜索知识库
    */
-  search: async (request: SearchRequest): Promise<SearchResponse> => {
-    const response = await axios.post(`${API_BASE}/search`, null, {
+  search: async (request: SearchRequest, baseId?: string): Promise<SearchResponse> => {
+    // 如果提供了baseId，搜索指定知识库；否则搜索默认知识库
+    const baseUrl = baseId ? `${API_BASE}/bases/${baseId}/search` : `${API_BASE}/bases/default/search`
+    const response = await axios.post(baseUrl, null, {
       params: {
         query: request.query,
         mode: request.mode || 'hybrid',

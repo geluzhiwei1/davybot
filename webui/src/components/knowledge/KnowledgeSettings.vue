@@ -618,7 +618,7 @@ const handleRAGSearch = async () => {
       query: ragQuery.value,
       mode: searchMode.value,
       top_k: topK.value
-    })
+    }, selectedBaseId.value)
 
     latency.value = Date.now() - startTime
     searchResults.value = response.results

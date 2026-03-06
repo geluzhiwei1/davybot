@@ -20,6 +20,7 @@ from dawei.knowledge.base_models import (
     KnowledgeBaseStatus,
     KnowledgeBaseUpdate,
 )
+from dawei.knowledge.models import RetrievalMode
 
 logger = logging.getLogger(__name__)
 
@@ -600,3 +601,148 @@ async def reindex_document_in_base(base_id: str, document_id: str):
             "message": "Document re-indexed successfully",
         },
     )
+
+
+# ============================================================================
+# Search Endpoints
+# ============================================================================
+
+
+@router.post("/{base_id}/search")
+async def search_in_base(
+    base_id: str,
+    query: str = Query(..., min_length=1, description="Search query"),
+    mode: RetrievalMode = Query(RetrievalMode.HYBRID, description="Retrieval mode"),
+    top_k: int = Query(5, ge=1, le=50, description="Number of results to return"),
+):
+    """Search within a specific knowledge base
+
+    Args:
+        base_id: Knowledge base ID
+        query: Search query text
+        mode: Retrieval mode (vector, fulltext, graph, hybrid)
+        top_k: Maximum number of results to return
+
+    Returns:
+        Search results with scores and metadata
+    """
+    import time
+
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "Knowledge base not found",
+                "base_id": base_id,
+                "message": f"Knowledge base '{base_id}' does not exist.",
+                "available_bases": [base.id for base in manager.list_bases().items],
+            },
+        )
+
+    # Initialize vector store for this knowledge base
+    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+
+    base_storage_path = manager._get_storage_path(base_id)
+    vector_db_path = base_storage_path / "vectors.db"
+
+    if not vector_db_path.exists():
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "query": query,
+                "mode": mode,
+                "top_k": top_k,
+                "results": [],
+                "total_count": 0,
+                "vector_count": 0,
+                "graph_count": 0,
+                "fulltext_count": 0,
+                "latency_ms": 0,
+                "message": "Vector store not found. Please upload documents first.",
+            },
+        )
+
+    vector_store = SQLiteVecVectorStore(
+        db_path=str(vector_db_path),
+        dimension=kb.settings.embedding_dimension,
+    )
+    await vector_store.initialize()
+
+    # Get embedding manager
+    embedding_service = manager.get_embedding_manager(base_id, model_type="MINILM")
+
+    # Perform search
+    start_time = time.time()
+
+    # Generate query embedding
+    query_embedding = await embedding_service.embed_query(query)
+
+    # Search vector store
+    from dawei.knowledge.models import VectorSearchResult
+
+    search_results = await vector_store.search(
+        query_embedding=query_embedding,
+        top_k=top_k,
+    )
+
+    latency_ms = (time.time() - start_time) * 1000
+
+    # Convert to response format (search_results is already a list)
+    results = []
+    for result in search_results:
+        results.append(
+            {
+                "id": result.id,
+                "content": result.content,
+                "score": result.score,
+                "source": "vector",
+                "metadata": result.metadata,
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "query": query,
+            "mode": mode,
+            "top_k": top_k,
+            "results": results,
+            "total_count": len(results),
+            "vector_count": len(results),
+            "graph_count": 0,
+            "fulltext_count": 0,
+            "latency_ms": round(latency_ms, 2),
+        },
+    )
+
+
+@router.post("/default/search")
+async def search_default_base(
+    query: str = Query(..., min_length=1, description="Search query"),
+    mode: RetrievalMode = Query(RetrievalMode.HYBRID, description="Retrieval mode"),
+    top_k: int = Query(5, ge=1, le=50, description="Number of results to return"),
+):
+    """Search in the default knowledge base
+
+    Args:
+        query: Search query text
+        mode: Retrieval mode (vector, fulltext, graph, hybrid)
+        top_k: Maximum number of results to return
+
+    Returns:
+        Search results with scores and metadata
+    """
+    manager = get_base_manager()
+    default_kb = manager.get_default_base()
+    if not default_kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No default knowledge base found",
+        )
+
+    # Delegate to base-specific search
+    return await search_in_base(default_kb.id, query, mode, top_k)
