@@ -426,6 +426,68 @@ async fn clear_crash_reports() -> Result<(), String> {
     clear_all_crash_reports().map_err(|e| e.to_string())
 }
 
+// ==================== 页面缩放功能 ====================
+
+/// 放大页面
+#[tauri::command]
+async fn zoom_in(window: tauri::Window) -> Result<String, String> {
+    use tauri::Emitter;
+
+    // 计算新的缩放级别 (最大300%)
+    let new_zoom = 1.1; // 每次增加10%
+
+    // 发送缩放事件到前端
+    window.emit("zoom-change", new_zoom)
+        .map_err(|e| format!("Failed to emit zoom event: {}", e))?;
+
+    Ok(format!("Zoom in to {:.0}%", new_zoom * 100.0))
+}
+
+/// 缩小页面
+#[tauri::command]
+async fn zoom_out(window: tauri::Window) -> Result<String, String> {
+    use tauri::Emitter;
+
+    // 计算新的缩放级别 (最小50%)
+    let new_zoom = 0.9; // 每次减少10%
+
+    // 发送缩放事件到前端
+    window.emit("zoom-change", new_zoom)
+        .map_err(|e| format!("Failed to emit zoom event: {}", e))?;
+
+    Ok(format!("Zoom out to {:.0}%", new_zoom * 100.0))
+}
+
+/// 重置缩放
+#[tauri::command]
+async fn zoom_reset(window: tauri::Window) -> Result<String, String> {
+    use tauri::Emitter;
+
+    // 重置为100%
+    let new_zoom = 1.0;
+
+    // 发送缩放事件到前端
+    window.emit("zoom-change", new_zoom)
+        .map_err(|e| format!("Failed to emit zoom event: {}", e))?;
+
+    Ok("Zoom reset to 100%".to_string())
+}
+
+/// 设置指定缩放级别
+#[tauri::command]
+async fn set_zoom(window: tauri::Window, mut zoom_level: f64) -> Result<String, String> {
+    use tauri::Emitter;
+
+    // 限制在50%-300%范围
+    zoom_level = zoom_level.max(0.5).min(3.0);
+
+    // 发送缩放事件到前端
+    window.emit("zoom-change", zoom_level)
+        .map_err(|e| format!("Failed to emit zoom event: {}", e))?;
+
+    Ok(format!("Zoom set to {:.0}%", zoom_level * 100.0))
+}
+
 fn main() {
     // ==================== 设置 Panic Hook ====================
     setup_panic_hook();
@@ -468,6 +530,11 @@ fn main() {
             get_python_info,
             // 后端管理命令
             start_backend,
+            // 页面缩放命令
+            zoom_in,
+            zoom_out,
+            zoom_reset,
+            set_zoom,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

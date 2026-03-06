@@ -10,6 +10,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { copyToClipboard } from '@/utils/clipboard'
+import { useZoom } from './useZoom'
 
 export type VimMode = 'normal' | 'insert' | 'visual'
 
@@ -23,6 +24,9 @@ interface ShortcutAction {
 export function useKeyboardShortcuts() {
   const mode = ref<VimMode>('normal')
   const showHelp = ref(false)
+
+  // Initialize zoom functionality
+  const { zoomIn, zoomOut, zoomReset } = useZoom()
 
   // 快捷键映射
   const shortcuts: Record<string, ShortcutAction> = {
@@ -162,6 +166,23 @@ export function useKeyboardShortcuts() {
       key: 'ctrl+v',
       description: '粘贴',
       action: () => pasteContent()
+    },
+
+    // === 页面缩放 (类似 Chrome) ===
+    'ctrl+plus': {
+      key: 'ctrl+plus',
+      description: '放大页面',
+      action: () => zoomIn()
+    },
+    'ctrl+-': {
+      key: 'ctrl+-',
+      description: '缩小页面',
+      action: () => zoomOut()
+    },
+    'ctrl+0': {
+      key: 'ctrl+0',
+      description: '重置缩放',
+      action: () => zoomReset()
     }
   }
 
