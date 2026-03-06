@@ -108,6 +108,65 @@ export function getWsBaseUrl(): string {
 }
 
 /**
+ * Detect mobile device by user agent
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}
+
+/**
+ * Detect tablet device
+ */
+export function isTabletDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
+  return /iPad|Android(?!.*Mobile)|Tablet/i.test(navigator.userAgent)
+}
+
+/**
+ * Detect touch capability
+ */
+export function isTouchDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  return (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    // @ts-ignore - vendor prefix
+    navigator.msMaxTouchPoints > 0
+  )
+}
+
+/**
+ * Get viewport width
+ */
+export function getViewportWidth(): number {
+  if (typeof window === 'undefined') return 1024
+  return window.innerWidth
+}
+
+/**
+ * Check if viewport is mobile size (< 768px)
+ */
+export function isMobileViewport(): boolean {
+  return getViewportWidth() < 768
+}
+
+/**
+ * Check if viewport is tablet size (768px - 1023px)
+ */
+export function isTabletViewport(): boolean {
+  const width = getViewportWidth()
+  return width >= 768 && width < 1024
+}
+
+/**
+ * Check if viewport is desktop size (>= 1024px)
+ */
+export function isDesktopViewport(): boolean {
+  return getViewportWidth() >= 1024
+}
+
+/**
  * Platform-specific feature flags
  */
 export const platformFeatures = {
@@ -119,4 +178,14 @@ export const platformFeatures = {
 
   // Should show platform-specific UI elements
   showDesktopOnlyUI: isTauri(),
+
+  // Mobile/touch detection
+  isMobileDevice: isMobileDevice(),
+  isTabletDevice: isTabletDevice(),
+  isTouchDevice: isTouchDevice(),
+  isMobileViewport: isMobileViewport(),
+
+  // Optimize for mobile
+  shouldUseMobileLayout: isMobileViewport(),
+  shouldUseTouchOptimizations: isTouchDevice(),
 }

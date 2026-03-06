@@ -715,6 +715,12 @@
     "switchWorkspace": "Switch Workspace",
     "userSettings": "User Settings"
   },
+  "mobileBottomNav": {
+    "chat": "Chat",
+    "conversations": "Chats",
+    "files": "Files",
+    "settings": "Settings"
+  },
   "topBar": {
     "newConversation": "New Chat",
     "unnamedConversation": "Unnamed Conversation",
@@ -724,7 +730,10 @@
     "reconnecting": "Reconnecting",
     "connectionError": "Connection Error",
     "disconnected": "Disconnected",
-    "notConnected": "Not Connected"
+    "notConnected": "Not Connected",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "resetZoom": "Reset Zoom"
   },
   "userSettings": {
     "title": "User Settings",

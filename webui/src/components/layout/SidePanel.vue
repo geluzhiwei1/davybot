@@ -4,11 +4,16 @@
 */
 
 <template>
-  <el-aside :width="collapsed ? '57px' : '400px'" class="side-panel">
+  <el-aside :width="collapsed ? '57px' : '400px'" class="side-panel" :class="{ 'mobile-drawer-mode': isMobileDrawer }">
     <div class="side-panel-container">
-      <div v-if="!collapsed" class="content-area">
+      <!-- 移动端关闭按钮 -->
+      <div v-if="isMobileDrawer" class="mobile-close-btn">
+        <el-button :icon="Close" circle @click="handleCloseMobileDrawer" />
+      </div>
+
+      <div v-if="!collapsed" class="content-area" :class="{ 'has-mobile-close': isMobileDrawer }">
         <!-- 侧边栏切换按钮 -->
-        <div class="sidebar-tabs">
+        <div class="sidebar-tabs" :class="{ 'mobile-tabs': isMobileDrawer }">
           <button :class="['tab-button', { active: activeTab === 'conversations' }]"
             @click="activeTab = 'conversations'" data-testid="conversations-tab">
             <el-icon>
@@ -194,11 +199,12 @@ import { apiManager } from '@/services/api';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import {
   ChatDotRound, Folder, Document, Plus, Delete,
-  FolderAdd, Edit, CopyDocument, Upload, Refresh, Connection, Download
+  FolderAdd, Edit, CopyDocument, Upload, Refresh, Connection, Download, Close
 } from '@element-plus/icons-vue';
 import UserSettingsDrawer from './UserSettingsDrawer.vue';
 import FileUploadDialog from '@/components/FileUploadDialog.vue';
 import MemoryBrowser from './MemoryBrowser.vue';
+import { useMobile } from '@/composables/useMobile';
 
 const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
@@ -241,10 +247,19 @@ const props = defineProps({
   memoryPanelDisabled: {
     type: Boolean,
     default: false
+  },
+  // 移动端抽屉模式
+  isMobileDrawer: {
+    type: Boolean,
+    default: false
   }
 });
 
-const emit = defineEmits(['open-file', 'open-settings']);
+const emit = defineEmits<{
+  'open-file': [file: any]
+  'open-settings': []
+  'close-mobile-drawer': []
+}>();
 
 // 注册全局函数供chat store调用
 onMounted(() => {
@@ -290,6 +305,11 @@ const isUploadDialogVisible = ref(false);
 
 // 当前激活的标签页（默认选择"工作区"）
 const activeTab = ref<'conversations' | 'files' | 'memory'>('files');
+
+// 移动端抽屉模式处理
+const handleCloseMobileDrawer = () => {
+  emit('close-mobile-drawer');
+};
 
 // 监听 memoryPanelDisabled 变化，如果当前是 memory tab 且被禁用，切换到 files tab
 watch(() => props.memoryPanelDisabled, (newDisabled) => {
@@ -1410,5 +1430,76 @@ defineExpose({
   height: 1px;
   background-color: var(--el-border-color-lighter);
   margin: 4px 0;
+}
+
+/* ========================================
+   MOBILE DRAWER MODE STYLES
+   ======================================== */
+
+.mobile-drawer-mode.side-panel {
+  width: 100vw !important;
+  border-right: none;
+}
+
+.mobile-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  padding: env(safe-area-inset-top) 12px 12px 12px;
+}
+
+.mobile-close-btn .el-button {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.content-area.has-mobile-close {
+  padding-top: 56px;
+}
+
+.sidebar-tabs.mobile-tabs {
+  position: sticky;
+  top: 0;
+  background-color: var(--el-bg-color-page);
+  z-index: 5;
+  padding: 16px;
+}
+
+/* 移动端优化 */
+@media (max-width: 767px) {
+  .tab-button {
+    min-height: var(--touch-target-min, 44px);
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+
+  .conversation-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .conversation-actions .el-button {
+    flex: 1 1 calc(50% - 4px);
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  .panel-content {
+    padding: 16px;
+  }
+
+  .el-tree-node {
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  .el-tree-node__content {
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  .custom-tree-node {
+    font-size: 14px;
+    padding: 8px 0;
+  }
 }
 </style>

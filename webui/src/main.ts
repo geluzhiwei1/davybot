@@ -20,6 +20,7 @@ import './styles/theme-application.css' // 主题CSS变量映射
 import './styles/dark-mode-comprehensive.css' // 统一深色主题
 import './styles/dark-mode-component-fixes.css' // 组件特定深色模式修复
 import './styles/element-plus-popper-fix.css' // 修复 Element Plus Popper 被遮挡问题
+import './styles/responsive.css' // 响应式设计系统
 
 // import { errorHandler } from './services/errorHandler'
 

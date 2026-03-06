@@ -5,8 +5,13 @@
 
 <template>
   <!-- 正常显示的文件内容区域 -->
-  <div class="file-content-area-wrapper">
-    <div class="file-content-area">
+  <div class="file-content-area-wrapper" :class="{ 'mobile-drawer-mode': isMobileDrawer }">
+    <!-- 移动端关闭按钮 -->
+    <div v-if="isMobileDrawer" class="mobile-close-btn">
+      <el-button :icon="Close" circle @click="handleCloseMobileDrawer" />
+    </div>
+
+    <div class="file-content-area" :class="{ 'has-mobile-close': isMobileDrawer }">
       <el-tabs v-if="hasFiles" :model-value="activeFileId || ''" type="card" class="file-tabs" closable
         @tab-remove="closeFile" @tab-change="handleTabChange">
         <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
@@ -354,6 +359,7 @@ interface File {
 interface Props {
   files: File[]
   activeFileId: string | null
+  isMobileDrawer?: boolean
 }
 
 interface Emits {
@@ -361,9 +367,12 @@ interface Emits {
   (e: 'update:activeFileId', fileId: string | null): void
   (e: 'save-file', fileId: string, content: string): void
   (e: 'update-file-content', fileId: string, content: string): void
+  (e: 'close-mobile-drawer'): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  isMobileDrawer: false
+})
 const emit = defineEmits<Emits>()
 
 const themeStore = useThemeStore()
@@ -392,6 +401,11 @@ const refreshAllFiles = () => {
   props.files.forEach(file => {
     emit('update-file-content', file.id, file.content)
   })
+}
+
+// 移动端抽屉模式处理
+const handleCloseMobileDrawer = () => {
+  emit('close-mobile-drawer')
 }
 
 // ✅ 暴露方法供父组件调用
@@ -1236,5 +1250,73 @@ onUnmounted(() => {
   padding: 16px;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* ========================================
+   MOBILE DRAWER MODE STYLES
+   ======================================== */
+
+.mobile-drawer-mode.file-content-area-wrapper {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-mobile-drawer, 1000);
+  background-color: var(--el-bg-color-page);
+}
+
+.mobile-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  padding: env(safe-area-inset-top) 12px 12px 12px;
+}
+
+.mobile-close-btn .el-button {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.file-content-area.has-mobile-close {
+  padding-top: 56px;
+  height: 100%;
+}
+
+/* 移动端优化 */
+@media (max-width: 767px) {
+  .file-tabs .el-tabs__header {
+    padding: 8px 12px 0 12px;
+  }
+
+  .file-tabs .el-tabs__item {
+    font-size: 13px;
+    padding: 0 12px;
+    height: 40px;
+    line-height: 40px;
+  }
+
+  .file-tabs .el-tabs__nav .el-icon {
+    font-size: 16px;
+  }
+
+  .editor-container {
+    padding: 12px;
+  }
+
+  .toolbar {
+    padding: 12px;
+  }
+
+  .tab-context-menu {
+    font-size: 14px;
+  }
+
+  .context-menu-item {
+    padding: 12px 16px;
+    min-height: var(--touch-target-min, 44px);
+  }
 }
 </style>

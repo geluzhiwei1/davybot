@@ -40,15 +40,15 @@
       </div>
     </el-aside>
 
-    <!-- 左侧内容区 - 独立的 aside，可折叠 -->
-    <el-aside v-show="!isSidePanelCollapsed" class="content-panel" :width="sidePanelWidth + 'px'">
+    <!-- 左侧内容区 - 桌面端固定侧边栏,移动端隐藏 -->
+    <el-aside v-show="!isSidePanelCollapsed && !isMobile" class="content-panel" :width="sidePanelWidth + 'px'">
       <SidePanel ref="sidePanelRef" @open-file="handleOpenFile" :side-panel-collapsed="isSidePanelCollapsed"
         :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined"
         :memory-panel-disabled="true" />
     </el-aside>
 
-    <!-- 左侧面板拖动分隔条 -->
-    <ResizerBar v-if="!isSidePanelCollapsed" :panel-ref="{ width: sidePanelWidth }" :min-width="100"
+    <!-- 左侧面板拖动分隔条 (仅桌面端) -->
+    <ResizerBar v-if="!isSidePanelCollapsed && !isMobile" :panel-ref="{ width: sidePanelWidth }" :min-width="100"
       storage-key="dawei-sidepanel-width" @resize="sidePanelWidth = $event" />
 
     <el-container v-show="!isChatPanelCollapsed" class="main-content">
@@ -66,21 +66,69 @@
         </div>
         <UserInputArea />
       </el-main>
-      <el-footer height="auto">
+      <el-footer height="auto" :class="{ 'mobile-footer': isMobile }">
         <BottomBar />
         <ServerStatusIndicator />
       </el-footer>
     </el-container>
 
-    <!-- 主内容区和右侧面板之间的拖动分隔条 -->
-    <ResizerBar v-if="isRightPanelVisible && !isChatPanelCollapsed" :panel-ref="{ width: rightPanelWidth }"
+    <!-- 移动端底部导航 -->
+    <MobileBottomNav
+      :open-files-count="openFiles.length"
+      @navigate="handleMobileNavNavigate"
+    />
+
+    <!-- 主内容区和右侧面板之间的拖动分隔条 (仅桌面端) -->
+    <ResizerBar v-if="isRightPanelVisible && !isChatPanelCollapsed && !isMobile" :panel-ref="{ width: rightPanelWidth }"
       :min-width="100" storage-key="dawei-rightpanel-width" position="right" @resize="rightPanelWidth = $event" />
 
-    <el-aside v-if="isRightPanelVisible" class="right-panel" :width="rightPanelWidth + 'px'">
+    <!-- 右侧文件内容区 - 桌面端固定,移动端隐藏 -->
+    <el-aside v-if="isRightPanelVisible && !isMobile" class="right-panel" :width="rightPanelWidth + 'px'">
       <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId"
         @close-file="handleCloseFile" @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
         @update-file-content="updateFileContent" />
     </el-aside>
+
+    <!-- 移动端侧边栏抽屉 -->
+    <el-drawer
+      v-model="isMobileSidePanelOpen"
+      :with-header="false"
+      direction="ltr"
+      size="100%"
+      class="mobile-side-panel-drawer"
+    >
+      <SidePanel
+        ref="sidePanelRef"
+        @open-file="handleOpenFile"
+        :side-panel-collapsed="false"
+        :chat-panel-collapsed="false"
+        :workspace-id="chatStore.workspaceId ?? undefined"
+        :memory-panel-disabled="true"
+        :is-mobile-drawer="true"
+        @close-mobile-drawer="isMobileSidePanelOpen = false"
+      />
+    </el-drawer>
+
+    <!-- 移动端右侧文件内容抽屉 -->
+    <el-drawer
+      v-model="isMobileRightPanelOpen"
+      :with-header="false"
+      direction="rtl"
+      size="100%"
+      class="mobile-right-panel-drawer"
+    >
+      <FileContentArea
+        ref="fileContentAreaRef"
+        :files="openFiles"
+        :active-file-id="currentActiveFileId"
+        :is-mobile-drawer="true"
+        @close-file="handleCloseFile"
+        @update:active-file-id="handleActiveFileChange"
+        @save-file="saveFileContent"
+        @update-file-content="updateFileContent"
+        @close-mobile-drawer="isMobileRightPanelOpen = false"
+      />
+    </el-drawer>
 
     <WorkspaceSettingsDrawer v-model="isSettingsDrawerVisible" :workspace-id="chatStore.workspaceId"
       :initial-tab="initialSettingsTab" />
@@ -113,8 +161,12 @@ import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
 import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
+import { useMobile } from '@/composables/useMobile';
 
 const { t } = useI18n();
+
+// 移动端响应式检测
+const { isMobile, isTablet, isDesktop, isTouchDevice } = useMobile();
 
 // 导入极简样式
 import '@/styles/chat-ultra-minimal.css';
@@ -133,6 +185,7 @@ import UserSettingsDrawer from '@/components/layout/UserSettingsDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
 import ImageViewer from '@/components/chat/ImageViewer.vue';
+import MobileBottomNav from '@/components/layout/MobileBottomNav.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -179,10 +232,81 @@ const isSettingsDrawerVisible = ref(false);
 const isUserSettingsVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
-// 面板宽度控制
-const sidePanelWidth = ref(400);
-const rightPanelWidth = ref(500);
-const savedSidePanelWidth = ref(400); // 折叠前保存宽度
+// 移动端侧边栏抽屉状态
+const isMobileSidePanelOpen = ref(false);
+const isMobileRightPanelOpen = ref(false);
+
+// 面板宽度控制 - 根据设备类型响应式调整
+const sidePanelWidth = computed({
+  get: () => {
+    // 移动端固定全屏宽度
+    if (isMobile.value) return window.innerWidth;
+    // 平板设备使用较小宽度
+    if (isTablet.value) return 320;
+    // 桌面端使用保存的宽度或默认400px
+    return savedSidePanelWidth.value;
+  },
+  set: (val) => {
+    if (!isMobile.value) {
+      savedSidePanelWidth.value = val;
+    }
+  }
+});
+
+const rightPanelWidth = computed({
+  get: () => {
+    // 移动端固定全屏宽度
+    if (isMobile.value) return window.innerWidth;
+    // 平板设备使用较小宽度
+    if (isTablet.value) return 400;
+    // 桌面端使用保存的宽度或默认500px
+    return savedRightPanelWidth.value;
+  },
+  set: (val) => {
+    if (!isMobile.value) {
+      savedRightPanelWidth.value = val;
+    }
+  }
+});
+
+const savedSidePanelWidth = ref(400); // 桌面端折叠前保存宽度
+const savedRightPanelWidth = ref(500); // 桌面端右侧面板宽度
+
+// 移动端自动折叠侧边栏
+watch(isMobile, (mobile) => {
+  if (mobile) {
+    // 移动端默认折叠侧边栏
+    isSidePanelCollapsed.value = true;
+  }
+}, { immediate: true });
+
+// 移动端底部导航处理
+const handleMobileNavNavigate = (tab: string) => {
+  switch (tab) {
+    case 'chat':
+      // 关闭所有抽屉,显示聊天区域
+      isMobileSidePanelOpen.value = false;
+      isMobileRightPanelOpen.value = false;
+      break;
+    case 'conversations':
+      // 打开左侧会话抽屉
+      isMobileSidePanelOpen.value = true;
+      break;
+    case 'files':
+      // 如果有打开的文件,显示文件抽屉
+      if (openFiles.value.length > 0) {
+        isMobileRightPanelOpen.value = true;
+      } else {
+        // 否则打开左侧文件树
+        isMobileSidePanelOpen.value = true;
+      }
+      break;
+    case 'settings':
+      // 打开设置抽屉
+      isSettingsDrawerVisible.value = true;
+      break;
+  }
+};
 
 // Agents状态 - 默认显示面板
 const isMonitoringPanelVisible = ref(true);

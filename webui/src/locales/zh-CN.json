@@ -720,6 +720,12 @@
     "switchWorkspace": "切换工作区",
     "userSettings": "用户设置"
   },
+  "mobileBottomNav": {
+    "chat": "聊天",
+    "conversations": "会话",
+    "files": "文件",
+    "settings": "设置"
+  },
   "topBar": {
     "newConversation": "新对话",
     "unnamedConversation": "未命名会话",
@@ -729,7 +735,10 @@
     "reconnecting": "重连中",
     "connectionError": "连接错误",
     "disconnected": "已断开",
-    "notConnected": "未连接"
+    "notConnected": "未连接",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "resetZoom": "重置缩放"
   },
   "userSettings": {
     "title": "用户设置",

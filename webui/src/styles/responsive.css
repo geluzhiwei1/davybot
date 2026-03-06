@@ -1,0 +1,389 @@
+/**
+ * Copyright (c) 2025 格律至微
+ * SPDX-License-Identifier: AGPL-3.0
+ */
+
+/**
+ * Responsive Design System
+ * 响应式设计系统
+ */
+
+/* ========================================
+   BREAKPOINTS - 断点系统
+   ======================================== */
+
+:root {
+  /* Breakpoint values (must match useMobile.ts) */
+  --bp-xs: 320px;
+  --bp-sm: 375px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+  --bp-xxl: 1440px;
+
+  /* Safe area insets for devices with notches */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+
+  /* Touch target sizes */
+  --touch-target-min: 44px;
+  --touch-target-comfortable: 48px;
+
+  /* Mobile-specific spacing */
+  --mobile-spacing-xs: 8px;
+  --mobile-spacing-sm: 12px;
+  --mobile-spacing-md: 16px;
+  --mobile-spacing-lg: 24px;
+  --mobile-spacing-xl: 32px;
+
+  /* Mobile-specific font sizes */
+  --mobile-font-size-xs: 12px;
+  --mobile-font-size-sm: 14px;
+  --mobile-font-size-base: 16px;
+  --mobile-font-size-lg: 18px;
+  --mobile-font-size-xl: 20px;
+  --mobile-font-size-2xl: 24px;
+
+  /* Panel widths */
+  --side-panel-width: 400px;
+  --side-panel-width-mobile: 100vw;
+  --right-panel-width: 500px;
+  --right-panel-width-mobile: 100vw;
+
+  /* Z-index layers */
+  --z-mobile-drawer: 1000;
+  --z-mobile-bottom-nav: 999;
+  --z-mobile-overlay: 998;
+}
+
+/* ========================================
+   MOBILE-FIRST UTILITY CLASSES
+   移动优先工具类
+   ======================================== */
+
+/* Hide/show utilities */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+/* Touch-friendly sizing */
+.touch-target {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========================================
+   MOBILE STYLES (< 768px)
+   ======================================== */
+
+@media (max-width: 767px) {
+  /* Show mobile-only elements */
+  .mobile-only {
+    display: block;
+  }
+
+  .mobile-only.flex {
+    display: flex;
+  }
+
+  .mobile-only.inline-flex {
+    display: inline-flex;
+  }
+
+  /* Hide desktop-only elements */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Safe area padding for devices with notches */
+  .safe-area-top {
+    padding-top: calc(var(--mobile-spacing-md) + var(--safe-area-inset-top));
+  }
+
+  .safe-area-bottom {
+    padding-bottom: calc(var(--mobile-spacing-md) + var(--safe-area-inset-bottom));
+  }
+
+  .safe-area-left {
+    padding-left: calc(var(--mobile-spacing-md) + var(--safe-area-inset-left));
+  }
+
+  .safe-area-right {
+    padding-right: calc(var(--mobile-spacing-md) + var(--safe-area-inset-right));
+  }
+
+  /* Mobile container */
+  .container {
+    padding: var(--mobile-spacing-md);
+    max-width: 100%;
+  }
+
+  /* Mobile typography */
+  h1 {
+    font-size: var(--mobile-font-size-2xl);
+    font-weight: 700;
+  }
+
+  h2 {
+    font-size: var(--mobile-font-size-xl);
+    font-weight: 600;
+  }
+
+  h3 {
+    font-size: var(--mobile-font-size-lg);
+    font-weight: 600;
+  }
+
+  p {
+    font-size: var(--mobile-font-size-base);
+    line-height: 1.6;
+  }
+
+  /* Mobile buttons */
+  .el-button {
+    min-height: var(--touch-target-min);
+    font-size: var(--mobile-font-size-base);
+    padding: var(--mobile-spacing-sm) var(--mobile-spacing-md);
+  }
+
+  .el-button--small {
+    min-height: 36px;
+    font-size: var(--mobile-font-size-sm);
+    padding: var(--mobile-spacing-xs) var(--mobile-spacing-sm);
+  }
+
+  /* Mobile inputs */
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: var(--mobile-font-size-base);
+    min-height: var(--touch-target-min);
+  }
+
+  /* Mobile cards */
+  .el-card {
+    border-radius: var(--mobile-spacing-sm);
+    margin: var(--mobile-spacing-sm) 0;
+  }
+
+  /* Mobile dialogs */
+  .el-dialog {
+    width: 100vw !important;
+    margin: 0 !important;
+    border-radius: var(--mobile-spacing-md) var(--mobile-spacing-md) 0 0;
+  }
+
+  .el-dialog__header {
+    padding: var(--mobile-spacing-md);
+  }
+
+  .el-dialog__body {
+    padding: var(--mobile-spacing-md);
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+  }
+
+  /* Mobile drawers */
+  .el-drawer {
+    width: 100vw !important;
+  }
+
+  .el-drawer.ltr {
+    border-radius: 0 var(--mobile-spacing-md) var(--mobile-spacing-md) 0;
+  }
+
+  .el-drawer.rtl {
+    border-radius: var(--mobile-spacing-md) 0 0 var(--mobile-spacing-md);
+  }
+
+  /* Mobile scrollbars */
+  .el-scrollbar__wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile tooltips */
+  .el-tooltip__popper {
+    max-width: 80vw;
+    font-size: var(--mobile-font-size-sm);
+  }
+
+  /* Mobile dropdowns */
+  .el-dropdown-menu {
+    max-width: 90vw;
+  }
+
+  /* Mobile menus */
+  .el-menu {
+    border-right: none;
+  }
+
+  .el-menu-item {
+    height: var(--touch-target-min);
+    line-height: var(--touch-target-min);
+    font-size: var(--mobile-font-size-base);
+  }
+
+  /* Mobile tabs */
+  .el-tabs__item {
+    font-size: var(--mobile-font-size-sm);
+    padding: 0 var(--mobile-spacing-sm);
+  }
+
+  /* Mobile tags */
+  .el-tag {
+    font-size: var(--mobile-font-size-sm);
+    padding: var(--mobile-spacing-xs) var(--mobile-spacing-sm);
+  }
+
+  /* Mobile tables */
+  .el-table {
+    font-size: var(--mobile-font-size-sm);
+  }
+
+  .el-table th,
+  .el-table td {
+    padding: var(--mobile-spacing-sm);
+  }
+
+  /* Mobile forms */
+  .el-form-item__label {
+    font-size: var(--mobile-font-size-sm);
+    margin-bottom: var(--mobile-spacing-xs);
+  }
+
+  /* Mobile pagination */
+  .el-pagination {
+    font-size: var(--mobile-font-size-sm);
+  }
+
+  .el-pagination button,
+  .el-pagination span {
+    min-height: var(--touch-target-min);
+    line-height: var(--touch-target-min);
+  }
+
+  /* Mobile message (notification) */
+  .el-message {
+    min-width: 300px;
+    max-width: 90vw;
+  }
+
+  /* Mobile loading */
+  .el-loading-mask {
+    border-radius: var(--mobile-spacing-sm);
+  }
+
+  /* Mobile popovers */
+  .el-popover {
+    max-width: 90vw;
+  }
+}
+
+/* ========================================
+   TABLET STYLES (768px - 1023px)
+   ======================================== */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tablet-only {
+    display: block;
+  }
+
+  .container {
+    padding: var(--mobile-spacing-lg);
+    max-width: 100%;
+  }
+
+  /* Adjust panel widths for tablet */
+  .side-panel {
+    width: 320px !important;
+  }
+
+  .right-panel {
+    width: 400px !important;
+  }
+}
+
+/* ========================================
+   LANDSCAPE MODE优化
+   ======================================== */
+
+@media (max-width: 767px) and (orientation: landscape) {
+  /* Reduce vertical spacing in landscape */
+  .safe-area-top,
+  .safe-area-bottom {
+    padding-top: var(--mobile-spacing-sm);
+    padding-bottom: var(--mobile-spacing-sm);
+  }
+
+  /* Adjust dialog height for landscape */
+  .el-dialog__body {
+    max-height: calc(100vh - 80px);
+  }
+}
+
+/* ========================================
+   HIGH DPI DISPLAYS
+   ======================================== */
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Sharper text on retina displays */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ========================================
+   PRINT STYLES
+   ======================================== */
+
+@media print {
+  .mobile-only,
+  .desktop-only,
+  .el-button,
+  .el-input {
+    display: none !important;
+  }
+
+  body {
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+}
+
+/* ========================================
+   REDUCED MOTION
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ========================================
+   DARK MODE (自动适配系统)
+   ======================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark mode overrides can be added here */
+    --color-surface-1: #1a1a1a;
+    --color-surface-2: #2a2a2a;
+    --color-text-primary: #e5e5e5;
+    --color-text-secondary: #a3a3a3;
+  }
+}

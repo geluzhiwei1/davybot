@@ -8,7 +8,7 @@
     v-model="visible"
     :title="t('userSettings.title')"
     direction="ltr"
-    :size="500"
+    :size="'80%'"
     class="user-settings-drawer"
     @close="handleClose"
   >
