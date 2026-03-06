@@ -11,7 +11,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import List, Dict, TYPE_CHECKING, Any, Optional
 
 from dawei.async_task.task_manager import AsyncTaskManager
 from dawei.async_task.types import RetryPolicy, TaskDefinition, TaskStatus
@@ -97,17 +97,17 @@ class ToolExecutor(IToolCallService):
         self.user_workspace = user_workspace
         self._agent = agent
         self._event_bus = event_bus
-        self.tools: dict[str, Tool] = {}
+        self.tools: Dict[str, Tool] = {}
         self.logger = logging.getLogger(__name__)
         self._load_tools()
 
         # Execution tracking
-        self._execution_history: list[dict[str, Any]] = []
-        self._tool_timeouts: dict[str, int] = {}
+        self._execution_history: List[Dict[str, Any]] = []
+        self._tool_timeouts: Dict[str, int] = {}
 
         # Task management
         self._task_manager = AsyncTaskManager()
-        self._active_tool_tasks: dict[str, str] = {}
+        self._active_tool_tasks: Dict[str, str] = {}
 
         # Note: Callbacks will be set up in async_initialize() method
         self._callbacks_initialized = False
@@ -126,6 +126,30 @@ class ToolExecutor(IToolCallService):
             self._task_manager.set_completion_callback(self._on_tool_task_completion)
             self._callbacks_initialized = True
             self.logger.info("[TOOL_EXECUTOR] Task manager callbacks initialized")
+
+    def inject_knowledge_service(self, knowledge_service) -> None:
+        """Inject KnowledgeService into all knowledge tools.
+
+        This method is called by Agent during initialization to inject the
+        KnowledgeService instance into all tools that require it.
+
+        Args:
+            knowledge_service: KnowledgeService instance to inject
+
+        """
+        injected_count = 0
+
+        for tool_name, tool_instance in self.tools.items():
+            # Check if tool has knowledge_service attribute
+            if hasattr(tool_instance, 'knowledge_service'):
+                tool_instance.knowledge_service = knowledge_service
+                injected_count += 1
+                self.logger.info(f"[TOOL_EXECUTOR] Injected knowledge_service into {tool_name}")
+
+        if injected_count > 0:
+            self.logger.info(f"[TOOL_EXECUTOR] Successfully injected knowledge_service into {injected_count} tools")
+        else:
+            self.logger.warning("[TOOL_EXECUTOR] No knowledge tools found to inject service")
 
     def _load_tools(self):
         """Load all tools from tool manager."""
@@ -182,7 +206,7 @@ class ToolExecutor(IToolCallService):
 
         return None, None
 
-    def check_permission(self, tool_name: str, parameters: dict[str, Any] | None = None) -> bool:
+    def check_permission(self, tool_name: str, parameters: Dict[str, Any] | None = None) -> bool:
         """Check if tool is allowed in current Agent mode.
 
         Args:
@@ -224,7 +248,7 @@ class ToolExecutor(IToolCallService):
 
         return True
 
-    def _check_file_write_permission(self, parameters: dict[str, Any]) -> bool:
+    def _check_file_write_permission(self, parameters: Dict[str, Any]) -> bool:
         """Check if file write is allowed based on whitelist (Plan mode).
 
         Args:
@@ -295,7 +319,7 @@ class ToolExecutor(IToolCallService):
     @staticmethod
     def _perform_external_security_check(
         tool_name: str,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
         user_workspace,
     ) -> str | None:
         """Perform external security checks.
@@ -343,10 +367,10 @@ class ToolExecutor(IToolCallService):
     async def execute_tool(
         self,
         tool_name: str,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
         context: Any,
         task_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """Execute tool with permission checks and snapshot creation.
 
         Args:
@@ -428,7 +452,7 @@ class ToolExecutor(IToolCallService):
             if len(self._execution_history) > 1000:
                 self._execution_history = self._execution_history[-1000:]
 
-    def list_available_tools(self) -> list[str]:
+    def list_available_tools(self) -> List[str]:
         """List all available tools.
 
         Returns:
@@ -443,7 +467,7 @@ class ToolExecutor(IToolCallService):
             self.logger.error(f"Failed to list available tools: {e}", exc_info=True)
             return []
 
-    def get_tool_schema(self, tool_name: str) -> dict[str, Any] | None:
+    def get_tool_schema(self, tool_name: str) -> Dict[str, Any] | None:
         """Get tool schema.
 
         Args:
@@ -519,8 +543,8 @@ class ToolExecutor(IToolCallService):
     def validate_tool_parameters(
         self,
         tool_name: str,
-        _parameters: dict[str, Any],
-    ) -> dict[str, Any]:
+        _parameters: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """Validate tool parameters.
 
         Args:
@@ -550,7 +574,7 @@ class ToolExecutor(IToolCallService):
             )
             return {"valid": False, "errors": [str(e)]}
 
-    def get_tool_execution_history(self, tool_name: str | None = None) -> list[dict[str, Any]]:
+    def get_tool_execution_history(self, tool_name: str | None = None) -> List[Dict[str, Any]]:
         """Get tool execution history.
 
         Args:
@@ -598,9 +622,9 @@ class ToolExecutor(IToolCallService):
     async def execute_tool_internal(
         self,
         tool_name: str,
-        tool_input: dict[str, Any],
+        tool_input: Dict[str, Any],
         context: TaskContext = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """Execute the specified tool.
 
         Args:
@@ -698,7 +722,7 @@ class ToolExecutor(IToolCallService):
 
     async def _execute_tool_with_tracking(
         self,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
         _context: Any = None,
     ) -> Any:
         """Execute tool with tracking (adapter for AsyncTaskManager executor interface).
@@ -1063,7 +1087,7 @@ class ToolExecutor(IToolCallService):
         """
         return self._tool_timeouts.get(tool_name)
 
-    def get_all_tool_timeouts(self) -> dict[str, int]:
+    def get_all_tool_timeouts(self) -> Dict[str, int]:
         """Get all tool timeouts.
 
         Returns:
@@ -1098,7 +1122,7 @@ class ToolExecutor(IToolCallService):
             self.logger.error(f"Failed to clear execution history: {e}", exc_info=True)
             return False
 
-    def get_execution_statistics(self) -> dict[str, Any]:
+    def get_execution_statistics(self) -> Dict[str, Any]:
         """Get execution statistics.
 
         Returns:
@@ -1119,7 +1143,7 @@ class ToolExecutor(IToolCallService):
             avg_duration = sum(record["duration"] for record in completed_records) / len(completed_records) if completed_records else 0
 
             # Per-tool statistics
-            tool_stats: dict[str, dict[str, int]] = {}
+            tool_stats: Dict[str, Dict[str, int]] = {}
             for record in self._execution_history:
                 tool_name = record["tool_name"]
                 if tool_name not in tool_stats:
@@ -1148,7 +1172,7 @@ class ToolExecutor(IToolCallService):
     async def _create_snapshot_before_write(
         self,
         tool_name: str,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
     ) -> bool:
         """Create file snapshot before write operations.
 

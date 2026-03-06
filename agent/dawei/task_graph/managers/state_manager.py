@@ -7,8 +7,9 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import Any, ClassVar
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any, ClassVar
 
 from dawei.core.errors import (
     StateTransitionError,
@@ -50,14 +51,14 @@ class StatusUpdate:
     task_id: str
     new_status: TaskStatus
     reason: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class StateValidator:
     """状态转换验证器"""
 
     # 定义允许的状态转换
-    VALID_TRANSITIONS: ClassVar[dict[TaskStatus, set[TaskStatus]]] = {
+    VALID_TRANSITIONS: ClassVar[Dict[TaskStatus, set[TaskStatus]]] = {
         TaskStatus.PENDING: {TaskStatus.RUNNING, TaskStatus.ABORTED},
         TaskStatus.RUNNING: {
             TaskStatus.PAUSED,
@@ -116,8 +117,8 @@ class StateManager:
 
     def __init__(self, event_bus=None):
         self._event_bus = event_bus
-        self._states: dict[str, TaskStatus] = {}
-        self._state_history: dict[str, list[StateTransition]] = {}
+        self._states: Dict[str, TaskStatus] = {}
+        self._state_history: Dict[str, List[StateTransition]] = {}
         self._lock = asyncio.Lock()
         self._validator = StateValidator()
         self.logger = get_logger(__name__)
@@ -137,7 +138,7 @@ class StateManager:
         task_id: str,
         new_status: TaskStatus,
         reason: str = "",
-        metadata: dict[str, Any] | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> bool:
         """更新任务状态"""
         try:
@@ -205,7 +206,7 @@ class StateManager:
             self.logger.exception("Failed to get status for task {task_id}: ")
             return None
 
-    async def get_state_history(self, task_id: str) -> list[StateTransition]:
+    async def get_state_history(self, task_id: str) -> List[StateTransition]:
         """获取状态转换历史"""
         try:
             async with self._lock:
@@ -239,7 +240,7 @@ class StateManager:
 
     async def batch_update_status(
         self,
-        updates: list[StatusUpdate],
+        updates: List[StatusUpdate],
         _source: str = "system",
     ) -> bool:
         """批量更新状态"""
@@ -281,7 +282,7 @@ class StateManager:
             self.logger.exception("Failed to batch update status: ")
             return False
 
-    async def get_all_states(self) -> dict[str, TaskStatus]:
+    async def get_all_states(self) -> Dict[str, TaskStatus]:
         """获取所有任务状态"""
         try:
             async with self._lock:
@@ -290,7 +291,7 @@ class StateManager:
             self.logger.exception("Failed to get all states: ")
             return {}
 
-    async def get_state_statistics(self) -> dict[str, Any]:
+    async def get_state_statistics(self) -> Dict[str, Any]:
         """获取状态统计信息"""
         try:
             all_states = await self.get_all_states()
@@ -373,7 +374,7 @@ class StateManager:
             self.logger.exception("Failed to reset state for task {task_id}: ")
             return False
 
-    async def save_state(self, task_id: str) -> dict[str, Any]:
+    async def save_state(self, task_id: str) -> Dict[str, Any]:
         """保存任务状态到持久化存储"""
         try:
             status = await self.get_status(task_id)
@@ -389,7 +390,7 @@ class StateManager:
             self.logger.exception(f"Failed to save state for task {task_id}: {e}")
             raise  # Re-raise to fail fast - state save failures should not be silent
 
-    async def load_state(self, task_id: str, data: dict[str, Any]) -> bool:
+    async def load_state(self, task_id: str, data: Dict[str, Any]) -> bool:
         """从持久化存储加载任务状态"""
         try:
             if not data or "status" not in data:

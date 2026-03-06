@@ -44,7 +44,7 @@
     <el-aside v-show="!isSidePanelCollapsed && !isMobile" class="content-panel" :width="sidePanelWidth + 'px'">
       <SidePanel ref="sidePanelRef" @open-file="handleOpenFile" :side-panel-collapsed="isSidePanelCollapsed"
         :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined"
-        :memory-panel-disabled="true" />
+        :memory-panel-disabled="false" />
     </el-aside>
 
     <!-- 左侧面板拖动分隔条 (仅桌面端) -->

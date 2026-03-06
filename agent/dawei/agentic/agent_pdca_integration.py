@@ -9,7 +9,7 @@
 """
 
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.domain_adapter import DomainType, get_domain_adapter
 from dawei.agentic.pdca_context import PDCACycleContext, PDCAPhase
@@ -70,8 +70,8 @@ class AgentPDCAExtension:
         self,
         session_id: str,
         task_description: str,
-        task_goals: list[str] | None = None,
-        success_criteria: list[str] | None = None,
+        task_goals: List[str] | None = None,
+        success_criteria: List[str] | None = None,
     ) -> PDCACycleContext:
         """启动 PDCA 循环
 
@@ -103,9 +103,9 @@ class AgentPDCAExtension:
 
     async def advance_pdca_phase(
         self,
-        phase_data: dict[str, Any],
+        phase_data: Dict[str, Any],
         next_phase: PDCAPhase | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """推进到下一个 PDCA 阶段
 
         Args:
@@ -135,7 +135,7 @@ class AgentPDCAExtension:
 
         return result
 
-    def get_pdca_guidance(self) -> dict[str, Any] | None:
+    def get_pdca_guidance(self) -> Dict[str, Any] | None:
         """获取当前阶段的 PDCA 指导
 
         Returns:
@@ -147,7 +147,7 @@ class AgentPDCAExtension:
 
         return self.pdca_manager.get_domain_guidance(cycle_id=self.current_cycle.cycle_id)
 
-    def get_pdca_status(self) -> dict[str, Any] | None:
+    def get_pdca_status(self) -> Dict[str, Any] | None:
         """获取 PDCA 循环状态
 
         Returns:
@@ -237,7 +237,7 @@ class AgentPDCAExtension:
         current_phase = self.current_cycle.current_phase
         return current_phase.value
 
-    def save_pdca_checkpoint(self) -> dict[str, Any] | None:
+    def save_pdca_checkpoint(self) -> Dict[str, Any] | None:
         """保存 PDCA 检查点"""
         if not self.current_cycle:
             return None
@@ -248,7 +248,7 @@ class AgentPDCAExtension:
 
     def restore_pdca_checkpoint(
         self,
-        checkpoint_data: dict[str, Any],
+        checkpoint_data: Dict[str, Any],
     ) -> PDCACycleContext | None:
         """从检查点恢复 PDCA 状态"""
         cycle = self.pdca_manager.context_manager.restore_from_checkpoint(

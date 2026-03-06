@@ -3,13 +3,13 @@
 
 """Configuration utility functions"""
 
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.agent_config import Config
 from dawei.core.errors import ValidationError
 
 
-def validate_and_create_config(config: Config | dict[str, Any] | None = None) -> Config:
+def validate_and_create_config(config: Config | Dict[str, Any] | None = None) -> Config:
     """Validate and create a Config object from various input types.
 
     Args:

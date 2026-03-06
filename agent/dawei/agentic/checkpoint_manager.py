@@ -11,9 +11,10 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
 from enum import Enum
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.workspace.persistence_manager import WorkspacePersistenceManager
 
@@ -52,7 +53,7 @@ class CheckpointMetadata:
     created_at: datetime
     size_bytes: int = 0
     checksum: str = ""
-    tags: list[str] = None
+    tags: List[str] = None
     parent_checkpoint_id: str | None = None
 
     def __post_init__(self):
@@ -65,8 +66,8 @@ class CheckpointData:
     """检查点数据"""
 
     metadata: CheckpointMetadata
-    state: dict[str, Any]
-    diff_from_previous: dict[str, Any] | None = None
+    state: Dict[str, Any]
+    diff_from_previous: Dict[str, Any] | None = None
     compressed: bool = False
 
 
@@ -74,11 +75,11 @@ class ICheckpointStrategy(ABC):
     """检查点策略接口"""
 
     @abstractmethod
-    async def should_create_checkpoint(self, context: dict[str, Any]) -> bool:
+    async def should_create_checkpoint(self, context: Dict[str, Any]) -> bool:
         """判断是否应该创建检查点"""
 
     @abstractmethod
-    async def prepare_checkpoint_data(self, context: dict[str, Any]) -> dict[str, Any]:
+    async def prepare_checkpoint_data(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """准备检查点数据"""
 
 
@@ -89,7 +90,7 @@ class AutoCheckpointStrategy(ICheckpointStrategy):
         self.min_interval = min_interval
         self.last_checkpoint_time = None
 
-    async def should_create_checkpoint(self, context: dict[str, Any]) -> bool:
+    async def should_create_checkpoint(self, context: Dict[str, Any]) -> bool:
         current_time = datetime.now(UTC)
 
         if self.last_checkpoint_time and current_time - self.last_checkpoint_time < self.min_interval:
@@ -98,7 +99,7 @@ class AutoCheckpointStrategy(ICheckpointStrategy):
         # 检查关键条件
         return context.get("tool_executed", False) or context.get("state_changed", False) or context.get("error_occurred", False) or context.get("milestone_reached", False)
 
-    async def prepare_checkpoint_data(self, context: dict[str, Any]) -> dict[str, Any]:
+    async def prepare_checkpoint_data(self, context: Dict[str, Any]) -> Dict[str, Any]:
         self.last_checkpoint_time = datetime.now(UTC)
         return {"trigger_reason": "auto", "context_snapshot": context}
 
@@ -106,7 +107,7 @@ class AutoCheckpointStrategy(ICheckpointStrategy):
 class StateChangeCheckpointStrategy(ICheckpointStrategy):
     """状态变化检查点策略"""
 
-    def __init__(self, watched_states: list[str] | None = None):
+    def __init__(self, watched_states: List[str] | None = None):
         self.watched_states = watched_states or [
             "running",
             "paused",
@@ -115,7 +116,7 @@ class StateChangeCheckpointStrategy(ICheckpointStrategy):
         ]
         self.last_state = None
 
-    async def should_create_checkpoint(self, context: dict[str, Any]) -> bool:
+    async def should_create_checkpoint(self, context: Dict[str, Any]) -> bool:
         current_state = context.get("current_state")
         if not current_state:
             return False
@@ -128,7 +129,7 @@ class StateChangeCheckpointStrategy(ICheckpointStrategy):
         self.last_state = current_state
         return False
 
-    async def prepare_checkpoint_data(self, context: dict[str, Any]) -> dict[str, Any]:
+    async def prepare_checkpoint_data(self, context: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "trigger_reason": "state_change",
             "previous_state": self.last_state,
@@ -140,11 +141,11 @@ class StateChangeCheckpointStrategy(ICheckpointStrategy):
 class MilestoneCheckpointStrategy(ICheckpointStrategy):
     """里程碑检查点策略"""
 
-    def __init__(self, milestones: list[str] | None = None):
+    def __init__(self, milestones: List[str] | None = None):
         self.milestones = milestones or []
         self.completed_milestones = set()
 
-    async def should_create_checkpoint(self, context: dict[str, Any]) -> bool:
+    async def should_create_checkpoint(self, context: Dict[str, Any]) -> bool:
         current_milestone = context.get("current_milestone")
         if not current_milestone:
             return False
@@ -156,7 +157,7 @@ class MilestoneCheckpointStrategy(ICheckpointStrategy):
 
         return False
 
-    async def prepare_checkpoint_data(self, context: dict[str, Any]) -> dict[str, Any]:
+    async def prepare_checkpoint_data(self, context: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "trigger_reason": "milestone_reached",
             "current_milestone": context.get("current_milestone"),
@@ -187,8 +188,8 @@ class IntelligentCheckpointManager:
         else:
             raise ValueError("workspace_path is required")
 
-        self._checkpoints: dict[str, CheckpointData] = {}  # 内存缓存
-        self._checkpoint_history: list[str] = []
+        self._checkpoints: Dict[str, CheckpointData] = {}  # 内存缓存
+        self._checkpoint_history: List[str] = []
         self._max_checkpoints = 50
         self._compression_enabled = True
         self._validation_enabled = True
@@ -201,9 +202,9 @@ class IntelligentCheckpointManager:
     async def create_checkpoint(
         self,
         task_id: str,
-        state: dict[str, Any],
+        state: Dict[str, Any],
         checkpoint_type: CheckpointType = CheckpointType.AUTO,
-        tags: list[str] | None = None,
+        tags: List[str] | None = None,
         parent_checkpoint_id: str | None = None,
     ) -> str | None:
         """创建检查点"""
@@ -311,7 +312,7 @@ class IntelligentCheckpointManager:
 
                 # 从字典恢复 CheckpointData
                 try:
-                    checkpoint_type_value = checkpoint_dict["metadata"]["checkpoint_type"]
+                    checkpoint_type_value = checkpoint_Dict["metadata"]["checkpoint_type"]
                     checkpoint_type = CheckpointType(checkpoint_type_value)
                 except ValueError:
                     self.logger.exception("Invalid checkpoint type '{checkpoint_type_value}': ")
@@ -322,19 +323,19 @@ class IntelligentCheckpointManager:
                     )
 
                 metadata = CheckpointMetadata(
-                    checkpoint_id=checkpoint_dict["metadata"]["checkpoint_id"],
-                    task_id=checkpoint_dict["metadata"]["task_id"],
+                    checkpoint_id=checkpoint_Dict["metadata"]["checkpoint_id"],
+                    task_id=checkpoint_Dict["metadata"]["task_id"],
                     checkpoint_type=checkpoint_type,
-                    created_at=datetime.fromisoformat(checkpoint_dict["metadata"]["created_at"]),
-                    size_bytes=checkpoint_dict["metadata"]["size_bytes"],
-                    checksum=checkpoint_dict["metadata"]["checksum"],
-                    tags=checkpoint_dict["metadata"]["tags"],
-                    parent_checkpoint_id=checkpoint_dict["metadata"].get("parent_checkpoint_id"),
+                    created_at=datetime.fromisoformat(checkpoint_Dict["metadata"]["created_at"]),
+                    size_bytes=checkpoint_Dict["metadata"]["size_bytes"],
+                    checksum=checkpoint_Dict["metadata"]["checksum"],
+                    tags=checkpoint_Dict["metadata"]["tags"],
+                    parent_checkpoint_id=checkpoint_Dict["metadata"].get("parent_checkpoint_id"),
                 )
 
                 checkpoint_data = CheckpointData(
                     metadata=metadata,
-                    state=checkpoint_dict["state"],
+                    state=checkpoint_Dict["state"],
                     diff_from_previous=checkpoint_dict.get("diff_from_previous"),
                     compressed=checkpoint_dict.get("compressed", False),
                 )
@@ -366,7 +367,7 @@ class IntelligentCheckpointManager:
         self,
         task_id: str,
         checkpoint_type: CheckpointType = None,
-    ) -> list[CheckpointMetadata]:
+    ) -> List[CheckpointMetadata]:
         """列出检查点"""
         async with self._lock:
             checkpoints = [cp.metadata for cp_id, cp in self._checkpoints.items() if cp.metadata.task_id == task_id and (checkpoint_type is None or cp.metadata.checkpoint_type == checkpoint_type)]
@@ -404,7 +405,7 @@ class IntelligentCheckpointManager:
         self,
         checkpoint_id: str,
         compare_to_id: str | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> Dict[str, Any] | None:
         """获取检查点差异"""
         async with self._lock:
             checkpoint_data = self._checkpoints.get(checkpoint_id)
@@ -464,7 +465,7 @@ class IntelligentCheckpointManager:
         )
         return None
 
-    async def get_checkpoints(self, task_id: str) -> list[dict[str, Any]]:
+    async def get_checkpoints(self, task_id: str) -> List[Dict[str, Any]]:
         """获取任务的所有检查点（API 兼容接口）
 
         Args:
@@ -496,7 +497,7 @@ class IntelligentCheckpointManager:
             all_checkpoints = await self.persistence_manager.list_checkpoints()
             for cp_dict in all_checkpoints:
                 if cp_dict.get("metadata", {}).get("task_id") == task_id:
-                    metadata = cp_dict["metadata"]
+                    metadata = cp_Dict["metadata"]
                     checkpoint_list.append({
                         "checkpoint_id": metadata["checkpoint_id"],
                         "task_id": metadata["task_id"],
@@ -512,7 +513,7 @@ class IntelligentCheckpointManager:
         checkpoint_list.sort(key=lambda x: x["created_at"], reverse=True)
         return checkpoint_list
 
-    async def get_checkpoint(self, checkpoint_id: str) -> dict[str, Any] | None:
+    async def get_checkpoint(self, checkpoint_id: str) -> Dict[str, Any] | None:
         """获取检查点详细信息（API 兼容接口）
 
         Args:
@@ -569,8 +570,8 @@ class IntelligentCheckpointManager:
     async def _calculate_diff(
         self,
         task_id: str,
-        current_state: dict[str, Any],
-    ) -> dict[str, Any] | None:
+        current_state: Dict[str, Any],
+    ) -> Dict[str, Any] | None:
         """计算与上一个检查点的差异"""
         # 获取同一任务的最新检查点
         latest_checkpoint = None
@@ -596,9 +597,9 @@ class IntelligentCheckpointManager:
 
     async def _calculate_diff_between_states(
         self,
-        state1: dict[str, Any],
-        state2: dict[str, Any],
-    ) -> dict[str, Any]:
+        state1: Dict[str, Any],
+        state2: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """计算两个状态之间的差异"""
         # 返回JSON可序列化的数据（使用列表而不是集合）
         return {
@@ -628,7 +629,7 @@ class IntelligentCheckpointManager:
 
         return calculated_checksum == checkpoint_data.metadata.checksum
 
-    async def _compress_state(self, state: dict[str, Any]) -> dict[str, Any]:
+    async def _compress_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """压缩状态"""
         # 简单的压缩实现：保留完整状态但压缩大型数据
         compressed = state.copy()  # 保留原始数据
@@ -642,7 +643,7 @@ class IntelligentCheckpointManager:
         compressed["_compressed"] = True
         return compressed
 
-    async def _decompress_state(self, compressed_state: dict[str, Any]) -> dict[str, Any]:
+    async def _decompress_state(self, compressed_state: Dict[str, Any]) -> Dict[str, Any]:
         """解压缩状态"""
         if compressed_state.get("_compressed"):
             # 移除压缩标记
@@ -689,19 +690,19 @@ class IntelligentCheckpointManager:
             except Exception:
                 self.logger.exception("Unexpected error during checkpoint cleanup: ")
 
-    def _has_tool_executed(self, state: dict[str, Any]) -> bool:
+    def _has_tool_executed(self, state: Dict[str, Any]) -> bool:
         """检查是否有工具执行"""
         return "tool_calls" in state and len(state["tool_calls"]) > 0
 
-    def _has_state_changed(self, state: dict[str, Any]) -> bool:
+    def _has_state_changed(self, state: Dict[str, Any]) -> bool:
         """检查是否有状态变化"""
         return "state_changes" in state and len(state["state_changes"]) > 0
 
-    def _has_error_occurred(self, state: dict[str, Any]) -> bool:
+    def _has_error_occurred(self, state: Dict[str, Any]) -> bool:
         """检查是否有错误发生"""
         return "errors" in state and len(state["errors"]) > 0
 
-    def _has_milestone_reached(self, state: dict[str, Any]) -> bool:
+    def _has_milestone_reached(self, state: Dict[str, Any]) -> bool:
         """检查是否达到里程碑"""
         return "current_milestone" in state and state["current_milestone"] is not None
 

@@ -7,8 +7,9 @@
 """
 
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 import jinja2
 
@@ -39,9 +40,9 @@ class TemplateRenderer:
         # 渲染统计
         self.render_count = 0
         self.error_count = 0
-        self.render_history: list[dict[str, Any]] = []
+        self.render_history: List[Dict[str, Any]] = []
 
-    def render(self, template: jinja2.Template, context: dict[str, Any]) -> str:
+    def render(self, template: jinja2.Template, context: Dict[str, Any]) -> str:
         """渲染模板
 
         Args:
@@ -91,7 +92,7 @@ class TemplateRenderer:
             self._record_render_error(str(template), start_time, str(e))
             raise TemplateRenderError(f"Invalid context: {e}")
 
-    def render_string(self, template_string: str, context: dict[str, Any]) -> str:
+    def render_string(self, template_string: str, context: Dict[str, Any]) -> str:
         """渲染字符串模板
 
         Args:
@@ -143,7 +144,7 @@ class TemplateRenderer:
             self._record_render_error("string_template", start_time, str(e))
             raise TemplateRenderError(f"Invalid context: {e}")
 
-    def _prepare_render_environment(self) -> dict[str, Any]:
+    def _prepare_render_environment(self) -> Dict[str, Any]:
         """准备渲染环境
 
         Returns:
@@ -166,7 +167,7 @@ class TemplateRenderer:
 
         return env
 
-    def _validate_context(self, context: dict[str, Any]) -> dict[str, Any]:
+    def _validate_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """验证并清理上下文
 
         Args:
@@ -267,7 +268,7 @@ class TemplateRenderer:
             logger.debug(f"Invalid format string '{format_str}': {fmt_error}")
             return str(dt) if dt else ""
 
-    def _format_list(self, items: list[Any], prefix: str = "- ", separator: str = "\n") -> str:
+    def _format_list(self, items: List[Any], prefix: str = "- ", separator: str = "\n") -> str:
         """格式化列表
 
         Args:
@@ -289,7 +290,7 @@ class TemplateRenderer:
         formatted_items = [f"{prefix}{item}" for item in items]
         return separator.join(formatted_items)
 
-    def _format_dict(self, data: dict[str, Any], indent: int = 0) -> str:
+    def _format_dict(self, data: Dict[str, Any], indent: int = 0) -> str:
         """格式化字典
 
         Args:
@@ -424,7 +425,7 @@ class TemplateRenderer:
         self.debug_mode = enabled
         logger.info(f"Template renderer debug mode: {'enabled' if enabled else 'disabled'}")
 
-    def get_render_stats(self) -> dict[str, Any]:
+    def get_render_stats(self) -> Dict[str, Any]:
         """获取渲染统计信息
 
         Returns:
@@ -439,7 +440,7 @@ class TemplateRenderer:
             "strict_undefined": self.strict_undefined,
         }
 
-    def get_render_history(self, limit: int = 10) -> list[dict[str, Any]]:
+    def get_render_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """获取渲染历史
 
         Args:
@@ -456,7 +457,7 @@ class TemplateRenderer:
         self.render_history.clear()
         logger.info("Render history cleared")
 
-    def validate_template_syntax(self, template_string: str) -> list[str]:
+    def validate_template_syntax(self, template_string: str) -> List[str]:
         """验证模板语法
 
         Args:
@@ -485,7 +486,7 @@ class TemplateRenderer:
 
         return errors
 
-    def extract_variables(self, template_string: str) -> list[str]:
+    def extract_variables(self, template_string: str) -> List[str]:
         """提取模板中的变量
 
         Args:

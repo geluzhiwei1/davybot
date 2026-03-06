@@ -9,7 +9,7 @@
 import logging
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
@@ -53,7 +53,7 @@ def _validate_path_not_exists(file_path: Path, error_message: str) -> None:
 # --- 文件树构建函数 ---
 
 
-def _build_file_tree(files: list[dict[str, Any]], base_path: str = "") -> list[FileTreeItem]:
+def _build_file_tree(files: List[Dict[str, Any]], base_path: str = "") -> List[FileTreeItem]:
     """构建文件树结构"""
     tree = {}
 
@@ -75,7 +75,7 @@ def _build_file_tree(files: list[dict[str, Any]], base_path: str = "") -> list[F
             current_level = current_level[part]["children"]
 
     # 转换为列表格式
-    def _tree_to_list(tree_dict: dict, level: int = 0) -> list[FileTreeItem]:
+    def _tree_to_list(tree_dict: dict, level: int = 0) -> List[FileTreeItem]:
         result = []
         for item in tree_dict.values():
             result.append(
@@ -258,7 +258,7 @@ async def upload_file(
 @router.post("/{workspace_id}/files/upload-folder")
 async def upload_folder(
     workspace_id: str,
-    files: list[UploadFile],
+    files: List[UploadFile],
     parent_path: str = Form(""),
     file_service: Storage = Depends(get_workspace_file_service),
 ):

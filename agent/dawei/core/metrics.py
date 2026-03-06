@@ -10,7 +10,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import List, Dict, Any
 
 
 class MetricType(Enum):
@@ -28,13 +28,13 @@ class MetricValue:
 
     value: float
     timestamp: float
-    tags: dict[str, str] = field(default_factory=dict)
+    tags: Dict[str, str] = field(default_factory=dict)
 
 
 class Counter:
     """计数器指标"""
 
-    def __init__(self, name: str, tags: dict[str, str] | None = None):
+    def __init__(self, name: str, tags: Dict[str, str] | None = None):
         self.name = name
         self.tags = tags or {}
         self.value = 0.0
@@ -60,7 +60,7 @@ class Counter:
 class Gauge:
     """仪表盘指标"""
 
-    def __init__(self, name: str, tags: dict[str, str] | None = None):
+    def __init__(self, name: str, tags: Dict[str, str] | None = None):
         self.name = name
         self.tags = tags or {}
         self.value = 0.0
@@ -94,8 +94,8 @@ class Histogram:
     def __init__(
         self,
         name: str,
-        tags: dict[str, str] | None = None,
-        buckets: list[float] | None = None,
+        tags: Dict[str, str] | None = None,
+        buckets: List[float] | None = None,
     ):
         self.name = name
         self.tags = tags or {}
@@ -133,7 +133,7 @@ class Histogram:
         with self._lock:
             return self.sum / self.count if self.count > 0 else 0.0
 
-    def get_bucket_counts(self) -> dict[float, int]:
+    def get_bucket_counts(self) -> Dict[float, int]:
         """获取桶计数"""
         with self._lock:
             return self.bucket_counts.copy()
@@ -152,7 +152,7 @@ class Histogram:
 class Timer:
     """计时器指标"""
 
-    def __init__(self, name: str, tags: dict[str, str] | None = None):
+    def __init__(self, name: str, tags: Dict[str, str] | None = None):
         self.name = name
         self.tags = tags or {}
         self.histogram = Histogram(f"{name}_duration", tags)
@@ -200,10 +200,10 @@ class MetricsCollector:
 
     def __init__(self, config: MetricsConfig | None = None):
         self.config = config or MetricsConfig()
-        self.counters: dict[str, Counter] = {}
-        self.gauges: dict[str, Gauge] = {}
-        self.histograms: dict[str, Histogram] = {}
-        self.timers: dict[str, Timer] = {}
+        self.counters: Dict[str, Counter] = {}
+        self.gauges: Dict[str, Gauge] = {}
+        self.histograms: Dict[str, Histogram] = {}
+        self.timers: Dict[str, Timer] = {}
         self._lock = threading.Lock()
 
         # 启动清理线程
@@ -211,7 +211,7 @@ class MetricsCollector:
             self._cleanup_thread = threading.Thread(target=self._cleanup_loop, daemon=True)
             self._cleanup_thread.start()
 
-    def _make_key(self, name: str, tags: dict[str, str] | None = None) -> str:
+    def _make_key(self, name: str, tags: Dict[str, str] | None = None) -> str:
         """生成指标键"""
         if not tags:
             return name
@@ -223,7 +223,7 @@ class MetricsCollector:
         self,
         name: str,
         value: float = 1.0,
-        tags: dict[str, str] | None = None,
+        tags: Dict[str, str] | None = None,
     ):
         """增加计数器"""
         if not self.config.enabled:
@@ -235,7 +235,7 @@ class MetricsCollector:
                 self.counters[key] = Counter(name, tags)
             self.counters[key].increment(value)
 
-    def set_gauge(self, name: str, value: float, tags: dict[str, str] | None = None):
+    def set_gauge(self, name: str, value: float, tags: Dict[str, str] | None = None):
         """设置仪表盘值"""
         if not self.config.enabled:
             return
@@ -246,7 +246,7 @@ class MetricsCollector:
                 self.gauges[key] = Gauge(name, tags)
             self.gauges[key].set(value)
 
-    def record_histogram(self, name: str, value: float, tags: dict[str, str] | None = None):
+    def record_histogram(self, name: str, value: float, tags: Dict[str, str] | None = None):
         """记录直方图数据"""
         if not self.config.enabled:
             return
@@ -257,7 +257,7 @@ class MetricsCollector:
                 self.histograms[key] = Histogram(name, tags)
             self.histograms[key].observe(value)
 
-    def record_timer(self, name: str, duration: float, tags: dict[str, str] | None = None):
+    def record_timer(self, name: str, duration: float, tags: Dict[str, str] | None = None):
         """记录计时器数据"""
         if not self.config.enabled:
             return
@@ -268,7 +268,7 @@ class MetricsCollector:
                 self.timers[key] = Timer(name, tags)
             self.timers[key].time(duration)
 
-    def timer(self, name: str, tags: dict[str, str] | None = None) -> Timer:
+    def timer(self, name: str, tags: Dict[str, str] | None = None) -> Timer:
         """获取计时器实例"""
         if not self.config.enabled:
             return DummyTimer()
@@ -279,13 +279,13 @@ class MetricsCollector:
                 self.timers[key] = Timer(name, tags)
             return self.timers[key]
 
-    def get_counter(self, name: str, tags: dict[str, str] | None = None) -> Counter | None:
+    def get_counter(self, name: str, tags: Dict[str, str] | None = None) -> Counter | None:
         """获取计数器"""
         key = self._make_key(name, tags)
         with self._lock:
             return self.counters.get(key)
 
-    def get_gauge(self, name: str, tags: dict[str, str] | None = None) -> Gauge | None:
+    def get_gauge(self, name: str, tags: Dict[str, str] | None = None) -> Gauge | None:
         """获取仪表盘"""
         key = self._make_key(name, tags)
         with self._lock:
@@ -294,20 +294,20 @@ class MetricsCollector:
     def get_histogram(
         self,
         name: str,
-        tags: dict[str, str] | None = None,
+        tags: Dict[str, str] | None = None,
     ) -> Histogram | None:
         """获取直方图"""
         key = self._make_key(name, tags)
         with self._lock:
             return self.histograms.get(key)
 
-    def get_timer(self, name: str, tags: dict[str, str] | None = None) -> Timer | None:
+    def get_timer(self, name: str, tags: Dict[str, str] | None = None) -> Timer | None:
         """获取计时器"""
         key = self._make_key(name, tags)
         with self._lock:
             return self.timers.get(key)
 
-    def get_all_metrics(self) -> dict[str, dict[str, Any]]:
+    def get_all_metrics(self) -> Dict[str, Dict[str, Any]]:
         """获取所有指标"""
         metrics = {}
 
@@ -356,7 +356,7 @@ class MetricsCollector:
 
         return metrics
 
-    def reset_metric(self, name: str, tags: dict[str, str] | None = None):
+    def reset_metric(self, name: str, tags: Dict[str, str] | None = None):
         """重置指标"""
         key = self._make_key(name, tags)
 
@@ -449,33 +449,33 @@ def get_metrics_collector(config: MetricsConfig | None = None) -> MetricsCollect
     return _global_metrics_collector
 
 
-def increment_counter(name: str, value: float = 1.0, tags: dict[str, str] | None = None):
+def increment_counter(name: str, value: float = 1.0, tags: Dict[str, str] | None = None):
     """增加计数器（便捷函数）"""
     get_metrics_collector().increment_counter(name, value, tags)
 
 
-def set_gauge(name: str, value: float, tags: dict[str, str] | None = None):
+def set_gauge(name: str, value: float, tags: Dict[str, str] | None = None):
     """设置仪表盘值（便捷函数）"""
     get_metrics_collector().set_gauge(name, value, tags)
 
 
-def record_histogram(name: str, value: float, tags: dict[str, str] | None = None):
+def record_histogram(name: str, value: float, tags: Dict[str, str] | None = None):
     """记录直方图数据（便捷函数）"""
     get_metrics_collector().record_histogram(name, value, tags)
 
 
-def record_timer(name: str, duration: float, tags: dict[str, str] | None = None):
+def record_timer(name: str, duration: float, tags: Dict[str, str] | None = None):
     """记录计时器数据（便捷函数）"""
     get_metrics_collector().record_timer(name, duration, tags)
 
 
-def timer(name: str, tags: dict[str, str] | None = None) -> Timer:
+def timer(name: str, tags: Dict[str, str] | None = None) -> Timer:
     """获取计时器实例（便捷函数）"""
     return get_metrics_collector().timer(name, tags)
 
 
 # 指标装饰器
-def count_calls(name: str, tags: dict[str, str] | None = None):
+def count_calls(name: str, tags: Dict[str, str] | None = None):
     """调用计数装饰器"""
 
     def decorator(func):
@@ -491,7 +491,7 @@ def count_calls(name: str, tags: dict[str, str] | None = None):
     return decorator
 
 
-def measure_time(name: str, tags: dict[str, str] | None = None):
+def measure_time(name: str, tags: Dict[str, str] | None = None):
     """执行时间测量装饰器"""
 
     def decorator(func):

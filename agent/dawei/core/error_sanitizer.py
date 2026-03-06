@@ -15,7 +15,7 @@ Removes sensitive information like:
 import logging
 import re
 import traceback
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class ErrorSanitizer:
     """
 
     # Patterns to detect and sanitize
-    SANITIZATION_PATTERNS: ClassVar[dict[str, list]] = {
+    SANITIZATION_PATTERNS: ClassVar[Dict[str, list]] = {
         # File paths (Unix and Windows)
         "file_path": [
             r"/[a-zA-Z0-9_\-\.\/]+",  # Unix paths
@@ -217,10 +217,10 @@ class ErrorSanitizer:
 
     def sanitize_dict(
         self,
-        data: dict[str, Any],
+        data: Dict[str, Any],
         sensitive_keys: ClassVar[set[str] | None] = None,
         recursive: ClassVar[bool] = True,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """Sanitize a dictionary by removing sensitive values.
 
         Args:

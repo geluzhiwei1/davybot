@@ -10,7 +10,7 @@ for runtime use. Keep both files in sync.
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -25,9 +25,9 @@ VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$")
 class DependencySpec(BaseModel):
     """Plugin dependency specification"""
 
-    pypi: list[str] = Field(default_factory=list)
-    system: list[str] = Field(default_factory=list)
-    plugins: list[str] = Field(default_factory=list)
+    pypi: List[str] = Field(default_factory=list)
+    system: List[str] = Field(default_factory=list)
+    plugins: List[str] = Field(default_factory=list)
 
 
 class ConfigProperty(BaseModel):
@@ -36,7 +36,7 @@ class ConfigProperty(BaseModel):
     type: str
     default: Any | None = None
     description: str | None = None
-    enum: list[Any] | None = None
+    enum: List[Any] | None = None
     format: str | None = None
     pattern: str | None = None
     minimum: float | None = None
@@ -49,8 +49,8 @@ class ConfigSchema(BaseModel):
     """Configuration schema"""
 
     type: str = "object"
-    properties: dict[str, ConfigProperty] = Field(default_factory=dict)
-    required: list[str] = Field(default_factory=list)
+    properties: Dict[str, ConfigProperty] = Field(default_factory=dict)
+    required: List[str] = Field(default_factory=list)
     additional_properties: bool = True
 
 
@@ -81,10 +81,10 @@ class PluginManifest(BaseModel):
     plugin_type: str = Field(..., alias="type")
     entry_point: str = Field(..., pattern=r"^[a-zA-Z_][a-zA-Z0-9_.]*:[A-Z][a-zA-Z0-9_]*$")
 
-    dependencies: dict[str, list[str]] = Field(default_factory=dict)
-    config_schema: dict[str, Any] | str = Field(default_factory=dict)
-    hooks: list[str] = Field(default_factory=list)
-    settings: dict[str, Any] = Field(default_factory=dict)
+    dependencies: Dict[str, List[str]] = Field(default_factory=dict)
+    config_schema: Dict[str, Any] | str = Field(default_factory=dict)
+    hooks: List[str] = Field(default_factory=list)
+    settings: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("name")
     @classmethod
@@ -249,7 +249,7 @@ class PluginConfigValidator:
     """Validate plugin configuration against schema."""
 
     @staticmethod
-    def validate_config(config: dict[str, Any], schema: dict[str, Any]) -> bool:
+    def validate_config(config: Dict[str, Any], schema: Dict[str, Any]) -> bool:
         """Validate configuration against schema.
 
         Args:
@@ -286,7 +286,7 @@ class PluginConfigValidator:
         return True
 
     @staticmethod
-    def _validate_property(field: str, value: Any, schema: dict[str, Any]) -> None:
+    def _validate_property(field: str, value: Any, schema: Dict[str, Any]) -> None:
         """Validate a single property against schema"""
         expected_type = schema.get("type")
 
@@ -349,7 +349,7 @@ class PluginConfigValidator:
                 raise ValueError(f"Field '{field}' must be an object")
 
 
-def validate_plugin_directory(plugin_dir: Path) -> tuple[bool, list[str]]:
+def validate_plugin_directory(plugin_dir: Path) -> tuple[bool, List[str]]:
     """Validate plugin directory structure.
 
     Args:
@@ -406,7 +406,7 @@ def validate_plugin_directory(plugin_dir: Path) -> tuple[bool, list[str]]:
     return is_valid, errors
 
 
-def validate_plugin_yaml(yaml_path: Path) -> tuple[bool, PluginManifest, list[str]]:
+def validate_plugin_yaml(yaml_path: Path) -> tuple[bool, PluginManifest, List[str]]:
     """Validate plugin.yaml file.
 
     Args:

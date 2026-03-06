@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """解析器缓存管理器
@@ -32,9 +33,9 @@ class ParserCache:
             cache_ttl: 缓存生存时间（秒），默认 300 秒
 
         """
-        self._cache: dict[str, StreamChunkParser] = {}
+        self._cache: Dict[str, StreamChunkParser] = {}
         self._cache_ttl = cache_ttl
-        self._cache_timestamps: dict[str, float] = {}
+        self._cache_timestamps: Dict[str, float] = {}
 
     def _is_cache_valid(self, provider: str) -> bool:
         """检查缓存是否有效"""

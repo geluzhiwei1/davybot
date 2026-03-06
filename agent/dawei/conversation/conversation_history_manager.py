@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """对话历史管理器 (重构版)
@@ -61,7 +62,7 @@ class ConversationHistoryManager:
 
         self.workspace_path = workspace_path
         self.persistence_manager = WorkspacePersistenceManager(workspace_path)
-        self._conversations: dict[str, Conversation] = {}  # 内存中的对话缓存
+        self._conversations: Dict[str, Conversation] = {}  # 内存中的对话缓存
         self._loaded = False  # 是否已从磁盘加载
 
     async def build_from_dir(self, force_reload: bool = False) -> int:
@@ -102,7 +103,7 @@ class ConversationHistoryManager:
             logger.error(f"Failed to load conversations: {e}", exc_info=True)
             return 0
 
-    async def list_all(self, include_empty: bool = False) -> list[Conversation]:
+    async def list_all(self, include_empty: bool = False) -> List[Conversation]:
         """列出所有对话
 
         Args:

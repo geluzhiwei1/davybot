@@ -11,8 +11,9 @@
 
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import Any, ClassVar
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any, ClassVar
 
 from .context_manager import TokenEstimator
 
@@ -58,7 +59,7 @@ class ConversationCompressor:
     """
 
     # 关键消息识别规则
-    KEY_MESSAGE_RULES: ClassVar[dict[str, list[str]]] = {
+    KEY_MESSAGE_RULES: ClassVar[Dict[str, List[str]]] = {
         "tool_call_keywords": ["tool_call", "function_call", "tool_calls"],
         "error_keywords": ["error", "exception", "failed", "failure"],
         "mode_switch_keywords": ["mode_switch", "switched_mode", "mode_changed"],
@@ -91,7 +92,7 @@ class ConversationCompressor:
 
         self.logger = logging.getLogger(__name__)
 
-    def estimate_messages_tokens(self, messages: list[dict[str, Any]]) -> int:
+    def estimate_messages_tokens(self, messages: List[Dict[str, Any]]) -> int:
         """估算消息列表的总token数
 
         Args:
@@ -123,8 +124,8 @@ class ConversationCompressor:
 
     def identify_key_messages(
         self,
-        messages: list[dict[str, Any]],
-    ) -> tuple[set[int], list[MessageMetadata]]:
+        messages: List[Dict[str, Any]],
+    ) -> tuple[set[int], List[MessageMetadata]]:
         """识别关键消息
 
         关键消息类型：
@@ -210,10 +211,10 @@ class ConversationCompressor:
 
     def compress_conversation(
         self,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         target_tokens: ClassVar[int | None] = None,
         current_tokens: ClassVar[int | None] = None,
-    ) -> tuple[list[dict[str, Any]], CompressionStats]:
+    ) -> tuple[List[Dict[str, Any]], CompressionStats]:
         """压缩对话历史
 
         Args:
@@ -257,10 +258,10 @@ class ConversationCompressor:
 
     def _intelligent_compression(
         self,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         _target_tokens: int,
         estimated_tokens: int,
-    ) -> tuple[list[dict[str, Any]], CompressionStats]:
+    ) -> tuple[List[Dict[str, Any]], CompressionStats]:
         """智能压缩策略
 
         1. 保留最近N条完整消息
@@ -328,10 +329,10 @@ class ConversationCompressor:
 
     def _aggressive_compression(
         self,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         _target_tokens: int,
         estimated_tokens: int,
-    ) -> tuple[list[dict[str, Any]], CompressionStats]:
+    ) -> tuple[List[Dict[str, Any]], CompressionStats]:
         """激进压缩策略
 
         1. 仅保留最近N条消息
@@ -349,7 +350,7 @@ class ConversationCompressor:
         most_critical = []
         for idx in key_indices:
             if idx < len(messages) - preserve_count:
-                meta = metadata_list[idx]
+                meta = metadata_List[idx]
                 # 只保留错误和工具调用
                 if meta.key_reason in ["error", "tool_call", "tool_response"]:
                     most_critical.append(messages[idx])
@@ -413,8 +414,8 @@ class ConversationCompressor:
 
     def _generate_summary(
         self,
-        messages: list[dict[str, Any]],
-        _metadata_list: list[MessageMetadata],
+        messages: List[Dict[str, Any]],
+        _metadata_list: List[MessageMetadata],
         detailed: bool = False,
     ) -> str:
         """生成消息摘要
@@ -460,7 +461,7 @@ class ConversationCompressor:
 
         return "\n".join(summary_parts)
 
-    def should_compress(self, messages: list[dict[str, Any]]) -> bool:
+    def should_compress(self, messages: List[Dict[str, Any]]) -> bool:
         """检查是否需要压缩
 
         Args:
@@ -487,7 +488,7 @@ class ConversationCompressor:
 
         return False
 
-    def get_compression_level(self, messages: list[dict[str, Any]]) -> str:
+    def get_compression_level(self, messages: List[Dict[str, Any]]) -> str:
         """获取当前压缩级别
 
         Args:

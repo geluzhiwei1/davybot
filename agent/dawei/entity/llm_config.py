@@ -4,7 +4,7 @@
 """LLM 配置相关的实体类"""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import List, Dict, Any
 
 
 @dataclass
@@ -22,7 +22,7 @@ class LLMConfig:
     input_price: float = 0.0
     output_price: float = 0.0
     reasoning_effort: str = None
-    custom_headers: dict[str, str] = field(default_factory=dict)
+    custom_headers: Dict[str, str] = field(default_factory=dict)
     # 代理配置
     http_proxy: str = ""  # HTTP 代理 URL, 如 "http://127.0.0.1:7890"
     https_proxy: str = ""  # HTTPS 代理 URL
@@ -73,9 +73,9 @@ class LLMProviderConfig:
     source: str = "user"  # system/user/workspace
     priority: int = 50
     is_default: bool = False
-    raw_config: dict[str, Any] = field(default_factory=dict)  # 存储完整的原始配置数据
+    raw_config: Dict[str, Any] = field(default_factory=dict)  # 存储完整的原始配置数据
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典,返回完整的配置数据(包括所有字段)"""
         # 如果有原始配置,优先使用原始配置
         if self.raw_config:

@@ -14,7 +14,7 @@ import logging
 import re
 import time
 from collections import defaultdict, deque
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 from dawei.websocket.protocol import BaseWebSocketMessage, MessageType
 
@@ -59,9 +59,9 @@ class MessageValidationMiddleware:
         self.enabled_checks = enabled_checks
 
         # Session tracking: {session_id: {'timestamps': deque, 'count': int}}
-        self.session_message_history: dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
-        self.session_message_counts: dict[str, int] = defaultdict(int)
-        self.session_last_reset: dict[str, float] = {}
+        self.session_message_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
+        self.session_message_counts: Dict[str, int] = defaultdict(int)
+        self.session_last_reset: Dict[str, float] = {}
 
         # Malicious patterns to detect
         self.malicious_patterns = {
@@ -286,7 +286,7 @@ class MessageValidationMiddleware:
 
         logger.info(f"Reset rate limits for session {session_id}")
 
-    def get_session_stats(self, session_id: str) -> dict[str, Any]:
+    def get_session_stats(self, session_id: str) -> Dict[str, Any]:
         """Get rate limit statistics for a session."""
         timestamps = self.session_message_history.get(session_id, deque())
         current_time = time.time()

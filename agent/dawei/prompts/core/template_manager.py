@@ -8,9 +8,10 @@
 
 import logging
 import threading
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 import jinja2
 
@@ -47,8 +48,8 @@ class TemplateManager:
         # 缓存配置
         self.cache_enabled = cache_enabled
         self.cache_ttl = cache_ttl
-        self.template_cache: dict[str, dict[str, Any]] = {}
-        self.cache_timestamps: dict[str, datetime] = {}
+        self.template_cache: Dict[str, Dict[str, Any]] = {}
+        self.cache_timestamps: Dict[str, datetime] = {}
 
         # Jinja环境
         self.jinja_env = None
@@ -86,7 +87,7 @@ class TemplateManager:
     def _add_custom_filters(self) -> None:
         """添加自定义Jinja过滤器"""
 
-        def format_list_items(items: list[str], prefix: str = "- ") -> str:
+        def format_list_items(items: List[str], prefix: str = "- ") -> str:
             """格式化列表项"""
             return "\n".join(f"{prefix}{item}" for item in items)
 
@@ -94,7 +95,7 @@ class TemplateManager:
             """首字母大写"""
             return text[:1].upper() + text[1:] if text else text
 
-        def format_capability_list(capabilities: list[str]) -> str:
+        def format_capability_list(capabilities: List[str]) -> str:
             """格式化能力列表"""
             if not capabilities:
                 return ""
@@ -238,7 +239,7 @@ class TemplateManager:
     def render_template(
         self,
         template_name: str,
-        context: dict[str, Any],
+        context: Dict[str, Any],
         mode: str | None = None,
         language: str | None = None,
     ) -> str:
@@ -286,10 +287,10 @@ class TemplateManager:
 
     def _prepare_context(
         self,
-        context: dict[str, Any],
+        context: Dict[str, Any],
         mode: str | None = None,
         language: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """准备渲染上下文
 
         Args:
@@ -409,7 +410,7 @@ class TemplateManager:
                 )
                 raise
 
-    def get_available_templates(self) -> list[str]:
+    def get_available_templates(self) -> List[str]:
         """获取所有可用模板列表
 
         Returns:

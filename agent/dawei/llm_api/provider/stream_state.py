@@ -8,7 +8,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.entity.lm_messages import ToolCall
 
@@ -25,8 +25,8 @@ class StreamState:
     is_processing: bool = False
     is_streaming: bool = False
     current_content: str = ""
-    current_tool_calls: dict[str, ToolCall] = field(default_factory=dict)
-    token_usage: dict[str, Any] | None = None
+    current_tool_calls: Dict[str, ToolCall] = field(default_factory=dict)
+    token_usage: Dict[str, Any] | None = None
     error_count: int = 0
     last_error: str | None = None
 

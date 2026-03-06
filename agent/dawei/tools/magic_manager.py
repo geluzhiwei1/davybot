@@ -15,7 +15,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from .magic_parser import ParsedMagicCommand
 
@@ -27,10 +27,10 @@ class MagicContext:
     """Execution context for magic commands"""
 
     cwd: Path = field(default_factory=Path.cwd)
-    env: dict[str, str] = field(default_factory=lambda: dict(os.environ))
-    variables: dict[str, Any] = field(default_factory=dict)
-    history: list[str] = field(default_factory=list)
-    captures: dict[str, Any] = field(default_factory=dict)
+    env: Dict[str, str] = field(default_factory=lambda: dict(os.environ))
+    variables: Dict[str, Any] = field(default_factory=dict)
+    history: List[str] = field(default_factory=list)
+    captures: Dict[str, Any] = field(default_factory=dict)
     agent_mode: str = "orchestrator"
     workspace: str = "default"
 
@@ -62,13 +62,13 @@ class MagicCommandManager:
 
     def __init__(self):
         # Line magic registry: command_name -> function
-        self.line_magics: dict[str, Callable] = {}
+        self.line_magics: Dict[str, Callable] = {}
 
         # Cell magic registry: command_name -> function
-        self.cell_magics: dict[str, Callable] = {}
+        self.cell_magics: Dict[str, Callable] = {}
 
         # Command aliases
-        self.aliases: dict[str, str] = {}
+        self.aliases: Dict[str, str] = {}
 
         # Execution context
         self.context: MagicContext = MagicContext()
@@ -112,7 +112,7 @@ class MagicCommandManager:
         self,
         name: str,
         func: Callable[[str, MagicContext], str],
-        aliases: list[str] | None = None,
+        aliases: List[str] | None = None,
     ):
         """Register a line magic command.
 

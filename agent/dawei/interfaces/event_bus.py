@@ -9,7 +9,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any
+from typing import List, Dict, Any
 
 
 class IEventBus(ABC):
@@ -64,7 +64,7 @@ class IEventBus(ABC):
         """
 
     @abstractmethod
-    def get_event_history(self, event_type: str | None = None) -> list[dict[str, Any]]:
+    def get_event_history(self, event_type: str | None = None) -> List[Dict[str, Any]]:
         """获取事件历史
 
         Args:
@@ -110,7 +110,7 @@ class IEventBus(ABC):
         self,
         event_type: str,
         timeout: float | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> Dict[str, Any] | None:
         """等待特定事件
 
         Args:

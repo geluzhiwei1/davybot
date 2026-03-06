@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.sandbox.command_whitelist import CommandWhitelist
 
@@ -45,7 +45,7 @@ class LightweightSandbox:
         command: str,
         workspace_path: Path,
         _user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """在轻量级沙箱中执行命令
 
         Args:
@@ -210,7 +210,7 @@ class ChrootSandbox:
         command: str,
         workspace_path: Path,
         _user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """在chroot环境中执行命令
 
         注意：需要root权限才能执行chroot
@@ -361,7 +361,7 @@ class FirejailSandbox:
         command: str,
         workspace_path: Path,
         _user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """使用Firejail执行命令"""
         if not self.available:
             return {
@@ -512,7 +512,7 @@ class HybridSandboxExecutor:
         command: str,
         workspace_path: Path,
         user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """使用最佳的可用方法执行命令"""
         # 1. 验证白名单（所有方法共享）
         try:
@@ -577,7 +577,7 @@ class HybridSandboxExecutor:
         command: str,
         workspace_path: Path,
         user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """异步执行"""
         import asyncio
 
@@ -587,7 +587,7 @@ class HybridSandboxExecutor:
             lambda: self.execute(command, workspace_path, user_id),
         )
 
-    def health_check(self) -> dict[str, Any]:
+    def health_check(self) -> Dict[str, Any]:
         """健康检查"""
         return {
             "executor": "HybridSandboxExecutor",

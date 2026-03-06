@@ -8,7 +8,7 @@ Provides tools for creating and updating A2UI surfaces.
 
 import logging
 import uuid
-from typing import Any
+from typing import List, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +18,7 @@ from dawei.tools.custom_base_tool import CustomBaseTool
 # TODO: Integrate official A2UI extension when a2a-sdk is installed
 
 
-def create_a2ui_part(a2ui_data: dict[str, Any]) -> Any:
+def create_a2ui_part(a2ui_data: Dict[str, Any]) -> Any:
     """Create an A2UI part (simplified version)."""
     return {"data": a2ui_data, "mimeType": "application/json+a2ui"}
 
@@ -75,11 +75,11 @@ class CreateA2UISurfaceTool(CustomBaseTool):
             "custom",
             description="Type of surface: 'form', 'dashboard', 'visualization', or 'custom'",
         )
-        components: list[dict[str, Any]] = Field(
+        components: List[Dict[str, Any]] = Field(
             ...,
             description="List of A2UI component definitions. Each component must have 'id', 'type', and 'component' properties with component-specific properties.",
         )
-        data_model: dict[str, Any] = Field(
+        data_model: Dict[str, Any] = Field(
             default_factory=dict,
             description="Initial data model for UI state. Keys are JSON Pointer paths, values are the data.",
         )

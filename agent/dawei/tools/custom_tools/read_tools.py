@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import ast
@@ -308,7 +309,7 @@ class ListCodeDefinitionsTool(CustomBaseTool):
         return "\n".join(definitions) if definitions else "No code definitions found"
 
     @safe_tool_operation("extract_definitions", fallback_value="Error: Failed to parse file")
-    def _extract_definitions(self, file_path: str) -> list[str]:
+    def _extract_definitions(self, file_path: str) -> List[str]:
         """Extract definitions from a Python file."""
         definitions = []
 

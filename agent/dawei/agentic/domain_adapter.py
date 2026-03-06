@@ -19,7 +19,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import List, Dict, Any
 
 
 class DomainType(Enum):
@@ -41,13 +41,13 @@ class DomainContext:
     """领域特定上下文"""
 
     domain: DomainType
-    typical_outputs: list[str]
-    quality_criteria: list[str]
-    common_tools: list[str]
-    success_metrics: list[str]
-    workflows: dict[str, list[str]]
+    typical_outputs: List[str]
+    quality_criteria: List[str]
+    common_tools: List[str]
+    success_metrics: List[str]
+    workflows: Dict[str, List[str]]
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "domain": self.domain.value,
@@ -66,7 +66,7 @@ class DomainAdapter:
         self._domain_keywords = self._init_domain_keywords()
         self._domain_contexts = self._init_domain_contexts()
 
-    def _init_domain_keywords(self) -> dict[DomainType, list[str]]:
+    def _init_domain_keywords(self) -> Dict[DomainType, List[str]]:
         """初始化领域关键词（中英文）"""
         return {
             DomainType.SOFTWARE: [
@@ -342,7 +342,7 @@ class DomainAdapter:
             ],
         }
 
-    def _init_domain_contexts(self) -> dict[DomainType, DomainContext]:
+    def _init_domain_contexts(self) -> Dict[DomainType, DomainContext]:
         """初始化领域特定上下文"""
         return {
             DomainType.SOFTWARE: DomainContext(
@@ -521,7 +521,7 @@ class DomainAdapter:
         """
         return self._domain_contexts.get(domain, self._domain_contexts[DomainType.GENERAL])
 
-    def get_workflow_for_phase(self, domain: DomainType, phase: str) -> list[str]:
+    def get_workflow_for_phase(self, domain: DomainType, phase: str) -> List[str]:
         """获取特定领域和阶段的工作流程
 
         Args:
@@ -535,22 +535,22 @@ class DomainAdapter:
         context = self.get_domain_context(domain)
         return context.workflows.get(phase, [])
 
-    def get_quality_criteria(self, domain: DomainType) -> list[str]:
+    def get_quality_criteria(self, domain: DomainType) -> List[str]:
         """获取质量标准"""
         context = self.get_domain_context(domain)
         return context.quality_criteria
 
-    def get_typical_outputs(self, domain: DomainType) -> list[str]:
+    def get_typical_outputs(self, domain: DomainType) -> List[str]:
         """获取典型产出物"""
         context = self.get_domain_context(domain)
         return context.typical_outputs
 
-    def get_success_metrics(self, domain: DomainType) -> list[str]:
+    def get_success_metrics(self, domain: DomainType) -> List[str]:
         """获取成功指标"""
         context = self.get_domain_context(domain)
         return context.success_metrics
 
-    def detect_domain_from_context(self, context: dict[str, Any]) -> DomainType:
+    def detect_domain_from_context(self, context: Dict[str, Any]) -> DomainType:
         """从上下文中检测领域（更复杂的检测）
 
         Args:

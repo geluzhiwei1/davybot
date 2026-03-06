@@ -5,7 +5,9 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Optional, Self
+from typing import List, Dict, Any, Optional, TypeVar
+
+Self = TypeVar("Self", bound="StorageConfig")
 
 from .types import StorageType
 
@@ -24,7 +26,7 @@ class StorageConfig:
     # azure_container: Optional[str] = None
     # gcs_bucket: Optional[str] = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "storage_type": self.storage_type,
@@ -33,7 +35,7 @@ class StorageConfig:
         }
 
     @classmethod
-    def from_dict(cls, config_dict: dict[str, Any]) -> "StorageConfig":
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "StorageConfig":
         """从字典创建配置实例"""
         storage_type = config_dict.get("storage_type", StorageType.LOCAL_FILESYSTEM)
         if isinstance(storage_type, str):
@@ -80,7 +82,7 @@ class StorageConfigManager:
             self._config = StorageConfig.from_env()
         return self._config
 
-    def load_from_dict(self, config_dict: dict[str, Any]) -> None:
+    def load_from_dict(self, config_dict: Dict[str, Any]) -> None:
         """从字典加载配置"""
         self._config = StorageConfig.from_dict(config_dict)
 

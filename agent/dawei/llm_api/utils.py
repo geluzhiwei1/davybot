@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import List, Dict, Any
 
 from aiohttp import ClientResponse
 
@@ -26,7 +26,7 @@ class StreamProcessor:
     async def process_stream(
         self,
         stream_generator: AsyncGenerator[bytes, None],
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """处理流式响应
 
         Args:
@@ -70,7 +70,7 @@ class StreamProcessor:
     async def process_http_stream(
         self,
         response: ClientResponse,
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """处理 HTTP 流式响应
 
         Args:
@@ -144,7 +144,7 @@ class ResponseUtils:
     """响应处理工具"""
 
     @staticmethod
-    def extract_error_message(response_data: dict[str, Any]) -> str:
+    def extract_error_message(response_data: Dict[str, Any]) -> str:
         """从响应数据中提取错误消息
 
         Args:
@@ -199,7 +199,7 @@ class JsonUtils:
     """JSON 处理工具"""
 
     @staticmethod
-    def safe_loads(json_str: str) -> dict[str, Any] | None:
+    def safe_loads(json_str: str) -> Dict[str, Any] | None:
         """安全解析 JSON 字符串
 
         Args:

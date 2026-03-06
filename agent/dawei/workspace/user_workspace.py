@@ -16,9 +16,10 @@ import json
 import logging
 import os
 import uuid
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import List, Dict, TYPE_CHECKING, Any
 
 from dawei import get_dawei_home
 from dawei.conversation.conversation import Conversation, create_conversation
@@ -766,7 +767,7 @@ class UserWorkspace:
                     with config_file.open(encoding="utf-8") as f:
                         config_data = json.load(f)
 
-                    plugins_config_dict[plugin_id] = PluginInstanceConfig.model_validate(config_data)
+                    plugins_config_Dict[plugin_id] = PluginInstanceConfig.model_validate(config_data)
                     logger.debug(f"Loaded plugin config: {plugin_id}")
                 except Exception as e:
                     logger.warning(f"Failed to load plugin config {config_file}: {e}")
@@ -828,7 +829,7 @@ class UserWorkspace:
 
         from dawei.tools.custom_tools.skills_tool import create_skills_tools
 
-        def find_skills_roots() -> list[Path]:
+        def find_skills_roots() -> List[Path]:
             """查找所有可能包含skills的根目录
             返回两个级别的根目录列表（workspace和global user）
 
@@ -1035,7 +1036,7 @@ class UserWorkspace:
 
         return success
 
-    def _conversation_to_dict(self, conversation: Conversation) -> dict[str, Any]:
+    def _conversation_to_dict(self, conversation: Conversation) -> Dict[str, Any]:
         """将对话对象转换为字典格式"""
         # 处理时间戳 - 确保是字符串格式
         created_at = conversation.created_at
@@ -1066,15 +1067,15 @@ class UserWorkspace:
                 msg_dict = {}
 
             # 确保 content 字段是字符串格式(处理OpenAI格式的content对象)
-            if "content" in msg_dict and isinstance(msg_dict["content"], dict):
+            if "content" in msg_dict and isinstance(msg_Dict["content"], dict):
                 # OpenAI格式: {"type": "text", "text": "..."}
-                if msg_dict["content"].get("type") == "text":
-                    msg_dict["content"] = msg_dict["content"].get("text", "")
+                if msg_Dict["content"].get("type") == "text":
+                    msg_Dict["content"] = msg_Dict["content"].get("text", "")
                 else:
                     # 其他类型,转为JSON字符串
                     import json
 
-                    msg_dict["content"] = json.dumps(msg_dict["content"])
+                    msg_Dict["content"] = json.dumps(msg_Dict["content"])
 
             messages_data.append(msg_dict)
 
@@ -1163,7 +1164,7 @@ class UserWorkspace:
 
         return success
 
-    async def get_conversation_list(self) -> list[Conversation]:
+    async def get_conversation_list(self) -> List[Conversation]:
         """获取对话历史列表
 
         Returns:
@@ -1185,7 +1186,7 @@ class UserWorkspace:
         self,
         query: str,
         search_in_content: bool = False,
-    ) -> list[Conversation]:
+    ) -> List[Conversation]:
         """搜索对话
 
         Args:
@@ -1275,7 +1276,7 @@ class UserWorkspace:
 
         return success
 
-    def get_all_llm_configs(self) -> dict[str, LLMConfig]:
+    def get_all_llm_configs(self) -> Dict[str, LLMConfig]:
         """获取所有LLM配置"""
         if not self.llm_manager:
             return {}
@@ -1333,7 +1334,7 @@ class UserWorkspace:
         return True
 
     @property
-    def allowed_tools(self) -> list[dict[str, Any]]:
+    def allowed_tools(self) -> List[Dict[str, Any]]:
         """获取允许的工具列表 - 由 ToolManager 统一管理"""
         if self.tool_manager:
             # 从 ToolManager 获取最新数据并应用工作区过滤
@@ -1357,7 +1358,7 @@ class UserWorkspace:
             return tools
         return []
 
-    def _get_filtered_tool_names(self, tools: list[dict[str, Any]]) -> set[str]:
+    def _get_filtered_tool_names(self, tools: List[Dict[str, Any]]) -> set[str]:
         """根据工作区设置过滤工具名称 - 使用 ToolManager 的统一方法"""
         if self.tool_manager:
             return self.tool_manager.get_filtered_tool_names(tools, self.workspace_settings)
@@ -1427,14 +1428,14 @@ class UserWorkspace:
             return success
         return False
 
-    def get_tools_by_category(self, category: str) -> list[dict[str, Any]]:
+    def get_tools_by_category(self, category: str) -> List[Dict[str, Any]]:
         """按类别获取工具"""
         if self.tool_manager:
             tool_configs = self.tool_manager.get_tools_by_category(category)
             return [config.to_dict() for config in tool_configs]
         return []
 
-    def get_mode_available_tools(self, mode: str) -> dict[str, Any]:
+    def get_mode_available_tools(self, mode: str) -> Dict[str, Any]:
         """获取指定模式下可用的工具
 
         Args:
@@ -1510,9 +1511,9 @@ class UserWorkspace:
 
     def _filter_tools_by_mode(
         self,
-        tools: list[dict[str, Any]],
-        mode_info: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        tools: List[Dict[str, Any]],
+        mode_info: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
         """根据模式配置过滤工具
 
         Args:
@@ -1555,7 +1556,7 @@ class UserWorkspace:
         logger.debug(f"Filtered {len(tools)} tools to {len(filtered_tools)} for mode")
         return filtered_tools
 
-    def get_tool_statistics(self) -> dict[str, Any]:
+    def get_tool_statistics(self) -> Dict[str, Any]:
         """获取工具统计信息"""
         if self.tool_manager:
             stats = self.tool_manager.get_tool_statistics()
@@ -1588,7 +1589,7 @@ class UserWorkspace:
             # 调用者需要在异步上下文中处理 _update_allowed_tools()
         logger.info("Tool configurations reloaded")
 
-    def get_tool_sources(self, tool_name: str) -> dict[str, bool]:
+    def get_tool_sources(self, tool_name: str) -> Dict[str, bool]:
         """获取工具配置来源信息"""
         if self.tool_manager:
             return self.tool_manager.get_tool_sources(tool_name)
@@ -1601,7 +1602,7 @@ class UserWorkspace:
             return self.mcp_tool_manager.get_config(server_name)
         return None
 
-    def get_all_mcp_configs(self) -> dict[str, MCPConfig]:
+    def get_all_mcp_configs(self) -> Dict[str, MCPConfig]:
         """获取所有MCP配置"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_all_configs()
@@ -1613,19 +1614,19 @@ class UserWorkspace:
             return self.mcp_tool_manager.get_server_info(server_name)
         return None
 
-    def get_all_mcp_servers(self) -> dict[str, Any]:
+    def get_all_mcp_servers(self) -> Dict[str, Any]:
         """获取所有MCP服务器信息"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_all_servers()
         return {}
 
-    def get_mcp_config_sources(self, server_name: str) -> dict[str, bool]:
+    def get_mcp_config_sources(self, server_name: str) -> Dict[str, bool]:
         """获取MCP配置来源信息"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_config_sources(server_name)
         return {}
 
-    def get_mcp_statistics(self) -> dict[str, Any]:
+    def get_mcp_statistics(self) -> Dict[str, Any]:
         """获取MCP统计信息"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_statistics()
@@ -1643,13 +1644,13 @@ class UserWorkspace:
             return await self.mcp_tool_manager.disconnect_server(server_name)
         return False
 
-    async def connect_all_mcp_servers(self) -> dict[str, bool]:
+    async def connect_all_mcp_servers(self) -> Dict[str, bool]:
         """连接所有MCP服务器"""
         if self.mcp_tool_manager:
             return await self.mcp_tool_manager.connect_all_servers()
         return {}
 
-    async def disconnect_all_mcp_servers(self) -> dict[str, bool]:
+    async def disconnect_all_mcp_servers(self) -> Dict[str, bool]:
         """断开所有MCP服务器连接"""
         if self.mcp_tool_manager:
             return await self.mcp_tool_manager.disconnect_all_servers()
@@ -1802,7 +1803,7 @@ class UserWorkspace:
         return self._loaded
 
     # 序列化方法
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         # 获取 LLM 配置信息
         current_llm_config = self.llm_manager.get_current_config_name() if self.llm_manager else None
@@ -1965,7 +1966,7 @@ class UserWorkspace:
             for task in all_tasks:
                 # 🔥 修复：使用 task_node_id 而不是 task_id，且 to_dict() 不是异步方法
                 task_id = task.task_node_id
-                nodes_dict[task_id] = task.to_dict()
+                nodes_Dict[task_id] = task.to_dict()
 
             task_data = {
                 "task_graph_id": task_graph.task_node_id,
@@ -2138,7 +2139,7 @@ class UserWorkspace:
         except Exception as e:
             logger.error(f"Failed to send persistence failure alert: {e}", exc_info=True)
 
-    async def _log_persistence_failure(self, alert_data: dict[str, Any]):
+    async def _log_persistence_failure(self, alert_data: Dict[str, Any]):
         """将持久化失败记录到日志文件
 
         Args:
@@ -2163,7 +2164,7 @@ class UserWorkspace:
         except Exception as e:
             logger.warning(f"Failed to log persistence failure to file: {e}")
 
-    async def get_persistence_failures(self, limit: int = 100) -> list[dict[str, Any]]:
+    async def get_persistence_failures(self, limit: int = 100) -> List[Dict[str, Any]]:
         """获取持久化失败记录
 
         Args:
@@ -2430,7 +2431,7 @@ class UserWorkspace:
 
     async def update_ui_context_auto(
         self,
-        open_files: list[str] | None = None,
+        open_files: List[str] | None = None,
         current_file: str | None = None,
         current_selected_content: str | None = None,
         current_mode: str | None = None,

@@ -9,9 +9,10 @@ import csv
 import io
 import json
 import os
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -38,7 +39,7 @@ class MemoryCreateRequest(BaseModel):
     memory_type: str = "fact"
     confidence: float = 0.8
     energy: float = 1.0
-    keywords: list[str] = []
+    keywords: List[str] = []
 
 
 class MemoryUpdateRequest(BaseModel):
@@ -49,7 +50,7 @@ class MemoryUpdateRequest(BaseModel):
     valid_end: str | None = None
     confidence: float | None = None
     energy: float | None = None
-    keywords: list[str] | None = None
+    keywords: List[str] | None = None
 
 
 class MemoryResponse(BaseModel):
@@ -65,16 +66,16 @@ class MemoryResponse(BaseModel):
     energy: float
     access_count: int
     memory_type: str
-    keywords: list[str]
+    keywords: List[str]
     source_event_id: str | None
-    metadata: dict[str, Any]
+    metadata: Dict[str, Any]
     created_at: str
 
 
 class MemoryListResponse(BaseModel):
     """Response model for memory list"""
 
-    items: list[MemoryResponse]
+    items: List[MemoryResponse]
     total: int
     page: int
     page_size: int
@@ -84,7 +85,7 @@ class MemoryStatsResponse(BaseModel):
     """Response model for memory statistics"""
 
     total: int
-    by_type: dict[str, int]
+    by_type: Dict[str, int]
     avg_confidence: float
     avg_energy: float
 
@@ -92,14 +93,14 @@ class MemoryStatsResponse(BaseModel):
 class GraphDataResponse(BaseModel):
     """Response model for graph data"""
 
-    nodes: list[dict[str, Any]]
-    links: list[dict[str, Any]]
+    nodes: List[Dict[str, Any]]
+    links: List[Dict[str, Any]]
 
 
 class AssociativeRetrievalRequest(BaseModel):
     """Request model for associative retrieval"""
 
-    entities: list[str]
+    entities: List[str]
     hops: int = 1
     min_energy: float = 0.2
 
@@ -516,7 +517,7 @@ async def retrieve_associative(workspace_id: str, request: AssociativeRetrievalR
 
 
 @router.post("/{workspace_id}/memory/bulk-delete")
-async def bulk_delete_memories(workspace_id: str, memory_ids: list[str]):
+async def bulk_delete_memories(workspace_id: str, memory_ids: List[str]):
     """Delete multiple memories"""
     db_path = _get_memory_db_path(workspace_id)
 

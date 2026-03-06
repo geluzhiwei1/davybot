@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """LLM 成本追踪器
@@ -8,7 +9,8 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 
 from dawei.llm_api.model_router import ModelCost, load_cost_config
 
@@ -34,15 +36,15 @@ class CostSummary:
     total_calls: int
     total_input_tokens: int
     total_output_tokens: int
-    by_model: dict[str, dict]
-    by_task_type: dict[str, dict]
+    by_model: Dict[str, dict]
+    by_task_type: Dict[str, dict]
     avg_cost_per_call: float
 
 
 class CostTracker:
     """LLM 成本追踪器"""
 
-    def __init__(self, cost_config: dict[str, ModelCost] | None = None):
+    def __init__(self, cost_config: Dict[str, ModelCost] | None = None):
         """初始化成本追踪器
 
         Args:
@@ -50,7 +52,7 @@ class CostTracker:
 
         """
         self.cost_config = cost_config or load_cost_config()
-        self.calls: list[LLMMCall] = []
+        self.calls: List[LLMMCall] = []
         self.session_start = datetime.now(UTC)
         self.logger = logging.getLogger(__name__)
 
@@ -137,7 +139,7 @@ class CostTracker:
             avg_cost_per_call=round(avg_cost, 4),
         )
 
-    def get_optimization_suggestions(self) -> list[str]:
+    def get_optimization_suggestions(self) -> List[str]:
         """获取成本优化建议
 
         Returns:
@@ -188,7 +190,7 @@ class CostTracker:
 
         return suggestions
 
-    def _find_cheaper_alternatives(self, model: str) -> list[str]:
+    def _find_cheaper_alternatives(self, model: str) -> List[str]:
         """查找更便宜的替代模型"""
         # 获取当前模型成本
         current_cost_info = self.cost_config.get(model)

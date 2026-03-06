@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """API Error Codes for Internationalization
@@ -119,7 +120,7 @@ class ErrorCodes:
             Formatted error message, or code itself if not found
 
         """
-        all_messages: dict[str, str] = {}
+        all_messages: Dict[str, str] = {}
         all_messages.update(cls.WORKSPACE_MESSAGES)
         all_messages.update(cls.CHECKPOINT_MESSAGES)
         all_messages.update(cls.LLM_CONFIG_MESSAGES)
@@ -137,7 +138,7 @@ class ErrorCodes:
             return f"{template} | Params: {params}"
 
     @classmethod
-    def create_error_detail(cls, code: str, **params) -> dict[str, any]:
+    def create_error_detail(cls, code: str, **params) -> Dict[str, any]:
         """Create standardized error detail dictionary.
 
         Args:
@@ -152,7 +153,7 @@ class ErrorCodes:
 
 
 # Convenience function for creating error details
-def error_detail(code: str, **params) -> dict[str, any]:
+def error_detail(code: str, **params) -> Dict[str, any]:
     """Create error detail dictionary from error code.
 
     Args:

@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -27,7 +27,7 @@ class GraphCreate(BaseModel):
 
     name: str = Field(..., description="任务图名称")
     description: str | None = Field(None, description="任务图描述")
-    root_task: dict[str, Any] | None = Field(None, description="根任务配置")
+    root_task: Dict[str, Any] | None = Field(None, description="根任务配置")
 
 
 class GraphUpdate(BaseModel):
@@ -46,7 +46,7 @@ class TaskNodeInfo(BaseModel):
     status: str
     priority: str = "medium"
     parent_id: str | None = None
-    child_ids: list[str] = []
+    child_ids: List[str] = []
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -82,7 +82,7 @@ class TodoItemUpdate(BaseModel):
 class TaskTodosUpdate(BaseModel):
     """任务TODO列表更新模型"""
 
-    todos: list[TodoItemUpdate]
+    todos: List[TodoItemUpdate]
 
 
 class TaskInfo(BaseModel):
@@ -94,7 +94,7 @@ class TaskInfo(BaseModel):
     status: str
     priority: str
     parent_id: str | None
-    child_ids: list[str]
+    child_ids: List[str]
     created_at: str | None
     updated_at: str | None
 
@@ -106,7 +106,7 @@ class CheckpointInfo(BaseModel):
     task_id: str
     created_at: str
     description: str | None
-    execution_state: dict[str, Any] | None
+    execution_state: Dict[str, Any] | None
 
 
 class SubTaskCreate(BaseModel):
@@ -406,7 +406,7 @@ async def get_workspace_task(workspace_id: str, task_id: str):
 
 
 @router.put("/{workspace_id}/tasks/{task_id}/todos")
-async def update_task_todos(workspace_id: str, task_id: str, todos_data: list[TodoItemUpdate]):
+async def update_task_todos(workspace_id: str, task_id: str, todos_data: List[TodoItemUpdate]):
     """更新任务的TODO列表"""
     workspace = get_user_workspace(workspace_id)
     await _ensure_workspace_initialized(workspace)

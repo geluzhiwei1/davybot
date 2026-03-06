@@ -10,7 +10,7 @@ import json
 import logging
 import traceback
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -24,7 +24,7 @@ from .core import UserWorkspace, get_user_workspace
 logger = logging.getLogger(__name__)
 
 # Plugin manager cache per workspace (simple singleton pattern)
-_plugin_managers: dict[str, PluginManager] = {}
+_plugin_managers: Dict[str, PluginManager] = {}
 
 
 def get_cached_plugin_manager(workspace_id: str, workspace_path: Path) -> "PluginManager":
@@ -78,14 +78,14 @@ class PluginSettings(BaseModel):
     """Plugin settings"""
 
     enabled: bool = True
-    settings: dict[str, Any] = Field(default_factory=dict)
+    settings: Dict[str, Any] = Field(default_factory=dict)
 
 
 class UpdatePluginSettingsRequest(BaseModel):
     """Update plugin settings request"""
 
     enabled: bool | None = None
-    settings: dict[str, Any] | None = None
+    settings: Dict[str, Any] | None = None
 
 
 class PluginActionRequest(BaseModel):
@@ -97,13 +97,13 @@ class PluginActionRequest(BaseModel):
 class ValidateConfigRequest(BaseModel):
     """Validate plugin configuration request"""
 
-    config: dict[str, Any]
+    config: Dict[str, Any]
 
 
 class SaveConfigRequest(BaseModel):
     """Save plugin configuration request"""
 
-    config: dict[str, Any]
+    config: Dict[str, Any]
 
 
 # Dependency to get plugin manager
@@ -213,7 +213,7 @@ class PluginsConfigResponse(BaseModel):
     """插件配置响应模型"""
 
     success: bool
-    config: dict[str, Any]
+    config: Dict[str, Any]
     message: str | None = None
 
 
@@ -258,7 +258,7 @@ async def get_plugins_config(
 
 @router.put("/config")
 async def update_plugins_config(
-    config_update: dict[str, Any],
+    config_update: Dict[str, Any],
     workspace: UserWorkspace = Depends(get_user_workspace),
 ) -> PluginsConfigResponse:
     """更新插件配置（两层配置系统）
@@ -664,7 +664,7 @@ async def uninstall_plugin_endpoint(
     plugin_id: str,
     workspace: UserWorkspace = Depends(get_user_workspace),
     manager: PluginManager = Depends(get_plugin_manager),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """卸载插件。支持两种格式：
     - 完整ID：name@version（如 feishu-channel@0.1.0）
     - 仅名称：name（卸载该名称的所有版本）
@@ -716,7 +716,7 @@ async def test_feishu_connection(
     plugin_id: str,
     workspace: UserWorkspace = Depends(get_user_workspace),
     manager: PluginManager = Depends(get_plugin_manager),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """测试飞书长连接状态
 
     检查项目：
@@ -798,7 +798,7 @@ async def send_feishu_test_message(
     request: TestFeishuMessageRequest,
     workspace: UserWorkspace = Depends(get_user_workspace),
     manager: PluginManager = Depends(get_plugin_manager),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """发送飞书测试消息
 
     发送一条测试消息到配置的飞书群聊

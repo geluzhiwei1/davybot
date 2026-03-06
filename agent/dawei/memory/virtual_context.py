@@ -9,9 +9,10 @@ import logging
 import sqlite3
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.context_manager import TokenEstimator
 
@@ -36,7 +37,7 @@ class ContextPage:
     # Source tracking
     source_type: str = "conversation"  # conversation, document, tool_output
     source_ref: str | None = None  # Reference to source
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def score(self) -> float:
@@ -45,7 +46,7 @@ class ContextPage:
         access_factor = 1 / (self.access_count + 1)
         return age_hours * access_factor
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         data = asdict(self)
         data["created_at"] = self.created_at.isoformat()
@@ -53,7 +54,7 @@ class ContextPage:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ContextPage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ContextPage":
         """Create from dictionary"""
         if isinstance(data.get("created_at"), str):
             data["created_at"] = datetime.fromisoformat(data["created_at"])
@@ -96,7 +97,7 @@ class VirtualContextManager:
         self.max_active_pages = max_active_pages
 
         self.logger = logging.getLogger(__name__)
-        self.active_pages: dict[str, ContextPage] = {}
+        self.active_pages: Dict[str, ContextPage] = {}
 
         # Initialize database tables if needed
         self._ensure_tables()
@@ -195,7 +196,7 @@ class VirtualContextManager:
         top_k: int = 3,
         current_tokens: int = 0,
         max_tokens: int = 100000,
-    ) -> list[str]:
+    ) -> List[str]:
         """Load relevant pages into active context
 
         Uses keyword matching for relevance (can be upgraded to vector search)
@@ -314,7 +315,7 @@ class VirtualContextManager:
         except sqlite3.Error as e:
             self.logger.warning(f"Failed to update page access: {e}")
 
-    async def page_out(self, count: int = 1) -> list[str]:
+    async def page_out(self, count: int = 1) -> List[str]:
         """Evict least recently used pages from active context
 
         Uses LRU policy based on page.score
@@ -351,7 +352,7 @@ class VirtualContextManager:
 
         return "\n---\n".join(pages_content)
 
-    def get_active_page_ids(self) -> list[str]:
+    def get_active_page_ids(self) -> List[str]:
         """Get list of active page IDs"""
         return list(self.active_pages.keys())
 
@@ -388,7 +389,7 @@ class VirtualContextManager:
             self.logger.exception("Failed to get page: ")
             return None
 
-    async def get_session_pages(self, session_id: str, limit: int = 100) -> list[ContextPage]:
+    async def get_session_pages(self, session_id: str, limit: int = 100) -> List[ContextPage]:
         """Get all pages for a session"""
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -445,7 +446,7 @@ class VirtualContextManager:
             self.logger.exception("Failed to delete page: ")
             return False
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """Get context manager statistics"""
         return {
             "active_pages": len(self.active_pages),

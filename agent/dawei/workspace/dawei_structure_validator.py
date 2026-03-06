@@ -12,7 +12,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Dict, Optional
 
 from dawei import get_dawei_home
 
@@ -213,14 +213,14 @@ class DaweiStructureValidator:
                 )
 
     @staticmethod
-    def validate_jsonl_files(dawei_path: Path) -> list[str]:
+    def validate_jsonl_files(dawei_path: Path) -> List[str]:
         """Validate JSONL files in persistence_failures directory.
 
         Args:
             dawei_path: Path to .dawei directory
 
         Returns:
-            list[str]: List of validation warnings (non-critical issues)
+            List[str]: List of validation warnings (non-critical issues)
 
         Raises:
             WorkspaceJsonError: If JSONL file format is invalid
@@ -270,7 +270,7 @@ class DaweiStructureValidator:
             dict: Validation result with keys:
                 - valid (bool): True if validation passed
                 - workspace_data (dict): Parsed workspace.json content
-                - warnings (list[str]): List of non-critical warnings
+                - warnings (List[str]): List of non-critical warnings
 
         Raises:
             DaweiStructureValidationError: If validation fails (Fast Fail)
@@ -303,8 +303,8 @@ class DaweiStructureValidator:
                 - total (int): Total number of workspaces
                 - valid (int): Number of valid workspaces
                 - invalid (int): Number of invalid workspaces
-                - errors (list[dict]): List of validation errors
-                - workspace_details (list[dict]): Details for each workspace
+                - errors (List[dict]): List of validation errors
+                - workspace_details (List[dict]): Details for each workspace
         """
         if not workspaces_root.exists():
             raise DirectoryStructureError(

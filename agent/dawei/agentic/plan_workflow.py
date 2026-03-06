@@ -7,9 +7,10 @@
 """
 
 import logging
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from enum import Enum
-from typing import Any, Optional
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class PlanPhase(Enum):
     EXIT = "exit"  # Phase 5: 退出
 
     @classmethod
-    def get_phase_order(cls) -> list["PlanPhase"]:
+    def get_phase_order(cls) -> List["PlanPhase"]:
         """获取阶段顺序"""
         return [cls.UNDERSTANDING, cls.DESIGN, cls.REVIEW, cls.FINAL_PLAN, cls.EXIT]
 
@@ -61,7 +62,7 @@ class PlanWorkflowState:
         self.created_at = datetime.now(UTC)
 
         # Phase-specific data
-        self.phase_data: dict[str, Any] = {
+        self.phase_data: Dict[str, Any] = {
             "understanding": {
                 "explore_results": [],
                 "user_requirements": None,
@@ -111,7 +112,7 @@ class PlanWorkflowState:
         )
         return True
 
-    def record_explore_agent(self, result: dict[str, Any]):
+    def record_explore_agent(self, result: Dict[str, Any]):
         """记录 explore agent 结果
 
         Args:
@@ -122,7 +123,7 @@ class PlanWorkflowState:
         self.explore_agents_launched += 1
         logger.debug(f"Recorded explore agent result. Total: {self.explore_agents_launched}")
 
-    def record_plan_agent(self, approach: dict[str, Any]):
+    def record_plan_agent(self, approach: Dict[str, Any]):
         """记录 plan agent 设计方案
 
         Args:
@@ -133,7 +134,7 @@ class PlanWorkflowState:
         self.plan_agents_launched += 1
         logger.debug(f"Recorded plan agent result. Total: {self.plan_agents_launched}")
 
-    def select_approach(self, approach: dict[str, Any]):
+    def select_approach(self, approach: Dict[str, Any]):
         """选择最终方案
 
         Args:
@@ -208,7 +209,7 @@ class PlanWorkflowState:
         # 每个阶段占 20%
         return phase_number * 20
 
-    def get_phase_summary(self) -> dict[str, Any]:
+    def get_phase_summary(self) -> Dict[str, Any]:
         """获取阶段摘要
 
         Returns:
@@ -326,7 +327,7 @@ class PlanWorkflowExecutor:
             logger.exception("Failed to get plan file info: ")
             return f"**Plan File**: Error loading information ({type(e).__name__})"
 
-    def get_template_context(self) -> dict[str, Any]:
+    def get_template_context(self) -> Dict[str, Any]:
         """获取模板渲染上下文
 
         Returns:
@@ -363,7 +364,7 @@ class PlanWorkflowExecutor:
         except ValueError:
             return str(plan_path)
 
-    def record_activity(self, activity_type: str, data: dict[str, Any] | None = None):
+    def record_activity(self, activity_type: str, data: Dict[str, Any] | None = None):
         """记录活动
 
         Args:
@@ -383,7 +384,7 @@ class PlanWorkflowExecutor:
             if plan_path:
                 self.state.set_plan_file(plan_path, content)
 
-    def get_workflow_summary(self) -> dict[str, Any]:
+    def get_workflow_summary(self) -> Dict[str, Any]:
         """获取工作流摘要
 
         Returns:

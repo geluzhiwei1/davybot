@@ -18,7 +18,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, ClassVar, TypeVar
+from typing import List, Dict, Any, ClassVar, TypeVar
 
 from dawei.interfaces.event_bus import IEventBus
 
@@ -130,7 +130,7 @@ class TaskEventType(Enum):
 
 
 @dataclass
-class TaskEvent[T]:
+class TaskEvent:
     """纯强类型任务事件数据结构"""
 
     event_id: str
@@ -141,7 +141,7 @@ class TaskEvent[T]:
     priority: int = 5
     timestamp: float = field(default_factory=time.time)
 
-    def get_event_data_dict(self) -> dict[str, Any]:
+    def get_event_data_dict(self) -> Dict[str, Any]:
         """获取事件数据的字典表示（向后兼容）"""
         if hasattr(self.data, "get_event_data"):
             return self.data.get_event_data()
@@ -176,11 +176,11 @@ class SimpleEventBus(IEventBus):
             max_history_size: 事件历史记录的最大大小
 
         """
-        self._handlers: dict[TaskEventType, list[Callable]] = {}
-        self._event_history: list[TaskEvent[Any]] = []
+        self._handlers: Dict[TaskEventType, List[Callable]] = {}
+        self._event_history: List[Any] = []
         self._max_history_size = max_history_size
         self._lock = asyncio.Lock()
-        self._statistics: dict[str, Any] = {
+        self._statistics: Dict[str, Any] = {
             "total_events": 0,
             "event_counts": {},
             "handler_errors": {},
@@ -189,11 +189,11 @@ class SimpleEventBus(IEventBus):
         self._logger = logging.getLogger(__name__)
 
         # 适配器兼容性
-        self._handler_id_map: dict[str, TaskEventType] = {}  # handler_id -> event_type
-        self._handler_to_id_map: dict[int, str] = {}  # id(handler) -> handler_id (using object id as key)
+        self._handler_id_map: Dict[str, TaskEventType] = {}  # handler_id -> event_type
+        self._handler_to_id_map: Dict[int, str] = {}  # id(handler) -> handler_id (using object id as key)
         self._id_counter = 0
-        self._once_handlers: dict[str, str] = {}
-        self._event_waiters: dict[TaskEventType, list[asyncio.Future]] = {}
+        self._once_handlers: Dict[str, str] = {}
+        self._event_waiters: Dict[TaskEventType, List[asyncio.Future]] = {}
 
     async def _execute_handler(
         self,
@@ -692,7 +692,7 @@ class SimpleEventBus(IEventBus):
         self._logger.debug(f"Once handler added successfully: {event_type} (ID: {handler_id})")
         return handler_id
 
-    def get_event_history(self, event_type: str | None = None) -> list[dict[str, Any]]:
+    def get_event_history(self, event_type: str | None = None) -> List[Dict[str, Any]]:
         """获取事件历史（实现 IEventBus 接口）
 
         Args:
@@ -740,7 +740,7 @@ class SimpleEventBus(IEventBus):
         self,
         event_type: ClassVar[str | TaskEventType | None] = None,
         limit: ClassVar[int] = 100,
-    ) -> list[TaskEvent[Any]]:
+    ) -> List[Any]:
         """获取事件历史（内部方法）
 
         Args:
@@ -901,7 +901,7 @@ class SimpleEventBus(IEventBus):
         self,
         event_type: str,
         timeout: ClassVar[float | None] = None,
-    ) -> dict[str, Any] | None:
+    ) -> Dict[str, Any] | None:
         """等待特定事件（实现 IEventBus 接口）
 
         Args:
@@ -969,7 +969,7 @@ class SimpleEventBus(IEventBus):
             self._logger.error(f"Failed to setup wait for event {event_type}: {e}", exc_info=True)
             return None
 
-    def get_event_statistics(self) -> dict[str, Any]:
+    def get_event_statistics(self) -> Dict[str, Any]:
         """获取事件统计
 
         Returns:
@@ -1034,7 +1034,7 @@ class SimpleEventBus(IEventBus):
 
         return len(self._handlers.get(event_type, []))
 
-    def get_handler_ids(self) -> list[str]:
+    def get_handler_ids(self) -> List[str]:
         """获取所有处理器ID
 
         Returns:

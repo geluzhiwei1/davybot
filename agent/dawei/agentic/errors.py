@@ -6,7 +6,7 @@
 """
 
 import time
-from typing import Any
+from typing import List, Dict, Any
 
 
 class AgenticError(Exception):
@@ -16,7 +16,7 @@ class AgenticError(Exception):
         self,
         message: str,
         error_code: str | None = None,
-        details: dict[str, Any] | None = None,
+        details: Dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.message = message
@@ -24,7 +24,7 @@ class AgenticError(Exception):
         self.details = details or {}
         self.timestamp = time.time()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "error": self.__class__.__name__,

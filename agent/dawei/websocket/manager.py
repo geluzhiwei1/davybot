@@ -9,8 +9,9 @@
 import asyncio
 import contextlib
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
@@ -73,7 +74,7 @@ class ConnectionInfo:
         """获取连接运行时间"""
         return datetime.now(UTC) - self.connected_at
 
-    def get_status(self) -> dict[str, Any]:
+    def get_status(self) -> Dict[str, Any]:
         """获取连接状态信息"""
         return {
             "session_id": self.session_id,
@@ -104,15 +105,15 @@ class WebSocketManager:
         if connection_timeout <= 0:
             raise ValidationError("connection_timeout", connection_timeout, "must be positive")
 
-        self.active_connections: dict[str, ConnectionInfo] = {}
+        self.active_connections: Dict[str, ConnectionInfo] = {}
         self.heartbeat_interval = heartbeat_interval
         self.connection_timeout = connection_timeout
-        self.message_handlers: dict[str, Callable] = {}
-        self.connection_listeners: list[Callable] = []
-        self.error_handlers: list[Callable] = []  # 错误处理器列表
+        self.message_handlers: Dict[str, Callable] = {}
+        self.connection_listeners: List[Callable] = []
+        self.error_handlers: List[Callable] = []  # 错误处理器列表
         self._heartbeat_task: asyncio.Task | None = None
         self._is_running = False
-        self._error_stats: dict[str, Any] = {
+        self._error_stats: Dict[str, Any] = {
             "total_errors": 0,
             "connection_errors": 0,
             "message_errors": 0,
@@ -124,7 +125,7 @@ class WebSocketManager:
 
         # 任务取消配置
         self._task_cancel_delay = 3  # 断开连接后3秒取消任务
-        self._pending_cancel_tasks: dict[str, asyncio.Task] = {}  # session_id -> cancel_task
+        self._pending_cancel_tasks: Dict[str, asyncio.Task] = {}  # session_id -> cancel_task
 
         # 初始化WebSocket状态管理器
         self._state_manager = WebSocketStateManager(
@@ -517,7 +518,7 @@ class WebSocketManager:
         session_id: str,
         code: str,
         message: str,
-        details: dict[str, Any] | None = None,
+        details: Dict[str, Any] | None = None,
         recoverable: bool = True,
     ):
         """发送错误消息"""
@@ -636,7 +637,7 @@ class WebSocketManager:
                 )
 
     @handle_errors(component="websocket_manager", operation="handle_error")
-    async def _handle_error(self, error_type: str, error_data: dict[str, Any]):
+    async def _handle_error(self, error_type: str, error_data: Dict[str, Any]):
         """处理错误"""
         # 通知所有错误处理器
         for handler in self.error_handlers:
@@ -714,7 +715,7 @@ class WebSocketManager:
         # 然后从本地连接信息中获取详细信息
         return self.active_connections.get(session_id)
 
-    def get_all_connections(self) -> dict[str, ConnectionInfo]:
+    def get_all_connections(self) -> Dict[str, ConnectionInfo]:
         """获取所有连接信息"""
         return self.active_connections.copy()
 
@@ -728,7 +729,7 @@ class WebSocketManager:
         connection_state = await self._state_manager.get_connection_state(session_id)
         return connection_state is not None and connection_state.is_connected
 
-    def get_error_statistics(self) -> dict[str, Any]:
+    def get_error_statistics(self) -> Dict[str, Any]:
         """获取错误统计信息"""
         return {
             **self._error_stats,
@@ -788,7 +789,7 @@ class WebSocketManager:
                 context={"session_id": session_id, "component": "websocket_manager"},
             )
 
-    async def get_connection_statistics(self) -> dict[str, Any]:
+    async def get_connection_statistics(self) -> Dict[str, Any]:
         """获取连接统计信息"""
         try:
             # 获取状态管理器的统计信息

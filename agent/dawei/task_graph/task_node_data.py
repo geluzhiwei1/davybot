@@ -6,9 +6,10 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from enum import Enum
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.entity.task_types import TaskStatus
 
@@ -35,18 +36,18 @@ class TaskContext:
     workspace_path: str | None = None
 
     # 任务相关上下文
-    parent_context: dict[str, Any] | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    parent_context: Dict[str, Any] | None = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     # 文件和资源
-    task_files: list[str] = field(default_factory=list)
-    task_images: list[str] = field(default_factory=list)
+    task_files: List[str] = field(default_factory=list)
+    task_images: List[str] = field(default_factory=list)
 
     # 时间戳
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "user_id": self.user_id,
@@ -62,7 +63,7 @@ class TaskContext:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskContext":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskContext":
         """从字典创建实例"""
         created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC)
         updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC)
@@ -80,7 +81,7 @@ class TaskContext:
             updated_at=updated_at,
         )
 
-    def merge(self, updates: dict[str, Any]) -> None:
+    def merge(self, updates: Dict[str, Any]) -> None:
         """合并更新"""
         for key, value in updates.items():
             if hasattr(self, key):
@@ -110,10 +111,10 @@ class TaskData:
     )
 
     # TODO 列表
-    todos: list[TodoItem] = field(default_factory=list)
+    todos: List[TodoItem] = field(default_factory=list)
 
     # 元数据
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     # 时间戳
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -150,7 +151,7 @@ class TaskData:
         self.metadata[key] = value
         self.updated_at = datetime.now(UTC)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "task_node_id": self.task_node_id,
@@ -166,7 +167,7 @@ class TaskData:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskData":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskData":
         """从字典创建实例"""
         created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC)
         updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC)
@@ -204,9 +205,9 @@ class StateTransition:
     to_status: TaskStatus
     timestamp: datetime
     reason: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "from_status": self.from_status.value,
@@ -217,7 +218,7 @@ class StateTransition:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StateTransition":
+    def from_dict(cls, data: Dict[str, Any]) -> "StateTransition":
         """从字典创建实例"""
         return cls(
             from_status=TaskStatus(data["from_status"]),
@@ -233,9 +234,9 @@ class ValidationResult:
     """验证结果"""
 
     is_valid: bool
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def add_error(self, error: str) -> None:
         """添加错误"""
@@ -246,7 +247,7 @@ class ValidationResult:
         """添加警告"""
         self.warnings.append(warning)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "is_valid": self.is_valid,

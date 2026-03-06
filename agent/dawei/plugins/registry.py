@@ -7,7 +7,7 @@ import contextlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.plugins.base import BasePlugin, PluginMetadata, PluginType
 from dawei.plugins.loader import PluginLoader
@@ -23,7 +23,7 @@ class PluginRegistration:
     manifest: PluginMetadata
     plugin: BasePlugin
     activated: bool = False
-    settings: dict[str, Any] = field(default_factory=dict)
+    settings: Dict[str, Any] = field(default_factory=dict)
 
 
 class PluginRegistry:
@@ -34,13 +34,13 @@ class PluginRegistry:
 
     def __init__(self):
         self.loader = PluginLoader()
-        self.registrations: dict[str, PluginRegistration] = {}
-        self.plugin_hooks: dict[str, list[Callable]] = {}
+        self.registrations: Dict[str, PluginRegistration] = {}
+        self.plugin_hooks: Dict[str, List[Callable]] = {}
 
     async def register_plugin(
         self,
         manifest: PluginMetadata,
-        settings: dict[str, Any],
+        settings: Dict[str, Any],
         auto_activate: bool = False,
     ) -> bool:
         """Register a plugin.
@@ -232,7 +232,7 @@ class PluginRegistry:
         self,
         plugin_type: PluginType | None = None,
         activated_only: bool = False,
-    ) -> list[PluginMetadata]:
+    ) -> List[PluginMetadata]:
         """List registered plugins.
 
         Args:
@@ -289,12 +289,12 @@ class PluginRegistry:
             except Exception as e:
                 logger.error(f"Error in hook handler for {event_name}: {e}", exc_info=True)
 
-    def get_plugin_settings(self, plugin_id: str) -> dict[str, Any] | None:
+    def get_plugin_settings(self, plugin_id: str) -> Dict[str, Any] | None:
         """Get plugin settings"""
         registration = self.registrations.get(plugin_id)
         return registration.settings if registration else None
 
-    async def update_plugin_settings(self, plugin_id: str, settings: dict[str, Any]) -> bool:
+    async def update_plugin_settings(self, plugin_id: str, settings: Dict[str, Any]) -> bool:
         """Update plugin settings.
 
         Args:

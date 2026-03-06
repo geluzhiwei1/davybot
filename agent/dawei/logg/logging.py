@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """统一日志记录模块
@@ -165,7 +166,7 @@ class AgenticLogger:
 
 
 # 全局日志记录器缓存
-_loggers: dict[str, AgenticLogger] = {}
+_loggers: Dict[str, AgenticLogger] = {}
 
 
 def get_logger(name: str, level: str | None = None) -> AgenticLogger:

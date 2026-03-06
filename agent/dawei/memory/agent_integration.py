@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Agent Memory Integration
@@ -8,7 +9,8 @@ Extends Agent class with memory system capabilities
 import asyncio
 import logging
 import uuid
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
 
 from dawei.agentic.agent import Agent, is_memory_enabled  # ✨ 导入统一配置函数
@@ -84,7 +86,7 @@ def setup_memory_system(agent: Agent) -> bool:
     return True
 
 
-async def _extract_memories_from_conversation(agent: Agent) -> list[MemoryEntry]:
+async def _extract_memories_from_conversation(agent: Agent) -> List[MemoryEntry]:
     """Extract structured memories from recent conversation
 
     This method analyzes recent conversation messages and extracts
@@ -240,7 +242,7 @@ def _infer_memory_type(subject: str, predicate: str, object: str) -> MemoryType:
     return MemoryType.FACT
 
 
-def _extract_keywords(subject: str, predicate: str, object: str) -> list[str]:
+def _extract_keywords(subject: str, predicate: str, object: str) -> List[str]:
     """Extract keywords from memory components"""
     import re
 
@@ -356,7 +358,7 @@ class AgentWithMemory(Agent):
         subject: str | None = None,
         predicate: str | None = None,
         object: str | None = None,
-    ) -> list[MemoryEntry]:
+    ) -> List[MemoryEntry]:
         """Query memory graph"""
         if not self.memory_graph:
             return []
@@ -375,7 +377,7 @@ class AgentWithMemory(Agent):
         object: str,
         memory_type: str = "fact",
         confidence: float = 0.8,
-        keywords: list[str] | None = None,
+        keywords: List[str] | None = None,
     ) -> MemoryEntry | None:
         """Add a memory to the graph"""
         if not self.memory_graph:

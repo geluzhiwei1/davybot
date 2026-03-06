@@ -8,7 +8,7 @@
 
 import json
 import uuid
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
@@ -324,7 +324,7 @@ class WebSocketServer:
             # 连接断开时的处理
             pass
 
-    async def _on_error(self, error_type: str, error_data: dict[str, Any]):
+    async def _on_error(self, error_type: str, error_data: Dict[str, Any]):
         """错误事件处理器
 
         Args:
@@ -397,7 +397,7 @@ class WebSocketServer:
             except Exception:
                 logger.exception("广播消息失败 - 直接广播错误: ")
 
-    async def get_server_status(self) -> dict[str, Any]:
+    async def get_server_status(self) -> Dict[str, Any]:
         """获取服务器状态
 
         Returns:

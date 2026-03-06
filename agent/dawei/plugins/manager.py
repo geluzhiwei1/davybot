@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.plugins.base import PluginMetadata, PluginType
 from dawei.plugins.registry import PluginRegistry
@@ -38,7 +38,7 @@ class PluginManager:
 
         logger.info(f"PluginManager initialized with workspace: {workspace_path}")
 
-    def _init_discovery_paths(self) -> list[Path]:
+    def _init_discovery_paths(self) -> List[Path]:
         """Initialize 4-tier discovery paths"""
         paths = []
 
@@ -66,7 +66,7 @@ class PluginManager:
 
         return paths
 
-    async def discover_and_load_all(self, settings: dict[str, str] | None = None) -> int:
+    async def discover_and_load_all(self, settings: Dict[str, str] | None = None) -> int:
         """Discover and load all plugins from discovery paths.
 
         Args:
@@ -115,7 +115,7 @@ class PluginManager:
         logger.info(f"Loaded {loaded_count}/{len(manifests)} plugins, activated {activated_count}")
         return loaded_count
 
-    async def load_plugin_from_path(self, plugin_dir: Path, settings: dict[str, Any]) -> bool:
+    async def load_plugin_from_path(self, plugin_dir: Path, settings: Dict[str, Any]) -> bool:
         """Load a plugin from a specific directory.
 
         Args:
@@ -221,7 +221,7 @@ class PluginManager:
         self,
         plugin_type: PluginType | None = None,
         activated_only: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """List all plugins with their status.
 
         Args:
@@ -357,7 +357,7 @@ class PluginManager:
         """
         await self.registry.emit_event(event_name, event_data)
 
-    async def get_plugin_tools(self) -> list[Any]:
+    async def get_plugin_tools(self) -> List[Any]:
         """Get all tools from activated tool plugins.
 
         Returns:
@@ -376,11 +376,11 @@ class PluginManager:
 
         return tools
 
-    async def update_plugin_settings(self, plugin_id: str, settings: dict[str, Any]) -> bool:
+    async def update_plugin_settings(self, plugin_id: str, settings: Dict[str, Any]) -> bool:
         """Update plugin settings"""
         return await self.registry.update_plugin_settings(plugin_id, settings)
 
-    def get_plugin_settings(self, plugin_id: str) -> dict[str, Any] | None:
+    def get_plugin_settings(self, plugin_id: str) -> Dict[str, Any] | None:
         """Get plugin settings"""
         return self.registry.get_plugin_settings(plugin_id)
 
@@ -397,7 +397,7 @@ class PluginManager:
 
         logger.info("Plugin manager shutdown complete")
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """Get plugin system statistics"""
         total = len(self.registry.registrations)
         activated = sum(1 for r in self.registry.registrations.values() if r.activated)
@@ -414,7 +414,7 @@ class PluginManager:
             "discovery_paths": [str(p) for p in self.discovery_paths],
         }
 
-    def get_config_schema(self, plugin_id: str) -> dict[str, Any] | None:
+    def get_config_schema(self, plugin_id: str) -> Dict[str, Any] | None:
         """Get configuration schema for a plugin.
 
         Args:
@@ -430,7 +430,7 @@ class PluginManager:
 
         return getattr(manifest, "config_schema", None)
 
-    def validate_config(self, plugin_id: str, config: dict[str, Any]) -> tuple[bool, list[str]]:
+    def validate_config(self, plugin_id: str, config: Dict[str, Any]) -> tuple[bool, List[str]]:
         """Validate plugin configuration against schema.
 
         Args:
@@ -471,7 +471,7 @@ class PluginManager:
 
         return PluginConfigManager(workspace_path=self.workspace_path)
 
-    async def save_plugin_config(self, plugin_id: str, config: dict[str, Any]) -> bool:
+    async def save_plugin_config(self, plugin_id: str, config: Dict[str, Any]) -> bool:
         """Save and apply plugin configuration using PluginConfigManager.
 
         Args:
@@ -514,7 +514,7 @@ class PluginManager:
             logger.exception(f"Failed to save config for {plugin_id}: ")
             return False
 
-    def get_plugin_config(self, plugin_id: str) -> dict[str, Any] | None:
+    def get_plugin_config(self, plugin_id: str) -> Dict[str, Any] | None:
         """Load saved plugin configuration using PluginConfigManager.
 
         Args:

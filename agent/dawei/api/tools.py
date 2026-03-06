@@ -8,7 +8,7 @@ Provides REST API endpoints for slash command management and tool operations.
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -82,7 +82,7 @@ def _update_workspace_context(manager: CommandManager, workspace: str | None) ->
         manager.workspace_root = Path(workspace)
 
 
-def _format_command_for_response(cmd_name: str, cmd: Any) -> dict[str, str | None]:
+def _format_command_for_response(cmd_name: str, cmd: Any) -> Dict[str, str | None]:
     """Format command object for API response.
 
     Args:
@@ -109,7 +109,7 @@ def _format_command_for_response(cmd_name: str, cmd: Any) -> dict[str, str | Non
 
 
 @router.get("/commands")
-async def list_commands(workspace: str | None = None, reload: bool = False) -> dict[str, Any]:
+async def list_commands(workspace: str | None = None, reload: bool = False) -> Dict[str, Any]:
     """List all available slash commands.
 
     Args:
@@ -156,7 +156,7 @@ async def list_commands(workspace: str | None = None, reload: bool = False) -> d
 
 
 @router.get("/commands/{command_name}")
-async def get_command(command_name: str, workspace: str | None = None) -> dict[str, Any]:
+async def get_command(command_name: str, workspace: str | None = None) -> Dict[str, Any]:
     """Get a specific slash command by name.
 
     Args:
@@ -184,7 +184,7 @@ async def get_command(command_name: str, workspace: str | None = None) -> dict[s
 
 
 @router.post("/commands/reload")
-async def reload_commands(workspace: str | None = None) -> dict[str, Any]:
+async def reload_commands(workspace: str | None = None) -> Dict[str, Any]:
     """Reload slash commands from disk.
 
     Useful after adding/modifying command files without restarting the server.
@@ -217,7 +217,7 @@ async def execute_command(
     command: str,
     args: str | None = None,
     workspace: str | None = None,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Execute a slash command and return its result.
 
     This endpoint provides direct command execution for testing without

@@ -7,7 +7,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.entity.task_types import TaskStatus
 from dawei.entity.user_input_message import UserInputText
@@ -109,7 +109,7 @@ class TaskDataValidationRule(ValidationRule):
 
         return result
 
-    def _validate_todo_list(self, todos: list[TodoItem]) -> ValidationResult:
+    def _validate_todo_list(self, todos: List[TodoItem]) -> ValidationResult:
         """验证TODO列表"""
         result = ValidationResult(is_valid=True)
 
@@ -207,7 +207,7 @@ class StatusTransitionValidationRule(ValidationRule):
             TaskStatus.ABORTED: {TaskStatus.PENDING, TaskStatus.RUNNING},
         }
 
-    def validate(self, transition_data: dict[str, Any]) -> ValidationResult:
+    def validate(self, transition_data: Dict[str, Any]) -> ValidationResult:
         """验证状态转换"""
         result = ValidationResult(is_valid=True)
 
@@ -241,7 +241,7 @@ class TaskValidator:
     """任务验证器"""
 
     def __init__(self):
-        self._rules: list[ValidationRule] = []
+        self._rules: List[ValidationRule] = []
         self.logger = get_logger(__name__)
         self._setup_default_rules()
 
@@ -340,7 +340,7 @@ class TaskValidator:
         self.logger.warning(f"Validation rule not found: {rule_name}")
         return False
 
-    def get_rules(self) -> list[str]:
+    def get_rules(self) -> List[str]:
         """获取所有规则名称"""
         return [rule.name for rule in self._rules]
 

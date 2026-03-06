@@ -7,7 +7,7 @@
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.core.errors import TaskNotFoundError, ValidationError
 from dawei.logg.logging import get_logger
@@ -37,8 +37,8 @@ class TodoUpdate:
     task_id: str
     todo_id: str | None = None
     action: str = ""  # add, update, remove, batch_update
-    todo_data: dict[str, Any] | None = None
-    todos: list[TodoItem] | None = None
+    todo_data: Dict[str, Any] | None = None
+    todos: List[TodoItem] | None = None
     new_status: TodoStatus | None = None
 
 
@@ -47,7 +47,7 @@ class TodoManager:
 
     def __init__(self, event_bus=None):
         self._event_bus = event_bus
-        self._todo_lists: dict[str, list[TodoItem]] = {}
+        self._todo_lists: Dict[str, List[TodoItem]] = {}
         self._lock = asyncio.Lock()
         self.logger = get_logger(__name__)
 
@@ -64,7 +64,7 @@ class TodoManager:
     async def update_todos(
         self,
         task_id: str,
-        todos: list[TodoItem],
+        todos: List[TodoItem],
         source: str = "user",
         auto_progress: bool = True,
     ) -> bool:
@@ -263,7 +263,7 @@ class TodoManager:
             self.logger.warning(f"TODO item {todo_id} not found in task {task_id}")
             return False
 
-    async def batch_update_todos(self, updates: list[TodoUpdate], source: str = "system") -> bool:
+    async def batch_update_todos(self, updates: List[TodoUpdate], source: str = "system") -> bool:
         """批量更新 TODO 列表"""
         async with self._lock:
             results = []
@@ -321,7 +321,7 @@ class TodoManager:
             self.logger.info(f"Batch updated todos: {success_count}/{len(updates)} successful")
             return success_count == len(updates)
 
-    async def get_todos(self, task_id: str) -> list[TodoItem]:
+    async def get_todos(self, task_id: str) -> List[TodoItem]:
         """获取任务的 TODO 列表"""
         try:
             async with self._lock:
@@ -330,7 +330,7 @@ class TodoManager:
             self.logger.exception("Failed to get todos for task {task_id}: ")
             return []
 
-    def validate_todos(self, todos: list[TodoItem]) -> ValidationResult:
+    def validate_todos(self, todos: List[TodoItem]) -> ValidationResult:
         """验证 TODO 列表"""
         result = ValidationResult(is_valid=True)
 
@@ -372,7 +372,7 @@ class TodoManager:
 
         return result
 
-    async def get_todo_statistics(self, task_id: str) -> dict[str, Any]:
+    async def get_todo_statistics(self, task_id: str) -> Dict[str, Any]:
         """获取 TODO 统计信息"""
         try:
             todos = await self.get_todos(task_id)
@@ -408,7 +408,7 @@ class TodoManager:
                 "completion_rate": 0.0,
             }
 
-    async def save_todos(self, task_id: str) -> dict[str, Any]:
+    async def save_todos(self, task_id: str) -> Dict[str, Any]:
         """保存 TODO 列表到持久化存储"""
         todos = await self.get_todos(task_id)
         return {
@@ -417,7 +417,7 @@ class TodoManager:
             "timestamp": asyncio.get_event_loop().time(),
         }
 
-    async def load_todos(self, task_id: str, data: dict[str, Any]) -> bool:
+    async def load_todos(self, task_id: str, data: Dict[str, Any]) -> bool:
         """从持久化存储加载 TODO 列表"""
         if not data or "todos" not in data:
             return False
@@ -425,7 +425,7 @@ class TodoManager:
         todos = [TodoItem.from_dict(todo_data) for todo_data in data["todos"]]
         return await self.update_todos(task_id, todos, "persistence")
 
-    async def _ensure_single_in_progress(self, todos: list[TodoItem]) -> list[TodoItem]:
+    async def _ensure_single_in_progress(self, todos: List[TodoItem]) -> List[TodoItem]:
         """确保同时只有一个 TODO 是 IN_PROGRESS
 
         Args:

@@ -7,7 +7,7 @@
 
 import asyncio
 import time
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.agent_config import Config
 from dawei.agentic.checkpoint_manager import (
@@ -116,8 +116,8 @@ class TaskNodeExecutionEngine:
         description: str,
         mode: str = "",
         parent_task_id: str | None = None,
-        todos: list[TodoItem] | None = None,
-        metadata: dict[str, Any] | None = None,
+        todos: List[TodoItem] | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> None:
         """创建任务（更新当前任务节点的属性）
 
@@ -819,7 +819,7 @@ class TaskNodeExecutionEngine:
 
                 self.last_checkpoint_time = current_time
 
-    def _get_capabilities(self) -> list[str]:
+    def _get_capabilities(self) -> List[str]:
         """获取能力列表
 
         Returns:
@@ -856,7 +856,7 @@ class TaskNodeExecutionEngine:
         """
         return self.execution_task is not None and not self.execution_task.done()
 
-    async def get_execution_status(self) -> dict[str, Any]:
+    async def get_execution_status(self) -> Dict[str, Any]:
         """获取执行状态
 
         Returns:
@@ -937,7 +937,7 @@ class TaskNodeExecutionEngine:
         self,
         error_message: str,
         error_type: str = "execution_error",
-        details: dict[str, Any] | None = None,
+        details: Dict[str, Any] | None = None,
     ) -> None:
         """发送错误消息到前端
 

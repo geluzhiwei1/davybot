@@ -9,7 +9,7 @@
 import asyncio
 import contextlib
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.logg.logging import get_logger
 from dawei.websocket.manager import WebSocketManager
@@ -53,7 +53,7 @@ class BaseWebSocketMessageHandler(ABC):
         """
 
     @abstractmethod
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         """获取支持的消息类型列表
 
         Returns:
@@ -125,7 +125,7 @@ class BaseWebSocketMessageHandler(ABC):
         session_id: str,
         code: str,
         message: str,
-        details: dict[str, Any] | None = None,
+        details: Dict[str, Any] | None = None,
         recoverable: bool = True,
     ) -> bool:
         """发送错误消息
@@ -169,8 +169,8 @@ class BaseWebSocketMessageHandler(ABC):
     async def update_session_data(
         self,
         session_id: str,
-        data: dict[str, Any] | None = None,
-        metadata: dict[str, Any] | None = None,
+        data: Dict[str, Any] | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> bool:
         """更新会话数据
 
@@ -241,7 +241,7 @@ class AsyncMessageHandler(BaseWebSocketMessageHandler):
     def __init__(self, max_concurrent_tasks: int = 10):
         super().__init__()
         self.max_concurrent_tasks = max_concurrent_tasks
-        self.active_tasks: dict[str, asyncio.Task] = {}
+        self.active_tasks: Dict[str, asyncio.Task] = {}
         self.task_semaphore = asyncio.Semaphore(max_concurrent_tasks)
 
     async def handle(
@@ -340,7 +340,7 @@ class AsyncMessageHandler(BaseWebSocketMessageHandler):
         """获取活跃任务数量"""
         return len(self.active_tasks)
 
-    def get_active_tasks(self) -> list[str]:
+    def get_active_tasks(self) -> List[str]:
         """获取活跃任务列表"""
         return list(self.active_tasks.keys())
 
@@ -350,7 +350,7 @@ class StatefulMessageHandler(BaseWebSocketMessageHandler):
 
     def __init__(self):
         super().__init__()
-        self.handler_state: dict[str, Any] = {}
+        self.handler_state: Dict[str, Any] = {}
         self.state_lock = asyncio.Lock()
 
     async def get_state(self, key: str, default: Any = None) -> Any:
@@ -378,7 +378,7 @@ class StatefulMessageHandler(BaseWebSocketMessageHandler):
         async with self.state_lock:
             self.handler_state[key] = value
 
-    async def update_state(self, updates: dict[str, Any]):
+    async def update_state(self, updates: Dict[str, Any]):
         """更新处理器状态
 
         Args:
@@ -393,7 +393,7 @@ class StatefulMessageHandler(BaseWebSocketMessageHandler):
         async with self.state_lock:
             self.handler_state.clear()
 
-    async def get_all_state(self) -> dict[str, Any]:
+    async def get_all_state(self) -> Dict[str, Any]:
         """获取所有处理器状态"""
         async with self.state_lock:
             return self.handler_state.copy()

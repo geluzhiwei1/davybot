@@ -12,7 +12,7 @@ If the SDK is not available, operations will fail immediately (fast fail).
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from .models import CliExecutionError
 
@@ -99,7 +99,7 @@ class CliWrapper:
     # Health Check
     # ========================================================================
 
-    def health(self) -> dict[str, Any]:
+    def health(self) -> Dict[str, Any]:
         """Check Market API health status.
 
         Returns:
@@ -117,7 +117,7 @@ class CliWrapper:
     # Search
     # ========================================================================
 
-    def search(self, query: str, resource_type: str = "skill", limit: int = 20) -> dict[str, Any]:
+    def search(self, query: str, resource_type: str = "skill", limit: int = 20) -> Dict[str, Any]:
         """Search for resources in the market.
 
         Args:
@@ -139,11 +139,11 @@ class CliWrapper:
         except Exception as e:
             self._handle_error(e, f"search {query}")
 
-    def search_skills(self, query: str, limit: int = 20) -> dict[str, Any]:
+    def search_skills(self, query: str, limit: int = 20) -> Dict[str, Any]:
         """Search for skills."""
         return self.search(query, "skill", limit)
 
-    def search_agents(self, query: str, limit: int = 20) -> dict[str, Any]:
+    def search_agents(self, query: str, limit: int = 20) -> Dict[str, Any]:
         """Search for agents."""
         return self.search(query, "agent", limit)
 
@@ -151,7 +151,7 @@ class CliWrapper:
     # List Resources
     # ========================================================================
 
-    def list_resources(self, resource_type: str, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+    def list_resources(self, resource_type: str, limit: int = 50, skip: int = 0) -> Dict[str, Any]:
         """List all resources of a type.
 
         Args:
@@ -191,15 +191,15 @@ class CliWrapper:
         except Exception as e:
             self._handle_error(e, f"list {resource_type}")
 
-    def list_skills(self, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+    def list_skills(self, limit: int = 50, skip: int = 0) -> Dict[str, Any]:
         """List all skills."""
         return self.list_resources("skill", limit=limit, skip=skip)
 
-    def list_agents(self, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+    def list_agents(self, limit: int = 50, skip: int = 0) -> Dict[str, Any]:
         """List all agents."""
         return self.list_resources("agent", limit=limit, skip=skip)
 
-    def list_plugins(self, limit: int = 50, skip: int = 0) -> dict[str, Any]:
+    def list_plugins(self, limit: int = 50, skip: int = 0) -> Dict[str, Any]:
         """List all plugins."""
         return self.list_resources("plugin", limit=limit, skip=skip)
 
@@ -207,7 +207,7 @@ class CliWrapper:
     # Resource Info
     # ========================================================================
 
-    def info(self, resource_type: str, identifier: str) -> dict[str, Any]:
+    def info(self, resource_type: str, identifier: str) -> Dict[str, Any]:
         """Get detailed information about a resource.
 
         Args:
@@ -249,7 +249,7 @@ class CliWrapper:
         resource_uri: str,
         output_dir: str,
         format: str = "zip",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """Install a resource (skill, agent, etc.).
 
         Args:

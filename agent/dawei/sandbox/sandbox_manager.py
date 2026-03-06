@@ -206,7 +206,7 @@ class SandboxManager:
         command: str,
         workspace_path: Path,
         user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """在沙箱中执行命令
 
         Args:
@@ -525,7 +525,7 @@ class SandboxManager:
         command: str,
         workspace_path: Path,
         user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """异步执行命令"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(

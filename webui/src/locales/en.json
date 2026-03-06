@@ -696,6 +696,7 @@
     "conversations": "Conversations",
     "workspace": "Workspace",
     "memory": "Memory",
+    "knowledge": "Knowledge",
     "newConversation": "New Chat",
     "deleteAll": "Delete All",
     "deleteConversation": "Delete Conversation",

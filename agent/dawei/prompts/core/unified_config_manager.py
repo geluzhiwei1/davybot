@@ -10,7 +10,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 import yaml
 
@@ -25,8 +25,8 @@ class LanguageConfig:
 
     name: str
     code: str
-    sections: dict[str, dict[str, Any]] = field(default_factory=dict)
-    custom_variables: dict[str, Any] = field(default_factory=dict)
+    sections: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    custom_variables: Dict[str, Any] = field(default_factory=dict)
 
 
 class UnifiedConfigManager:
@@ -48,9 +48,9 @@ class UnifiedConfigManager:
         self.config_path = Path(config_path or base_path / "prompts" / "config")
 
         # 配置缓存
-        self.template_config: dict[str, Any] = {}
-        self.mode_configs: dict[str, ModeConfig] = {}
-        self.language_configs: dict[str, LanguageConfig] = {}
+        self.template_config: Dict[str, Any] = {}
+        self.mode_configs: Dict[str, ModeConfig] = {}
+        self.language_configs: Dict[str, LanguageConfig] = {}
 
         # 线程锁
         self._lock = threading.RLock()
@@ -88,7 +88,7 @@ class UnifiedConfigManager:
             default_config = self._get_default_template_config()
             self.template_config = {**default_config, **self.template_config}
 
-    def _get_default_template_config(self) -> dict[str, Any]:
+    def _get_default_template_config(self) -> Dict[str, Any]:
         """获取默认模板配置"""
         return {
             "templates": {
@@ -140,7 +140,7 @@ class UnifiedConfigManager:
                 self.mode_configs[mode_config.slug] = mode_config
                 logger.debug(f"Loaded mode config: {mode_config.slug}")
 
-    def _parse_mode_config(self, config_data: dict[str, Any]) -> ModeConfig | None:
+    def _parse_mode_config(self, config_data: Dict[str, Any]) -> ModeConfig | None:
         """解析模式配置"""
         mode_config = config_data.get("mode", {})
         return ModeConfig(
@@ -226,7 +226,7 @@ class UnifiedConfigManager:
                 self.language_configs[language_config.code] = language_config
                 logger.debug(f"Loaded language config: {language_config.code}")
 
-    def _parse_language_config(self, config_data: dict[str, Any]) -> LanguageConfig | None:
+    def _parse_language_config(self, config_data: Dict[str, Any]) -> LanguageConfig | None:
         """解析语言配置"""
         language_config = config_data.get("language", {})
         return LanguageConfig(
@@ -257,7 +257,7 @@ class UnifiedConfigManager:
                         indent=2,
                     )
 
-    def get_template_config(self) -> dict[str, Any]:
+    def get_template_config(self) -> Dict[str, Any]:
         """获取模板配置
 
         Returns:
@@ -290,7 +290,7 @@ class UnifiedConfigManager:
         """
         return self.language_configs.get(language)
 
-    def get_all_modes(self) -> list[str]:
+    def get_all_modes(self) -> List[str]:
         """获取所有可用模式
 
         Returns:
@@ -299,7 +299,7 @@ class UnifiedConfigManager:
         """
         return list(self.mode_configs.keys())
 
-    def get_all_languages(self) -> list[str]:
+    def get_all_languages(self) -> List[str]:
         """获取所有可用语言
 
         Returns:
@@ -314,7 +314,7 @@ class UnifiedConfigManager:
             self._load_all_configs()
             logger.info("Configuration reloaded successfully")
 
-    def validate_config(self) -> list[str]:
+    def validate_config(self) -> List[str]:
         """验证配置
 
         Returns:

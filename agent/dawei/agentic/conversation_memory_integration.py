@@ -11,8 +11,9 @@
 """
 
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from .conversation_compressor import CompressionStats
 
@@ -53,11 +54,11 @@ class ConversationMemoryIntegration:
 
     async def extract_memories_from_compression(
         self,
-        original_messages: list[dict[str, Any]],
-        compressed_messages: list[dict[str, Any]],
+        original_messages: List[Dict[str, Any]],
+        compressed_messages: List[Dict[str, Any]],
         _stats: CompressionStats,
         session_id: str,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """从压缩的消息中提取记忆
 
         提取类型：
@@ -122,7 +123,7 @@ class ConversationMemoryIntegration:
         content: str,
         role: str,
         session_id: str,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """提取事实记忆
 
         识别用户陈述的事实、偏好等信息。
@@ -177,7 +178,7 @@ class ConversationMemoryIntegration:
         content: str,
         role: str,
         session_id: str,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """提取策略记忆
 
         识别解决方案、方法、步骤等。
@@ -240,7 +241,7 @@ class ConversationMemoryIntegration:
         _role: str,
         session_id: str,
         message_index: int,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """提取情景记忆
 
         记录重要的交互事件。
@@ -300,7 +301,7 @@ class ConversationMemoryIntegration:
 
         return memories
 
-    def _extract_keywords(self, text: str) -> list[str]:
+    def _extract_keywords(self, text: str) -> List[str]:
         """提取关键词
 
         简单的关键词提取实现
@@ -335,7 +336,7 @@ class ConversationMemoryIntegration:
 
         return keywords[:10]  # 最多10个关键词
 
-    async def _store_memories(self, memories: list[dict[str, Any]], _session_id: str):
+    async def _store_memories(self, memories: List[Dict[str, Any]], _session_id: str):
         """存储记忆到MemoryGraph
 
         Args:
@@ -372,7 +373,7 @@ class ConversationMemoryIntegration:
         query: str,
         _session_id: str,
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """检索相关记忆
 
         Args:
@@ -414,11 +415,11 @@ class ConversationMemoryIntegration:
 
     async def inject_memories_to_context(
         self,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         query: str,
         session_id: str,
         max_memories: int = 5,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """将相关记忆注入到上下文
 
         在系统提示后添加检索到的记忆。
@@ -459,7 +460,7 @@ class ConversationMemoryIntegration:
         self.logger.info(f"Injected {len(memories)} memories into context")
         return result
 
-    def _format_memories(self, memories: list[dict[str, Any]]) -> str:
+    def _format_memories(self, memories: List[Dict[str, Any]]) -> str:
         """格式化记忆为文本
 
         Args:
@@ -491,9 +492,9 @@ class ConversationMemoryIntegration:
 
     async def create_context_pages(
         self,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         session_id: str,
-    ) -> list[str]:
+    ) -> List[str]:
         """将对话历史创建为上下文页面
 
         用于VirtualContextManager的分页管理。
@@ -535,7 +536,7 @@ class ConversationMemoryIntegration:
         self.logger.info(f"Created {len(page_ids)} context pages for {len(messages)} messages")
         return page_ids
 
-    def _format_page_content(self, messages: list[dict[str, Any]], start_index: int) -> str:
+    def _format_page_content(self, messages: List[Dict[str, Any]], start_index: int) -> str:
         """格式化页面内容"""
         lines = [f"Conversation Page {start_index // 20 + 1}"]
 
@@ -552,7 +553,7 @@ class ConversationMemoryIntegration:
 
         return "\n".join(lines)
 
-    def _generate_page_summary(self, messages: list[dict[str, Any]], start_index: int) -> str:
+    def _generate_page_summary(self, messages: List[Dict[str, Any]], start_index: int) -> str:
         """生成页面摘要"""
         role_counts = {}
         for msg in messages:
@@ -611,7 +612,7 @@ class ConversationMemoryIntegration:
 
         return ""
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """获取集成统计信息"""
         return {
             "memory_graph_enabled": self.memory_graph is not None,

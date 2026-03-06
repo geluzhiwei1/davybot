@@ -18,9 +18,13 @@
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
-from typing import ClassVar
+from typing import List, Dict, ClassVar
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
 
 # ============================================================================
 # 数据类定义
@@ -44,7 +48,7 @@ class FileReference:
 
     raw_path: str  # 原始路径 (如 "@file.py")
     reference_type: ReferenceType
-    resolved_paths: list[str] = field(default_factory=list)  # 解析后的路径列表
+    resolved_paths: List[str] = field(default_factory=list)  # 解析后的路径列表
     line_number: int | None = None  # 在消息中的行号
     is_valid: bool = True
     error_message: str | None = None
@@ -56,7 +60,7 @@ class ParsedMessage:
 
     original_message: str
     cleaned_message: str  # 移除引用后的消息
-    references: list[FileReference]
+    references: List[FileReference]
     total_files: int  # 引用的文件总数
 
 
@@ -81,7 +85,7 @@ class FileReferenceParser:
         re.MULTILINE,  # 匹配 @xxx (遇到空格或行尾结束，不包含空格)
     )
 
-    WILDCARD_PATTERNS: ClassVar[dict[str, ReferenceType]] = {
+    WILDCARD_PATTERNS: ClassVar[Dict[str, ReferenceType]] = {
         "*": ReferenceType.WILDCARD,
         "**": ReferenceType.RECURSIVE,
     }
@@ -160,7 +164,7 @@ class FileReferenceParser:
         # 默认为文件
         return ReferenceType.FILE
 
-    def _clean_message(self, message: str, references: list[FileReference]) -> str:
+    def _clean_message(self, message: str, references: List[FileReference]) -> str:
         """清理消息，移除文件引用标记
 
         Args:
@@ -199,7 +203,7 @@ class FileReferenceParser:
         cleaned = re.sub(r"\s+", " ", cleaned)
         return cleaned.strip()
 
-    def extract_references_from_lines(self, lines: list[str]) -> list[FileReference]:
+    def extract_references_from_lines(self, lines: List[str]) -> List[FileReference]:
         """从多行文本中提取引用（支持代码块）
 
         Args:
@@ -245,7 +249,7 @@ class PathResolver:
         self.workspace_root = workspace_root or Path.cwd()
         self.logger = logging.getLogger(__name__)
 
-    def resolve(self, reference: FileReference) -> list[str]:
+    def resolve(self, reference: FileReference) -> List[str]:
         """解析文件引用为实际路径列表
 
         Args:
@@ -320,7 +324,7 @@ class PathResolver:
             reference.error_message = str(e)
             return []
 
-    def _resolve_file(self, path: Path, reference: FileReference) -> list[str]:
+    def _resolve_file(self, path: Path, reference: FileReference) -> List[str]:
         """解析单个文件"""
         if not path.exists():
             reference.is_valid = False
@@ -334,7 +338,7 @@ class PathResolver:
 
         return [str(path)]
 
-    def _resolve_folder(self, path: Path, reference: FileReference) -> list[str]:
+    def _resolve_folder(self, path: Path, reference: FileReference) -> List[str]:
         """解析文件夹"""
         if not path.exists():
             reference.is_valid = False
@@ -362,7 +366,7 @@ class PathResolver:
             reference.error_message = f"Failed to list folder: {e}"
             return []
 
-    def _resolve_wildcard(self, path: Path, reference: FileReference, recursive: bool) -> list[str]:
+    def _resolve_wildcard(self, path: Path, reference: FileReference, recursive: bool) -> List[str]:
         """解析通配符模式"""
         # 获取父目录和模式
         path_str = str(path)

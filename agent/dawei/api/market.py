@@ -6,7 +6,7 @@ skills, agents, and plugins from the davybot market.
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 
 # Singleton instances
 _cli_wrapper: CliWrapper | None = None
-_installers: dict[str, MarketInstaller] = {}
+_installers: Dict[str, MarketInstaller] = {}
 
 
 # ============================================================================
@@ -53,7 +53,7 @@ class SearchResponse(BaseModel):
     query: str
     type: str
     total: int
-    results: list[dict[str, Any]]
+    results: List[Dict[str, Any]]
 
 
 class InstallRequest(BaseModel):
@@ -69,14 +69,14 @@ class InstallResponse(BaseModel):
     """Install response model."""
 
     success: bool
-    result: dict[str, Any]
+    result: Dict[str, Any]
 
 
 class InfoResponse(BaseModel):
     """Resource info response model."""
 
     success: bool
-    resource: dict[str, Any] | None = None
+    resource: Dict[str, Any] | None = None
     error: str | None = None
 
 

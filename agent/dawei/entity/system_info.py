@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import List, Dict, Any
 
 # 敏感环境变量键名模式
 SENSITIVE_ENV_PATTERNS = [
@@ -36,9 +36,9 @@ class SystemEnvironments:
     memory_available: int = 0  # MB
     disk_total: int = 0  # MB
     disk_available: int = 0  # MB
-    environment_variables: dict[str, str] = field(default_factory=dict)
+    environment_variables: Dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self, include_env_vars: bool = False) -> dict[str, Any]:
+    def to_dict(self, include_env_vars: bool = False) -> Dict[str, Any]:
         """转换为字典
 
         Args:
@@ -65,7 +65,7 @@ class SystemEnvironments:
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SystemEnvironments":
+    def from_dict(cls, data: Dict[str, Any]) -> "SystemEnvironments":
         """从字典创建系统环境信息"""
         return cls(
             os_name=data.get("os_name", ""),
@@ -79,7 +79,7 @@ class SystemEnvironments:
             environment_variables=data.get("environment_variables", {}),
         )
 
-    def _sanitize_env_vars(self, env_vars: dict[str, str]) -> dict[str, str]:
+    def _sanitize_env_vars(self, env_vars: Dict[str, str]) -> Dict[str, str]:
         """过滤敏感环境变量
 
         Args:
@@ -107,7 +107,7 @@ class SystemEnvironments:
 
         return sanitized
 
-    def get_safe_for_analytics(self) -> dict[str, Any]:
+    def get_safe_for_analytics(self) -> Dict[str, Any]:
         """获取安全的分析数据 (隐私保护版本)
 
         这是用于分析数据收集的推荐方法。
@@ -136,7 +136,7 @@ class UserUIEnvironments:
     timezone: str = ""
     screen_resolution: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "browser_name": self.browser_name,
@@ -148,7 +148,7 @@ class UserUIEnvironments:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "UserUIEnvironments":
+    def from_dict(cls, data: Dict[str, Any]) -> "UserUIEnvironments":
         """从字典创建用户UI环境信息"""
         return cls(
             browser_name=data.get("browser_name", ""),
@@ -159,7 +159,7 @@ class UserUIEnvironments:
             screen_resolution=data.get("screen_resolution", ""),
         )
 
-    def get_safe_for_analytics(self) -> dict[str, Any]:
+    def get_safe_for_analytics(self) -> Dict[str, Any]:
         """获取安全的分析数据
 
         对于 UI 环境信息，所有字段通常都是安全的。
@@ -181,16 +181,16 @@ class UserUIContext:
     - user_preferences 可能包含个人设置，需要谨慎处理
     """
 
-    open_files: list[str] = field(default_factory=list)
-    active_applications: list[str] = field(default_factory=list)
-    user_preferences: dict[str, Any] = field(default_factory=dict)
+    open_files: List[str] = field(default_factory=list)
+    active_applications: List[str] = field(default_factory=list)
+    user_preferences: Dict[str, Any] = field(default_factory=dict)
     current_file: str | None = None
     current_selected_content: str | None = None
     current_mode: str | None = None
     current_llm_id: str | None = None
     conversation_id: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "open_files": self.open_files,
@@ -204,7 +204,7 @@ class UserUIContext:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "UserUIContext":
+    def from_dict(cls, data: Dict[str, Any]) -> "UserUIContext":
         """从字典创建用户UI上下文信息"""
         return cls(
             open_files=data.get("open_files", []),
@@ -217,7 +217,7 @@ class UserUIContext:
             conversation_id=data.get("conversation_id"),
         )
 
-    def get_safe_for_analytics(self) -> dict[str, Any]:
+    def get_safe_for_analytics(self) -> Dict[str, Any]:
         """获取安全的分析数据 (隐私保护版本)
 
         排除或匿名化敏感的上下文信息:

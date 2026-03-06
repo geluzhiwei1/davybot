@@ -13,9 +13,10 @@
 
 import asyncio
 import contextlib
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.core.events import emit_typed_event  # 🔴 修复：删除 CORE_EVENT_BUS 导入
 from dawei.logg.logging import get_logger
@@ -178,7 +179,7 @@ class TaskGraphPersistenceManager:
         except Exception as e:
             self.logger.error(f"Error handling STATE_CHANGED event: {e}", exc_info=True)
 
-    def _extract_event_data(self, event: Any) -> dict[str, Any]:
+    def _extract_event_data(self, event: Any) -> Dict[str, Any]:
         """提取事件数据（兼容不同的事件格式）"""
         try:
             # 尝试从强类型事件中提取
@@ -342,7 +343,7 @@ class TaskGraphPersistenceManager:
 
         self.logger.info(f"Force save completed for task graph: {task_graph_id}")
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """获取统计信息"""
         return {
             "started": self._started,

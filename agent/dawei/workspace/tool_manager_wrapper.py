@@ -8,7 +8,7 @@
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import List, Dict, TYPE_CHECKING, Any
 
 from dawei.tools.mcp_tool_manager import MCPConfig, MCPToolManager
 from dawei.tools.tool_manager import ToolManager
@@ -172,7 +172,7 @@ class WorkspaceToolManager:
     # ==================== 工具查询和配置 ====================
 
     @property
-    def allowed_tools(self) -> list[dict[str, Any]]:
+    def allowed_tools(self) -> List[Dict[str, Any]]:
         """获取允许的工具列表"""
         if self.tool_manager:
             # 从 ToolManager 获取最新数据并应用工作区过滤
@@ -196,7 +196,7 @@ class WorkspaceToolManager:
             return tools
         return []
 
-    def _get_filtered_tool_names(self, tools: list[dict[str, Any]]) -> set[str]:
+    def _get_filtered_tool_names(self, tools: List[Dict[str, Any]]) -> set[str]:
         """根据工作区设置过滤工具名称"""
         if self.tool_manager:
             return self.tool_manager.get_filtered_tool_names(tools, self.workspace_settings)
@@ -266,14 +266,14 @@ class WorkspaceToolManager:
             return success
         return False
 
-    def get_tools_by_category(self, category: str) -> list[dict[str, Any]]:
+    def get_tools_by_category(self, category: str) -> List[Dict[str, Any]]:
         """按类别获取工具"""
         if self.tool_manager:
             tool_configs = self.tool_manager.get_tools_by_category(category)
             return [config.to_dict() for config in tool_configs]
         return []
 
-    def get_mode_available_tools(self, mode: str) -> dict[str, Any]:
+    def get_mode_available_tools(self, mode: str) -> Dict[str, Any]:
         """获取指定模式下可用的工具
 
         Args:
@@ -324,9 +324,9 @@ class WorkspaceToolManager:
 
     def _filter_tools_by_mode(
         self,
-        tools: list[dict[str, Any]],
-        mode_info: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        tools: List[Dict[str, Any]],
+        mode_info: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
         """根据模式信息过滤工具
 
         Args:
@@ -361,7 +361,7 @@ class WorkspaceToolManager:
 
         return filtered_tools
 
-    def get_tool_statistics(self) -> dict[str, Any]:
+    def get_tool_statistics(self) -> Dict[str, Any]:
         """获取工具统计信息"""
         if self.tool_manager:
             stats = self.tool_manager.get_tool_statistics()
@@ -392,7 +392,7 @@ class WorkspaceToolManager:
 
         logger.info("Tool configurations reloaded")
 
-    def get_tool_sources(self, tool_name: str) -> dict[str, bool]:
+    def get_tool_sources(self, tool_name: str) -> Dict[str, bool]:
         """获取工具配置来源信息"""
         if self.tool_manager:
             return self.tool_manager.get_tool_sources(tool_name)
@@ -406,7 +406,7 @@ class WorkspaceToolManager:
             return self.mcp_tool_manager.get_config(server_name)
         return None
 
-    def get_all_mcp_configs(self) -> dict[str, MCPConfig]:
+    def get_all_mcp_configs(self) -> Dict[str, MCPConfig]:
         """获取所有MCP配置"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_all_configs()
@@ -418,19 +418,19 @@ class WorkspaceToolManager:
             return self.mcp_tool_manager.get_server_info(server_name)
         return None
 
-    def get_all_mcp_servers(self) -> dict[str, Any]:
+    def get_all_mcp_servers(self) -> Dict[str, Any]:
         """获取所有MCP服务器信息"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_all_servers()
         return {}
 
-    def get_mcp_config_sources(self, server_name: str) -> dict[str, bool]:
+    def get_mcp_config_sources(self, server_name: str) -> Dict[str, bool]:
         """获取MCP配置来源信息"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_config_sources(server_name)
         return {}
 
-    def get_mcp_statistics(self) -> dict[str, Any]:
+    def get_mcp_statistics(self) -> Dict[str, Any]:
         """获取MCP统计信息"""
         if self.mcp_tool_manager:
             return self.mcp_tool_manager.get_statistics()
@@ -448,13 +448,13 @@ class WorkspaceToolManager:
             return await self.mcp_tool_manager.disconnect_server(server_name)
         return False
 
-    async def connect_all_mcp_servers(self) -> dict[str, bool]:
+    async def connect_all_mcp_servers(self) -> Dict[str, bool]:
         """连接所有MCP服务器"""
         if self.mcp_tool_manager:
             return await self.mcp_tool_manager.connect_all_servers()
         return {}
 
-    async def disconnect_all_mcp_servers(self) -> dict[str, bool]:
+    async def disconnect_all_mcp_servers(self) -> Dict[str, bool]:
         """断开所有MCP服务器连接"""
         if self.mcp_tool_manager:
             return await self.mcp_tool_manager.disconnect_all_servers()

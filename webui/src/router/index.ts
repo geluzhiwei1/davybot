@@ -6,6 +6,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import ChatView from '../views/ChatView.vue'
 import WorkspacesView from '../views/WorkspacesView.vue'
+import KnowledgeView from '../views/KnowledgeView.vue'
 import ElementPlusTest from '../components/ElementPlusTest.vue'
 
 const router = createRouter({
@@ -20,6 +21,11 @@ const router = createRouter({
             path: '/workspaces',
             name: 'workspaces',
             component: WorkspacesView
+        },
+        {
+            path: '/knowledge',
+            name: 'knowledge',
+            component: KnowledgeView
         },
         {
             path: '/element-plus-test',

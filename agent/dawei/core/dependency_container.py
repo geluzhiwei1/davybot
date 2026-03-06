@@ -6,10 +6,9 @@ Provides centralized dependency injection throughout the application
 """
 
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass
 from threading import RLock
-from typing import Any, TypeVar
+from typing import List, Dict, Any, Callable, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class ServiceConfig:
     """Configuration for service registration"""
 
     singleton: bool = True
-    factory: Callable | None = None
+    factory: Callable[[], Any] | None = None
     instance: Any | None = None
 
 
@@ -31,8 +30,8 @@ class DependencyContainer:
     """
 
     def __init__(self):
-        self._services: dict[str, ServiceConfig] = {}
-        self._singletons: dict[str, Any] = {}
+        self._services: Dict[str, ServiceConfig] = {}
+        self._singletons: Dict[str, Any] = {}
         self._lock = RLock()
 
     def register(self, service_type: type[T], instance: T, **_kwargs) -> None:
@@ -110,7 +109,7 @@ class DependencyContainer:
             self._singletons.clear()
             logger.debug("Cleared all services")
 
-    def get_registered_services(self) -> dict[str, ServiceConfig]:
+    def get_registered_services(self) -> Dict[str, ServiceConfig]:
         """Get all registered service configurations"""
         return self._services.copy()
 
@@ -135,7 +134,7 @@ def reset_global_container() -> None:
     _global_container = None
 
 
-def inject[T](service_type: type[T]) -> Callable[[Any], T]:
+def inject(service_type: type[T]) -> Callable[[Any], T]:
     """Decorator to inject a service into a class
     Usage:
         @inject(MyService)
@@ -164,7 +163,7 @@ def inject[T](service_type: type[T]) -> Callable[[Any], T]:
     return decorator
 
 
-def service_factory[T](service_type: type[T]) -> Callable[[], T]:
+def service_factory(service_type: type[T]) -> Callable[[], T]:
     """Decorator to mark a function as a service factory
     Usage:
         @service_factory(MyService)
@@ -180,7 +179,7 @@ def service_factory[T](service_type: type[T]) -> Callable[[], T]:
     return decorator
 
 
-def singleton_service[T](service_type: type[T]) -> Callable[[], T]:
+def singleton_service(service_type: type[T]) -> Callable[[], T]:
     """Decorator to mark a function as a singleton service factory
     Usage:
         @singleton_service(MyService)
@@ -196,7 +195,7 @@ def singleton_service[T](service_type: type[T]) -> Callable[[], T]:
     return decorator
 
 
-def transient_service[T](service_type: type[T]) -> Callable[[], T]:
+def transient_service(service_type: type[T]) -> Callable[[], T]:
     """Decorator to mark a function as a transient service factory
     Usage:
         @transient_service(MyService)

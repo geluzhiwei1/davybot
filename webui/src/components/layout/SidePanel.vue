@@ -35,6 +35,13 @@
             </el-icon>
             <span>{{ t('sidePanel.memory') }}</span>
           </button>
+          <button :class="['tab-button', { active: activeTab === 'knowledge' }]" @click="activeTab = 'knowledge'"
+            data-testid="knowledge-tab">
+            <el-icon>
+              <Grid />
+            </el-icon>
+            <span>{{ t('sidePanel.knowledge') }}</span>
+          </button>
         </div>
 
         <!-- 历史会话面板 -->
@@ -132,6 +139,11 @@
         <div v-if="!memoryPanelDisabled" v-show="activeTab === 'memory'" class="tab-panel">
           <MemoryBrowser v-if="workspaceId" :workspace-id="workspaceId" @select-memory="handleSelectMemory" />
         </div>
+
+        <!-- 知识库面板 -->
+        <div v-show="activeTab === 'knowledge'" class="tab-panel knowledge-panel">
+          <KnowledgeSettings v-if="workspaceId" :workspace-id="workspaceId" />
+        </div>
       </div>
     </div>
 
@@ -200,11 +212,13 @@ import { ElMessageBox, ElMessage } from 'element-plus';
 import {
   ChatDotRound, Folder, Document, Plus, Delete,
   FolderAdd, Edit, CopyDocument, Upload, Refresh, Connection, Download, Close
+  Grid
 } from '@element-plus/icons-vue';
 import UserSettingsDrawer from './UserSettingsDrawer.vue';
 import FileUploadDialog from '@/components/FileUploadDialog.vue';
 import MemoryBrowser from './MemoryBrowser.vue';
 import { useMobile } from '@/composables/useMobile';
+import KnowledgeSettings from './knowledge/KnowledgeSettings.vue';
 
 const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
@@ -304,7 +318,7 @@ const isUserSettingsVisible = ref(false);
 const isUploadDialogVisible = ref(false);
 
 // 当前激活的标签页（默认选择"工作区"）
-const activeTab = ref<'conversations' | 'files' | 'memory'>('files');
+const activeTab = ref<'conversations' | 'files' | 'memory' | 'knowledge'>('files');
 
 // 移动端抽屉模式处理
 const handleCloseMobileDrawer = () => {

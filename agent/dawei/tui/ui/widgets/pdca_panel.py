@@ -7,7 +7,7 @@ Displays detailed PDCA cycle information including current phase,
 domain, completion, and phase transition history.
 """
 
-from typing import ClassVar
+from typing import List, Dict, ClassVar
 
 from textual.reactive import reactive
 from textual.widgets import Static
@@ -22,7 +22,7 @@ class PDCAPanel(Static):
     domain = reactive("")
     cycle_count = reactive(0)
     completion_percentage = reactive(0.0)
-    phase_history: ClassVar[list[str]] = []
+    phase_history: ClassVar[List[str]] = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -6,7 +6,7 @@
 import asyncio
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.storage.storage import Storage
 
@@ -37,7 +37,7 @@ class LocalFileSystemStorage(Storage):
         recursive: bool = False,
         include_hidden: bool = False,
         max_depth: int = 3,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         safe_path = self._get_safe_path(path)
         if not safe_path.is_dir():
             raise FileNotFoundError(f"目录不存在: {path}")

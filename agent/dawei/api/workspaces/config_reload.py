@@ -7,7 +7,7 @@
 """
 
 import logging
-from typing import Literal
+from typing import List, Dict, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ class ConfigReloadResponse(BaseModel):
 
     success: bool
     message: str
-    details: dict[str, str | int | bool]
+    details: Dict[str, str | int | bool]
 
 
 # --- 辅助函数 ---

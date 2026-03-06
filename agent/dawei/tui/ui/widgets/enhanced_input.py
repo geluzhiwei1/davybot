@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Enhanced Input Box
@@ -22,7 +23,7 @@ class EnhancedInputBox(Input):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._history: list[str] = []
+        self._history: List[str] = []
         self._history_index: int = -1
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -103,7 +104,7 @@ class EnhancedInputBox(Input):
         # Move cursor to end
         self.cursor_position = len(self.value)
 
-    def get_history(self) -> list[str]:
+    def get_history(self) -> List[str]:
         """Get command history
 
         Returns:

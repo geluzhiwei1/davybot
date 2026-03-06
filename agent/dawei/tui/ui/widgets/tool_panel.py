@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """ToolPanel Widget
@@ -20,7 +21,7 @@ class ToolPanel(Static):
     def __init__(self, max_lines: int = 5, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_lines = max_lines
-        self._tool_history: list[str] = []
+        self._tool_history: List[str] = []
         self._current_tool: str = ""
 
     def watch_tool_info(self, _old_info: str, _new_info: str) -> None:

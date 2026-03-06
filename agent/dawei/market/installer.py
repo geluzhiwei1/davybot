@@ -12,7 +12,7 @@ import logging
 import shutil
 import zipfile
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 from .cli_wrapper import CliWrapper, CliExecutionError
 from .models import (
@@ -150,7 +150,7 @@ class MarketInstaller:
         resource_dir.mkdir(parents=True, exist_ok=True)
         return resource_dir
 
-    def _extract_archive(self, archive_path: Path, dest_dir: Path) -> list[str]:
+    def _extract_archive(self, archive_path: Path, dest_dir: Path) -> List[str]:
         """Extract archive file to destination directory.
 
         Args:
@@ -540,7 +540,7 @@ class MarketInstaller:
     # List Methods
     # ========================================================================
 
-    def list_installed(self, resource_type: str | None = None) -> list[InstalledResource]:
+    def list_installed(self, resource_type: str | None = None) -> List[InstalledResource]:
         """List installed resources in the workspace.
 
         Args:
@@ -589,7 +589,7 @@ class MarketInstaller:
 
         return installed
 
-    def list_plugins(self) -> list[dict[str, Any]]:
+    def list_plugins(self) -> List[Dict[str, Any]]:
         """List installed plugins from local settings.
 
         Returns:

@@ -6,7 +6,7 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import List, Dict, Any, TypeVar
 
 import yaml
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def load_yaml_file(file_path: Path) -> dict[str, Any]:
+def load_yaml_file(file_path: Path) -> Dict[str, Any]:
     """Load YAML file safely"""
     if not file_path.exists():
         raise FileNotFoundError(f"YAML file not found: {file_path}")
@@ -29,7 +29,7 @@ def load_yaml_file(file_path: Path) -> dict[str, Any]:
         raise
 
 
-def save_yaml_file(file_path: Path, data: dict[str, Any]) -> None:
+def save_yaml_file(file_path: Path, data: Dict[str, Any]) -> None:
     """Save data to YAML file safely"""
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -124,7 +124,7 @@ def import_class_from_file(file_path: str | Path, class_name: str) -> type[T]:
         raise ImportError(f"Class '{class_name}' not found in module '{module_name}' (file: {file_path})")
 
 
-def merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+def merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """Recursively merge two dictionaries"""
     result = base.copy()
 

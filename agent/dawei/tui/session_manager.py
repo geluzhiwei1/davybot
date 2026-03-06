@@ -6,9 +6,10 @@ Handle chat history persistence and restoration.
 import json
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.core.local_context import set_session_id
 
@@ -26,7 +27,7 @@ class ChatMessage:
     role: str
     content: str
     timestamp: str
-    metadata: dict[str, Any] | None = None
+    metadata: Dict[str, Any] | None = None
 
 
 @dataclass
@@ -37,9 +38,9 @@ class ChatSession:
     workspace: str
     created_at: str
     updated_at: str
-    messages: list[ChatMessage]
-    settings: dict[str, Any] | None = None
-    metadata: dict[str, Any] | None = None
+    messages: List[ChatMessage]
+    settings: Dict[str, Any] | None = None
+    metadata: Dict[str, Any] | None = None
 
 
 class SessionManager:
@@ -258,8 +259,8 @@ class SessionManager:
             session = ChatSession(
                 session_id=file_session_id,
                 workspace=session_dict.get("workspace", str(self.workspace_path)),
-                created_at=session_dict["created_at"],
-                updated_at=session_dict["updated_at"],
+                created_at=session_Dict["created_at"],
+                updated_at=session_Dict["updated_at"],
                 messages=messages,
                 settings=session_dict.get("settings", {}),
                 metadata=session_dict.get("metadata", {}),
@@ -283,7 +284,7 @@ class SessionManager:
         except Exception as e:
             raise SessionManagerError(f"Unexpected error while loading session {session_id}: {e}")
 
-    def list_sessions(self) -> list[dict[str, Any]]:
+    def list_sessions(self) -> List[Dict[str, Any]]:
         """List all available sessions
 
         Returns:
@@ -319,8 +320,8 @@ class SessionManager:
                     sessions.append(
                         {
                             "session_id": session_id,  # Use the found ID
-                            "created_at": session_dict["created_at"],
-                            "updated_at": session_dict["updated_at"],
+                            "created_at": session_Dict["created_at"],
+                            "updated_at": session_Dict["updated_at"],
                             "message_count": session_dict.get("message_count", len(session_dict.get("messages", []))),
                             "file": str(session_file),
                         },

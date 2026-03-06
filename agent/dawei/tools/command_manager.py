@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Slash命令管理器 - 实现slash commands
@@ -73,8 +74,8 @@ class CommandManager:
         self.user_root = user_root or get_dawei_home()
 
         # 命令注册表: name -> Command（高优先级覆盖低优先级）
-        self._commands: dict[str, Command] = {}
-        self._builtin_commands: dict[str, Command] = {}
+        self._commands: Dict[str, Command] = {}
+        self._builtin_commands: Dict[str, Command] = {}
 
         # 标记是否已扫描
         self._scanned = False
@@ -105,7 +106,7 @@ class CommandManager:
         self._builtin_commands[command.name] = command
         logger.info(f"Registered builtin command: /{command.name}")
 
-    def scan_commands(self, force: bool = False) -> dict[str, Command]:
+    def scan_commands(self, force: bool = False) -> Dict[str, Command]:
         """扫描所有命令来源并返回合并后的命令列表
 
         优先级：workspace > user > builtin
@@ -148,7 +149,7 @@ class CommandManager:
 
         return self._commands
 
-    def _scan_directory(self, dir_path: Path, source: str) -> list[Command]:
+    def _scan_directory(self, dir_path: Path, source: str) -> List[Command]:
         """扫描指定目录下的命令文件
 
         Args:
@@ -288,13 +289,13 @@ class CommandManager:
         command_name = name.lstrip("/")
         return self._commands.get(command_name)
 
-    def get_all_commands(self) -> dict[str, Command]:
+    def get_all_commands(self) -> Dict[str, Command]:
         """获取所有可用命令"""
         if not self._scanned:
             self.scan_commands()
         return self._commands.copy()
 
-    def get_command_names(self) -> list[str]:
+    def get_command_names(self) -> List[str]:
         """获取所有命令名称列表"""
         if not self._scanned:
             self.scan_commands()

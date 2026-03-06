@@ -7,8 +7,9 @@
 """
 
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -33,7 +34,7 @@ class CheckpointInfo(BaseModel):
     task_id: str
     created_at: str
     description: str | None
-    execution_state: dict[str, Any] | None
+    execution_state: Dict[str, Any] | None
 
 
 # --- 辅助函数 ---

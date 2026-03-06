@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Workspace LLM配置管理器
@@ -98,7 +99,7 @@ class WorkspaceLLMConfigManager:
 
         return success
 
-    def get_all_llm_configs(self) -> dict[str, LLMConfig]:
+    def get_all_llm_configs(self) -> Dict[str, LLMConfig]:
         """获取所有LLM配置
 
         Returns:

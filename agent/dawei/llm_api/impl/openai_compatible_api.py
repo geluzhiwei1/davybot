@@ -7,9 +7,10 @@
 
 import json
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.config.logging_config import LoggingConfig, get_config
 from dawei.core import local_context
@@ -49,7 +50,7 @@ class OpenaiCompatibleClient(BaseClient):
     同时保持了原有的generate()和stream_generate()方法以确保向后兼容性。
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, config: Dict[str, Any]) -> None:
         """初始化OpenAI兼容客户端
 
         Args:
@@ -113,7 +114,7 @@ class OpenaiCompatibleClient(BaseClient):
             "stream": False,
         }
 
-    def _prepare_headers(self) -> dict[str, str]:
+    def _prepare_headers(self) -> Dict[str, str]:
         """准备请求头"""
         headers = {
             "Content-Type": "application/json",
@@ -168,7 +169,7 @@ class OpenaiCompatibleClient(BaseClient):
 
         return request_log_file, response_log_file
 
-    def _log_request(self, request_log_file: Path, endpoint: str, params: dict[str, Any]) -> None:
+    def _log_request(self, request_log_file: Path, endpoint: str, params: Dict[str, Any]) -> None:
         """记录请求日志
 
         Args:
@@ -200,10 +201,10 @@ class OpenaiCompatibleClient(BaseClient):
         workspace_path: str,
         response_log_file: Path | None,
         endpoint: str,
-        params: dict[str, Any],
+        params: Dict[str, Any],
         _url_suffix: str,
         _original_url: str,
-    ) -> tuple[AsyncGenerator[bytes, None], int | None, dict[str, str] | None, str | None]:
+    ) -> tuple[AsyncGenerator[bytes, None], int | None, Dict[str, str] | None, str | None]:
         """执行HTTP请求并返回流式响应生成器（带保护层）
 
         集成了速率限制器、断路器和监控指标
@@ -335,7 +336,7 @@ class OpenaiCompatibleClient(BaseClient):
         self,
         response_log_file: Path,
         status: int,
-        headers: dict[str, str],
+        headers: Dict[str, str],
         error_text: str,
         url: str,
     ) -> None:
@@ -368,9 +369,9 @@ class OpenaiCompatibleClient(BaseClient):
     def _log_response(
         self,
         response_log_file: Path,
-        response_chunks: list[bytes],
+        response_chunks: List[bytes],
         status: int | None,
-        headers: dict[str, str] | None,
+        headers: Dict[str, str] | None,
         url: str | None,
     ) -> None:
         """记录响应日志
@@ -424,7 +425,7 @@ class OpenaiCompatibleClient(BaseClient):
             return 0
         return len(text) // 4
 
-    def get_num_tokens_from_messages(self, messages: list[dict[str, Any]]) -> int:
+    def get_num_tokens_from_messages(self, messages: List[Dict[str, Any]]) -> int:
         """计算消息列表的总令牌数"""
         total_tokens = 0
         for message in messages:
@@ -440,7 +441,7 @@ class OpenaiCompatibleClient(BaseClient):
                 total_tokens += self.get_num_tokens(content)
         return total_tokens
 
-    def _prepare_request_params(self, messages: list[LLMMessage], **kwargs) -> dict[str, Any]:
+    def _prepare_request_params(self, messages: List[LLMMessage], **kwargs) -> Dict[str, Any]:
         """准备请求参数"""
         params = {**self.default_params, **kwargs}
 
@@ -459,7 +460,7 @@ class OpenaiCompatibleClient(BaseClient):
 
         return params
 
-    def _convert_response_to_chat_result(self, response_data: dict[str, Any]) -> ChatResult:
+    def _convert_response_to_chat_result(self, response_data: Dict[str, Any]) -> ChatResult:
         """将API响应转换为ChatResult"""
         choices = response_data.get("choices", [])
         generations = []
@@ -487,7 +488,7 @@ class OpenaiCompatibleClient(BaseClient):
 
     @handle_errors(component="openai_compatible_api", operation="make_http_request")
     @log_performance("openai_compatible_api.make_http_request")
-    async def _make_http_request(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _make_http_request(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """执行单次HTTP请求"""
         # 处理 Gemini 特殊情况
         url_suffix = f"?key={self.api_key}" if self.provider == "gemini" else ""
@@ -521,7 +522,7 @@ class OpenaiCompatibleClient(BaseClient):
     @log_performance("openai_compatible_api.create_message")
     async def create_message(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         **kwargs,
     ) -> AsyncGenerator[StreamMessages, None]:
         """创建消息，支持推理过程、内容和工具调用的分别处理"""
@@ -597,7 +598,7 @@ class OpenaiCompatibleClient(BaseClient):
     @log_performance("openai_compatible_api.astream_chat_completion")
     async def astream_chat_completion(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         **kwargs,
     ) -> AsyncGenerator[StreamMessages, None]:
         """异步流式聊天完成，兼容旧接口
@@ -636,7 +637,7 @@ class OpenAICompatibleParser(StreamChunkParser):
         self.content_started = False
         self.final_usage = None
 
-    def parse_chunk(self, chunk: dict[str, Any]) -> list[StreamMessages]:
+    def parse_chunk(self, chunk: Dict[str, Any]) -> List[StreamMessages]:
         """解析OpenAI兼容格式的数据块"""
         messages = []
 
@@ -787,7 +788,7 @@ class OpenAICompatibleParser(StreamChunkParser):
 
         return messages
 
-    def complete(self, chunk: dict[str, Any]) -> CompleteMessage:
+    def complete(self, chunk: Dict[str, Any]) -> CompleteMessage:
         """创建完成消息"""
         # 将工具调用字典转换为 ToolCall 对象列表，使用缓冲的完整参数
         tool_calls = []

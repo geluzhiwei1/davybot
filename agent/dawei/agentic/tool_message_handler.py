@@ -8,7 +8,7 @@
 import asyncio
 import json
 import traceback
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.errors import ToolExecutionError
 from dawei.core.events import TaskEventType, emit_typed_event
@@ -47,7 +47,7 @@ class ToolMessageHandle:
     async def handle_stream_messages(
         self,
         stream_message: StreamMessages,
-    ) -> dict[str, Any] | None:
+    ) -> Dict[str, Any] | None:
         """处理完成消息，获取其中的 tool_calls 并执行
 
         Args:
@@ -113,7 +113,7 @@ class ToolMessageHandle:
                 self.logger.debug("No tool calls found in CompleteMessage")
         return None
 
-    async def execute_tool_call(self, tool_call_obj: ToolCall) -> Any | dict[str, str]:
+    async def execute_tool_call(self, tool_call_obj: ToolCall) -> Any | Dict[str, str]:
         """执行完整的工具调用（从流式响应中检测到的）
 
         Args:
@@ -338,7 +338,7 @@ class ToolMessageHandle:
         tool_call_id: str,
         error_message: str,
         _original_tool_call_id: str,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """通用的工具执行错误处理方法
 
         Args:
@@ -387,7 +387,7 @@ class ToolMessageHandle:
         tool_call_id: str,
         error: Exception,
         _original_tool_call_id: str,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """通用的工具执行错误处理方法（包含 traceback）
 
         Args:
@@ -447,7 +447,7 @@ class ToolMessageHandle:
         self,
         tool_call_obj: ToolCall,
         tool_call_id: str,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """处理 ask_followup_question 工具调用
 
         Args:

@@ -9,9 +9,10 @@
 
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -63,7 +64,7 @@ async def list_scheduled_tasks(workspace_id: str):
 
 
 @router.post("")
-async def create_scheduled_task(workspace_id: str, task: dict[str, Any]):
+async def create_scheduled_task(workspace_id: str, task: Dict[str, Any]):
     """创建新的定时任务
 
     请求体格式:
@@ -211,7 +212,7 @@ async def get_scheduled_task(workspace_id: str, task_id: str):
 
 
 @router.put("/{task_id}")
-async def update_scheduled_task(workspace_id: str, task_id: str, updates: dict[str, Any]):
+async def update_scheduled_task(workspace_id: str, task_id: str, updates: Dict[str, Any]):
     """更新定时任务
 
     支持更新的字段:

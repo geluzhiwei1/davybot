@@ -7,9 +7,10 @@
 """
 
 import os
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
@@ -83,11 +84,11 @@ class LoggingConfig(BaseSettings):
 
     # 安全配置
     sanitize_sensitive_data: bool = Field(default=True)
-    sensitive_fields: list[str] = Field(default_factory=lambda: ["api_key", "password", "secret", "credential"])
+    sensitive_fields: List[str] = Field(default_factory=lambda: ["api_key", "password", "secret", "credential"])
 
     @model_validator(mode="before")
     @classmethod
-    def convert_max_file_size_unit(cls, data: dict[str, Any]) -> dict[str, Any]:
+    def convert_max_file_size_unit(cls, data: Dict[str, Any]) -> Dict[str, Any]:
         """转换 max_file_size 单位
 
         前端传入的是 MB (1-100)，后端存储的是字节
@@ -166,7 +167,7 @@ class LoggingConfig(BaseSettings):
                 return v
         return v
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         result = {}
         for field_name in self.model_fields:
@@ -175,7 +176,7 @@ class LoggingConfig(BaseSettings):
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LoggingConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> "LoggingConfig":
         """从字典创建配置"""
         return cls(**data)
 

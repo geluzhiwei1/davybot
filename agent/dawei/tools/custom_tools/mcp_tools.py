@@ -10,7 +10,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -47,7 +47,7 @@ class UseMCPToolInput(BaseModel):
 
     server_name: str = Field(..., description="Name of the MCP server providing the tool.")
     tool_name: str = Field(..., description="Name of the tool to execute.")
-    arguments: dict[str, Any] = Field(
+    arguments: Dict[str, Any] = Field(
         ...,
         description="JSON object containing the tool's input parameters.",
     )
@@ -71,7 +71,7 @@ class UseMCPTool(CustomBaseTool):
         "use_mcp_tool",
         fallback_value='{"status": "error", "message": "Failed to execute MCP tool"}',
     )
-    def _run(self, server_name: str, tool_name: str, arguments: dict[str, Any]) -> str:
+    def _run(self, server_name: str, tool_name: str, arguments: Dict[str, Any]) -> str:
         """Use MCP tool (real implementation using MCP SDK)."""
         try:
             # Execute tool call asynchronously

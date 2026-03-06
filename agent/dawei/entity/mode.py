@@ -4,7 +4,7 @@
 """模式相关的实体定义"""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import List, Dict, Any
 
 
 @dataclass
@@ -16,13 +16,13 @@ class ModeConfig:
     role_definition: str = ""
     when_to_use: str = ""
     description: str = ""
-    groups: list[str | dict[str, Any]] = field(default_factory=list)
+    groups: List[str | Dict[str, Any]] = field(default_factory=list)
     source: str = ""
     custom_instructions: str = ""
-    rules: dict[str, str] = field(default_factory=dict)
+    rules: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ModeConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> "ModeConfig":
         """从字典创建模式配置"""
         return cls(
             slug=data.get("slug", ""),
@@ -36,7 +36,7 @@ class ModeConfig:
             rules=data.get("rules", {}),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "slug": self.slug,

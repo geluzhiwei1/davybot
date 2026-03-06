@@ -9,8 +9,12 @@ Defines resource types, search results, and installation results.
 import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import StrEnum
-from typing import Any
+from enum import Enum
+from typing import List, Dict, Any
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
 
 
 class ResourceType(StrEnum):
@@ -30,13 +34,13 @@ class MarketError(Exception):
         self,
         message: str,
         code: str | None = None,
-        details: dict[str, Any] | None = None,
+        details: Dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.code = code
         self.details = details or {}
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "error": self.code or "market_error",
             "message": str(self),
@@ -94,15 +98,15 @@ class SearchResult:
     description: str
     author: str | None = None
     version: str | None = None
-    tags: list[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
     downloads: int = 0
     rating: float | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    raw_data: dict[str, Any] = field(default_factory=dict)
+    raw_data: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SearchResult":
+    def from_dict(cls, data: Dict[str, Any]) -> "SearchResult":
         """Create SearchResult from API response dictionary."""
         # Parse dates
         created_at = None
@@ -129,7 +133,7 @@ class SearchResult:
             raw_data=data,
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "id": self.id,
@@ -154,11 +158,11 @@ class ResourceInfo:
     readme: str | None = None
     license: str | None = None
     python_version: str | None = None
-    dependencies: list[str] = field(default_factory=list)
+    dependencies: List[str] = field(default_factory=list)
     install_path: str | None = None
-    similar_resources: list[SearchResult] = field(default_factory=list)
+    similar_resources: List[SearchResult] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             **self.result.to_dict(),
@@ -182,10 +186,10 @@ class InstallResult:
     version: str | None = None
     message: str = ""
     error: str | None = None
-    installed_files: list[str] = field(default_factory=list)
+    installed_files: List[str] = field(default_factory=list)
     requires_restart: bool = False
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API response."""
         result = {
             "success": self.success,
@@ -213,11 +217,11 @@ class InstalledResource:
     install_path: str = ""
     installed_at: datetime | None = None
     enabled: bool = True
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
     scope: str = "project"  # "project" for workspace-level, "global" for user-level
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "InstalledResource":
+    def from_dict(cls, data: Dict[str, Any]) -> "InstalledResource":
         """Create InstalledResource from dictionary."""
         installed_at = None
         if data.get("installed_at"):
@@ -235,7 +239,7 @@ class InstalledResource:
             scope=data.get("scope", "project"),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -253,8 +257,8 @@ class InstalledResource:
 class MarketSettings:
     """Market configuration for a workspace."""
 
-    installed: dict[str, list[str]] = field(default_factory=dict)
-    registry: dict[str, Any] = field(default_factory=dict)
+    installed: Dict[str, List[str]] = field(default_factory=dict)
+    registry: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Initialize default values."""
@@ -266,13 +270,13 @@ class MarketSettings:
             self.installed["plugins"] = []
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "MarketSettings":
+    def from_dict(cls, data: Dict[str, Any]) -> "MarketSettings":
         """Create MarketSettings from dictionary."""
         installed = data.get("installed", {})
         registry = data.get("registry", {})
         return cls(installed=installed, registry=registry)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {"installed": self.installed, "registry": self.registry}
 

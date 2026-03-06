@@ -10,8 +10,12 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import Any
+from enum import Enum
+from typing import List, Dict, Any
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +45,8 @@ class PluginConfig:
     name: str
     version: str
     plugin_type: PluginType
-    settings: dict[str, Any] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    settings: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
 
 
@@ -59,13 +63,13 @@ class PluginMetadata:
     python_version: str
     plugin_type: PluginType
     entry_point: str
-    dependencies: dict[str, list[str]] = field(default_factory=dict)
-    config_schema: dict[str, Any] = field(default_factory=dict)
-    hooks: list[str] = field(default_factory=list)
-    settings: dict[str, Any] = field(default_factory=dict)
+    dependencies: Dict[str, List[str]] = field(default_factory=dict)
+    config_schema: Dict[str, Any] = field(default_factory=dict)
+    hooks: List[str] = field(default_factory=list)
+    settings: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PluginMetadata":
+    def from_dict(cls, data: Dict[str, Any]) -> "PluginMetadata":
         """Create metadata from dictionary"""
         return cls(
             api_version=data.get("api_version", "1.0"),
@@ -111,7 +115,7 @@ class BasePlugin(ABC):
         self.config = config
         self._status = PluginStatus.LOADED
         self._activated = False
-        self._hooks: dict[str, Callable] = {}
+        self._hooks: Dict[str, Callable] = {}
 
     @property
     def status(self) -> PluginStatus:
@@ -158,7 +162,7 @@ class BasePlugin(ABC):
         Override this to release resources, close connections, etc.
         """
 
-    def register_hooks(self) -> dict[str, Callable]:
+    def register_hooks(self) -> Dict[str, Callable]:
         """Register event hooks.
 
         Returns:
@@ -167,7 +171,7 @@ class BasePlugin(ABC):
         """
         return {}
 
-    def register_tools(self) -> list[Any]:
+    def register_tools(self) -> List[Any]:
         """Register custom tools.
 
         Returns:
@@ -176,7 +180,7 @@ class BasePlugin(ABC):
         """
         return []
 
-    def get_config_schema(self) -> dict[str, Any]:
+    def get_config_schema(self) -> Dict[str, Any]:
         """Get configuration schema for this plugin.
 
         Returns:
@@ -185,7 +189,7 @@ class BasePlugin(ABC):
         """
         return {}
 
-    async def validate_config(self, config: dict[str, Any]) -> bool:
+    async def validate_config(self, config: Dict[str, Any]) -> bool:
         """Validate plugin configuration.
 
         Args:
@@ -231,7 +235,7 @@ class ChannelPlugin(BasePlugin):
         """
 
     @abstractmethod
-    async def send_rich_message(self, content: dict[str, Any], **kwargs) -> bool:
+    async def send_rich_message(self, content: Dict[str, Any], **kwargs) -> bool:
         """Send a rich/formatted message to the channel.
 
         Args:
@@ -251,7 +255,7 @@ class ToolPlugin(BasePlugin):
     """
 
     @abstractmethod
-    def register_tools(self) -> list[Any]:
+    def register_tools(self) -> List[Any]:
         """Register custom tools provided by this plugin.
 
         Returns:
@@ -300,7 +304,7 @@ class MemoryPlugin(BasePlugin):
         """Retrieve a value from memory"""
 
     @abstractmethod
-    async def search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+    async def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search memory for items matching query"""
 
     @abstractmethod

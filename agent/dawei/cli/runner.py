@@ -8,7 +8,7 @@
 
 import asyncio
 import time
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.agent import Agent
 from dawei.cli.config import CLIConfig
@@ -34,7 +34,7 @@ class AgentRunner:
         self.logger = get_logger(__name__)
         self.user_workspace: UserWorkspace | None = None
         self.agent: Agent | None = None
-        self._execution_result: dict[str, Any] = {}
+        self._execution_result: Dict[str, Any] = {}
 
     async def initialize(self) -> None:
         """初始化工作区和Agent"""
@@ -72,7 +72,7 @@ class AgentRunner:
 
         self.logger.info("Agent initialized successfully")
 
-    async def run(self) -> dict[str, Any]:
+    async def run(self) -> Dict[str, Any]:
         """执行Agent任务
 
         Returns:
@@ -171,7 +171,7 @@ async def run_agent_directly(
     message: str,
     verbose: bool = False,
     timeout: int = 1800,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """直接运行Agent（不经过HTTP/WebSocket）
 
     Args:
@@ -225,7 +225,7 @@ def run_agent_sync(
     message: str,
     verbose: bool = False,
     timeout: int = 1800,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """同步版本的Agent执行器（用于Fire等同步环境）
 
     Args:

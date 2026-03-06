@@ -9,9 +9,11 @@
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .interfaces import ITaskContext
@@ -51,7 +53,7 @@ class RetryPolicy:
     max_delay: float = 60.0  # 最大延迟时间（秒）
     exponential_base: float = 2.0  # 指数退避基数
     jitter: bool = True  # 是否添加随机抖动
-    retryable_exceptions: list[type] = field(default_factory=list)  # 可重试的异常类型
+    retryable_exceptions: List[type] = field(default_factory=list)  # 可重试的异常类型
 
     def calculate_delay(self, attempt: int) -> float:
         """计算重试延迟时间
@@ -108,11 +110,11 @@ class TaskDefinition:
     name: str = ""
     description: str = ""
     executor: Callable[..., Awaitable[Any]] | None = None  # 任务执行函数
-    parameters: dict[str, Any] = field(default_factory=dict)
+    parameters: Dict[str, Any] = field(default_factory=dict)
     priority: int = 5  # 优先级（1-10，数字越大优先级越高）
     timeout: float | None = None  # 超时时间（秒）
     retry_policy: RetryPolicy | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
@@ -135,7 +137,7 @@ class TaskResult:
     attempts: int = 1
     started_at: datetime | None = None
     completed_at: datetime | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_success(self) -> bool:
@@ -151,7 +153,7 @@ class TaskResult:
             TaskStatus.CANCELLED,
         ]
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "task_id": self.task_id,
@@ -175,12 +177,12 @@ class TaskError:
     task_id: str
     error_type: str
     error_message: str
-    error_details: dict[str, Any] | None = None
+    error_details: Dict[str, Any] | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     recoverable: bool = True
     retry_count: int = 0
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "task_id": self.task_id,
@@ -199,12 +201,12 @@ class CheckpointData:
 
     checkpoint_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     task_id: str = ""
-    state_data: dict[str, Any] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    state_data: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     version: int = 1
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "checkpoint_id": self.checkpoint_id,
@@ -228,7 +230,7 @@ class WebSocketState:
     error_count: int = 0
     last_error: str | None = None
     reconnect_attempts: int = 0
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_connected(self) -> bool:
@@ -276,7 +278,7 @@ class WebSocketState:
         if error:
             self.last_error = error
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "session_id": self.session_id,
@@ -300,10 +302,10 @@ class TaskProgress:
     task_id: str
     progress: int  # 进度百分比（0-100）
     message: str = ""
-    data: dict[str, Any] | None = None
+    data: Dict[str, Any] | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "task_id": self.task_id,
@@ -325,7 +327,7 @@ CompletionCallback = Callable[[TaskResult], Awaitable[None]]
 
 # 事件类型定义
 TaskEventType = str
-EventData = dict[str, Any]
+EventData = Dict[str, Any]
 
 
 # 配置类型定义

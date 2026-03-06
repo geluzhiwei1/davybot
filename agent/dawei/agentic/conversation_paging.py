@@ -10,8 +10,9 @@
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from .conversation_compressor import ConversationCompressor
 
@@ -35,7 +36,7 @@ class ConversationPage:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_accessed: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
     access_count: int = 0
-    keywords: list[str] = field(default_factory=list)
+    keywords: List[str] = field(default_factory=list)
 
     @property
     def lru_score(self) -> float:
@@ -77,12 +78,12 @@ class ConversationPagingManager:
         self.compressor = compressor
 
         # 页面存储
-        self.pages: dict[str, ConversationPage] = {}
-        self.session_pages: dict[str, list[str]] = {}  # session_id -> [page_ids]
+        self.pages: Dict[str, ConversationPage] = {}
+        self.session_pages: Dict[str, List[str]] = {}  # session_id -> [page_ids]
 
         self.logger = logging.getLogger(__name__)
 
-    async def create_pages(self, messages: list[dict[str, Any]], session_id: str) -> list[str]:
+    async def create_pages(self, messages: List[Dict[str, Any]], session_id: str) -> List[str]:
         """将对话切分为页面
 
         Args:
@@ -153,7 +154,7 @@ class ConversationPagingManager:
 
     def _format_page_content(
         self,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         start_index: int,
         session_id: str,
     ) -> str:
@@ -188,7 +189,7 @@ class ConversationPagingManager:
 
     def _generate_page_summary(
         self,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         start_index: int,
         _session_id: str,
     ) -> str:
@@ -222,7 +223,7 @@ class ConversationPagingManager:
             return TokenEstimator.estimate(text)
         return len(text) // 4  # 简单估算
 
-    def _extract_keywords(self, messages: list[dict[str, Any]]) -> list[str]:
+    def _extract_keywords(self, messages: List[Dict[str, Any]]) -> List[str]:
         """提取关键词"""
         import re
 
@@ -277,7 +278,7 @@ class ConversationPagingManager:
         top_k: int = 3,
         current_tokens: int = 0,
         max_tokens: int = 10000,
-    ) -> list[ConversationPage]:
+    ) -> List[ConversationPage]:
         """加载相关页面
 
         基于查询关键词匹配和LRU策略选择相关页面。
@@ -343,7 +344,7 @@ class ConversationPagingManager:
 
         return loaded_pages
 
-    async def page_out(self, session_id: str, count: int = 1) -> list[str]:
+    async def page_out(self, session_id: str, count: int = 1) -> List[str]:
         """淘汰最少使用的页面
 
         Args:
@@ -377,7 +378,7 @@ class ConversationPagingManager:
         """获取指定页面"""
         return self.pages.get(page_id)
 
-    def get_session_pages(self, session_id: str) -> list[ConversationPage]:
+    def get_session_pages(self, session_id: str) -> List[ConversationPage]:
         """获取会话的所有页面"""
         if session_id not in self.session_pages:
             return []
@@ -385,7 +386,7 @@ class ConversationPagingManager:
         page_ids = self.session_pages[session_id]
         return [self.pages[pid] for pid in page_ids if pid in self.pages]
 
-    def get_active_context(self, pages: list[ConversationPage]) -> str:
+    def get_active_context(self, pages: List[ConversationPage]) -> str:
         """获取活动页面的上下文内容"""
         if not pages:
             return ""
@@ -437,7 +438,7 @@ class ConversationPagingManager:
 
         return count
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """获取统计信息"""
         return {
             "total_pages": len(self.pages),

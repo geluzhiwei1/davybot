@@ -7,7 +7,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import List, Dict, Any
 
 
 class IMessageProcessor(ABC):
@@ -17,7 +17,7 @@ class IMessageProcessor(ABC):
         self.user_workspace = user_workspace
 
     @abstractmethod
-    async def build_messages(self, capabilities: list[str]) -> dict[str, Any]:
+    async def build_messages(self, capabilities: List[str]) -> Dict[str, Any]:
         """构建消息列表
 
         Args:
@@ -30,7 +30,7 @@ class IMessageProcessor(ABC):
         """
 
     @abstractmethod
-    def build_user_message(self, task: str, images: list[str] | None = None) -> dict[str, Any]:
+    def build_user_message(self, task: str, images: List[str] | None = None) -> Dict[str, Any]:
         """构建用户消息
 
         Args:
@@ -45,8 +45,8 @@ class IMessageProcessor(ABC):
     @abstractmethod
     def build_assistant_message(
         self,
-        content: str | list[dict[str, Any]] | None,
-        tool_calls: list[dict[str, Any]] | None = None,
+        content: str | List[Dict[str, Any]] | None,
+        tool_calls: List[Dict[str, Any]] | None = None,
         **kwargs,
     ) -> Any:
         """构建助手消息
@@ -72,7 +72,7 @@ class IMessageProcessor(ABC):
         """
 
     @abstractmethod
-    def _convert_tools_to_openai_format(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _convert_tools_to_openai_format(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """转换工具为 OpenAI 格式
 
         Args:
@@ -84,7 +84,7 @@ class IMessageProcessor(ABC):
         """
 
     @abstractmethod
-    def validate_message(self, message: dict[str, Any]) -> bool:
+    def validate_message(self, message: Dict[str, Any]) -> bool:
         """验证消息格式
 
         Args:
@@ -96,7 +96,7 @@ class IMessageProcessor(ABC):
         """
 
     @abstractmethod
-    def format_system_prompt(self, base_prompt: str, context: dict[str, Any]) -> str:
+    def format_system_prompt(self, base_prompt: str, context: Dict[str, Any]) -> str:
         """格式化系统提示
 
         Args:

@@ -17,7 +17,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei import get_dawei_home
 
@@ -86,6 +86,16 @@ TOOL_GROUPS = {
             "timer",
         ],
     },
+    "knowledge": {
+        "custom_tools": [
+            "search_knowledge",
+            "query_knowledge_rag",
+            "upload_document",
+            "delete_document",
+            "list_documents",
+            "reindex_document",
+        ],
+    },
 }
 
 
@@ -93,12 +103,12 @@ TOOL_GROUPS = {
 class ToolGroupConfig:
     """工具组配置数据类"""
 
-    tools: list[str] = field(default_factory=list)
+    tools: List[str] = field(default_factory=list)
     always_available: bool = False
-    custom_tools: list[str] = field(default_factory=list)
+    custom_tools: List[str] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolGroupConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolGroupConfig":
         """从字典创建工具组配置"""
         return cls(
             tools=data.get("tools", []),
@@ -106,7 +116,7 @@ class ToolGroupConfig:
             custom_tools=data.get("custom_tools", []),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "tools": self.tools,
@@ -121,16 +131,16 @@ class ToolConfig:
 
     name: str
     description: str = ""
-    parameters: dict[str, Any] = field(default_factory=dict)
+    parameters: Dict[str, Any] = field(default_factory=dict)
     callable: Any = None
     enabled: bool = True
     priority: int = 50
     category: str = "general"
     source_level: str = "builtin"  # builtin, system, user, workspace
-    config_overrides: dict[str, Any] = field(default_factory=dict)
+    config_overrides: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], source_level: str = "builtin") -> "ToolConfig":
+    def from_dict(cls, data: Dict[str, Any], source_level: str = "builtin") -> "ToolConfig":
         """从字典创建工具配置"""
         return cls(
             name=data.get("name", ""),
@@ -144,7 +154,7 @@ class ToolConfig:
             config_overrides=data.get("config_overrides", {}),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "name": self.name,
@@ -172,7 +182,7 @@ class ToolConfig:
         return merged
 
 
-def _load_builtin_tools(workspace_path: str | None = None) -> dict[str, ToolConfig]:
+def _load_builtin_tools(workspace_path: str | None = None) -> Dict[str, ToolConfig]:
     """加载内置工具 (CustomToolProvider)
 
     Args:
@@ -204,7 +214,7 @@ def _load_builtin_tools(workspace_path: str | None = None) -> dict[str, ToolConf
     return tools
 
 
-def _load_user_tools() -> dict[str, ToolConfig]:
+def _load_user_tools() -> Dict[str, ToolConfig]:
     """加载用户级工具配置
 
     Returns:
@@ -240,7 +250,7 @@ def _load_user_tools() -> dict[str, ToolConfig]:
     return tools
 
 
-def _load_workspace_tools(workspace_path: str) -> dict[str, ToolConfig]:
+def _load_workspace_tools(workspace_path: str) -> Dict[str, ToolConfig]:
     """加载工作区级工具配置
 
     Args:
@@ -283,6 +293,59 @@ def _load_workspace_tools(workspace_path: str) -> dict[str, ToolConfig]:
     return tools
 
 
+def _load_knowledge_tools(workspace_path: str | None = None) -> Dict[str, ToolConfig]:
+    """加载知识库工具
+
+    Args:
+        workspace_path: 工作区路径（可选）
+
+    Returns:
+        工具配置字典
+
+    """
+    tools = {}
+    logger.info("Loading knowledge tools...")
+
+    try:
+        from dawei.tools.custom_tools.knowledge_tool import KnowledgeSearchTool, KnowledgeRAGTool
+        from dawei.tools.custom_tools.knowledge_management_tool import (
+            UploadDocumentTool,
+            DeleteDocumentTool,
+            ListDocumentsTool,
+            ReindexDocumentTool,
+        )
+
+        # 创建知识库工具实例（不传入service，稍后在Agent中注入）
+        knowledge_tools = [
+            KnowledgeSearchTool(),
+            KnowledgeRAGTool(),
+            UploadDocumentTool(),
+            DeleteDocumentTool(),
+            ListDocumentsTool(),
+            ReindexDocumentTool(),
+        ]
+
+        # 转换为ToolConfig
+        for tool in knowledge_tools:
+            tools[tool.name] = ToolConfig(
+                name=tool.name,
+                description=tool.description,
+                category="knowledge",
+                callable=tool.run if hasattr(tool, 'run') else tool._run,
+                enabled=True,
+                source_level="default",
+            )
+
+        logger.info(f"Loaded {len(knowledge_tools)} knowledge tools")
+
+    except ImportError as e:
+        logger.warning(f"Knowledge tools not available: {e}")
+    except Exception as e:
+        logger.error(f"Failed to load knowledge tools: {e}", exc_info=True)
+
+    return tools
+
+
 class ToolManager:
     """简化的工具管理器 (KISS Principle)
 
@@ -315,7 +378,7 @@ class ToolManager:
 
         logger.info(f"ToolManager initialized with {len(self._tools)} total tools")
 
-    def _load_tools(self) -> dict[str, ToolConfig]:
+    def _load_tools(self) -> Dict[str, ToolConfig]:
         """一次性加载所有工具（2层配置）
 
         Returns:
@@ -327,10 +390,11 @@ class ToolManager:
         """
         tools = {}
 
-        # 1. 加载默认工具（builtin + user）
+        # 1. 加载默认工具（builtin + user + knowledge）
         try:
             tools.update(_load_builtin_tools(self.workspace_path))
             tools.update(_load_user_tools())
+            tools.update(_load_knowledge_tools(self.workspace_path))  # 添加知识库工具
             logger.info(f"Loaded {len(tools)} default tools")
         except Exception as e:
             # Fast Fail: 默认工具加载失败应立即抛出
@@ -368,7 +432,7 @@ class ToolManager:
         self._tools = self._load_tools()
         logger.info(f"Workspace path set to {workspace_path}, tools reloaded")
 
-    def get_builtin_providers_info(self) -> dict[str, Any]:
+    def get_builtin_providers_info(self) -> Dict[str, Any]:
         """获取内置工具提供者信息（向后兼容）"""
         default_tools = [t for t in self._tools.values() if t.source_level == "default"]
         return {
@@ -384,7 +448,7 @@ class ToolManager:
         self._tools = self._load_tools()
         logger.info("Tools reloaded")
 
-    def load_tools(self) -> list[dict[str, Any]]:
+    def load_tools(self) -> List[Dict[str, Any]]:
         """加载所有启用的工具
 
         Returns:
@@ -398,7 +462,7 @@ class ToolManager:
                 tool_dict = tool_config.to_dict()
                 # 如果有可调用对象，添加到字典中
                 if tool_config.callable:
-                    tool_dict["callable"] = tool_config.callable
+                    tool_Dict["callable"] = tool_config.callable
                 all_tools.append(tool_dict)
 
         logger.info(f"Loaded {len(all_tools)} enabled tools")
@@ -416,7 +480,7 @@ class ToolManager:
         """
         return self._tools.get(tool_name)
 
-    def get_all_tool_configs(self) -> dict[str, ToolConfig]:
+    def get_all_tool_configs(self) -> Dict[str, ToolConfig]:
         """获取所有工具配置
 
         Returns:
@@ -438,7 +502,7 @@ class ToolManager:
         tool_config = self._tools.get(tool_name)
         return tool_config.enabled if tool_config else False
 
-    def get_tools_by_category(self, category: str) -> list[ToolConfig]:
+    def get_tools_by_category(self, category: str) -> List[ToolConfig]:
         """按类别获取工具
 
         Args:
@@ -450,7 +514,7 @@ class ToolManager:
         """
         return [config for config in self._tools.values() if config.category == category and config.enabled]
 
-    def get_tools_by_source_level(self, level: str) -> list[ToolConfig]:
+    def get_tools_by_source_level(self, level: str) -> List[ToolConfig]:
         """按来源级别获取工具（向后兼容）
 
         Args:
@@ -462,7 +526,7 @@ class ToolManager:
         """
         return [config for config in self._tools.values() if config.source_level == level]
 
-    def get_tool_sources(self, tool_name: str) -> dict[str, bool]:
+    def get_tool_sources(self, tool_name: str) -> Dict[str, bool]:
         """获取工具配置来源信息（向后兼容）
 
         Args:
@@ -485,7 +549,7 @@ class ToolManager:
             return {"builtin": False, "user": False, "workspace": True}
         return {"builtin": False, "user": False, "workspace": False}
 
-    def get_tool_override_info(self, tool_name: str) -> dict[str, Any]:
+    def get_tool_override_info(self, tool_name: str) -> Dict[str, Any]:
         """获取工具覆盖信息（向后兼容）
 
         Args:
@@ -524,7 +588,7 @@ class ToolManager:
             "config": tool_config.to_dict(),
         }
 
-    def get_all_override_info(self) -> list[dict[str, Any]]:
+    def get_all_override_info(self) -> List[Dict[str, Any]]:
         """获取所有工具的覆盖信息（向后兼容）
 
         Returns:
@@ -604,7 +668,7 @@ class ToolManager:
 
     def get_filtered_tool_names(
         self,
-        all_tools: list[dict[str, Any]],
+        all_tools: List[Dict[str, Any]],
         workspace_settings=None,
     ) -> set[str]:
         """根据工作区设置过滤工具名称，确保始终可用工具在任何模式下都可用
@@ -657,7 +721,7 @@ class ToolManager:
 
         return allowed_tools
 
-    def get_tool_statistics(self) -> dict[str, Any]:
+    def get_tool_statistics(self) -> Dict[str, Any]:
         """获取工具统计信息（简化版）
 
         Returns:
@@ -692,7 +756,7 @@ class ToolManager:
 
         return stats
 
-    def get_tools_by_group(self, group_name: str) -> list[ToolConfig]:
+    def get_tools_by_group(self, group_name: str) -> List[ToolConfig]:
         """根据工具组名称获取工具配置列表
 
         Args:
@@ -724,7 +788,7 @@ class ToolManager:
         logger.debug(f"Found {len(tools)} enabled tools in group '{group_name}'")
         return tools
 
-    def get_tool_groups(self) -> dict[str, ToolGroupConfig]:
+    def get_tool_groups(self) -> Dict[str, ToolGroupConfig]:
         """获取所有工具组配置
 
         Returns:
@@ -733,7 +797,7 @@ class ToolManager:
         """
         return {group_name: ToolGroupConfig.from_dict(group_data) for group_name, group_data in TOOL_GROUPS.items()}
 
-    def get_group_tools(self, group_names: list[Any]) -> set[str]:
+    def get_group_tools(self, group_names: List[Any]) -> set[str]:
         """获取指定工具组中的所有工具名称
 
         Args:
@@ -791,7 +855,7 @@ class ToolManager:
         """
         return tool_name in ALWAYS_AVAILABLE_TOOLS
 
-    def get_available_tools_with_groups(self, group_names: list[str]) -> set[str]:
+    def get_available_tools_with_groups(self, group_names: List[str]) -> set[str]:
         """结合工具组和始终可用工具获取最终可用工具列表
 
         Args:

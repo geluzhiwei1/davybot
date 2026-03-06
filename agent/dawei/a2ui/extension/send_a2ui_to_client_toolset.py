@@ -41,7 +41,7 @@ Usage Example:
 
 import json
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 import jsonschema
 
@@ -68,7 +68,7 @@ class SendA2uiToClientTool:
     VALIDATED_A2UI_JSON_KEY = "validated_a2ui_json"
     TOOL_ERROR_KEY = "error"
 
-    def __init__(self, a2ui_schema: dict[str, Any] | None = None):
+    def __init__(self, a2ui_schema: Dict[str, Any] | None = None):
         """Initialize the A2UI tool.
 
         Args:
@@ -78,7 +78,7 @@ class SendA2uiToClientTool:
         """
         self._a2ui_schema = a2ui_schema or self._get_default_schema()
 
-    def _get_default_schema(self) -> dict[str, Any]:
+    def _get_default_schema(self) -> Dict[str, Any]:
         """Get the default A2UI component schema.
 
         Returns:
@@ -102,7 +102,7 @@ class SendA2uiToClientTool:
         }
         return wrap_as_json_array(component_schema)
 
-    def get_tool_definition(self) -> dict[str, Any]:
+    def get_tool_definition(self) -> Dict[str, Any]:
         """Get the tool definition for LLM function calling.
 
         Returns:
@@ -127,7 +127,7 @@ class SendA2uiToClientTool:
     async def validate_and_parse(
         self,
         a2ui_json: str,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """Validate and parse A2UI JSON.
 
         Args:
@@ -154,9 +154,9 @@ class SendA2uiToClientTool:
 
     async def run_async(
         self,
-        args: dict[str, Any],
+        args: Dict[str, Any],
         tool_context: Any,  # Could be ToolContext or similar
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """Execute the tool asynchronously.
 
         Args:
@@ -185,11 +185,11 @@ class SendA2uiToClientTool:
 
     def create_websocket_message(
         self,
-        components: list[dict[str, Any]],
+        components: List[Dict[str, Any]],
         surface_id: str,
-        data_model: dict[str, Any] | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        data_model: Dict[str, Any] | None = None,
+        metadata: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         """Create a WebSocket message from validated components.
 
         Args:
@@ -210,7 +210,7 @@ class SendA2uiToClientTool:
         )
 
 
-def create_a2ui_tool(a2ui_schema: dict[str, Any] | None = None) -> SendA2uiToClientTool:
+def create_a2ui_tool(a2ui_schema: Dict[str, Any] | None = None) -> SendA2uiToClientTool:
     """Factory function to create an A2UI tool with optional custom schema.
 
     Args:
@@ -235,8 +235,8 @@ def create_a2ui_tool(a2ui_schema: dict[str, Any] | None = None) -> SendA2uiToCli
 
 
 def get_a2ui_schema_with_instructions(
-    component_types: list[str] | None = None,
-) -> tuple[dict[str, Any], str]:
+    component_types: List[str] | None = None,
+) -> tuple[Dict[str, Any], str]:
     """Get A2UI schema and LLM instructions.
 
     Args:

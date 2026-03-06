@@ -8,7 +8,7 @@ Quick action launcher (Ctrl+P) for TUI commands.
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import List, Dict, ClassVar
 
 from textual.containers import Vertical
 from textual.screen import ModalScreen
@@ -65,7 +65,7 @@ class CommandPalette(ModalScreen):
 
     def __init__(
         self,
-        commands: list[Command],
+        commands: List[Command],
         callback: ClassVar[Callable[[str], None] | None] = None,
         **kwargs,
     ):
@@ -184,7 +184,7 @@ class CommandPalette(ModalScreen):
         """Close command palette"""
         self.dismiss(None)
 
-    def _update_table(self, commands: list[Command]) -> None:
+    def _update_table(self, commands: List[Command]) -> None:
         """Update commands table
 
         Args:
@@ -223,7 +223,7 @@ class CommandPalette(ModalScreen):
         preview.update(text)
 
 
-def get_default_commands() -> list[Command]:
+def get_default_commands() -> List[Command]:
     """Get default command list
 
     Returns:

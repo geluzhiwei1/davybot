@@ -6,7 +6,7 @@
 处理 Agent 生命周期控制消息：停止
 """
 
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.agent import Agent
 from dawei.logg.logging import get_logger
@@ -34,7 +34,7 @@ class AgentLifecycleHandler(BaseMessageHandler):
     - 错误处理和清理
     """
 
-    def __init__(self, active_agents: dict[str, Agent], send_message_callback, send_error_callback):
+    def __init__(self, active_agents: Dict[str, Agent], send_message_callback, send_error_callback):
         """初始化 Agent 生命周期处理器
 
         Args:

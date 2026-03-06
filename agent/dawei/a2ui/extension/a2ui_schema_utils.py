@@ -8,14 +8,14 @@ Utilities for A2UI Schema manipulation and validation.
 
 import json
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 import jsonschema
 
 logger = logging.getLogger(__name__)
 
 
-def wrap_as_json_array(a2ui_schema: dict[str, Any]) -> dict[str, Any]:
+def wrap_as_json_array(a2ui_schema: Dict[str, Any]) -> Dict[str, Any]:
     """Wrap the A2UI schema in an array object to support multiple parts.
 
     Args:
@@ -38,7 +38,7 @@ def wrap_as_json_array(a2ui_schema: dict[str, Any]) -> dict[str, Any]:
     return {"type": "array", "items": a2ui_schema}
 
 
-def create_a2ui_schema_from_components(component_types: list[str]) -> dict[str, Any]:
+def create_a2ui_schema_from_components(component_types: List[str]) -> Dict[str, Any]:
     """Create a JSON Schema from a list of component type names.
 
     Args:
@@ -73,7 +73,7 @@ def create_a2ui_schema_from_components(component_types: list[str]) -> dict[str, 
     return wrap_as_json_array(component_schema)
 
 
-def validate_a2ui_json(a2ui_json: str | dict[str, Any], schema: dict[str, Any]) -> list[dict[str, Any]]:
+def validate_a2ui_json(a2ui_json: str | Dict[str, Any], schema: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Validate and parse A2UI JSON.
 
     Args:
@@ -112,7 +112,7 @@ def validate_a2ui_json(a2ui_json: str | dict[str, Any], schema: dict[str, Any]) 
     return data
 
 
-def merge_data_models(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
+def merge_data_models(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
     """Merge two A2UI data models.
 
     Args:
@@ -135,7 +135,7 @@ def merge_data_models(base: dict[str, Any], update: dict[str, Any]) -> dict[str,
     return result
 
 
-def extract_component_ids(components: list[dict[str, Any]]) -> list[str]:
+def extract_component_ids(components: List[Dict[str, Any]]) -> List[str]:
     """Extract all component IDs from a list of components.
 
     Args:
@@ -156,7 +156,7 @@ def extract_component_ids(components: list[dict[str, Any]]) -> list[str]:
     return [comp.get("id") for comp in components if "id" in comp]
 
 
-def find_components_by_type(components: list[dict[str, Any]], component_type: str) -> list[dict[str, Any]]:
+def find_components_by_type(components: List[Dict[str, Any]], component_type: str) -> List[Dict[str, Any]]:
     """Find all components of a specific type.
 
     Args:

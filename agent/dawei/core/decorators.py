@@ -10,7 +10,7 @@ import functools
 import logging
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import List, Dict, Any
 
 from .error_handler import get_error_handler
 from .errors import ErrorCategory, ErrorContext, ErrorSeverity, RecoveryStrategy
@@ -31,8 +31,8 @@ class SafeOperationConfig:
         log_level: str = "ERROR",
         retry_count: int = 0,
         retry_delay: float = 1.0,
-        catch_exceptions: list[type[Exception]] | None = None,
-        ignore_exceptions: list[type[Exception]] | None = None,
+        catch_exceptions: List[type[Exception]] | None = None,
+        ignore_exceptions: List[type[Exception]] | None = None,
     ):
         self.component = component
         self.operation = operation
@@ -59,8 +59,8 @@ def safe_operation(
     log_level: str = "ERROR",
     retry_count: int = 0,
     retry_delay: float = 1.0,
-    catch_exceptions: list[type[Exception]] | None = None,
-    ignore_exceptions: list[type[Exception]] | None = None,
+    catch_exceptions: List[type[Exception]] | None = None,
+    ignore_exceptions: List[type[Exception]] | None = None,
 ) -> Callable:
     """安全操作装饰器，用于替代简单的try块
 
@@ -114,7 +114,7 @@ def safe_operation(
 async def _execute_with_error_handling_async(
     func: Callable,
     args: tuple,
-    kwargs: dict[str, Any],
+    kwargs: Dict[str, Any],
     config: SafeOperationConfig,
 ) -> Any:
     logger = logging.getLogger(__name__)
@@ -178,7 +178,7 @@ async def _execute_with_error_handling_async(
 def _execute_with_error_handling_sync(
     func: Callable,
     args: tuple,
-    kwargs: dict[str, Any],
+    kwargs: Dict[str, Any],
     config: SafeOperationConfig,
 ) -> Any:
     logger = logging.getLogger(__name__)
@@ -242,7 +242,7 @@ def _execute_with_error_handling_sync(
 def _execute_with_error_handling(
     func: Callable,
     args: tuple,
-    kwargs: dict[str, Any],
+    kwargs: Dict[str, Any],
     config: SafeOperationConfig,
     is_async: bool = False,
 ) -> Any:
@@ -380,7 +380,7 @@ class TryBlockAnalyzer:
     """Try块分析器，用于识别可以替换的try块模式"""
 
     @staticmethod
-    def analyze_file_for_try_blocks(file_path: str) -> dict[str, list[dict[str, Any]]]:
+    def analyze_file_for_try_blocks(file_path: str) -> Dict[str, List[Dict[str, Any]]]:
         """分析文件中的try块模式
 
         Args:
@@ -452,7 +452,7 @@ class TryBlockAnalyzer:
         return patterns
 
     @staticmethod
-    def suggest_decorator_for_pattern(pattern_type: str, context: dict[str, Any]) -> str | None:
+    def suggest_decorator_for_pattern(pattern_type: str, context: Dict[str, Any]) -> str | None:
         """为特定模式建议合适的装饰器
 
         Args:

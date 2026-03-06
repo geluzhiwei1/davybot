@@ -9,7 +9,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.core.events import TaskEventType
 from dawei.entity.lm_messages import ToolCall
@@ -48,7 +48,7 @@ class StreamProcessor:
         # 从适配器合并的功能
         self.is_streaming_flag = False
         self.token_usage = None
-        self.processing_state: dict[str, bool | str | dict[str, ToolCall]] = {
+        self.processing_state: Dict[str, bool | str | Dict[str, ToolCall]] = {
             "is_processing": False,
             "current_content": "",
             "current_tool_calls": {},
@@ -76,7 +76,7 @@ class StreamProcessor:
         stream_response: AsyncGenerator,
         task_id: str,
         context: Any,
-    ) -> list[Any]:
+    ) -> List[Any]:
         """处理流式消息（实现 IStreamProcessor 接口）
 
         Args:
@@ -134,7 +134,7 @@ class StreamProcessor:
         """
         return self.token_usage or TokenUsage()
 
-    def get_stream_statistics(self) -> dict[str, Any]:
+    def get_stream_statistics(self) -> Dict[str, Any]:
         """获取流统计信息（实现 IStreamProcessor 接口）
 
         Returns:
@@ -152,7 +152,7 @@ class StreamProcessor:
         """重置流式处理状态（实现 IStreamProcessor 接口）"""
         self.is_streaming_flag = False
         self.token_usage = None
-        self.processing_state: dict[str, bool | str | dict[str, ToolCall]] = {
+        self.processing_state: Dict[str, bool | str | Dict[str, ToolCall]] = {
             "is_processing": False,
             "current_content": "",
             "current_tool_calls": {},
@@ -167,7 +167,7 @@ class StreamProcessor:
         """
         return self.is_streaming_flag
 
-    def get_processing_state(self) -> dict[str, bool | str | dict[str, ToolCall]]:
+    def get_processing_state(self) -> Dict[str, bool | str | Dict[str, ToolCall]]:
         """获取处理状态（实现 IStreamProcessor 接口）
 
         Returns:
@@ -201,7 +201,7 @@ class StreamProcessor:
         # 设置事件处理器
         self.event_handlers[event_type] = handler
 
-    async def handle_stream_chunk(self, chunk: Any, _context: Any) -> list[Any]:
+    async def handle_stream_chunk(self, chunk: Any, _context: Any) -> List[Any]:
         """处理单个流式块（实现 IStreamProcessor 接口）
 
         Args:

@@ -8,7 +8,7 @@
 """
 
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.entity.mode import ModeConfig
 
@@ -113,7 +113,7 @@ class PromptsManager:
     def render_template(
         self,
         template_name: str,
-        context: dict[str, Any],
+        context: Dict[str, Any],
         mode: str | None = None,
         language: str | None = None,
     ) -> str:
@@ -140,7 +140,7 @@ class PromptsManager:
             logger.exception("Failed to render template {template_name}: ")
             raise TemplateRenderError(f"Template rendering failed: {e}")
 
-    def build_system_prompt(self, capabilities: list[str], _mode: str | None = None) -> dict[str, Any]:
+    def build_system_prompt(self, capabilities: List[str], _mode: str | None = None) -> Dict[str, Any]:
         """构建系统提示
 
         Args:
@@ -190,7 +190,7 @@ class PromptsManager:
 
         return self.config_manager.get_language_config(language)
 
-    def get_available_modes(self) -> list[str]:
+    def get_available_modes(self) -> List[str]:
         """获取可用模式列表
 
         Returns:
@@ -202,7 +202,7 @@ class PromptsManager:
 
         return self.config_manager.get_all_modes()
 
-    def get_available_languages(self) -> list[str]:
+    def get_available_languages(self) -> List[str]:
         """获取可用语言列表
 
         Returns:
@@ -214,7 +214,7 @@ class PromptsManager:
 
         return self.config_manager.get_all_languages()
 
-    def get_available_templates(self) -> list[str]:
+    def get_available_templates(self) -> List[str]:
         """获取可用模板列表
 
         Returns:
@@ -246,7 +246,7 @@ class PromptsManager:
             logger.exception("Failed to clear cache: ")
             raise
 
-    def validate_configuration(self) -> list[str]:
+    def validate_configuration(self) -> List[str]:
         """验证配置
 
         Returns:
@@ -284,7 +284,7 @@ class PromptsManager:
         return self._initialized
 
     @property
-    def template_cache_info(self) -> dict[str, Any]:
+    def template_cache_info(self) -> Dict[str, Any]:
         """获取模板缓存信息"""
         return {
             "cache_enabled": self.template_manager.cache_enabled,
@@ -293,7 +293,7 @@ class PromptsManager:
         }
 
     @property
-    def configuration_info(self) -> dict[str, Any]:
+    def configuration_info(self) -> Dict[str, Any]:
         """获取配置信息"""
         return {
             "modes_count": len(self.config_manager.get_all_modes()),

@@ -11,7 +11,7 @@ import json
 import logging
 import re
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import List, Dict, Any
 
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
@@ -35,7 +35,7 @@ class OpenRouterClient(BaseClient):
     支持多提供商路由、推理令牌、工具调用和图像生成
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, config: Dict[str, Any]) -> None:
         """初始化 OpenRouter 客户端
 
         Args:
@@ -73,7 +73,7 @@ class OpenRouterClient(BaseClient):
         self.max_retries = config.get("maxRetries", 3)
         self.retry_delay = config.get("retryDelay", 1.0)
 
-    def _prepare_headers(self) -> dict[str, str]:
+    def _prepare_headers(self) -> Dict[str, str]:
         """准备请求头"""
         return {
             "Content-Type": "application/json",
@@ -107,8 +107,8 @@ class OpenRouterClient(BaseClient):
 
     def _convert_messages_to_openai_format(
         self,
-        messages: list[LLMMessage],
-    ) -> list[dict[str, Any]]:
+        messages: List[LLMMessage],
+    ) -> List[Dict[str, Any]]:
         """将消息转换为 OpenAI API 格式"""
         openai_messages = []
         for message in messages:
@@ -134,8 +134,8 @@ class OpenRouterClient(BaseClient):
     def _add_cache_breakpoints(
         self,
         _system_prompt: str,
-        messages: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+        messages: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
         """添加缓存断点（简化实现）"""
         # 这里应该根据模型类型添加不同的缓存断点
         # 为了简化，直接返回原消息
@@ -144,10 +144,10 @@ class OpenRouterClient(BaseClient):
     def _prepare_request_params(
         self,
         system_prompt: str,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         stream: bool = False,
         **kwargs,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """准备请求参数"""
         openai_messages = self._convert_messages_to_openai_format(messages)
 
@@ -206,8 +206,8 @@ class OpenRouterClient(BaseClient):
     async def _make_stream_request(
         self,
         endpoint: str,
-        params: dict[str, Any],
-    ) -> AsyncGenerator[dict[str, Any], None]:
+        params: Dict[str, Any],
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """发送流式请求到 OpenRouter API
 
         Args:
@@ -274,7 +274,7 @@ class OpenRouterClient(BaseClient):
 
     async def create_message(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         **kwargs,
     ) -> AsyncGenerator[StreamMessages, None]:
         """创建消息并返回流式响应
@@ -337,7 +337,7 @@ class OpenRouterClient(BaseClient):
         model: str,
         api_key: str,
         input_image: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """生成图像
 
         Args:
@@ -491,7 +491,7 @@ class OpenRouterClient(BaseClient):
                 "error": f"Unexpected error: {str(e) if hasattr(e, '__str__') else 'Unknown error'}",
             }
 
-    def get_model_info(self) -> dict[str, Any]:
+    def get_model_info(self) -> Dict[str, Any]:
         """获取模型信息
 
         Returns:

@@ -6,7 +6,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.plugins.base import BasePlugin, PluginConfig, PluginMetadata, PluginType
 from dawei.plugins.config import resolve_env_vars
@@ -33,13 +33,13 @@ class PluginLoader:
     """
 
     def __init__(self):
-        self.loaded_plugins: dict[str, BasePlugin] = {}
+        self.loaded_plugins: Dict[str, BasePlugin] = {}
 
     async def discover_plugins(
         self,
-        search_paths: list[Path],
+        search_paths: List[Path],
         recursive: bool = True,
-    ) -> list[PluginMetadata]:
+    ) -> List[PluginMetadata]:
         """Discover all plugins in search paths.
 
         Args:
@@ -110,7 +110,7 @@ class PluginLoader:
     async def load_plugin(
         self,
         manifest: PluginMetadata,
-        settings: dict[str, Any],
+        settings: Dict[str, Any],
     ) -> BasePlugin | None:
         """Load a plugin from its manifest.
 
@@ -225,7 +225,7 @@ class PluginLoader:
         """Get loaded plugin by ID"""
         return self.loaded_plugins.get(plugin_id)
 
-    def list_loaded_plugins(self) -> list[str]:
+    def list_loaded_plugins(self) -> List[str]:
         """List all loaded plugin IDs"""
         return list(self.loaded_plugins.keys())
 

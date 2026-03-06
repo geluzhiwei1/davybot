@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import logging
@@ -442,7 +443,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
 
         return -1
 
-    def _verify_diff(self, file_path: str, diff_blocks: list[dict]) -> str:
+    def _verify_diff(self, file_path: str, diff_blocks: List[dict]) -> str:
         """Verify that all diffs were applied correctly."""
         try:
             path_obj = Path(file_path)
@@ -466,7 +467,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
             # Diff block structure error
             return f"Verification failed: Invalid diff block structure - {e!s}"
 
-    def _parse_diff(self, diff: str) -> list[dict]:
+    def _parse_diff(self, diff: str) -> List[dict]:
         """Parse diff content into blocks. Supports both SEARCH/REPLACE and git unified diff formats."""
         # Auto-detect format
         if "<<<<<<< SEARCH" in diff or "<<<<<<< SEARCH" in diff:
@@ -481,7 +482,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
         logger.warning("Unable to detect diff format, trying unified diff parser")
         return self._parse_unified_diff(diff)
 
-    def _parse_search_replace(self, diff: str) -> list[dict]:
+    def _parse_search_replace(self, diff: str) -> List[dict]:
         """Parse SEARCH/REPLACE format diff."""
         blocks = []
         current_block = None
@@ -507,7 +508,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
 
         return blocks
 
-    def _parse_unified_diff(self, diff: str) -> list[dict]:
+    def _parse_unified_diff(self, diff: str) -> List[dict]:
         """Parse git unified diff format."""
         blocks = []
         lines = diff.split("\n")

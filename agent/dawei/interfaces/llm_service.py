@@ -8,7 +8,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from typing import List, Dict, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dawei.entity.lm_messages import LLMMessage
@@ -23,7 +23,7 @@ class ILLMService(ABC):
     """LLM 服务接口"""
 
     @abstractmethod
-    def get_available_providers(self) -> list[str]:
+    def get_available_providers(self) -> List[str]:
         """获取可用的 LLM 提供者列表
 
         Returns:
@@ -53,7 +53,7 @@ class ILLMService(ABC):
         """
 
     @abstractmethod
-    def get_provider_config(self, provider_name: str) -> dict[str, Any] | None:
+    def get_provider_config(self, provider_name: str) -> Dict[str, Any] | None:
         """获取提供者配置
 
         Args:
@@ -65,7 +65,7 @@ class ILLMService(ABC):
         """
 
     @abstractmethod
-    def update_provider_config(self, provider_name: str, config: dict[str, Any]) -> bool:
+    def update_provider_config(self, provider_name: str, config: Dict[str, Any]) -> bool:
         """更新提供者配置
 
         Args:
@@ -78,7 +78,7 @@ class ILLMService(ABC):
         """
 
     @abstractmethod
-    def get_model_info(self, provider_name: str | None = None) -> dict[str, Any]:
+    def get_model_info(self, provider_name: str | None = None) -> Dict[str, Any]:
         """获取模型信息
 
         Args:
@@ -102,7 +102,7 @@ class ILLMService(ABC):
         """
 
     @abstractmethod
-    async def process_message(self, messages: list[LLMMessage], **kwargs) -> dict[str, Any]:
+    async def process_message(self, messages: List[LLMMessage], **kwargs) -> Dict[str, Any]:
         """处理消息并返回完整结果
 
         Args:
@@ -117,10 +117,10 @@ class ILLMService(ABC):
     @abstractmethod
     async def create_message_with_callback(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         callback: Callable[[StreamMessages], Awaitable[None]],
         **kwargs,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """创建消息并通过回调函数处理流式响应
 
         Args:

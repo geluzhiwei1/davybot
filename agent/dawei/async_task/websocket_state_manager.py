@@ -10,8 +10,9 @@ import asyncio
 import contextlib
 import threading
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.logg.logging import get_logger
 
@@ -32,11 +33,11 @@ class WebSocketStateManager(IWebSocketStateManager):
         self.config = config or WebSocketManagerConfig()
 
         # 连接状态存储
-        self._connections: dict[str, WebSocketState] = {}
+        self._connections: Dict[str, WebSocketState] = {}
 
         # 回调函数
-        self._state_change_callbacks: list[Callable[[str, ConnectionState, ConnectionState], None]] = []
-        self._heartbeat_callbacks: list[Callable[[str], None]] = []
+        self._state_change_callbacks: List[Callable[[str, ConnectionState, ConnectionState], None]] = []
+        self._heartbeat_callbacks: List[Callable[[str], None]] = []
 
         # 后台任务
         self._heartbeat_task: asyncio.Task | None = None
@@ -261,7 +262,7 @@ class WebSocketStateManager(IWebSocketStateManager):
 
             return True
 
-    async def list_connections(self, state_filter: ConnectionState | None = None) -> list[str]:
+    async def list_connections(self, state_filter: ConnectionState | None = None) -> List[str]:
         """列出连接
 
         Args:
@@ -277,7 +278,7 @@ class WebSocketStateManager(IWebSocketStateManager):
 
             return [session_id for session_id, connection in self._connections.items() if connection.state == state_filter]
 
-    async def get_healthy_connections(self) -> list[str]:
+    async def get_healthy_connections(self) -> List[str]:
         """获取健康的连接
 
         Returns:
@@ -423,7 +424,7 @@ class WebSocketStateManager(IWebSocketStateManager):
 
         self._logger.info("WebSocketStateManager stopped")
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息
 
         Returns:

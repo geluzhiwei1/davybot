@@ -11,7 +11,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
@@ -55,10 +55,10 @@ class BaseClient(LlmApi, ABC):
     # 全局保护组件（所有子类共享）
     _global_rate_limiter: ClassVar[AdaptiveRateLimiter | None] = None
     _global_request_queue: ClassVar[RequestQueue | None] = None
-    _circuit_breakers: ClassVar[dict[str, CircuitBreaker]] = {}
+    _circuit_breakers: ClassVar[Dict[str, CircuitBreaker]] = {}
     _protection_initialized = False
 
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, config: Dict[str, Any]) -> None:
         """初始化基础客户端
 
         Args:
@@ -110,7 +110,7 @@ class BaseClient(LlmApi, ABC):
         return float(delay)
 
     @staticmethod
-    def _ensure_rate_limiter(config: dict[str, Any]):
+    def _ensure_rate_limiter(config: Dict[str, Any]):
         """确保速率限制器已初始化（惰性初始化）
 
         这是一个防御性方法，确保在使用速率限制器之前它已被初始化。
@@ -130,7 +130,7 @@ class BaseClient(LlmApi, ABC):
         BaseClient._global_rate_limiter = AdaptiveRateLimiter(rate_limit_config)
         logger.info("✓ Global rate limiter initialized (lazy)")
 
-    def _initialize_global_protection(self, config: dict[str, Any]):
+    def _initialize_global_protection(self, config: Dict[str, Any]):
         """初始化全局保护组件"""
         # 防御性检查：即使 _protection_initialized 为 True，也要确保 rate_limiter 存在
         # 这处理了初始化可能未正确完成的边缘情况
@@ -197,7 +197,7 @@ class BaseClient(LlmApi, ABC):
             self._session = ClientSession(**session_kwargs)
         return self._session
 
-    def _get_proxy_config(self) -> dict[str, Any] | None:
+    def _get_proxy_config(self) -> Dict[str, Any] | None:
         """获取代理配置
 
         Returns:
@@ -219,7 +219,7 @@ class BaseClient(LlmApi, ABC):
             "https": https_proxy or proxy_url,
         }
 
-    def _prepare_request_kwargs(self, params: dict[str, Any], url: str) -> dict[str, Any]:
+    def _prepare_request_kwargs(self, params: Dict[str, Any], url: str) -> Dict[str, Any]:
         """准备请求参数（包括代理配置）
 
         Args:
@@ -241,23 +241,23 @@ class BaseClient(LlmApi, ABC):
         return request_kwargs
 
     @abstractmethod
-    def _prepare_headers(self) -> dict[str, str]:
+    def _prepare_headers(self) -> Dict[str, str]:
         """准备请求头"""
 
     @abstractmethod
     def _prepare_request_params(
         self,
-        messages: list[LLMMessage | dict[str, Any]],
+        messages: List[LLMMessage | Dict[str, Any]],
         **kwargs,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """准备请求参数"""
 
     async def _make_http_request(
         self,
         endpoint: str,
-        params: dict[str, Any],
+        params: Dict[str, Any],
         with_protection: ClassVar[bool] = True,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """执行单次 HTTP 请求（受保护）
 
         Args:
@@ -334,8 +334,8 @@ class BaseClient(LlmApi, ABC):
     async def _make_protected_http_request(
         self,
         endpoint: str,
-        params: dict[str, Any],
-    ) -> dict[str, Any]:
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """受保护的 HTTP 请求（KISS 原则：线性执行，清晰简单）
 
         执行顺序：
@@ -387,8 +387,8 @@ class BaseClient(LlmApi, ABC):
     async def _make_unprotected_http_request(
         self,
         endpoint: str,
-        params: dict[str, Any],
-    ) -> dict[str, Any]:
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """不受保护的 HTTP 请求（原有逻辑）"""
         try:
             session = self._get_client_session()
@@ -454,8 +454,8 @@ class BaseClient(LlmApi, ABC):
     async def _make_stream_request(
         self,
         endpoint: str,
-        params: dict[str, Any],
-    ) -> AsyncGenerator[dict[str, Any], None]:
+        params: Dict[str, Any],
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """执行流式 HTTP 请求（受保护）"""
         provider = self.get_provider_name()
         model = getattr(self, "model", "unknown")
@@ -600,7 +600,7 @@ class BaseClient(LlmApi, ABC):
         # (由各个实例自己处理)
 
     @staticmethod
-    def get_global_stats() -> dict[str, Any]:
+    def get_global_stats() -> Dict[str, Any]:
         """获取全局统计信息"""
         return {
             "rate_limiter": (BaseClient._global_rate_limiter.get_stats() if BaseClient._global_rate_limiter else {}),

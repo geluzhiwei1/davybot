@@ -13,8 +13,9 @@ import time
 import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.logg.logging import get_logger
 
@@ -63,10 +64,10 @@ class AsyncTaskManager(IAsyncTaskManager):
         )
 
         # 任务存储
-        self._tasks: dict[str, TaskDefinition] = {}
-        self._contexts: dict[str, TaskContext] = {}
-        self._results: dict[str, TaskResult] = {}
-        self._futures: dict[str, asyncio.Future] = {}
+        self._tasks: Dict[str, TaskDefinition] = {}
+        self._contexts: Dict[str, TaskContext] = {}
+        self._results: Dict[str, TaskResult] = {}
+        self._futures: Dict[str, asyncio.Future] = {}
 
         # 执行控制
         self._running_tasks: set[str] = set()
@@ -89,7 +90,7 @@ class AsyncTaskManager(IAsyncTaskManager):
         self._start_callback: StartCallback | None = None
 
         # 任务执行器注册表
-        self._executors: list[ITaskExecutor] = []
+        self._executors: List[ITaskExecutor] = []
 
         # 线程安全锁
         self._lock = threading.RLock()
@@ -332,7 +333,7 @@ class AsyncTaskManager(IAsyncTaskManager):
         with self._lock:
             return self._results.get(task_id)
 
-    async def list_tasks(self, status_filter: TaskStatus | None = None) -> list[str]:
+    async def list_tasks(self, status_filter: TaskStatus | None = None) -> List[str]:
         """列出任务
 
         Args:
@@ -497,7 +498,7 @@ class AsyncTaskManager(IAsyncTaskManager):
 
         self._logger.info("AsyncTaskManager stopped")
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息
 
         Returns:
@@ -752,7 +753,7 @@ class AsyncTaskManager(IAsyncTaskManager):
     async def _execute_with_timeout(
         self,
         executor_func: Callable,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
         context: TaskContext,
         timeout: float | None,
     ) -> Any:
@@ -784,7 +785,7 @@ class AsyncTaskManager(IAsyncTaskManager):
     def _execute_sync(
         self,
         executor_func: Callable,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
         context: TaskContext,
         timeout: float | None,
     ) -> Any:

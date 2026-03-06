@@ -7,7 +7,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import List, Dict, Any
 
 
 class IToolCallService(ABC):
@@ -17,9 +17,9 @@ class IToolCallService(ABC):
     async def execute_tool(
         self,
         tool_name: str,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
         context: Any,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """执行工具
 
         Args:
@@ -33,7 +33,7 @@ class IToolCallService(ABC):
         """
 
     @abstractmethod
-    def list_available_tools(self) -> list[str]:
+    def list_available_tools(self) -> List[str]:
         """列出所有可用工具
 
         Returns:
@@ -42,7 +42,7 @@ class IToolCallService(ABC):
         """
 
     @abstractmethod
-    def get_tool_schema(self, tool_name: str) -> dict[str, Any] | None:
+    def get_tool_schema(self, tool_name: str) -> Dict[str, Any] | None:
         """获取工具模式
 
         Args:
@@ -82,8 +82,8 @@ class IToolCallService(ABC):
     def validate_tool_parameters(
         self,
         tool_name: str,
-        parameters: dict[str, Any],
-    ) -> dict[str, Any]:
+        parameters: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """验证工具参数
 
         Args:
@@ -96,7 +96,7 @@ class IToolCallService(ABC):
         """
 
     @abstractmethod
-    def get_tool_execution_history(self, tool_name: str | None = None) -> list[dict[str, Any]]:
+    def get_tool_execution_history(self, tool_name: str | None = None) -> List[Dict[str, Any]]:
         """获取工具执行历史
 
         Args:

@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Autocomplete Input Box Widget
@@ -46,7 +47,7 @@ class AutocompleteInputBox(Input):
         """
         super().__init__(*args, **kwargs)
         self.workspace_path = workspace_path or Path.cwd()
-        self.available_skills: list[str] = []
+        self.available_skills: List[str] = []
         self._load_available_skills()
 
     def _load_available_skills(self) -> None:
@@ -178,7 +179,7 @@ class AutocompleteInputBox(Input):
             logger = get_logger(__name__)
             logger.error(f"Error during tab completion: {e}", exc_info=True)
 
-    def _find_matching_skills(self, partial: str) -> list[str]:
+    def _find_matching_skills(self, partial: str) -> List[str]:
         """Find skills that match partial name
 
         Args:
@@ -195,7 +196,7 @@ class AutocompleteInputBox(Input):
         # Find skills that start with partial
         return [skill for skill in self.available_skills if skill.lower().startswith(partial.lower())]
 
-    def _find_common_prefix(self, strings: list[str]) -> str:
+    def _find_common_prefix(self, strings: List[str]) -> str:
         """Find common prefix among strings
 
         Args:
@@ -243,7 +244,7 @@ class AutocompleteInputBox(Input):
         new_cursor_pos = start_pos + len(f"@skill:{skill_name}")
         self.cursor_position = new_cursor_pos
 
-    async def _show_skill_matches(self, matches: list[str]) -> None:
+    async def _show_skill_matches(self, matches: List[str]) -> None:
         """Show available skill matches
 
         Args:

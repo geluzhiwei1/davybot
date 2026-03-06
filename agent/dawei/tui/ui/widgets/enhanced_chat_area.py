@@ -6,7 +6,8 @@
 Rich chat display with markdown rendering and syntax highlighting.
 """
 
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 
 from textual.containers import Vertical
 from textual.reactive import reactive

@@ -9,7 +9,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -30,22 +30,22 @@ router = APIRouter(tags=["workspaces-config"])
 class WorkspaceConfigUpdate(BaseModel):
     """更新工作区配置的请求模型"""
 
-    agent: dict[str, Any] | None = None
-    checkpoint: dict[str, Any] | None = None
-    compression: dict[str, Any] | None = None
-    memory: dict[str, Any] | None = None
-    skills: dict[str, Any] | None = None
-    tools: dict[str, Any] | None = None
-    logging: dict[str, Any] | None = None
-    monitoring: dict[str, Any] | None = None
-    analytics: dict[str, Any] | None = None
+    agent: Dict[str, Any] | None = None
+    checkpoint: Dict[str, Any] | None = None
+    compression: Dict[str, Any] | None = None
+    memory: Dict[str, Any] | None = None
+    skills: Dict[str, Any] | None = None
+    tools: Dict[str, Any] | None = None
+    logging: Dict[str, Any] | None = None
+    monitoring: Dict[str, Any] | None = None
+    analytics: Dict[str, Any] | None = None
 
 
 class WorkspaceConfigResponse(BaseModel):
     """工作区配置响应模型"""
 
     success: bool
-    config: dict[str, Any]
+    config: Dict[str, Any]
     message: str | None = None
 
 

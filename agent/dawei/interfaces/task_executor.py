@@ -7,7 +7,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import List, Dict, Any
 
 # 使用已有的枚举定义
 from dawei.entity.task_types import TaskStatus
@@ -24,9 +24,9 @@ class ITaskExecutor(ABC):
     async def execute_task(
         self,
         task_id: str,
-        task_data: dict[str, Any],
+        task_data: Dict[str, Any],
         priority: TaskPriority = TaskPriority.MEDIUM,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """执行指定任务
 
         Args:
@@ -88,7 +88,7 @@ class ITaskExecutor(ABC):
         """
 
     @abstractmethod
-    def list_running_tasks(self) -> list[str]:
+    def list_running_tasks(self) -> List[str]:
         """列出所有正在运行的任务
 
         Returns:

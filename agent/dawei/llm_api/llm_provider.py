@@ -17,7 +17,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei import get_dawei_home
 from dawei.core.exceptions import ConfigurationError
@@ -40,7 +40,7 @@ from .provider import LLMClientFactory, ParserCache, StreamState
 logger = logging.getLogger(__name__)
 
 
-def _load_settings_file(settings_file: Path, source: str) -> dict[str, LLMProviderConfig]:
+def _load_settings_file(settings_file: Path, source: str) -> Dict[str, LLMProviderConfig]:
     """加载 settings.json 文件（简化版）
 
     Args:
@@ -107,7 +107,7 @@ def _load_settings_file(settings_file: Path, source: str) -> dict[str, LLMProvid
     return configs, mode_api_configs
 
 
-def _load_user_llm_configs() -> tuple[dict[str, LLMProviderConfig], dict[str, str]]:
+def _load_user_llm_configs() -> tuple[Dict[str, LLMProviderConfig], Dict[str, str]]:
     """加载用户级LLM配置
 
     Returns:
@@ -122,7 +122,7 @@ def _load_user_llm_configs() -> tuple[dict[str, LLMProviderConfig], dict[str, st
 
 def _load_workspace_llm_configs(
     workspace_path: str,
-) -> tuple[dict[str, LLMProviderConfig], dict[str, str]]:
+) -> tuple[Dict[str, LLMProviderConfig], Dict[str, str]]:
     """加载工作区级LLM配置
 
     Args:
@@ -161,14 +161,14 @@ class LLMProvider(ILLMService):
         self.workspace_path = workspace_path
 
         # 配置字典
-        self._configs: dict[str, LLMProviderConfig] = {}
+        self._configs: Dict[str, LLMProviderConfig] = {}
         self._current_config_name: str | None = None
 
         # 模式特定的 LLM 配置
-        self._mode_llm_configs: dict[str, str] = {}
+        self._mode_llm_configs: Dict[str, str] = {}
 
         # 活跃的 LLM 客户端实例列表，用于清理
-        self._active_llm_clients: list[LlmApi] = []
+        self._active_llm_clients: List[LlmApi] = []
 
         # StreamState 和 ParserCache 实例
         self._stream_state: StreamState = StreamState()
@@ -230,7 +230,7 @@ class LLMProvider(ILLMService):
             logger.warning("No LLM configurations available")
 
     # 实现 ILLMService 接口的方法
-    def get_available_providers(self) -> list[str]:
+    def get_available_providers(self) -> List[str]:
         """获取可用的 LLM 提供者列表（实现 ILLMService 接口）
 
         Returns:
@@ -273,7 +273,7 @@ class LLMProvider(ILLMService):
 
         return success
 
-    def get_provider_config(self, provider_name: str) -> dict[str, Any] | None:
+    def get_provider_config(self, provider_name: str) -> Dict[str, Any] | None:
         """获取提供者配置（实现 ILLMService 接口）
 
         Args:
@@ -287,7 +287,7 @@ class LLMProvider(ILLMService):
         logger.debug(f"Retrieved config for provider: {provider_name}")
         return config
 
-    def update_provider_config(self, provider_name: str, config: dict[str, Any]) -> bool:
+    def update_provider_config(self, provider_name: str, config: Dict[str, Any]) -> bool:
         """更新提供者配置（实现 ILLMService 接口）
 
         Args:
@@ -325,7 +325,7 @@ class LLMProvider(ILLMService):
 
         return success
 
-    def get_model_info(self, provider_name: str | None = None) -> dict[str, Any]:
+    def get_model_info(self, provider_name: str | None = None) -> Dict[str, Any]:
         """获取模型信息（实现 ILLMService 接口）
 
         Args:
@@ -398,7 +398,7 @@ class LLMProvider(ILLMService):
     # 将 InternalStreamManager 的功能直接合并到 LLMProvider 中
     # 移除 _get_stream_manager 方法，直接在 LLMProvider 中管理 StreamState 和 ParserCache
 
-    async def process_message(self, messages: list[LLMMessage], **kwargs) -> dict[str, Any]:
+    async def process_message(self, messages: List[LLMMessage], **kwargs) -> Dict[str, Any]:
         """处理消息并返回完整结果（实现 ILLMService 接口）
 
         Args:
@@ -454,10 +454,10 @@ class LLMProvider(ILLMService):
 
     async def create_message_with_callback(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         callback: Callable[[StreamMessages], Awaitable[None]],
         **kwargs,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """创建消息并通过回调函数处理流式响应（实现 ILLMService 接口）
 
         Args:
@@ -526,7 +526,7 @@ class LLMProvider(ILLMService):
         self._load_all_configs()
         logger.info(f"Workspace path set to {workspace_path}, LLM configs reloaded")
 
-    def get_all_configs(self) -> dict[str, LLMProviderConfig]:
+    def get_all_configs(self) -> Dict[str, LLMProviderConfig]:
         """获取所有可用的 LLM 配置"""
         return self._configs.copy()
 
@@ -554,11 +554,11 @@ class LLMProvider(ILLMService):
         """获取当前配置名称"""
         return self._current_config_name
 
-    def get_config_names(self) -> list[str]:
+    def get_config_names(self) -> List[str]:
         """获取所有配置名称"""
         return list(self._configs.keys())
 
-    def get_config_by_provider(self, provider: str) -> list[LLMProviderConfig]:
+    def get_config_by_provider(self, provider: str) -> List[LLMProviderConfig]:
         """根据提供商类型获取配置"""
         configs = []
         for config in self._configs.values():
@@ -587,7 +587,7 @@ class LLMProvider(ILLMService):
         logger.info(f"Set LLM config for mode {mode}: {config_name}")
         return True
 
-    def get_mode_configs(self) -> dict[str, str]:
+    def get_mode_configs(self) -> Dict[str, str]:
         """获取所有模式特定的配置"""
         return self._mode_llm_configs.copy()
 
@@ -630,7 +630,7 @@ class LLMProvider(ILLMService):
         logger.warning(f"LLM config not found: {config_name}")
         return False
 
-    def get_config_sources(self, config_name: str) -> dict[str, bool]:
+    def get_config_sources(self, config_name: str) -> Dict[str, bool]:
         """获取配置来源信息"""
         config = self._configs.get(config_name)
         if not config:
@@ -672,7 +672,7 @@ class LLMProvider(ILLMService):
         self._parser_cache.clear_cache()
         logger.info("All LLM configurations reloaded")
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息"""
         user_configs = sum(1 for c in self._configs.values() if c.source == "user")
         workspace_configs = sum(1 for c in self._configs.values() if c.source == "workspace")
@@ -689,7 +689,7 @@ class LLMProvider(ILLMService):
             ),
         }
 
-    def get_all_configs_with_source(self) -> dict[str, Any]:
+    def get_all_configs_with_source(self) -> Dict[str, Any]:
         """获取所有配置及其来源信息"""
         user_configs_list = []
         workspace_configs_list = []
@@ -714,7 +714,7 @@ class LLMProvider(ILLMService):
             "mode_configs": self._mode_llm_configs.copy(),
         }
 
-    def export_configs(self, include_sensitive: bool = False) -> dict[str, Any]:
+    def export_configs(self, include_sensitive: bool = False) -> Dict[str, Any]:
         """导出配置"""
         exported = {
             "providerProfiles": {
@@ -736,7 +736,7 @@ class LLMProvider(ILLMService):
 
         return exported
 
-    def import_configs(self, configs: dict[str, Any], source: str = "user") -> bool:
+    def import_configs(self, configs: Dict[str, Any], source: str = "user") -> bool:
         """导入配置"""
         if "providerProfiles" not in configs:
             logger.error("Invalid config format: missing providerProfiles")
@@ -857,7 +857,7 @@ class LLMProvider(ILLMService):
         """
         return self.create_llm_provider(name)
 
-    def get_default_llm_config(self) -> dict[str, Any]:
+    def get_default_llm_config(self) -> Dict[str, Any]:
         """获取默认 LLM 配置的便捷方法
 
         Returns:
@@ -874,7 +874,7 @@ class LLMProvider(ILLMService):
             )
         return config.config.__dict__
 
-    def get_llm_config_by_name(self, name: str) -> dict[str, Any]:
+    def get_llm_config_by_name(self, name: str) -> Dict[str, Any]:
         """根据名称获取 LLM 配置的便捷方法
 
         Args:

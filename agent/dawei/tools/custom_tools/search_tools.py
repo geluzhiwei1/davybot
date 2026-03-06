@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Search Tools - File pattern search and full-text search"""
@@ -96,7 +97,7 @@ class FullTextSearchInput(BaseModel):
     query: str = Field(..., description="Text query to search for in file contents.")
     path: str = Field(".", description="Directory path to search in (default: current directory).")
     max_results: int = Field(10, description="Maximum number of results to return.")
-    file_extensions: list[str] | None = Field(
+    file_extensions: List[str] | None = Field(
         None,
         description="List of file extensions to search (e.g., ['.py', '.js']). Searches common text files if not specified.",
     )
@@ -117,7 +118,7 @@ class FullTextSearchTool(CustomBaseTool):
         "fulltext_search",
         fallback_value="Error: Failed to perform full-text search",
     )
-    def _run(self, query: str, path: str = ".", max_results: int = 10, file_extensions: list[str] | None = None) -> str:
+    def _run(self, query: str, path: str = ".", max_results: int = 10, file_extensions: List[str] | None = None) -> str:
         """Perform full-text search with relevance scoring."""
         # Default file extensions to search
         if file_extensions is None:
@@ -177,7 +178,7 @@ class FullTextSearchTool(CustomBaseTool):
 
         return f"No results found for query: '{query}' in directory: {path}"
 
-    def _calculate_relevance_score(self, content: str, query: str, query_lower: str, query_words: list[str]) -> int:
+    def _calculate_relevance_score(self, content: str, query: str, query_lower: str, query_words: List[str]) -> int:
         """Calculate relevance score for a file.
 
         Scoring factors:

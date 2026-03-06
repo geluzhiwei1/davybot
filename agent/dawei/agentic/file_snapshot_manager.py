@@ -17,10 +17,15 @@ import hashlib
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
-from enum import StrEnum
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
+from enum import Enum
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 # ============================================================================
 # 数据类定义
@@ -50,9 +55,9 @@ class FileSnapshot:
     size_bytes: int
     compression_type: str = "full"  # "full", "diff", "gzip"
     parent_id: str | None = None  # 父快照（用于增量）
-    tags: list[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         data = asdict(self)
         data["created_at"] = self.created_at.isoformat()
@@ -61,7 +66,7 @@ class FileSnapshot:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], content: str | None = None) -> "FileSnapshot":
+    def from_dict(cls, data: Dict[str, Any], content: str | None = None) -> "FileSnapshot":
         """从字典创建"""
         if isinstance(data["created_at"], str):
             data["created_at"] = datetime.fromisoformat(data["created_at"])
@@ -74,7 +79,7 @@ class FileSnapshotIndex:
     """文件快照索引"""
 
     file_path: str
-    snapshots: list[FileSnapshot] = field(default_factory=list)
+    snapshots: List[FileSnapshot] = field(default_factory=list)
     total_size_bytes: int = 0
     last_updated: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -143,7 +148,7 @@ class FileSnapshotManager:
         self._create_directories()
 
         # 快照索引缓存
-        self._index_cache: dict[str, FileSnapshotIndex] = {}
+        self._index_cache: Dict[str, FileSnapshotIndex] = {}
         self._lock = asyncio.Lock()
 
         self.logger = logging.getLogger(__name__)
@@ -164,7 +169,7 @@ class FileSnapshotManager:
         file_path: str,
         reason: str = "manual",
         strategy: SnapshotStrategy = SnapshotStrategy.MANUAL,
-        tags: list[str] | None = None,
+        tags: List[str] | None = None,
     ) -> FileSnapshot | None:
         """创建文件快照
 
@@ -226,7 +231,7 @@ class FileSnapshotManager:
             self.logger.exception("Failed to create snapshot for {file_path}: ")
             return None
 
-    def create_workspace_snapshot(self, reason: str = "workspace") -> list[FileSnapshot]:
+    def create_workspace_snapshot(self, reason: str = "workspace") -> List[FileSnapshot]:
         """创建工作区快照（所有文件）
 
         Args:
@@ -336,7 +341,7 @@ class FileSnapshotManager:
     # 快照查询
     # -------------------------------------------------------------------------
 
-    def list_snapshots(self, file_path: str) -> list[FileSnapshot]:
+    def list_snapshots(self, file_path: str) -> List[FileSnapshot]:
         """列出文件的所有快照
 
         Args:
@@ -710,7 +715,7 @@ class FileSnapshotManager:
     # 批量操作
     # -------------------------------------------------------------------------
 
-    def get_storage_stats(self) -> dict[str, Any]:
+    def get_storage_stats(self) -> Dict[str, Any]:
         """获取存储统计信息"""
         total_size = 0
         total_snapshots = 0

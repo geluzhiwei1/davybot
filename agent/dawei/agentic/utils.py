@@ -11,7 +11,7 @@ import time
 import uuid
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.core.decorators import safe_system_operation
 
@@ -164,7 +164,7 @@ class AsyncEventEmitter:
     """简单的事件发射器"""
 
     def __init__(self):
-        self._listeners: dict[str, list[Callable]] = {}
+        self._listeners: Dict[str, List[Callable]] = {}
 
     def on(self, event: str, listener: Callable):
         """添加事件监听器
@@ -221,8 +221,8 @@ class AsyncCache:
             ttl: 生存时间（秒）
 
         """
-        self._cache: dict[str, Any] = {}
-        self._timestamps: dict[str, float] = {}
+        self._cache: Dict[str, Any] = {}
+        self._timestamps: Dict[str, float] = {}
         self._ttl = ttl
 
     def get(self, key: str) -> Any | None:
@@ -314,7 +314,7 @@ def safe_json_dumps(obj: Any, default: str = "{}") -> str:
     return json.dumps(obj, ensure_ascii=False)
 
 
-def merge_dicts(*dicts: dict[str, Any]) -> dict[str, Any]:
+def merge_dicts(*dicts: Dict[str, Any]) -> Dict[str, Any]:
     """合并多个字典
 
     Args:
@@ -331,7 +331,7 @@ def merge_dicts(*dicts: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def flatten_dict(d: dict[str, Any], parent_key: str = "", sep: str = ".") -> dict[str, Any]:
+def flatten_dict(d: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
     """扁平化字典
 
     Args:
@@ -353,7 +353,7 @@ def flatten_dict(d: dict[str, Any], parent_key: str = "", sep: str = ".") -> dic
     return dict(items)
 
 
-def unflatten_dict(d: dict[str, Any], sep: str = ".") -> dict[str, Any]:
+def unflatten_dict(d: Dict[str, Any], sep: str = ".") -> Dict[str, Any]:
     """反扁平化字典
 
     Args:
@@ -376,7 +376,7 @@ def unflatten_dict(d: dict[str, Any], sep: str = ".") -> dict[str, Any]:
     return result
 
 
-async def gather_with_concurrency(coros, max_concurrency: int = 10) -> list[Any]:
+async def gather_with_concurrency(coros, max_concurrency: int = 10) -> List[Any]:
     """并发执行协程，限制并发数
 
     Args:

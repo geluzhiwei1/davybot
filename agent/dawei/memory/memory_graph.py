@@ -9,10 +9,11 @@ import json
 import logging
 import sqlite3
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +48,13 @@ class MemoryEntry:
     access_count: int = 0  # Number of times accessed
 
     # Semantic search
-    embedding: list[float] | None = None  # Semantic embedding (optional)
-    keywords: list[str] = field(default_factory=list)
+    embedding: List[float] | None = None  # Semantic embedding (optional)
+    keywords: List[str] = field(default_factory=list)
 
     # Metadata
     memory_type: MemoryType = MemoryType.FACT
     source_event_id: str | None = None  # Origin event
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Validate and initialize memory entry"""
@@ -88,7 +89,7 @@ class MemoryEntry:
         self.energy = min(1.0, self.energy + boost)
         self.access_count += 1
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         data = asdict(self)
         # Convert datetime to ISO string
@@ -102,7 +103,7 @@ class MemoryEntry:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "MemoryEntry":
+    def from_dict(cls, data: Dict[str, Any]) -> "MemoryEntry":
         """Create from dictionary"""
         # Convert ISO string to datetime
         if isinstance(data.get("valid_start"), str):
@@ -120,11 +121,11 @@ class MemoryStats:
     """Memory statistics"""
 
     total: int
-    by_type: dict[str, int]
+    by_type: Dict[str, int]
     avg_confidence: float
     avg_energy: float
-    most_accessed: list[MemoryEntry]
-    recent: list[MemoryEntry]
+    most_accessed: List[MemoryEntry]
+    recent: List[MemoryEntry]
     low_energy: int  # Count of memories with energy < 0.2
 
 
@@ -298,8 +299,8 @@ class MemoryGraph:
         valid_end: datetime | None = None,
         confidence: float | None = None,
         energy: float | None = None,
-        keywords: list[str] | None = None,
-        metadata: dict[str, Any] | None = None,
+        keywords: List[str] | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> bool:
         """Update existing memory entry
 
@@ -394,7 +395,7 @@ class MemoryGraph:
         only_valid: bool = True,
         memory_type: MemoryType | None = None,
         min_energy: float | None = None,
-    ) -> list[MemoryEntry]:
+    ) -> List[MemoryEntry]:
         """Query memory graph with temporal filtering
 
         Args:
@@ -466,10 +467,10 @@ class MemoryGraph:
 
     async def retrieve_associative(
         self,
-        query_entities: list[str],
+        query_entities: List[str],
         hops: int = 1,
         min_energy: float = 0.2,
-    ) -> list[MemoryEntry]:
+    ) -> List[MemoryEntry]:
         """HippoRAG-style associative retrieval via graph traversal
 
         Args:
@@ -538,7 +539,7 @@ class MemoryGraph:
         self,
         limit: int | None = None,
         offset: int = 0,
-    ) -> list[MemoryEntry]:
+    ) -> List[MemoryEntry]:
         """Get all memories with optional pagination"""
         try:
             query = "SELECT * FROM memory_graph ORDER BY created_at DESC"
@@ -556,7 +557,7 @@ class MemoryGraph:
             self.logger.exception("Failed to get all memories: ")
             return []
 
-    async def search_memories(self, query: str, limit: int = 100) -> list[MemoryEntry]:
+    async def search_memories(self, query: str, limit: int = 100) -> List[MemoryEntry]:
         """Search memories by keyword (simple text search)
 
         Args:

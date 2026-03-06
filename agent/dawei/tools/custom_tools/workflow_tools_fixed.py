@@ -3,7 +3,7 @@
 
 import asyncio
 import json
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -50,7 +50,7 @@ class AskFollowupQuestionInput(BaseModel):
         ...,
         description="Clear, specific question addressinging information needed.",
     )
-    follow_up: list[str] = Field(
+    follow_up: List[str] = Field(
         ...,
         description="List of 2-4 suggested answers, each in its own <suggest> tag.",
     )
@@ -68,7 +68,7 @@ class AskFollowupQuestionTool(CustomBaseTool):
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
 
-    def _run(self, question: str, follow_up: list[str]) -> str:
+    def _run(self, question: str, follow_up: List[str]) -> str:
         """Ask follow-up question with enhanced error handling."""
         try:
             # Validate follow-up suggestions
@@ -475,7 +475,7 @@ class NewTaskTool(CustomBaseTool):
 class UpdateTodoListInput(BaseModel):
     """Input for UpdateTodoListTool."""
 
-    todos: list[str] = Field(
+    todos: List[str] = Field(
         ...,
         description="List of todo items with status markers: [ ] pending, [x] completed, [-] in progress.",
     )
@@ -493,7 +493,7 @@ class UpdateTodoListTool(CustomBaseTool):
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
 
-    def _run(self, todos: list[str]) -> str:
+    def _run(self, todos: List[str]) -> str:
         """Update todo list with enhanced task management."""
         try:
             # 获取组件
@@ -697,8 +697,8 @@ class TaskComplexityAnalyzer:
     def analyze(
         self,
         task_description: str,
-        _context: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        _context: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         """分析任务复杂度"""
         # 检测复杂度级别
         complexity_level = self._detect_complexity_level(task_description)
@@ -778,7 +778,7 @@ class TaskComplexityAnalyzer:
 
         return min(base_steps.get(complexity_level, 1) + adjustments, 15)
 
-    def _detect_dependencies(self, task_description: str) -> list[str]:
+    def _detect_dependencies(self, task_description: str) -> List[str]:
         """检测任务依赖"""
         dependencies = []
         task_lower = task_description.lower()
@@ -825,7 +825,7 @@ class TaskComplexityAnalyzer:
         and_count = task_description.count("和") + task_description.count("以及")
         return and_count >= 2
 
-    def _detect_required_modes(self, task_description: str) -> list[str]:
+    def _detect_required_modes(self, task_description: str) -> List[str]:
         """检测所需的专业模式"""
         required = ["code"]  # 默认需要 code 模式
         task_lower = task_description.lower()
@@ -844,7 +844,7 @@ class TaskComplexityAnalyzer:
 
         return list(set(required))  # 去重
 
-    def _assess_risks(self, task_description: str, complexity_level: str) -> list[dict[str, str]]:
+    def _assess_risks(self, task_description: str, complexity_level: str) -> List[Dict[str, str]]:
         """评估任务风险"""
         risks = []
         task_lower = task_description.lower()
@@ -886,7 +886,7 @@ class TaskComplexityAnalyzer:
         complexity_level: str,
         estimated_steps: int,
         _dependencies: list,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """生成执行建议"""
         if complexity_level == "high" or estimated_steps > 7:
             return {
@@ -912,7 +912,7 @@ class AnalyzeTaskComplexityInput(BaseModel):
     """Input for AnalyzeTaskComplexityTool."""
 
     task_description: str = Field(..., description="Description of the task to analyze.")
-    context: dict[str, Any] | None = Field(
+    context: Dict[str, Any] | None = Field(
         None,
         description="Additional context about the task.",
     )
@@ -931,7 +931,7 @@ class AnalyzeTaskComplexityTool(CustomBaseTool):
         self.logger = get_logger(__name__)
         self.analyzer = TaskComplexityAnalyzer()
 
-    def _run(self, task_description: str, context: dict[str, Any] | None = None) -> str:
+    def _run(self, task_description: str, context: Dict[str, Any] | None = None) -> str:
         """Analyze task complexity."""
         try:
             result = self.analyzer.analyze(task_description, context)
@@ -954,7 +954,7 @@ class AnalyzeTaskComplexityTool(CustomBaseTool):
                 indent=2,
             )
 
-    def _format_result(self, result: dict[str, Any]) -> str:
+    def _format_result(self, result: Dict[str, Any]) -> str:
         """格式化分析结果输出"""
         lines = []
 
@@ -992,9 +992,9 @@ class TodoPlanGenerator:
     def generate(
         self,
         task_description: str,
-        complexity_result: dict[str, Any],
-        _context: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        complexity_result: Dict[str, Any],
+        _context: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         """生成 TODO 计划"""
         # 基于复杂度生成 TODO 项
         todo_items = self._create_todo_items(task_description, complexity_result)
@@ -1023,8 +1023,8 @@ class TodoPlanGenerator:
     def _create_todo_items(
         self,
         task_description: str,
-        complexity_result: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        complexity_result: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
         """创建 TODO 项"""
         complexity_level = complexity_result.get("complexity_level", "low")
         estimated_steps = complexity_result.get("estimated_steps", 1)
@@ -1100,9 +1100,9 @@ class TodoPlanGenerator:
 
     def _adjust_todos_for_task(
         self,
-        todos: list[dict],
+        todos: List[dict],
         task_description: str,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """根据具体任务调整 TODO 项"""
         adjusted = []
         task_lower = task_description.lower()
@@ -1127,9 +1127,9 @@ class TodoPlanGenerator:
 
     def _sort_todos(
         self,
-        todos: list[dict],
-        _complexity_result: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        todos: List[dict],
+        _complexity_result: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
         """排序 TODO 项，考虑依赖关系"""
         # 优先级排序：high > medium > low
         priority_order = {"high": 0, "medium": 1, "low": 2}
@@ -1152,7 +1152,7 @@ class TodoPlanGenerator:
 
         return sorted(sorted_todos, key=lambda x: phase_order.get(x.get("phase", ""), 10))
 
-    def _enrich_todos(self, todos: list[dict], _task_description: str) -> list[dict[str, Any]]:
+    def _enrich_todos(self, todos: List[dict], _task_description: str) -> List[Dict[str, Any]]:
         """为 TODO 项添加元数据"""
         enriched = []
 
@@ -1186,9 +1186,9 @@ class TodoPlanGenerator:
 
     def _generate_execution_hints(
         self,
-        todos: list[dict],
-        _complexity_result: dict[str, Any],
-    ) -> dict[str, Any]:
+        todos: List[dict],
+        _complexity_result: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """生成执行提示"""
         parallel_tasks = []
 
@@ -1213,11 +1213,11 @@ class GenerateTodoPlanInput(BaseModel):
     """Input for GenerateTodoPlanTool."""
 
     task_description: str = Field(..., description="Description of the task.")
-    complexity_analysis: dict[str, Any] | None = Field(
+    complexity_analysis: Dict[str, Any] | None = Field(
         None,
         description="Result from analyze_task_complexity tool.",
     )
-    context: dict[str, Any] | None = Field(None, description="Additional context.")
+    context: Dict[str, Any] | None = Field(None, description="Additional context.")
 
 
 class GenerateTodoPlanTool(CustomBaseTool):
@@ -1236,8 +1236,8 @@ class GenerateTodoPlanTool(CustomBaseTool):
     def _run(
         self,
         task_description: str,
-        complexity_analysis: dict[str, Any] | None = None,
-        context: dict[str, Any] | None = None,
+        complexity_analysis: Dict[str, Any] | None = None,
+        context: Dict[str, Any] | None = None,
     ) -> str:
         """Generate TODO plan."""
         try:
@@ -1265,7 +1265,7 @@ class GenerateTodoPlanTool(CustomBaseTool):
                 indent=2,
             )
 
-    def _format_result(self, result: dict[str, Any]) -> str:
+    def _format_result(self, result: Dict[str, Any]) -> str:
         """格式化 TODO 计划输出"""
         lines = []
 
@@ -1297,7 +1297,7 @@ class TodoPlanValidator:
     def __init__(self):
         self.logger = get_logger(__name__)
 
-    def validate(self, todos: list[dict], task_description: str) -> dict[str, Any]:
+    def validate(self, todos: List[dict], task_description: str) -> Dict[str, Any]:
         """验证 TODO 计划"""
         validations = []
 
@@ -1345,7 +1345,7 @@ class TodoPlanValidator:
 
         return result
 
-    def _check_completeness(self, todos: list[dict], _task_description: str) -> dict[str, Any]:
+    def _check_completeness(self, todos: List[dict], _task_description: str) -> Dict[str, Any]:
         """检查计划完整性"""
         passed = len(todos) >= 3
 
@@ -1365,7 +1365,7 @@ class TodoPlanValidator:
             "suggestions": suggestions,
         }
 
-    def _check_dependencies(self, todos: list[dict]) -> dict[str, Any]:
+    def _check_dependencies(self, todos: List[dict]) -> Dict[str, Any]:
         """检查依赖关系"""
         issues = []
 
@@ -1387,7 +1387,7 @@ class TodoPlanValidator:
             "suggestions": [f"修复: {issue}" for issue in issues] if issues else [],
         }
 
-    def _check_ordering(self, todos: list[dict]) -> dict[str, Any]:
+    def _check_ordering(self, todos: List[dict]) -> Dict[str, Any]:
         """检查顺序合理性"""
         issues = []
 
@@ -1417,7 +1417,7 @@ class TodoPlanValidator:
             "suggestions": [f"考虑调整: {issue}" for issue in issues] if issues else [],
         }
 
-    def _check_coverage(self, todos: list[dict], task_description: str) -> dict[str, Any]:
+    def _check_coverage(self, todos: List[dict], task_description: str) -> Dict[str, Any]:
         """检查任务覆盖范围"""
         task_lower = task_description.lower()
         covered = []
@@ -1456,7 +1456,7 @@ class TodoPlanValidator:
             "suggestions": [f"建议添加: {m}" for m in missing] if missing else [],
         }
 
-    def _check_actionability(self, todos: list[dict]) -> dict[str, Any]:
+    def _check_actionability(self, todos: List[dict]) -> Dict[str, Any]:
         """检查可操作性"""
         issues = []
 
@@ -1490,7 +1490,7 @@ class TodoPlanValidator:
 class ValidateTodoPlanInput(BaseModel):
     """Input for ValidateTodoPlanTool."""
 
-    todos: list[dict[str, Any]] = Field(..., description="TODO list to validate.")
+    todos: List[Dict[str, Any]] = Field(..., description="TODO list to validate.")
     task_description: str = Field(..., description="Original task description.")
 
 
@@ -1507,7 +1507,7 @@ class ValidateTodoPlanTool(CustomBaseTool):
         self.logger = get_logger(__name__)
         self.validator = TodoPlanValidator()
 
-    def _run(self, todos: list[dict[str, Any]], task_description: str) -> str:
+    def _run(self, todos: List[Dict[str, Any]], task_description: str) -> str:
         """Validate TODO plan."""
         try:
             result = self.validator.validate(todos, task_description)
@@ -1528,7 +1528,7 @@ class ValidateTodoPlanTool(CustomBaseTool):
                 indent=2,
             )
 
-    def _format_result(self, result: dict[str, Any]) -> str:
+    def _format_result(self, result: Dict[str, Any]) -> str:
         """格式化验证结果输出"""
         lines = []
 
@@ -1566,12 +1566,12 @@ class ValidateTodoPlanTool(CustomBaseTool):
 class AdjustTodoOrderInput(BaseModel):
     """Input for AdjustTodoOrderTool."""
 
-    current_todos: list[dict[str, Any]] = Field(..., description="Current TODO list.")
+    current_todos: List[Dict[str, Any]] = Field(..., description="Current TODO list.")
     adjustment_type: str = Field(
         ...,
         description="Type of adjustment: 'reorder', 'add', 'remove', 'update'.",
     )
-    adjustment_data: dict[str, Any] = Field(..., description="Data for the adjustment.")
+    adjustment_data: Dict[str, Any] = Field(..., description="Data for the adjustment.")
     reason: str | None = Field(None, description="Reason for the adjustment.")
 
 
@@ -1589,9 +1589,9 @@ class AdjustTodoOrderTool(CustomBaseTool):
 
     def _run(
         self,
-        current_todos: list[dict[str, Any]],
+        current_todos: List[Dict[str, Any]],
         adjustment_type: str,
-        adjustment_data: dict[str, Any],
+        adjustment_data: Dict[str, Any],
         reason: str | None = None,
     ) -> str:
         """Adjust TODO order dynamically."""
@@ -1628,7 +1628,7 @@ class AdjustTodoOrderTool(CustomBaseTool):
                 indent=2,
             )
 
-    def _reorder_todos(self, todos: list[dict], data: dict) -> dict[str, Any]:
+    def _reorder_todos(self, todos: List[dict], data: dict) -> Dict[str, Any]:
         """重新排序 TODO"""
         new_order = data.get("new_order", [])
 
@@ -1650,7 +1650,7 @@ class AdjustTodoOrderTool(CustomBaseTool):
             "adjustment_description": f"Reordered {len(reordered)} todos to new sequence",
         }
 
-    def _add_todo(self, todos: list[dict], data: dict) -> dict[str, Any]:
+    def _add_todo(self, todos: List[dict], data: dict) -> Dict[str, Any]:
         """添加 TODO"""
         new_todo = {
             "content": data.get("content", ""),
@@ -1682,7 +1682,7 @@ class AdjustTodoOrderTool(CustomBaseTool):
             "adjustment_description": f"Added new TODO: {new_todo['content']}",
         }
 
-    def _remove_todo(self, todos: list[dict], data: dict) -> dict[str, Any]:
+    def _remove_todo(self, todos: List[dict], data: dict) -> Dict[str, Any]:
         """移除 TODO"""
         remove_id = data.get("remove_id", "")
 
@@ -1699,7 +1699,7 @@ class AdjustTodoOrderTool(CustomBaseTool):
             "adjustment_description": f"Removed TODO {remove_id}",
         }
 
-    def _update_todo(self, todos: list[dict], data: dict) -> dict[str, Any]:
+    def _update_todo(self, todos: List[dict], data: dict) -> Dict[str, Any]:
         """更新 TODO"""
         update_id = data.get("update_id", "")
         updates = data.get("updates", {})
@@ -1722,7 +1722,7 @@ class AdjustTodoOrderTool(CustomBaseTool):
             "adjustment_description": f"Updated TODO {update_id} with: {list(updates.keys())}",
         }
 
-    def _format_result(self, result: dict[str, Any]) -> str:
+    def _format_result(self, result: Dict[str, Any]) -> str:
         """格式化调整结果输出"""
         lines = []
 
@@ -1747,14 +1747,14 @@ class DAGTaskGraphManager:
 
     def __init__(self):
         # 依赖图: task_id -> Set[依赖的task_id]
-        self._dependencies: dict[str, set[str]] = {}
+        self._dependencies: Dict[str, set[str]] = {}
         # 反向依赖图: task_id -> Set[依赖该task_id的task_id]
-        self._dependents: dict[str, set[str]] = {}
+        self._dependents: Dict[str, set[str]] = {}
         # 任务元数据
-        self._task_metadata: dict[str, dict[str, Any]] = {}
+        self._task_metadata: Dict[str, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
-    async def add_task(self, task_id: str, metadata: dict[str, Any] | None = None) -> bool:
+    async def add_task(self, task_id: str, metadata: Dict[str, Any] | None = None) -> bool:
         """添加任务节点"""
         async with self._lock:
             if task_id in self._dependencies:
@@ -1822,7 +1822,7 @@ class DAGTaskGraphManager:
             stack.extend(self._dependencies.get(current, set()))
         return False
 
-    async def get_execution_order(self) -> list[str]:
+    async def get_execution_order(self) -> List[str]:
         """获取拓扑排序后的执行顺序"""
         async with self._lock:
             in_degree = {task_id: len(deps) for task_id, deps in self._dependencies.items()}
@@ -1844,7 +1844,7 @@ class DAGTaskGraphManager:
 
             return result
 
-    async def get_ready_tasks(self) -> list[str]:
+    async def get_ready_tasks(self) -> List[str]:
         """获取所有准备执行的任务（入度为0）"""
         async with self._lock:
             return [task_id for task_id, deps in self._dependencies.items() if len(deps) == 0]
@@ -1859,15 +1859,15 @@ class DAGTaskGraphManager:
         async with self._lock:
             return self._dependencies.get(task_id, set()).copy()
 
-    def get_task_metadata(self, task_id: str) -> dict[str, Any] | None:
+    def get_task_metadata(self, task_id: str) -> Dict[str, Any] | None:
         """获取任务元数据"""
         return self._task_metadata.get(task_id)
 
-    def get_all_tasks(self) -> list[str]:
+    def get_all_tasks(self) -> List[str]:
         """获取所有任务ID"""
         return list(self._dependencies.keys())
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "dependencies": {task_id: list(deps) for task_id, deps in self._dependencies.items()},
@@ -1902,7 +1902,7 @@ class CreateTaskGraphTool(CustomBaseTool):
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
         # 存储多个任务图
-        self._dag_managers: dict[str, DAGTaskGraphManager] = {}
+        self._dag_managers: Dict[str, DAGTaskGraphManager] = {}
 
     def _run(self, graph_id: str, description: str | None = None) -> str:
         """Create a new task graph."""
@@ -1951,7 +1951,7 @@ class AddTaskNodeInput(BaseModel):
         default="",
         description="Task execution mode (e.g., orchestrator, plan, do, check, act). Uses default mode if not specified.",
     )
-    metadata: dict[str, Any] | None = Field(
+    metadata: Dict[str, Any] | None = Field(
         None,
         description="Additional metadata for the task.",
     )
@@ -2236,7 +2236,7 @@ class GetTaskGraphTool(CustomBaseTool):
                 indent=2,
             )
 
-    async def _get_parallel_levels(self, dag_manager: DAGTaskGraphManager) -> list[list[str]]:
+    async def _get_parallel_levels(self, dag_manager: DAGTaskGraphManager) -> List[List[str]]:
         """获取可以并行执行的层级"""
         levels = []
         remaining = dag_manager.get_all_tasks()
@@ -2286,7 +2286,7 @@ class ExecuteTaskGraphTool(CustomBaseTool):
         super().__init__()
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
-        self._execution_results: dict[str, dict[str, Any]] = {}
+        self._execution_results: Dict[str, Dict[str, Any]] = {}
 
     def _run(self, graph_id: str, parallel: bool = True, max_parallel: int = 5) -> str:
         """Execute task graph."""
@@ -2356,9 +2356,9 @@ class ExecuteTaskGraphTool(CustomBaseTool):
 
     def _generate_execution_plan(
         self,
-        execution_order: list[str],
+        execution_order: List[str],
         dag_manager: DAGTaskGraphManager,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """生成执行计划"""
         import asyncio
 
@@ -2426,7 +2426,7 @@ class WorkflowToolFactory:
         self.workspace_path = workspace_path
         self.logger = get_logger(__name__)
 
-    def create_tools(self) -> list[CustomBaseTool]:
+    def create_tools(self) -> List[CustomBaseTool]:
         """创建所有工作流工具"""
         tools = [
             AskFollowupQuestionTool(self.task_graph),

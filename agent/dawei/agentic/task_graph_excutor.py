@@ -9,7 +9,7 @@
 
 import asyncio
 import uuid
-from typing import Any
+from typing import List, Dict, Any
 
 # 导入错误类型
 from dawei.agentic.errors import TaskExecutionError, ToolExecutionError
@@ -89,11 +89,11 @@ class TaskGraphExecutionEngine:
             raise ConfigurationError("tool_call_service must be provided")
 
         # 任务节点执行引擎管理
-        self._node_executors: dict[str, TaskNodeExecutionEngine] = {}
+        self._node_executors: Dict[str, TaskNodeExecutionEngine] = {}
 
         # 执行状态跟踪
-        self._execution_status: dict[str, TaskStatus] = {}
-        self._execution_tasks: dict[str, asyncio.Task] = {}
+        self._execution_status: Dict[str, TaskStatus] = {}
+        self._execution_tasks: Dict[str, asyncio.Task] = {}
 
         # 锁
         self._lock = asyncio.Lock()
@@ -401,7 +401,7 @@ class TaskGraphExecutionEngine:
         )
         return current_task.status
 
-    async def _execute_subtasks_and_check_status(self, subtasks: list[TaskNode]) -> TaskStatus:
+    async def _execute_subtasks_and_check_status(self, subtasks: List[TaskNode]) -> TaskStatus:
         """并行执行子任务并检查状态
 
         Args:
@@ -512,7 +512,7 @@ class TaskGraphExecutionEngine:
         await self._update_task_status(task_node_id, TaskStatus.FAILED)
         return TaskStatus.FAILED
 
-    async def _execute_subtasks_parallel(self, subtasks: list[TaskNode]) -> list[TaskStatus]:
+    async def _execute_subtasks_parallel(self, subtasks: List[TaskNode]) -> List[TaskStatus]:
         """并行执行子任务（受信号量限制最大并行数）
 
         Args:
@@ -584,9 +584,9 @@ class TaskGraphExecutionEngine:
 
     def _process_subtask_results(
         self,
-        results: list[Any],
-        subtasks: list[TaskNode],
-    ) -> list[TaskStatus]:
+        results: List[Any],
+        subtasks: List[TaskNode],
+    ) -> List[TaskStatus]:
         """处理子任务执行结果
 
         Args:
@@ -868,7 +868,7 @@ class TaskGraphExecutionEngine:
             )
             raise  # Fast fail: re-raise unexpected errors
 
-    async def get_task_execution_status(self, task_node_id: str) -> dict[str, Any]:
+    async def get_task_execution_status(self, task_node_id: str) -> Dict[str, Any]:
         """获取任务执行状态
 
         Args:

@@ -1,4 +1,5 @@
 """技能API端点
+from typing import List, Dict
 
 提供技能列表、搜索和详情查询
 """
@@ -56,7 +57,7 @@ class SkillResponse(BaseModel):
 class SkillsListResponse(BaseModel):
     """技能列表响应"""
 
-    skills: list[SkillResponse]
+    skills: List[SkillResponse]
     total: int
 
 
@@ -64,7 +65,7 @@ class SkillSearchResponse(BaseModel):
     """技能搜索响应"""
 
     query: str
-    results: list[SkillResponse]
+    results: List[SkillResponse]
     total: int
 
 
@@ -685,16 +686,16 @@ class FileTreeItem(BaseModel):
     path: str
     type: str  # 'file' or 'folder'
     level: int = 0
-    children: list["FileTreeItem"] = []
+    children: List["FileTreeItem"] = []
 
 
 FileTreeItem.model_rebuild()
 
 
-def _build_skill_file_tree(skill_dir: Path) -> list[FileTreeItem]:
+def _build_skill_file_tree(skill_dir: Path) -> List[FileTreeItem]:
     """构建技能目录的文件树"""
 
-    def _scan_dir(dir_path: Path, level: int = 0) -> list[FileTreeItem]:
+    def _scan_dir(dir_path: Path, level: int = 0) -> List[FileTreeItem]:
         items = []
         try:
             for item in sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name)):

@@ -6,7 +6,7 @@
 所有与Workspace API相关的数据模型定义
 """
 
-from typing import Any
+from typing import List, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -21,7 +21,7 @@ class FileContent(BaseModel):
 
 # Pydantic models for workspace management
 class WorkspaceList(BaseModel):
-    workspaces: list[WorkspaceInfo]
+    workspaces: List[WorkspaceInfo]
 
 
 # --- 依赖注入 ---
@@ -30,7 +30,7 @@ class FileTreeItem(BaseModel):
     path: str
     type: str  # 'file' or 'folder'
     level: int
-    children: list["FileTreeItem"] = []
+    children: List["FileTreeItem"] = []
 
 
 # 解决前向引用
@@ -41,7 +41,7 @@ class LLMSettingsUpdate(BaseModel):
     """更新 LLM 配置的请求模型"""
 
     currentApiConfigName: str | None = None
-    modeApiConfigs: dict[str, str] | None = None
+    modeApiConfigs: Dict[str, str] | None = None
 
 
 class LLMProviderCreate(BaseModel):
@@ -67,7 +67,7 @@ class GraphExecuteRequest(BaseModel):
     """执行任务图的请求模型"""
 
     task_id: str | None = Field(None, description="指定执行的任务ID,为空则执行根任务")
-    input_data: dict[str, Any] | None = Field(None, description="执行输入数据")
+    input_data: Dict[str, Any] | None = Field(None, description="执行输入数据")
 
 
 # ==================== 任务 API 模型 ====================
@@ -77,7 +77,7 @@ class CheckpointInfo(BaseModel):
     checkpoint_id: str
     task_id: str
     timestamp: str
-    nodes: dict[str, Any]
+    nodes: Dict[str, Any]
     root_node_id: str | None = None
 
 
@@ -85,9 +85,9 @@ class CheckpointInfo(BaseModel):
 class UIContextUpdate(BaseModel):
     """更新用户UI上下文信息的请求模型"""
 
-    open_files: list[str] | None = Field(None, description="打开的文件列表")
-    active_applications: list[str] | None = Field(None, description="活动应用程序列表")
-    user_preferences: dict[str, Any] | None = Field(None, description="用户偏好设置")
+    open_files: List[str] | None = Field(None, description="打开的文件列表")
+    active_applications: List[str] | None = Field(None, description="活动应用程序列表")
+    user_preferences: Dict[str, Any] | None = Field(None, description="用户偏好设置")
     current_file: str | None = Field(None, description="当前文件路径")
     current_selected_content: str | None = Field(None, description="当前选中的内容")
     current_mode: str | None = Field(None, description="当前模式")
@@ -115,16 +115,16 @@ class McpServerConfig(BaseModel):
     """MCP 服务器配置模型"""
 
     command: str = Field(..., description="启动命令")
-    args: list[str] = Field(default_factory=list, description="命令参数")
+    args: List[str] = Field(default_factory=list, description="命令参数")
     cwd: str | None = Field(None, description="工作目录")
-    alwaysAllow: list[str] | None = Field(None, description="始终允许的工具列表")
+    alwaysAllow: List[str] | None = Field(None, description="始终允许的工具列表")
     timeout: int | None = Field(None, description="超时时间(秒)")
 
 
 class McpSettingsData(BaseModel):
     """MCP 设置数据模型"""
 
-    mcpServers: dict[str, McpServerConfig] = Field(
+    mcpServers: Dict[str, McpServerConfig] = Field(
         default_factory=dict,
         description="MCP 服务器配置",
     )

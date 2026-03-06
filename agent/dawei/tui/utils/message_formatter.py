@@ -7,7 +7,7 @@ Format messages for TUI display with colors and styling.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import List, Dict, Any
 
 
 class MessageFormatter:
@@ -90,7 +90,7 @@ class MessageFormatter:
         return f"[dim cyan]ℹ️ {info}[/dim cyan]"
 
     @staticmethod
-    def format_tool_call(tool_name: str, params: dict[str, Any]) -> str:
+    def format_tool_call(tool_name: str, params: Dict[str, Any]) -> str:
         """Format tool call information
 
         Args:

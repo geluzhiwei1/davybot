@@ -15,9 +15,13 @@ import json
 import logging
 import os
 import re
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import List, Dict, Any, Optional
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -33,7 +37,7 @@ logger = logging.getLogger(__name__)
 ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
 
 
-def resolve_env_vars(config: dict[str, Any]) -> dict[str, Any]:
+def resolve_env_vars(config: Dict[str, Any]) -> Dict[str, Any]:
     """递归替换配置中的环境变量
 
     支持的格式:
@@ -109,15 +113,15 @@ class PluginConfigField(BaseModel):
     description: str = Field("", description="字段描述")
     default: Any = Field(None, description="默认值")
     required: bool = Field(False, description="是否必填")
-    enum: list[str] | None = Field(None, description="枚举值列表")
+    enum: List[str] | None = Field(None, description="枚举值列表")
     minimum: float | None = Field(None, description="最小值（数字类型）")
     maximum: float | None = Field(None, description="最大值（数字类型）")
     pattern: str | None = Field(None, description="正则表达式（字符串类型）")
     format: str | None = Field(None, description="格式（如 email、uri、date-time）")
 
-    def to_schema(self) -> dict[str, Any]:
+    def to_schema(self) -> Dict[str, Any]:
         """转换为 JSON Schema 格式"""
-        schema: dict[str, Any] = {
+        schema: Dict[str, Any] = {
             "type": self.type,
             "description": self.description,
         }
@@ -153,12 +157,12 @@ class PluginConfigManifest(BaseModel):
     schema_type: str = Field(..., description="Schema 类型：object, array, or custom")
     title: str = Field(..., description="配置标题")
     description: str = Field("", description="配置描述")
-    properties: list[PluginConfigField] = Field(default_factory=list, description="配置字段列表")
-    required: list[str] = Field(default_factory=list, description="必填字段名称列表")
+    properties: List[PluginConfigField] = Field(default_factory=list, description="配置字段列表")
+    required: List[str] = Field(default_factory=list, description="必填字段名称列表")
 
-    def to_json_schema(self) -> dict[str, Any]:
+    def to_json_schema(self) -> Dict[str, Any]:
         """转换为完整的 JSON Schema"""
-        schema: dict[str, Any] = {
+        schema: Dict[str, Any] = {
             "$schema": "http://json-schema.org/draft-07/schema#",
             "$id": f"plugin_config_{self.schema_type}",
             "title": self.title,
@@ -174,7 +178,7 @@ class PluginConfigManifest(BaseModel):
 
         return schema
 
-    def to_form_config(self) -> dict[str, Any]:
+    def to_form_config(self) -> Dict[str, Any]:
         """转换为前端表单配置"""
         return {
             "schema": self.to_json_schema(),
@@ -235,7 +239,7 @@ class PluginConfigManager:
         # 使用完整的 plugin_id 作为文件名（包含版本号）
         return self.config_dir / f"{plugin_id}.json"
 
-    def load_plugin_config(self, plugin_id: str) -> dict[str, Any]:
+    def load_plugin_config(self, plugin_id: str) -> Dict[str, Any]:
         """加载插件配置
 
         Args:
@@ -261,7 +265,7 @@ class PluginConfigManager:
         except (OSError, json.JSONDecodeError) as e:
             raise ConfigurationError(f"Invalid plugin config file {config_file}: {e}")
 
-    def save_plugin_config(self, plugin_id: str, config: dict[str, Any]) -> None:
+    def save_plugin_config(self, plugin_id: str, config: Dict[str, Any]) -> None:
         """保存插件配置
 
         Args:
@@ -296,7 +300,7 @@ class PluginConfigManager:
 # ============================================================================
 
 
-def validate_config_against_schema(config: dict[str, Any], schema: dict[str, Any]) -> bool:
+def validate_config_against_schema(config: Dict[str, Any], schema: Dict[str, Any]) -> bool:
     """
     验证配置是否符合 Schema
 

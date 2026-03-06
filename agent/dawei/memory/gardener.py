@@ -9,8 +9,9 @@ import asyncio
 import contextlib
 import logging
 import sqlite3
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.llm_api.llm_provider import LLMProvider
 
@@ -169,7 +170,7 @@ class MemoryGardener:
                 return
 
             # Group by subject
-            grouped: dict[str, list[MemoryEntry]] = {}
+            grouped: Dict[str, List[MemoryEntry]] = {}
             for row in rows:
                 mem = self.memory_graph._row_to_memory(row)
                 if mem.subject not in grouped:
@@ -221,7 +222,7 @@ class MemoryGardener:
     async def _generate_consolidation_strategy(
         self,
         subject: str,
-        memories: list[MemoryEntry],
+        memories: List[MemoryEntry],
     ) -> MemoryEntry | None:
         """Generate consolidated strategy from related memories"""
         try:
@@ -272,7 +273,7 @@ AVOIDS: [things to avoid based on the data]"""
             self.logger.exception("Failed to generate strategy: ")
             return None
 
-    def _extract_keywords(self, text: str) -> list[str]:
+    def _extract_keywords(self, text: str) -> List[str]:
         """Extract keywords from text"""
         # Simple keyword extraction
         import re
@@ -310,7 +311,7 @@ AVOIDS: [things to avoid based on the data]"""
         except sqlite3.Error:
             self.logger.exception("Failed to archive memories: ")
 
-    async def consolidate_now(self, subject: str | None = None) -> dict[str, Any]:
+    async def consolidate_now(self, subject: str | None = None) -> Dict[str, Any]:
         """Trigger immediate consolidation
 
         Args:
@@ -353,7 +354,7 @@ AVOIDS: [things to avoid based on the data]"""
             self.logger.exception("Manual consolidation failed: ")
             return {"success": False, "error": str(e)}
 
-    async def archive_now(self) -> dict[str, Any]:
+    async def archive_now(self) -> Dict[str, Any]:
         """Trigger immediate archival
 
         Returns:
@@ -374,7 +375,7 @@ AVOIDS: [things to avoid based on the data]"""
             self.logger.exception("Manual archival failed: ")
             return {"success": False, "error": str(e)}
 
-    async def get_status(self) -> dict[str, Any]:
+    async def get_status(self) -> Dict[str, Any]:
         """Get gardener status"""
         return {
             "running": self._running,

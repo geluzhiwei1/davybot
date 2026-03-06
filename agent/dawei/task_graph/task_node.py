@@ -6,8 +6,9 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, TYPE_CHECKING, Any, Optional
 
 from dawei.entity.task_types import TaskStatus
 
@@ -29,7 +30,7 @@ class TaskNode:
 
     # 关系管理 - 使用ID引用避免循环依赖
     parent_id: str | None = None
-    child_ids: list[str] = field(default_factory=list)
+    child_ids: List[str] = field(default_factory=list)
 
     # 图引用：当前节点所属的图
     graph: Optional["TaskGraph"] = None
@@ -74,7 +75,7 @@ class TaskNode:
         return self.data.todos
 
     @property
-    def metadata(self) -> dict[str, Any]:
+    def metadata(self) -> Dict[str, Any]:
         """获取元数据"""
         return self.data.metadata
 
@@ -136,7 +137,7 @@ class TaskNode:
         self.data.add_metadata(key, value)
         self.updated_at = datetime.now(UTC)
 
-    def get_hierarchy_info(self) -> dict[str, Any]:
+    def get_hierarchy_info(self) -> Dict[str, Any]:
         """获取层级信息"""
         return {
             "task_node_id": self.task_node_id,
@@ -148,7 +149,7 @@ class TaskNode:
             "child_count": len(self.child_ids),
         }
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "task_node_id": self.task_node_id,
@@ -161,7 +162,7 @@ class TaskNode:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskNode":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskNode":
         """从字典创建实例"""
         created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC)
         updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC)

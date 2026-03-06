@@ -56,7 +56,7 @@ import sys
 import threading
 import traceback
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.config.logging_config import get_tui_error_log_path, get_tui_log_path
 
@@ -336,7 +336,7 @@ class GlobalExceptionHandler:
         if _original_threading_excepthook is not None:
             _original_threading_excepthook(args)
 
-    def _async_exception_handler(self, _loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+    def _async_exception_handler(self, _loop: asyncio.AbstractEventLoop, context: Dict[str, Any]) -> None:
         """异步异常处理器
 
         处理 asyncio 中未捕获的异常。

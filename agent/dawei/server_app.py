@@ -13,7 +13,8 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
 
 # 强制 UTF-8 编码（解决 Windows 控制台编码问题）

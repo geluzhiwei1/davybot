@@ -8,7 +8,7 @@
 """
 
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.core.exceptions import ConfigurationError
 from dawei.llm_api.base_llm_api import LlmApi
@@ -44,7 +44,7 @@ class LLMClientFactory:
     }
 
     @classmethod
-    def create_client(cls, config: dict[str, Any]) -> LlmApi:
+    def create_client(cls, config: Dict[str, Any]) -> LlmApi:
         """创建 LLM 客户端实例
 
         Args:
@@ -79,7 +79,7 @@ class LLMClientFactory:
             )
 
     @classmethod
-    def get_supported_providers(cls) -> list[str]:
+    def get_supported_providers(cls) -> List[str]:
         """获取支持的提供商列表
 
         Returns:

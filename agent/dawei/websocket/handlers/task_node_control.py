@@ -5,7 +5,7 @@
 处理前端的暂停、恢复、停止任务节点请求
 """
 
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.logg.logging import get_logger
 from dawei.websocket.protocol import (
@@ -59,7 +59,7 @@ class TaskNodeControlHandler(AsyncMessageHandler):
         session_id: str,
         message,
         _message_id: str,
-    ) -> dict[str, Any] | None:
+    ) -> Dict[str, Any] | None:
         """处理任务节点控制消息
 
         Args:
@@ -93,7 +93,7 @@ class TaskNodeControlHandler(AsyncMessageHandler):
                 "task_node_id": getattr(message, "task_node_id", None),
             }
 
-    async def _handle_pause(self, session_id: str, message: TaskNodePauseMessage) -> dict[str, Any]:
+    async def _handle_pause(self, session_id: str, message: TaskNodePauseMessage) -> Dict[str, Any]:
         """处理暂停请求"""
         task_node_id = message.task_node_id
         reason = message.reason or "User requested pause"
@@ -152,7 +152,7 @@ class TaskNodeControlHandler(AsyncMessageHandler):
         self,
         session_id: str,
         message: TaskNodeResumeMessage,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """处理恢复请求"""
         task_node_id = message.task_node_id
 
@@ -202,7 +202,7 @@ class TaskNodeControlHandler(AsyncMessageHandler):
                 "success": False,
             }
 
-    async def _handle_stop(self, session_id: str, message: TaskNodeStopMessage) -> dict[str, Any]:
+    async def _handle_stop(self, session_id: str, message: TaskNodeStopMessage) -> Dict[str, Any]:
         """处理停止请求"""
         task_node_id = message.task_node_id
         reason = message.reason or "User requested stop"

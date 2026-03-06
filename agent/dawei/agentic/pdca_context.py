@@ -7,9 +7,10 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from enum import Enum
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.domain_adapter import DomainType
 
@@ -33,17 +34,17 @@ class PhaseContext:
     status: str = "in_progress"  # in_progress, completed, failed
 
     # 阶段特定的数据
-    plan_data: dict[str, Any] = field(default_factory=dict)
-    do_data: dict[str, Any] = field(default_factory=dict)
-    check_data: dict[str, Any] = field(default_factory=dict)
-    act_data: dict[str, Any] = field(default_factory=dict)
+    plan_data: Dict[str, Any] = field(default_factory=dict)
+    do_data: Dict[str, Any] = field(default_factory=dict)
+    check_data: Dict[str, Any] = field(default_factory=dict)
+    act_data: Dict[str, Any] = field(default_factory=dict)
 
     # 通用数据
-    metadata: dict[str, Any] = field(default_factory=dict)
-    artifacts: list[str] = field(default_factory=list)  # 产出物列表
-    issues: list[dict[str, Any]] = field(default_factory=list)  # 问题列表
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    artifacts: List[str] = field(default_factory=list)  # 产出物列表
+    issues: List[Dict[str, Any]] = field(default_factory=list)  # 问题列表
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "phase": self.phase.value,
@@ -72,13 +73,13 @@ class PDCACycleContext:
 
     # 阶段管理
     current_phase: PDCAPhase = PDCAPhase.PLAN
-    phase_history: list[PDCAPhase] = field(default_factory=list)
-    phase_contexts: dict[PDCAPhase, PhaseContext] = field(default_factory=dict)
+    phase_history: List[PDCAPhase] = field(default_factory=list)
+    phase_contexts: Dict[PDCAPhase, PhaseContext] = field(default_factory=dict)
 
     # 任务信息
     task_description: str = ""
-    task_goals: list[str] = field(default_factory=list)
-    success_criteria: list[str] = field(default_factory=list)
+    task_goals: List[str] = field(default_factory=list)
+    success_criteria: List[str] = field(default_factory=list)
 
     # 循环计数
     cycle_count: int = 0  # 当前是第几轮循环
@@ -89,7 +90,7 @@ class PDCACycleContext:
     completion_percentage: float = 0.0
 
     # 元数据
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """初始化后处理"""
@@ -100,7 +101,7 @@ class PDCACycleContext:
                 start_time=self.start_time,
             )
 
-    def advance_to_phase(self, next_phase: PDCAPhase, current_data: dict[str, Any]) -> PhaseContext:
+    def advance_to_phase(self, next_phase: PDCAPhase, current_data: Dict[str, Any]) -> PhaseContext:
         """推进到下一阶段
 
         Args:
@@ -161,7 +162,7 @@ class PDCACycleContext:
         act_context = self.get_phase_context(PDCAPhase.ACT)
         return not (act_context and not act_context.metadata.get("next_cycle"))
 
-    def get_summary(self) -> dict[str, Any]:
+    def get_summary(self) -> Dict[str, Any]:
         """获取循环摘要"""
         return {
             "session_id": self.session_id,
@@ -178,14 +179,14 @@ class PDCACycleContext:
             "issues": self._collect_all_issues(),
         }
 
-    def _collect_all_artifacts(self) -> list[str]:
+    def _collect_all_artifacts(self) -> List[str]:
         """收集所有产出物"""
         artifacts = []
         for context in self.phase_contexts.values():
             artifacts.extend(context.artifacts)
         return list(set(artifacts))  # 去重
 
-    def _collect_all_issues(self) -> list[dict[str, Any]]:
+    def _collect_all_issues(self) -> List[Dict[str, Any]]:
         """收集所有问题"""
         issues = []
         for context in self.phase_contexts.values():
@@ -218,15 +219,15 @@ class PDCAContextManager:
     """PDCA 上下文管理器"""
 
     def __init__(self):
-        self._cycles: dict[str, PDCACycleContext] = {}
+        self._cycles: Dict[str, PDCACycleContext] = {}
 
     def create_cycle(
         self,
         session_id: str,
         task_description: str,
         domain: DomainType,
-        task_goals: list[str] | None = None,
-        success_criteria: list[str] | None = None,
+        task_goals: List[str] | None = None,
+        success_criteria: List[str] | None = None,
     ) -> PDCACycleContext:
         """创建新的 PDCA 循环
 
@@ -268,7 +269,7 @@ class PDCAContextManager:
             return max(session_cycles, key=lambda c: c.start_time)
         return None
 
-    def save_checkpoint(self, cycle_id: str) -> dict[str, Any]:
+    def save_checkpoint(self, cycle_id: str) -> Dict[str, Any]:
         """保存检查点
 
         Args:
@@ -290,7 +291,7 @@ class PDCAContextManager:
 
     def restore_from_checkpoint(
         self,
-        checkpoint_data: dict[str, Any],
+        checkpoint_data: Dict[str, Any],
     ) -> PDCACycleContext | None:
         """从检查点恢复
 

@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.entity.lm_messages import LLMMessage
 from dawei.entity.stream_message import StreamMessages
@@ -13,7 +13,7 @@ class StreamChunkParser(ABC):
     """流式数据块解析器抽象基类"""
 
     @abstractmethod
-    def parse_chunk(self, chunk: dict[str, Any]) -> list[StreamMessages]:
+    def parse_chunk(self, chunk: Dict[str, Any]) -> List[StreamMessages]:
         """解析单个数据块
 
         Args:
@@ -31,7 +31,7 @@ class LlmApi(ABC):
     @abstractmethod
     async def create_message(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         **kwargs,
     ) -> AsyncGenerator[StreamMessages, None]:
         """创建消息并返回流式响应"""

@@ -2,9 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime, timezone
-from enum import StrEnum
-from typing import Any, Union
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from enum import Enum
+
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
+from typing import List, Dict, Any, Union
 
 from pydantic import BaseModel, Field
 
@@ -92,13 +98,13 @@ class BaseLLMMessage(BaseModel, ABC):
 
     id: str | None = Field(None, description="消息唯一标识符(可选)")
     role: MessageRole = Field(..., description="消息角色")
-    content: str | list[ContentBlock] | None = Field(
+    content: str | List[ContentBlock] | None = Field(
         None,
         description="消息内容,支持文本或多模态内容",
     )
     name: str | None = Field(None, description="发送者名称(可选)")
     tool_call_id: str | None = Field(None, description="工具调用ID(仅tool消息使用)")
-    tool_calls: list[ToolCall] | None = Field(
+    tool_calls: List[ToolCall] | None = Field(
         None,
         description="工具调用列表(仅assistant消息使用)",
     )
@@ -109,15 +115,15 @@ class BaseLLMMessage(BaseModel, ABC):
         arbitrary_types_allowed = True
 
     @abstractmethod
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """将消息转换为字典格式,便于API调用"""
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, data: dict[str, Any]) -> "BaseLLMMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "BaseLLMMessage":
         """从字典创建消息实例"""
 
-    def to_openai_format(self) -> dict[str, Any]:
+    def to_openai_format(self) -> Dict[str, Any]:
         """转换为 OpenAI API 兼容格式"""
         result = {
             "role": self.role.value if hasattr(self.role, "value") else str(self.role),
@@ -145,14 +151,14 @@ class BaseLLMMessage(BaseModel, ABC):
             for tool_call in self.tool_calls:
                 tool_call_dict = tool_call.dict()
                 # 将 tool_call_id 映射为 id 以兼容 OpenAI 格式
-                tool_call_dict["id"] = tool_call_dict.pop("tool_call_id")
+                tool_call_Dict["id"] = tool_call_dict.pop("tool_call_id")
                 tool_calls_openai.append(tool_call_dict)
             result["tool_calls"] = tool_calls_openai
 
         return result
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any]) -> "BaseLLMMessage":
+    def from_openai_format(cls, data: Dict[str, Any]) -> "BaseLLMMessage":
         """从 OpenAI 格式创建消息实例"""
         # 验证输入数据
         if not isinstance(data, dict):
@@ -187,17 +193,17 @@ class SystemMessage(BaseLLMMessage):
 
     role: MessageRole = MessageRole.SYSTEM
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_openai_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SystemMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "SystemMessage":
         """从字典创建实例"""
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "SystemMessage":
+    def from_openai_format(cls, data: Dict[str, Any], message_id: str | None = None) -> "SystemMessage":
         """从 OpenAI 格式创建实例"""
         content = data.get("content", "")
 
@@ -224,17 +230,17 @@ class UserMessage(BaseLLMMessage):
 
     role: MessageRole = MessageRole.USER
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_openai_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "UserMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "UserMessage":
         """从字典创建实例"""
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "UserMessage":
+    def from_openai_format(cls, data: Dict[str, Any], message_id: str | None = None) -> "UserMessage":
         """从 OpenAI 格式创建实例"""
         content = data.get("content", "")
 
@@ -303,17 +309,17 @@ class AssistantMessage(BaseLLMMessage):
 
     role: MessageRole = MessageRole.ASSISTANT
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_openai_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AssistantMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AssistantMessage":
         """从字典创建实例"""
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "AssistantMessage":
+    def from_openai_format(cls, data: Dict[str, Any], message_id: str | None = None) -> "AssistantMessage":
         """从 OpenAI 格式创建实例"""
         content = data.get("content", "")
 
@@ -363,17 +369,17 @@ class ToolMessage(BaseLLMMessage):
 
     role: MessageRole = MessageRole.TOOL
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_openai_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolMessage":
         """从字典创建实例"""
         return cls.from_openai_format(data)
 
     @classmethod
-    def from_openai_format(cls, data: dict[str, Any], message_id: str | None = None) -> "ToolMessage":
+    def from_openai_format(cls, data: Dict[str, Any], message_id: str | None = None) -> "ToolMessage":
         """从 OpenAI 格式创建实例"""
         # 处理时间戳
         timestamp = datetime.now(UTC)
@@ -402,7 +408,7 @@ class ChatGeneration(BaseModel):
     """聊天生成结果类,封装单次生成的信息"""
 
     message: AssistantMessage = Field(..., description="生成的AI消息")
-    generation_info: dict[str, Any] | None = Field(None, description="生成信息")
+    generation_info: Dict[str, Any] | None = Field(None, description="生成信息")
     text: str | None = Field(None, description="生成的文本内容")
     finish_reason: str | None = Field(None, description="完成原因")
     index: int = Field(default=0, description="生成结果的索引")
@@ -434,7 +440,7 @@ class ChatGeneration(BaseModel):
         return cls(message=message, text=text, **kwargs)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ChatGeneration":
+    def from_dict(cls, data: Dict[str, Any]) -> "ChatGeneration":
         """从字典创建实例"""
         message_data = data.get("message", {})
         message = AssistantMessage.from_dict(message_data) if message_data else None
@@ -447,7 +453,7 @@ class ChatGeneration(BaseModel):
             index=data.get("index", 0),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "message": self.message.to_dict() if self.message else None,
@@ -461,10 +467,10 @@ class ChatGeneration(BaseModel):
 class ChatResult(BaseModel):
     """聊天结果类,封装完整的聊天响应"""
 
-    generations: list[ChatGeneration] = Field(..., description="生成结果列表")
-    llm_output: dict[str, Any] | None = Field(None, description="LLM输出信息")
-    usage: dict[str, Any] | None = Field(None, description="使用统计信息")
-    response_metadata: dict[str, Any] | None = Field(None, description="响应元数据")
+    generations: List[ChatGeneration] = Field(..., description="生成结果列表")
+    llm_output: Dict[str, Any] | None = Field(None, description="LLM输出信息")
+    usage: Dict[str, Any] | None = Field(None, description="使用统计信息")
+    response_metadata: Dict[str, Any] | None = Field(None, description="响应元数据")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="创建时间")
 
     def __init__(self, **data):
@@ -499,7 +505,7 @@ class ChatResult(BaseModel):
         return cls(generations=[generation], **kwargs)
 
     @classmethod
-    def from_texts(cls, texts: list[str], **kwargs) -> "ChatResult":
+    def from_texts(cls, texts: List[str], **kwargs) -> "ChatResult":
         """从文本列表创建聊天结果的便捷方法
 
         Args:
@@ -514,7 +520,7 @@ class ChatResult(BaseModel):
         return cls(generations=generations, **kwargs)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ChatResult":
+    def from_dict(cls, data: Dict[str, Any]) -> "ChatResult":
         """从字典创建实例"""
         generations_data = data.get("generations", [])
         generations = [ChatGeneration.from_dict(gen_data) for gen_data in generations_data]
@@ -531,7 +537,7 @@ class ChatResult(BaseModel):
             created_at=created_at or datetime.now(UTC),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "generations": [gen.to_dict() for gen in self.generations],
@@ -553,7 +559,7 @@ class ChatResult(BaseModel):
                 return gen
         return None
 
-    def get_all_texts(self) -> list[str]:
+    def get_all_texts(self) -> List[str]:
         """获取所有生成结果的文本"""
         return [gen.text for gen in self.generations if gen.text]
 
@@ -561,9 +567,9 @@ class ChatResult(BaseModel):
 class LLMResult(BaseModel):
     """LLM结果类,封装更详细的LLM调用信息"""
 
-    results: list[ChatResult] = Field(..., description="聊天结果列表")
-    llm_output: dict[str, Any] | None = Field(None, description="LLM输出信息")
-    usage: dict[str, Any] | None = Field(None, description="使用统计信息")
+    results: List[ChatResult] = Field(..., description="聊天结果列表")
+    llm_output: Dict[str, Any] | None = Field(None, description="LLM输出信息")
+    usage: Dict[str, Any] | None = Field(None, description="使用统计信息")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="创建时间")
 
     @property
@@ -585,7 +591,7 @@ class LLMResult(BaseModel):
         return cls(results=[chat_result], **kwargs)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LLMResult":
+    def from_dict(cls, data: Dict[str, Any]) -> "LLMResult":
         """从字典创建实例"""
         results_data = data.get("results", [])
         results = [ChatResult.from_dict(result_data) for result_data in results_data]
@@ -601,7 +607,7 @@ class LLMResult(BaseModel):
             created_at=created_at or datetime.now(UTC),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "results": [result.to_dict() for result in self.results],
@@ -620,21 +626,21 @@ class ToolParameterProperty(BaseModel):
 
     type: str = Field(..., description="参数类型")
     description: str | None = Field(None, description="参数描述")
-    enum: list[str] | None = Field(None, description="枚举值列表")
+    enum: List[str] | None = Field(None, description="枚举值列表")
     minimum: int | float | None = Field(None, description="最小值")
     maximum: int | float | None = Field(None, description="最大值")
-    items: dict[str, Any] | None = Field(None, description="数组项类型定义")
+    items: Dict[str, Any] | None = Field(None, description="数组项类型定义")
 
 
 class ToolParameters(BaseModel):
     """工具参数定义"""
 
     type: str = Field(default="object", description="参数类型,通常是 object")
-    properties: dict[str, ToolParameterProperty] = Field(
+    properties: Dict[str, ToolParameterProperty] = Field(
         default_factory=dict,
         description="参数属性定义",
     )
-    required: list[str] | None = Field(None, description="必需参数列表")
+    required: List[str] | None = Field(None, description="必需参数列表")
 
 
 class ToolFunction(BaseModel):
@@ -652,7 +658,7 @@ class ToolDescriptor(BaseModel):
     function: ToolFunction = Field(..., description="函数定义")
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolDescriptor":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolDescriptor":
         """从字典创建工具描述符"""
         function_data = data.get("function", {})
 
@@ -681,7 +687,7 @@ class ToolDescriptor(BaseModel):
 
         return cls(type=data.get("type", "function"), function=function)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         # 转换参数
         properties = {}
@@ -708,15 +714,15 @@ class ToolDescriptor(BaseModel):
 class ToolsList(BaseModel):
     """工具列表"""
 
-    tools: list[ToolDescriptor] = Field(default_factory=list, description="工具描述符列表")
+    tools: List[ToolDescriptor] = Field(default_factory=list, description="工具描述符列表")
 
     @classmethod
-    def from_dict(cls, data: list[dict[str, Any]]) -> "ToolsList":
+    def from_dict(cls, data: List[Dict[str, Any]]) -> "ToolsList":
         """从字典列表创建工具列表"""
         tools = [ToolDescriptor.from_dict(tool_data) for tool_data in data]
         return cls(tools=tools)
 
-    def to_dict(self) -> list[dict[str, Any]]:
+    def to_dict(self) -> List[Dict[str, Any]]:
         """转换为字典列表格式"""
         return [tool.to_dict() for tool in self.tools]
 

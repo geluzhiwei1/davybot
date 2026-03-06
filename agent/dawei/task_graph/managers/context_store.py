@@ -6,8 +6,9 @@
 """
 
 import asyncio
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.core.errors import ValidationError
 from dawei.logg.logging import get_logger
@@ -18,7 +19,7 @@ class ContextStore:
     """上下文存储器"""
 
     def __init__(self):
-        self._contexts: dict[str, TaskContext] = {}
+        self._contexts: Dict[str, TaskContext] = {}
         self._lock = asyncio.Lock()
         self.logger = get_logger(__name__)
 
@@ -63,7 +64,7 @@ class ContextStore:
             self.logger.error(f"Context type error for task {task_id}: {e}", exc_info=True)
             return None
 
-    async def merge_context(self, task_id: str, updates: dict[str, Any]) -> bool:
+    async def merge_context(self, task_id: str, updates: Dict[str, Any]) -> bool:
         """合并更新上下文"""
         try:
             async with self._lock:
@@ -117,7 +118,7 @@ class ContextStore:
             self.logger.exception("Failed to inherit context from {parent_id} to {child_id}: ")
             return False
 
-    async def get_context_hierarchy(self, task_id: str) -> dict[str, TaskContext]:
+    async def get_context_hierarchy(self, task_id: str) -> Dict[str, TaskContext]:
         """获取上下文层级关系"""
         try:
             async with self._lock:
@@ -161,8 +162,8 @@ class ContextStore:
     async def update_context_files(
         self,
         task_id: str,
-        files: list[str],
-        images: list[str] | None = None,
+        files: List[str],
+        images: List[str] | None = None,
     ) -> bool:
         """更新上下文中的文件列表"""
         try:
@@ -287,7 +288,7 @@ class ContextStore:
 
         return result
 
-    async def get_all_contexts(self) -> dict[str, TaskContext]:
+    async def get_all_contexts(self) -> Dict[str, TaskContext]:
         """获取所有上下文"""
         try:
             async with self._lock:
@@ -312,7 +313,7 @@ class ContextStore:
             self.logger.exception("Failed to clear context for task {task_id}: ")
             return False
 
-    async def save_context(self, task_id: str) -> dict[str, Any]:
+    async def save_context(self, task_id: str) -> Dict[str, Any]:
         """保存上下文到持久化存储"""
         try:
             context = await self.get_context(task_id)
@@ -328,7 +329,7 @@ class ContextStore:
             self.logger.exception("Failed to save context for task {task_id}: ")
             return {}
 
-    async def load_context(self, task_id: str, data: dict[str, Any]) -> bool:
+    async def load_context(self, task_id: str, data: Dict[str, Any]) -> bool:
         """从持久化存储加载上下文"""
         try:
             if not data or "context" not in data:

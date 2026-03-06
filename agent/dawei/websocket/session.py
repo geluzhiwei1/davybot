@@ -11,8 +11,9 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.storage import Storage
 
@@ -29,10 +30,10 @@ class SessionData:
     user_id: str | None = None
     workspace_id: str | None = None
     conversation_id: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-    data: dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    data: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         result = asdict(self)
         # 转换日期时间为ISO字符串
@@ -41,7 +42,7 @@ class SessionData:
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SessionData":
+    def from_dict(cls, data: Dict[str, Any]) -> "SessionData":
         """从字典创建"""
         # 转换ISO字符串为日期时间
         if "created_at" in data and isinstance(data["created_at"], str):
@@ -75,11 +76,11 @@ class SessionManager:
 
         """
         self.storage = storage
-        self.sessions: dict[str, SessionData] = {}
-        self.session_locks: dict[str, asyncio.Lock] = {}
+        self.sessions: Dict[str, SessionData] = {}
+        self.session_locks: Dict[str, asyncio.Lock] = {}
         self.cleanup_interval = cleanup_interval
         self.session_timeout = session_timeout
-        self.session_listeners: list[Callable] = []
+        self.session_listeners: List[Callable] = []
         self._cleanup_task: asyncio.Task | None = None
         self._is_running = False
         self.sessions_dir = sessions_dir
@@ -116,8 +117,8 @@ class SessionManager:
         user_id: str | None = None,
         workspace_id: str | None = None,
         conversation_id: str | None = None,
-        initial_data: dict[str, Any] | None = None,
-        metadata: dict[str, Any] | None = None,
+        initial_data: Dict[str, Any] | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> SessionData:
         """创建新会话
 
@@ -177,8 +178,8 @@ class SessionManager:
     async def update_session(
         self,
         session_id: str,
-        data: dict[str, Any] | None = None,
-        metadata: dict[str, Any] | None = None,
+        data: Dict[str, Any] | None = None,
+        metadata: Dict[str, Any] | None = None,
         user_id: str | None = None,
         workspace_id: str | None = None,
         conversation_id: str | None = None,
@@ -314,7 +315,7 @@ class SessionManager:
         """
         return await self.update_session(session_id, metadata={key: value})
 
-    async def get_sessions_by_user(self, user_id: str) -> list[SessionData]:
+    async def get_sessions_by_user(self, user_id: str) -> List[SessionData]:
         """获取指定用户的所有会话
 
         Args:
@@ -330,7 +331,7 @@ class SessionManager:
                 sessions.append(session_data)
         return sessions
 
-    async def get_sessions_by_workspace(self, workspace_id: str) -> list[SessionData]:
+    async def get_sessions_by_workspace(self, workspace_id: str) -> List[SessionData]:
         """获取指定工作空间的所有会话
 
         Args:
@@ -346,7 +347,7 @@ class SessionManager:
                 sessions.append(session_data)
         return sessions
 
-    async def get_all_sessions(self) -> list[SessionData]:
+    async def get_all_sessions(self) -> List[SessionData]:
         """获取所有会话
 
         Returns:

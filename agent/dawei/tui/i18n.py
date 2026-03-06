@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """TUI Internationalization (i18n) Module
@@ -28,8 +29,8 @@ SUPPORTED_LANGUAGES = {
 DEFAULT_LANGUAGE = "en"
 
 # Translation caches
-_translations: dict[str, gettext.GNUTranslations] = {}
-_po_translations: dict[str, dict[str, str]] = {}
+_translations: Dict[str, gettext.GNUTranslations] = {}
+_po_translations: Dict[str, Dict[str, str]] = {}
 _current_language: str = DEFAULT_LANGUAGE
 
 
@@ -38,7 +39,7 @@ def get_locales_dir() -> Path:
     return Path(__file__).parent / "locales"
 
 
-def parse_po_file(po_file: Path) -> dict[str, str]:
+def parse_po_file(po_file: Path) -> Dict[str, str]:
     """Parse a .po file and return a dictionary of translations
 
     Args:
@@ -98,7 +99,7 @@ def parse_po_file(po_file: Path) -> dict[str, str]:
     return translations
 
 
-def load_po_translation(language: str) -> dict[str, str]:
+def load_po_translation(language: str) -> Dict[str, str]:
     """Load translations from .po file
 
     Args:
@@ -248,7 +249,7 @@ def set_language(language: str) -> None:
     logger.info(f"Language set to: {SUPPORTED_LANGUAGES.get(language, language)}")
 
 
-def get_supported_languages() -> dict[str, str]:
+def get_supported_languages() -> Dict[str, str]:
     """Get dictionary of supported languages
 
     Returns:

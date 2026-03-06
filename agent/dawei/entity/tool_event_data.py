@@ -6,8 +6,12 @@
 """
 
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import Any
+from enum import Enum
+from typing import List, Dict, Any
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
 
 
 class ToolExecutionStatus(StrEnum):
@@ -26,11 +30,11 @@ class ToolCallStartData:
     """工具调用开始事件数据"""
 
     tool_name: str
-    tool_input: dict[str, Any]
+    tool_input: Dict[str, Any]
     tool_call_id: str | None = None
     task_id: str = ""
 
-    def get_event_data(self) -> dict[str, Any]:
+    def get_event_data(self) -> Dict[str, Any]:
         """获取事件数据的字典表示"""
         return {
             "tool_name": self.tool_name,
@@ -54,7 +58,7 @@ class ToolCallProgressData:
     total_steps: int | None = None
     current_step_index: int | None = None
 
-    def get_event_data(self) -> dict[str, Any]:
+    def get_event_data(self) -> Dict[str, Any]:
         """获取事件数据的字典表示"""
         data = {
             "tool_name": self.tool_name,
@@ -89,7 +93,7 @@ class ToolCallResultData:
     task_id: str = ""
     execution_time: float | None = None
 
-    def get_event_data(self) -> dict[str, Any]:
+    def get_event_data(self) -> Dict[str, Any]:
         """获取事件数据的字典表示"""
         data = {
             "tool_name": self.tool_name,
@@ -130,9 +134,9 @@ class ToolCallDetailedProgressData:
     estimated_remaining_time: float | None = None
 
     # 额外数据
-    extra_data: dict[str, Any] | None = None
+    extra_data: Dict[str, Any] | None = None
 
-    def get_event_data(self) -> dict[str, Any]:
+    def get_event_data(self) -> Dict[str, Any]:
         """获取事件数据的字典表示"""
         data = {
             "tool_name": self.tool_name,

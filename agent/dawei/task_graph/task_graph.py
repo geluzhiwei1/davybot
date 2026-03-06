@@ -7,8 +7,9 @@
 
 import asyncio
 import uuid
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.agentic.errors import (
     StateTransitionError,
@@ -77,7 +78,7 @@ class TaskGraph:
 
         # 核心组件
         self._root_node: TaskNode | None = None
-        self._nodes: dict[str, TaskNode] = {}
+        self._nodes: Dict[str, TaskNode] = {}
         # 延迟导入管理器以避免循环导入
         from .managers import ContextStore, StateManager, TodoManager
 
@@ -91,7 +92,7 @@ class TaskGraph:
         self._lock = asyncio.Lock()
 
         # 🔧 修复内存泄漏：追踪事件处理器ID以便后续清理
-        self._handler_ids: list[str] = []
+        self._handler_ids: List[str] = []
 
         if self._event_bus is None:
             raise ValueError("event_bus is required for TaskGraph initialization")
@@ -238,7 +239,7 @@ class TaskGraph:
             node.update_data(todos=todo_items)
             self.logger.info(f"Updated node {task_id} todos: {len(todo_items)} items")
 
-    async def _on_context_updated(self, event_data: dict[str, Any]):
+    async def _on_context_updated(self, event_data: Dict[str, Any]):
         """上下文更新事件处理"""
         task_id = event_data.get("task_id")
 
@@ -504,7 +505,7 @@ class TaskGraph:
             self.logger.error(f"Failed to get root task: {e}", exc_info=True)
             return None
 
-    async def get_subtasks(self, parent_id: str) -> list[TaskNode]:
+    async def get_subtasks(self, parent_id: str) -> List[TaskNode]:
         """获取子任务列表"""
         try:
             async with self._lock:
@@ -522,7 +523,7 @@ class TaskGraph:
             self.logger.error(f"Failed to get subtasks for {parent_id}: {e}", exc_info=True)
             return []
 
-    async def get_all_tasks(self) -> list[TaskNode]:
+    async def get_all_tasks(self) -> List[TaskNode]:
         """获取所有任务节点"""
         try:
             async with self._lock:
@@ -667,7 +668,7 @@ class TaskGraph:
 
     # ==================== TODO 管理 ====================
 
-    async def update_todos(self, task_id: str, todos: list[TodoItem]) -> bool:
+    async def update_todos(self, task_id: str, todos: List[TodoItem]) -> bool:
         """更新任务的TODO列表"""
         try:
             # 注意：这里不启用 auto_progress，避免创建时自动激活 TODO
@@ -682,7 +683,7 @@ class TaskGraph:
             self.logger.error(f"Failed to update todos: {e}", exc_info=True)
             return False
 
-    async def get_todos(self, task_id: str) -> list[TodoItem]:
+    async def get_todos(self, task_id: str) -> List[TodoItem]:
         """获取任务的TODO列表"""
         try:
             return await self._todo_manager.get_todos(task_id)
@@ -730,7 +731,7 @@ class TaskGraph:
             self.logger.error(f"Failed to get task status: {e}", exc_info=True)
             return None
 
-    async def get_task_hierarchy(self) -> dict[str, Any]:
+    async def get_task_hierarchy(self) -> Dict[str, Any]:
         """获取任务层级结构"""
         try:
             async with self._lock:
@@ -748,7 +749,7 @@ class TaskGraph:
             self.logger.error(f"Failed to get task hierarchy: {e}", exc_info=True)
             return {}
 
-    def _build_tree(self, task_id: str) -> dict[str, Any]:
+    def _build_tree(self, task_id: str) -> Dict[str, Any]:
         """构建任务树"""
         node = self._nodes.get(task_id)
         if not node:
@@ -810,7 +811,7 @@ class TaskGraph:
             self.logger.error(f"Failed to save checkpoint: {e}", exc_info=True)
             raise
 
-    async def restore_from_checkpoint(self, checkpoint_data: dict[str, Any]) -> bool:
+    async def restore_from_checkpoint(self, checkpoint_data: Dict[str, Any]) -> bool:
         """从检查点恢复"""
         try:
             async with self._lock:
@@ -869,7 +870,7 @@ class TaskGraph:
 
     # ==================== 统计信息 ====================
 
-    async def get_statistics(self) -> dict[str, Any]:
+    async def get_statistics(self) -> Dict[str, Any]:
         """获取任务图统计信息"""
         try:
             # 基本统计
@@ -910,9 +911,9 @@ class TaskGraph:
         parent_task_id: str | None = None,
         status: TaskStatus = TaskStatus.PENDING,
         context: TaskContext | None = None,
-        todos: list[TodoItem] | None = None,
+        todos: List[TodoItem] | None = None,
         priority: TaskPriority | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> TaskNode:
         """创建任务的统一接口
 
@@ -955,7 +956,7 @@ class TaskGraph:
             self.logger.error(f"Failed to create task: {e}", exc_info=True)
             raise
 
-    async def get_task_info(self, task_id: str) -> dict[str, Any] | None:
+    async def get_task_info(self, task_id: str) -> Dict[str, Any] | None:
         """获取任务的完整信息
 
         Args:
@@ -1040,7 +1041,7 @@ class TaskGraph:
             self.logger.error(f"Failed to get task summary for {task_id}: {e}", exc_info=True)
             return None
 
-    async def get_task_statistics(self, task_id: str) -> dict[str, Any] | None:
+    async def get_task_statistics(self, task_id: str) -> Dict[str, Any] | None:
         """获取任务统计信息
 
         Args:

@@ -11,9 +11,14 @@ import contextlib
 import logging
 import traceback
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta, timezone
-from enum import StrEnum
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
+from enum import Enum
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
+from typing import List, Dict, Any
 
 from dawei.websocket.protocol import (
     BaseWebSocketMessage,
@@ -58,7 +63,7 @@ class ErrorInfo:
         message: str,
         severity: ErrorSeverity = ErrorSeverity.MEDIUM,
         category: ErrorCategory = ErrorCategory.SYSTEM,
-        details: dict[str, Any] | None = None,
+        details: Dict[str, Any] | None = None,
         recoverable: bool = True,
         session_id: str | None = None,
         timestamp: datetime | None = None,
@@ -73,7 +78,7 @@ class ErrorInfo:
         self.timestamp = timestamp or datetime.now(UTC)
         self.stack_trace = traceback.format_exc()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "code": self.code,
@@ -113,13 +118,13 @@ class ErrorHandler(StatefulMessageHandler):
         super().__init__()
         self.max_error_history = max_error_history
         self.cleanup_interval = cleanup_interval
-        self.error_history: list[ErrorInfo] = []
-        self.error_stats: dict[str, dict[str, Any]] = {}
-        self.error_callbacks: dict[str, list[Callable]] = {}
-        self.recovery_strategies: dict[str, Callable] = {}
+        self.error_history: List[ErrorInfo] = []
+        self.error_stats: Dict[str, Dict[str, Any]] = {}
+        self.error_callbacks: Dict[str, List[Callable]] = {}
+        self.recovery_strategies: Dict[str, Callable] = {}
         self._cleanup_task: asyncio.Task | None = None
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         """获取支持的消息类型"""
         return [MessageType.ERROR, MessageType.WARNING]
 
@@ -790,7 +795,7 @@ class ErrorHandler(StatefulMessageHandler):
             del self.recovery_strategies[error_code]
             logger.info(f"已移除恢复策略: {error_code}")
 
-    async def get_error_stats(self) -> dict[str, Any]:
+    async def get_error_stats(self) -> Dict[str, Any]:
         """获取错误统计
 
         Returns:

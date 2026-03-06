@@ -6,7 +6,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -45,7 +45,7 @@ def get_chat_history_dir_for_workspace(workspace_id: str) -> Path:
     return chat_history_dir
 
 
-def load_conversation_file(file_path: Path) -> dict[str, Any]:
+def load_conversation_file(file_path: Path) -> Dict[str, Any]:
     """加载单个对话文件"""
     with Path(file_path).open(encoding="utf-8") as f:
         data = json.load(f)
@@ -130,7 +130,7 @@ async def get_workspace_conversations(
 
 
 @router.post("")
-async def save_workspace_conversations(workspace_id: str, conversations: list[dict]):
+async def save_workspace_conversations(workspace_id: str, conversations: List[dict]):
     """Save conversations to a workspace."""
     chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
     saved_count = 0

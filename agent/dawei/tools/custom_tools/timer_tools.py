@@ -10,7 +10,8 @@
 import asyncio
 import json
 import uuid
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
 
 from pydantic import BaseModel, Field
 

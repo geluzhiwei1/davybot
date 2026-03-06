@@ -4,7 +4,8 @@
 """成本追踪工具 - 显示 LLM 使用成本和优化建议"""
 
 import json
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 
 from pydantic import BaseModel, Field
 

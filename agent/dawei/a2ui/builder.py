@@ -19,7 +19,7 @@ Example:
 """
 
 import uuid
-from typing import Any
+from typing import List, Dict, Any
 
 
 class A2UIComponent:
@@ -29,7 +29,7 @@ class A2UIComponent:
         self.id = component_id
         self.type = component_type
         self.properties = properties
-        self._children: list[A2UIComponent] = []
+        self._children: List[A2UIComponent] = []
         self._data_context: str | None = None
 
     def add_child(self, child: "A2UIComponent") -> "A2UIComponent":
@@ -42,9 +42,9 @@ class A2UIComponent:
         self._data_context = path
         return self
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to A2UI component dictionary format."""
-        component: dict[str, Any] = {
+        component: Dict[str, Any] = {
             "id": self.id,
             "component": {"type": self.type, **self.properties},
         }
@@ -70,7 +70,7 @@ class A2UIComponent:
 
         return component
 
-    def collect_components(self, components: list[dict[str, Any]]) -> None:
+    def collect_components(self, components: List[Dict[str, Any]]) -> None:
         """Recursively collect all components into a flat list."""
         components.append(self.to_dict())
         for child in self._children:
@@ -84,9 +84,9 @@ class A2UIBuilder:
     """
 
     def __init__(self):
-        self._components: list[A2UIComponent] = []
+        self._components: List[A2UIComponent] = []
         self._root_id: str | None = None
-        self._data_model: dict[str, Any] = {}
+        self._data_model: Dict[str, Any] = {}
 
     def create_row(
         self,
@@ -161,7 +161,7 @@ class A2UIBuilder:
         label: str = "Button",
         action: str = "click",
         variant: str = "default",
-        context: list[dict[str, Any]] | None = None,
+        context: List[Dict[str, Any]] | None = None,
     ) -> A2UIComponent:
         """Create a Button interactive component."""
         # Create text label as child
@@ -245,13 +245,13 @@ class A2UIBuilder:
         description: str | None = None,
         surface_type: str = "custom",
         layout: str = "vertical",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """Build the complete A2UI surface definition.
 
         Returns a dictionary ready to be passed to create_a2ui_surface tool.
         """
         # Collect all components into flat list
-        components_list: list[dict[str, Any]] = []
+        components_list: List[Dict[str, Any]] = []
         for component in self._components:
             component.collect_components(components_list)
 
@@ -272,9 +272,9 @@ class A2UIBuilder:
 def create_form(
     form_id: str,
     title: str,
-    fields: list[dict[str, Any]],
+    fields: List[Dict[str, Any]],
     submit_action: str = "submit",
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Create a form surface with text fields and a submit button.
 
     Args:
@@ -321,7 +321,7 @@ def create_form(
     return builder.build(title=title, surface_type="form", layout="vertical")
 
 
-def create_card_grid(grid_id: str, title: str, cards: list[dict[str, Any]]) -> dict[str, Any]:
+def create_card_grid(grid_id: str, title: str, cards: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Create a grid of cards for data display.
 
     Args:

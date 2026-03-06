@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """模式管理器 - 重构版本
@@ -8,7 +9,8 @@
 
 import logging
 import os
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
 
 import yaml
@@ -23,8 +25,8 @@ class ModeConfigLoader:
     """模式配置加载器 - 重构版本"""
 
     def __init__(self):
-        self._cache: dict[str, dict[str, ModeConfig]] = {}
-        self._cache_timestamps: dict[str, datetime] = {}
+        self._cache: Dict[str, Dict[str, ModeConfig]] = {}
+        self._cache_timestamps: Dict[str, datetime] = {}
         # 从配置系统读取缓存TTL，默认5分钟
         from dawei.config.settings import get_settings
 
@@ -43,12 +45,12 @@ class ModeConfigLoader:
         age = (datetime.now(UTC) - self._cache_timestamps[cache_key]).total_seconds()
         return age < self._cache_ttl
 
-    def _set_cache(self, cache_key: str, configs: dict[str, ModeConfig]):
+    def _set_cache(self, cache_key: str, configs: Dict[str, ModeConfig]):
         """设置缓存"""
         self._cache[cache_key] = configs
         self._cache_timestamps[cache_key] = datetime.now(UTC)
 
-    def _get_cache(self, cache_key: str) -> dict[str, ModeConfig] | None:
+    def _get_cache(self, cache_key: str) -> Dict[str, ModeConfig] | None:
         """获取缓存"""
         if self._is_cache_valid(cache_key):
             return self._cache.get(cache_key)
@@ -84,7 +86,7 @@ class ModeConfigLoader:
             else:
                 logger.debug(f"No cache found for: level={level}, path={path}")
 
-    def _load_modes_from_directory(self, config_dir: Path, level: str) -> dict[str, ModeConfig]:
+    def _load_modes_from_directory(self, config_dir: Path, level: str) -> Dict[str, ModeConfig]:
         """通用的模式加载函数，从指定目录加载模式配置
 
         Args:
@@ -123,18 +125,18 @@ class ModeConfigLoader:
         logger.info(f"Loaded {len(modes)} {level} modes from {config_dir}")
         return modes
 
-    def load_builtin_modes(self) -> dict[str, ModeConfig]:
+    def load_builtin_modes(self) -> Dict[str, ModeConfig]:
         """加载内置模式"""
         # 获取 builtin/agents 目录路径（与 user 级别保持一致）
         builtin_dir = Path(__file__).parent / "builtin" / "agents"
         return self._load_modes_from_directory(builtin_dir, "builtin")
 
-    def load_user_modes(self) -> dict[str, ModeConfig]:
+    def load_user_modes(self) -> Dict[str, ModeConfig]:
         """加载用户级模式配置"""
         user_config_dir = get_dawei_home() / "agents"
         return self._load_modes_from_directory(user_config_dir, "user")
 
-    def load_workspace_modes(self, workspace_path: str) -> dict[str, ModeConfig]:
+    def load_workspace_modes(self, workspace_path: str) -> Dict[str, ModeConfig]:
         """加载工作区级模式配置
 
         支持两个加载路径：
@@ -170,8 +172,8 @@ class ModeConfigLoader:
     def _load_modes_file(
         self,
         file_path: Path,
-        existing_modes: dict[str, ModeConfig] | None = None,
-    ) -> dict[str, ModeConfig]:
+        existing_modes: Dict[str, ModeConfig] | None = None,
+    ) -> Dict[str, ModeConfig]:
         """加载 modes 文件"""
         modes = {}
         try:
@@ -199,7 +201,7 @@ class ModeConfigLoader:
 
         return modes
 
-    def _load_dawei_directory(self, dawei_dir: Path) -> dict[str, ModeConfig]:
+    def _load_dawei_directory(self, dawei_dir: Path) -> Dict[str, ModeConfig]:
         """加载 .dawei 目录下的规则"""
         modes = {}
 
@@ -217,7 +219,7 @@ class ModeConfigLoader:
                             rules_content = f.read()
                         # 使用文件名（含扩展名）作为 key
                         file_key = rules_file.name
-                        rules_dict[file_key] = rules_content
+                        rules_Dict[file_key] = rules_content
                         logger.debug(
                             f"Loaded rules file {file_key} for mode {mode_slug} from {rules_file}",
                         )
@@ -283,12 +285,12 @@ class ModeManager:
         self.workspace_path = workspace_path
 
         # 三级配置缓存
-        self._builtin_modes: dict[str, ModeConfig] = {}
-        self._user_modes: dict[str, ModeConfig] = {}
-        self._workspace_modes: dict[str, ModeConfig] = {}
+        self._builtin_modes: Dict[str, ModeConfig] = {}
+        self._user_modes: Dict[str, ModeConfig] = {}
+        self._workspace_modes: Dict[str, ModeConfig] = {}
 
         # 合并后的模式配置
-        self._merged_modes: dict[str, ModeConfig] = {}
+        self._merged_modes: Dict[str, ModeConfig] = {}
 
         # 初始化配置
         self._load_all_configs()
@@ -352,7 +354,7 @@ class ModeManager:
             rules={},
         )
 
-    def get_all_modes(self) -> dict[str, ModeConfig]:
+    def get_all_modes(self) -> Dict[str, ModeConfig]:
         """获取所有可用模式，包含规则"""
         return dict(self._merged_modes.items())
 
@@ -360,7 +362,7 @@ class ModeManager:
         """检查模式是否有效"""
         return mode_slug in self._merged_modes
 
-    def get_mode_groups(self, mode_slug: str) -> list[str]:
+    def get_mode_groups(self, mode_slug: str) -> List[str]:
         """获取模式所属的工具组"""
         mode_info = self.get_mode_info(mode_slug)
         return getattr(mode_info, "groups", [])
@@ -381,7 +383,7 @@ class ModeManager:
         self._load_all_configs()
         logger.info("All mode configurations reloaded (async)")
 
-    def get_config_sources(self, mode_slug: str) -> dict[str, bool]:
+    def get_config_sources(self, mode_slug: str) -> Dict[str, bool]:
         """获取模式配置来源信息"""
         return {
             "builtin": mode_slug in self._builtin_modes,

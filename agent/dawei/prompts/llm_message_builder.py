@@ -8,8 +8,9 @@
 """
 
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.entity.lm_messages import AssistantMessage, ContentBlock, LLMMessage
 from dawei.interfaces.message_processor import IMessageProcessor
@@ -58,9 +59,9 @@ class EnhancedSystemBuilder(IMessageProcessor):
     def build_system_prompt(
         self,
         user_workspace,
-        capabilities: list[str] | None = None,
+        capabilities: List[str] | None = None,
         custom_instructions: str | None = None,
-        additional_data: dict[str, Any] | None = None,
+        additional_data: Dict[str, Any] | None = None,
     ) -> str:
         """构建系统提示词
 
@@ -123,10 +124,10 @@ class EnhancedSystemBuilder(IMessageProcessor):
         llm_manager,
         tool_manager,
         mode_manager,
-        capabilities: list[str],
+        capabilities: List[str],
         custom_instructions: str | None,
-        additional_data: dict[str, Any] | None,
-    ) -> dict[str, Any]:
+        additional_data: Dict[str, Any] | None,
+    ) -> Dict[str, Any]:
         """准备渲染上下文
 
         Args:
@@ -200,7 +201,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         return context
 
-    def _generate_dynamic_content(self, context: dict[str, Any]) -> dict[str, Any]:
+    def _generate_dynamic_content(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """生成动态内容
 
         Args:
@@ -223,7 +224,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         return dynamic_content
 
-    def _generate_sections(self, context: dict[str, Any]) -> dict[str, Any]:
+    def _generate_sections(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """生成段落内容
 
         Args:
@@ -265,7 +266,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         return sections
 
-    def _generate_capabilities_content(self, context: dict[str, Any]) -> str:
+    def _generate_capabilities_content(self, context: Dict[str, Any]) -> str:
         """生成能力段落内容
 
         Args:
@@ -279,7 +280,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/capabilities.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_rules_content(self, context: dict[str, Any]) -> str:
+    def _generate_rules_content(self, context: Dict[str, Any]) -> str:
         """生成规则内容
 
         Args:
@@ -293,7 +294,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/rules.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_tool_use_content(self, context: dict[str, Any]) -> str:
+    def _generate_tool_use_content(self, context: Dict[str, Any]) -> str:
         """生成工具使用内容
 
         Args:
@@ -307,7 +308,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/tools.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_skills_content(self, context: dict[str, Any]) -> str:
+    def _generate_skills_content(self, context: Dict[str, Any]) -> str:
         """生成Skills使用内容
 
         Args:
@@ -321,7 +322,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/skills.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_markdown_rules_content(self, context: dict[str, Any]) -> str:
+    def _generate_markdown_rules_content(self, context: Dict[str, Any]) -> str:
         """生成 Markdown 规则内容
 
         Args:
@@ -338,7 +339,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/markdown_rules.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_mode_specific_rules_content(self, context: dict[str, Any]) -> str:
+    def _generate_mode_specific_rules_content(self, context: Dict[str, Any]) -> str:
         """生成模式特定规则内容
 
         Args:
@@ -355,7 +356,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/mode_specific_rules.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_system_information_content(self, context: dict[str, Any]) -> str:
+    def _generate_system_information_content(self, context: Dict[str, Any]) -> str:
         """生成系统信息内容
 
         Args:
@@ -369,7 +370,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/system_information.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_objective_content(self, context: dict[str, Any]) -> str:
+    def _generate_objective_content(self, context: Dict[str, Any]) -> str:
         """生成目标内容
 
         Args:
@@ -383,7 +384,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/objective.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _generate_modes_content(self, context: dict[str, Any]) -> str:
+    def _generate_modes_content(self, context: Dict[str, Any]) -> str:
         """生成模式内容
 
         Args:
@@ -396,7 +397,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         template_path = "sections/modes.j2"
         return self.template_manager.render_template(template_path, context)
 
-    def _select_template(self, mode: str, context: dict[str, Any]) -> str:
+    def _select_template(self, mode: str, context: Dict[str, Any]) -> str:
         """选择合适的模板
 
         Args:
@@ -423,11 +424,11 @@ class EnhancedSystemBuilder(IMessageProcessor):
     def build_prompt_with_sections(
         self,
         user_workspace,
-        capabilities: list[str],
-        enabled_sections: list[str] | None = None,
-        disabled_sections: list[str] | None = None,
+        capabilities: List[str],
+        enabled_sections: List[str] | None = None,
+        disabled_sections: List[str] | None = None,
         custom_instructions: str | None = None,
-        additional_data: dict[str, Any] | None = None,
+        additional_data: Dict[str, Any] | None = None,
     ) -> str:
         """构建指定段落的系统提示词
 
@@ -484,7 +485,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         # 渲染模板
         return self.template_manager.render_template(template_name, context, mode=current_mode)
 
-    def get_available_templates(self) -> list[str]:
+    def get_available_templates(self) -> List[str]:
         """获取所有可用模板
 
         Returns:
@@ -493,7 +494,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         """
         return self.template_manager.get_available_templates()
 
-    def get_template_variables(self, template_name: str) -> list[str]:
+    def get_template_variables(self, template_name: str) -> List[str]:
         """获取模板变量
 
         Args:
@@ -517,7 +518,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         return self.template_renderer.extract_variables(template.source)
 
-    def validate_template(self, template_name: str) -> list[str]:
+    def validate_template(self, template_name: str) -> List[str]:
         """验证模板
 
         Args:
@@ -549,7 +550,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         return self.template_renderer.validate_template_syntax(template_source)
 
-    def get_render_stats(self) -> dict[str, Any]:
+    def get_render_stats(self) -> Dict[str, Any]:
         """获取渲染统计信息
 
         Returns:
@@ -563,7 +564,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         self.template_manager.reload_templates()
         logger.info("Templates reloaded")
 
-    def get_language_info(self, _language: str) -> dict[str, Any] | None:
+    def get_language_info(self, _language: str) -> Dict[str, Any] | None:
         """获取语言信息
 
         Args:
@@ -583,7 +584,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
     # IMessageProcessor 接口实现
 
-    async def build_messages(self, user_workspace: Any, capabilities: list[str]) -> dict[str, Any]:
+    async def build_messages(self, user_workspace: Any, capabilities: List[str]) -> Dict[str, Any]:
         """构建消息列表
 
         Args:
@@ -688,8 +689,8 @@ class EnhancedSystemBuilder(IMessageProcessor):
     async def _apply_conversation_compression(
         self,
         user_workspace: Any,
-        messages: list[dict[str, Any]],
-    ) -> tuple[list[dict[str, Any]], Any]:
+        messages: List[Dict[str, Any]],
+    ) -> tuple[List[Dict[str, Any]], Any]:
         """应用对话压缩
 
         Args:
@@ -771,7 +772,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
         return compressed, stats
 
-    def build_user_message(self, task: str, images: list[str] | None = None) -> dict[str, Any]:
+    def build_user_message(self, task: str, images: List[str] | None = None) -> Dict[str, Any]:
         """构建用户消息
 
         Args:
@@ -813,8 +814,8 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
     def build_assistant_message(
         self,
-        content: str | list[ContentBlock] | None,
-        tool_calls: list[dict[str, Any]] | None = None,
+        content: str | List[ContentBlock] | None,
+        tool_calls: List[Dict[str, Any]] | None = None,
         **kwargs,
     ) -> AssistantMessage:
         """构建助手消息
@@ -890,7 +891,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
                 f"No current conversation found for task {task_node_id}, message not added.",
             )
 
-    def _convert_tools_to_openai_format(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _convert_tools_to_openai_format(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """转换工具为 OpenAI 格式
 
         Args:
@@ -929,7 +930,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         logger.debug(f"Tools converted successfully: {len(openai_tools)} OpenAI tools")
         return openai_tools
 
-    def validate_message(self, message: dict[str, Any]) -> bool:
+    def validate_message(self, message: Dict[str, Any]) -> bool:
         """验证消息格式
 
         Args:
@@ -962,7 +963,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         logger.debug(f"Message validation passed for role: {message['role']}")
         return True
 
-    def format_system_prompt(self, base_prompt: str, context: dict[str, Any]) -> str:
+    def format_system_prompt(self, base_prompt: str, context: Dict[str, Any]) -> str:
         """格式化系统提示
 
         Args:

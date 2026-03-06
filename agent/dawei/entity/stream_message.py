@@ -10,7 +10,7 @@ import logging
 import time
 import uuid
 from enum import Enum
-from typing import Any, Union
+from typing import List, Dict, Any, Union
 
 from pydantic import BaseModel, Field
 
@@ -65,14 +65,14 @@ class ToolCallMessage(BaseStreamMessage):
 
     type: StreamMessageType = StreamMessageType.TOOL_CALL
     tool_call: ToolCall
-    all_tool_calls: list[ToolCall]
+    all_tool_calls: List[ToolCall]
 
 
 class UsageMessage(BaseStreamMessage):
     """使用统计消息"""
 
     type: StreamMessageType = StreamMessageType.USAGE
-    data: dict[str, Any]
+    data: Dict[str, Any]
 
 
 class CompleteMessage(BaseStreamMessage):
@@ -81,9 +81,9 @@ class CompleteMessage(BaseStreamMessage):
     type: StreamMessageType = StreamMessageType.COMPLETE
     reasoning_content: str | None = None
     content: str | None = None
-    tool_calls: list[ToolCall] = []
+    tool_calls: List[ToolCall] = []
     finish_reason: str | None = None
-    usage: dict[str, Any] | None = None
+    usage: Dict[str, Any] | None = None
 
 
 class ErrorMessage(BaseStreamMessage):
@@ -91,7 +91,7 @@ class ErrorMessage(BaseStreamMessage):
 
     type: StreamMessageType = StreamMessageType.ERROR
     error: str
-    details: dict[str, Any] | None = None
+    details: Dict[str, Any] | None = None
 
 
 # Union 类型，包含所有流式消息类型
@@ -125,7 +125,7 @@ class TopLogprob(BaseObject):
     """Top logprob，保持向后兼容"""
 
     token: str
-    bytes: list[int] | None = None
+    bytes: List[int] | None = None
     logprob: float
 
 
@@ -133,9 +133,9 @@ class ChatCompletionTokenLogprob(BaseObject):
     """Chat completion token logprob，保持向后兼容"""
 
     token: str
-    bytes: list[int] | None = None
+    bytes: List[int] | None = None
     logprob: float
-    top_logprobs: list[TopLogprob]
+    top_logprobs: List[TopLogprob]
 
     def __contains__(self, key):
         return hasattr(self, key)
@@ -150,7 +150,7 @@ class ChatCompletionTokenLogprob(BaseObject):
 class ChoiceLogprobs(BaseObject):
     """Choice logprobs，保持向后兼容"""
 
-    content: list[ChatCompletionTokenLogprob] | None = None
+    content: List[ChatCompletionTokenLogprob] | None = None
 
     def __contains__(self, key):
         return hasattr(self, key)
@@ -273,8 +273,8 @@ class Delta(BaseObject):
 
     content: str | None = None
     role: str | None = None
-    function_call: dict[str, Any] | None = None
-    tool_calls: list[dict[str, Any]] | None = None
+    function_call: Dict[str, Any] | None = None
+    tool_calls: List[Dict[str, Any]] | None = None
     reasoning_content: str | None = None
 
 
@@ -350,15 +350,15 @@ class Usage(BaseObject):
 class ModelResponseStream(ModelResponseBase):
     """Model response stream，保持向后兼容"""
 
-    choices: list[StreamingChoices]
-    provider_specific_fields: dict[str, Any] | None = Field(default=None)
+    choices: List[StreamingChoices]
+    provider_specific_fields: Dict[str, Any] | None = Field(default=None)
 
     def __init__(
         self,
-        choices: list[StreamingChoices] | StreamingChoices | dict | BaseModel | None = None,
+        choices: List[StreamingChoices] | StreamingChoices | dict | BaseModel | None = None,
         id: str | None = None,
         created: int | None = None,
-        provider_specific_fields: dict[str, Any] | None = None,
+        provider_specific_fields: Dict[str, Any] | None = None,
         **kwargs,
     ):
         if choices is not None and isinstance(choices, list):

@@ -8,7 +8,7 @@ Display and manage chat session history.
 
 import logging
 from datetime import datetime
-from typing import Any
+from typing import List, Dict, Any
 
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
@@ -54,7 +54,7 @@ class SessionHistoryScreen(Screen):
     }
     """
 
-    def __init__(self, sessions: list[dict[str, Any]], **kwargs):
+    def __init__(self, sessions: List[Dict[str, Any]], **kwargs):
         """Initialize session history screen
 
         Args:
@@ -63,7 +63,7 @@ class SessionHistoryScreen(Screen):
         """
         super().__init__(**kwargs)
         self.sessions = sessions
-        self.selected_session: dict[str, Any] | None = None
+        self.selected_session: Dict[str, Any] | None = None
 
     def compose(self):
         """Compose history screen UI"""

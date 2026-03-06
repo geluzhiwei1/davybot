@@ -9,7 +9,7 @@ Handles A2UI-related WebSocket messages:
 """
 
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.websocket.protocol import (
     A2UIServerEventMessage,
@@ -23,7 +23,7 @@ async def handle_a2ui_user_action(
     message: A2UIUserActionMessage,
     websocket,
     session_id: str,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Handle A2UI user action message from client.
 
     Args:
@@ -71,8 +71,8 @@ def send_a2ui_update(
     websocket,
     surface_id: str,
     components: list,
-    data_model: dict[str, Any],
-    metadata: dict[str, Any],
+    data_model: Dict[str, Any],
+    metadata: Dict[str, Any],
     session_id: str,
 ) -> None:
     """Send A2UI surface update to client.

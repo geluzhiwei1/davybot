@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Scheduler Engine and Manager
@@ -11,7 +12,8 @@ import asyncio
 import contextlib
 import logging
 import uuid
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
 
 from dawei.agentic.agent_execution_service import agent_execution_service
@@ -32,7 +34,7 @@ class TaskExecutionLock:
 
     def __init__(self):
         """初始化任务执行锁"""
-        self._locks: dict[str, asyncio.Lock] = {}
+        self._locks: Dict[str, asyncio.Lock] = {}
         self._global_lock = asyncio.Lock()
 
     async def acquire(self, task_id: str) -> bool:
@@ -110,7 +112,7 @@ class SchedulerEngine:
 
         self._execution_queue: asyncio.Queue = asyncio.Queue()
         self._max_concurrent = 3
-        self._workers: list[asyncio.Task] = []
+        self._workers: List[asyncio.Task] = []
 
         # ✅ 添加任务执行锁
         self._execution_lock = TaskExecutionLock()
@@ -438,7 +440,7 @@ class SchedulerManager:
     """
 
     def __init__(self):
-        self._engines: dict[str, SchedulerEngine] = {}
+        self._engines: Dict[str, SchedulerEngine] = {}
         self._lock = asyncio.Lock()
         self._initialized = False
 
@@ -503,7 +505,7 @@ class SchedulerManager:
         """检查管理器是否已初始化"""
         return self._initialized
 
-    async def get_active_workspaces(self) -> list[str]:
+    async def get_active_workspaces(self) -> List[str]:
         """获取活跃的 workspace ID 列表"""
         async with self._lock:
             return list(self._engines.keys())

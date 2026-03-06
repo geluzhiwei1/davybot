@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """模式切换处理器 - 简化修复版
@@ -26,7 +27,7 @@ class ModeSwitchHandler(AsyncMessageHandler):
     def __init__(self):
         super().__init__()
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         return [MessageType.MODE_SWITCH]
 
     async def process_message(

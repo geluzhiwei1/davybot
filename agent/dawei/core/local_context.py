@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """上下文管理模块
@@ -33,7 +34,7 @@ def get_message_id() -> str | None:
     return message_id_var.get()
 
 
-def get_full_context() -> dict[str, str | None]:
+def get_full_context() -> Dict[str, str | None]:
     """获取所有上下文变量的字典"""
     return {
         "user_id": user_id_var.get(),

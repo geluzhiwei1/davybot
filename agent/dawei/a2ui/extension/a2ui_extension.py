@@ -11,7 +11,7 @@ This module provides core A2UI functionality without external dependencies:
 
 import json
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 import jsonschema
 
@@ -25,10 +25,10 @@ STANDARD_CATALOG_ID = "https://a2ui.org/specification/v1_0/standard_catalog_defi
 
 def create_a2ui_message(
     surface_id: str,
-    components: list[dict[str, Any]],
-    data_model: dict[str, Any],
-    metadata: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    components: List[Dict[str, Any]],
+    data_model: Dict[str, Any],
+    metadata: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
     """Create an A2UI message for WebSocket transmission.
 
     Args:
@@ -59,7 +59,7 @@ def create_a2ui_message(
     return message
 
 
-def is_a2ui_message(data: dict[str, Any]) -> bool:
+def is_a2ui_message(data: Dict[str, Any]) -> bool:
     """Check if a dictionary contains A2UI data.
 
     Args:
@@ -73,8 +73,8 @@ def is_a2ui_message(data: dict[str, Any]) -> bool:
 
 
 def validate_a2ui_schema(
-    schema: dict[str, Any],
-    instance: dict[str, Any] | list[dict[str, Any]],
+    schema: Dict[str, Any],
+    instance: Dict[str, Any] | List[Dict[str, Any]],
 ) -> bool:
     """Validate A2UI schema using JSON Schema validation.
 
@@ -116,7 +116,7 @@ def validate_a2ui_schema(
         raise
 
 
-def wrap_as_json_array(a2ui_schema: dict[str, Any]) -> dict[str, Any]:
+def wrap_as_json_array(a2ui_schema: Dict[str, Any]) -> Dict[str, Any]:
     """Wrap A2UI schema in an array structure.
 
     This is useful when you want to support multiple components in a single schema.
@@ -141,7 +141,7 @@ def wrap_as_json_array(a2ui_schema: dict[str, Any]) -> dict[str, Any]:
     return {"type": "array", "items": a2ui_schema}
 
 
-def extract_surface_data(message: dict[str, Any]) -> dict[str, Any] | None:
+def extract_surface_data(message: Dict[str, Any]) -> Dict[str, Any] | None:
     """Extract surface data from an A2UI message.
 
     Args:

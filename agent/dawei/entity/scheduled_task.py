@@ -6,9 +6,14 @@
 """
 
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
-from enum import StrEnum
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from dawei.core.datetime_compat import UTC
+from enum import Enum
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
+from typing import List, Dict, Any
 
 
 class ScheduleType(StrEnum):
@@ -51,7 +56,7 @@ class ScheduledTask:
 
     # 执行配置
     execution_type: str = "message"  # 仅支持 message
-    execution_data: dict[str, Any] | None = None  # 包含 message, llm, mode 等参数
+    execution_data: Dict[str, Any] | None = None  # 包含 message, llm, mode 等参数
 
     # 状态
     status: TriggerStatus = TriggerStatus.PENDING
@@ -68,10 +73,10 @@ class ScheduledTask:
     retry_interval: int | None = None  # 重试间隔（秒），默认指数退避
 
     # 元数据
-    tags: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] | None = None
+    tags: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """序列化为字典"""
         d = asdict(self)
         d["schedule_type"] = self.schedule_type.value
@@ -89,7 +94,7 @@ class ScheduledTask:
         return d
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ScheduledTask":
+    def from_dict(cls, data: Dict[str, Any]) -> "ScheduledTask":
         """从字典反序列化"""
         data = data.copy()
         data["schedule_type"] = ScheduleType(data["schedule_type"])

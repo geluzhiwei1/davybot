@@ -8,9 +8,10 @@
 
 import json
 import logging
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import List, Dict, TYPE_CHECKING, Any
 
 from dawei.conversation.conversation import Conversation, create_conversation
 from dawei.conversation.conversation_history_manager import ConversationHistoryManager
@@ -284,7 +285,7 @@ class WorkspaceConversationManager:
 
     # ==================== 对话查询方法 ====================
 
-    async def get_conversation_list(self) -> list[Conversation]:
+    async def get_conversation_list(self) -> List[Conversation]:
         """获取对话历史列表
 
         Returns:
@@ -306,7 +307,7 @@ class WorkspaceConversationManager:
         self,
         query: str,
         search_in_content: bool = False,
-    ) -> list[Conversation]:
+    ) -> List[Conversation]:
         """搜索对话
 
         Args:
@@ -344,7 +345,7 @@ class WorkspaceConversationManager:
 
     # ==================== 辅助方法 ====================
 
-    def _conversation_to_dict(self, conversation: Conversation) -> dict[str, Any]:
+    def _conversation_to_dict(self, conversation: Conversation) -> Dict[str, Any]:
         """将对话对象转换为字典格式"""
         # 处理时间戳 - 确保是字符串格式
         created_at = conversation.created_at
@@ -374,13 +375,13 @@ class WorkspaceConversationManager:
                 msg_dict = msg.to_dict()
 
             # 确保 content 字段是字符串格式(处理OpenAI格式的content对象)
-            if "content" in msg_dict and isinstance(msg_dict["content"], dict):
+            if "content" in msg_dict and isinstance(msg_Dict["content"], dict):
                 # OpenAI格式: {"type": "text", "text": "..."}
-                if msg_dict["content"].get("type") == "text":
-                    msg_dict["content"] = msg_dict["content"].get("text", "")
+                if msg_Dict["content"].get("type") == "text":
+                    msg_Dict["content"] = msg_Dict["content"].get("text", "")
                 else:
                     # 其他类型,转为JSON字符串
-                    msg_dict["content"] = json.dumps(msg_dict["content"])
+                    msg_Dict["content"] = json.dumps(msg_Dict["content"])
 
             messages_data.append(msg_dict)
 

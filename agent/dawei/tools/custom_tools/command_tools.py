@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import json
@@ -434,7 +435,7 @@ class ShellCommandInput(BaseModel):
     """Input schema for ShellCommandTool."""
 
     command: str = Field(..., description="Command to execute")
-    args: list[str] = Field(..., description="Command arguments as list")
+    args: List[str] = Field(..., description="Command arguments as list")
     cwd: str | None = Field(
         None,
         description="Working directory (ignored, always uses workspace)",
@@ -458,7 +459,7 @@ class ShellCommandTool(CustomBaseTool):
         "shell_command",
         fallback_value='{"status": "error", "message": "Failed to execute shell command"}',
     )
-    def _run(self, command: str, args: list[str], cwd: str | None = None) -> str:
+    def _run(self, command: str, args: List[str], cwd: str | None = None) -> str:
         """Execute shell command with arguments.
 
         Args:

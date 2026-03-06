@@ -11,9 +11,10 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei import get_dawei_home
 from dawei.core.decorators import safe_system_operation
@@ -38,9 +39,9 @@ class MCPConfig:
 
     server_name: str
     command: str
-    args: list[str] = field(default_factory=list)
+    args: List[str] = field(default_factory=list)
     cwd: str | None = None
-    always_allow: list[str] = field(default_factory=list)
+    always_allow: List[str] = field(default_factory=list)
     timeout: int = 300
     source_level: str = "user"  # user, workspace
 
@@ -48,7 +49,7 @@ class MCPConfig:
     def from_dict(
         cls,
         server_name: str,
-        config_dict: dict[str, Any],
+        config_dict: Dict[str, Any],
         source_level: str = "user",
     ) -> "MCPConfig":
         """从字典创建MCP配置"""
@@ -62,7 +63,7 @@ class MCPConfig:
             source_level=source_level,
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "server_name": self.server_name,
@@ -100,15 +101,15 @@ class MCPServerInfo:
     config: MCPConfig
     status: str = "disconnected"  # disconnected, connecting, connected, error
     last_error: str | None = None
-    tools: list[dict[str, Any]] = field(default_factory=list)
-    resources: list[dict[str, Any]] = field(default_factory=list)
+    tools: List[Dict[str, Any]] = field(default_factory=list)
+    resources: List[Dict[str, Any]] = field(default_factory=list)
     connected_at: datetime | None = None
     session: Any = None  # ClientSession instance
     read_stream: Any = None  # Read stream for stdio_client
     write_stream: Any = None  # Write stream for stdio_client
     client_context: Any = None  # stdio_client context manager
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "name": self.name,
@@ -125,8 +126,8 @@ class MCPConfigLoader:
     """MCP配置加载器"""
 
     def __init__(self):
-        self._cache: dict[str, dict[str, MCPConfig]] = {}
-        self._cache_timestamps: dict[str, datetime] = {}
+        self._cache: Dict[str, Dict[str, MCPConfig]] = {}
+        self._cache_timestamps: Dict[str, datetime] = {}
         self._cache_ttl = 300  # 5分钟缓存
 
     def _get_cache_key(self, level: str, path: str | None = None) -> str:
@@ -141,19 +142,19 @@ class MCPConfigLoader:
         age = (datetime.now(UTC) - self._cache_timestamps[cache_key]).total_seconds()
         return age < self._cache_ttl
 
-    def _set_cache(self, cache_key: str, configs: dict[str, MCPConfig]):
+    def _set_cache(self, cache_key: str, configs: Dict[str, MCPConfig]):
         """设置缓存"""
         self._cache[cache_key] = configs
         self._cache_timestamps[cache_key] = datetime.now(UTC)
 
-    def _get_cache(self, cache_key: str) -> dict[str, MCPConfig] | None:
+    def _get_cache(self, cache_key: str) -> Dict[str, MCPConfig] | None:
         """获取缓存"""
         if self._is_cache_valid(cache_key):
             return self._cache.get(cache_key)
         return None
 
     @safe_system_operation("load_user_mcp_configs", fallback_value={})
-    def load_user_mcp_configs(self) -> dict[str, MCPConfig]:
+    def load_user_mcp_configs(self) -> Dict[str, MCPConfig]:
         """加载用户级MCP配置"""
         dawei_home = get_dawei_home()
         user_config_dir = dawei_home / "configs"
@@ -184,7 +185,7 @@ class MCPConfigLoader:
         return configs
 
     @safe_system_operation("load_workspace_mcp_configs", fallback_value={})
-    def load_workspace_mcp_configs(self, workspace_path: str) -> dict[str, MCPConfig]:
+    def load_workspace_mcp_configs(self, workspace_path: str) -> Dict[str, MCPConfig]:
         """加载工作区级MCP配置"""
         workspace_dir = Path(workspace_path)
         # 保持与用户配置目录一致的路径结构
@@ -235,14 +236,14 @@ class MCPToolManager:
         self.loader = MCPConfigLoader()
 
         # 二级配置缓存
-        self._user_configs: dict[str, MCPConfig] = {}
-        self._workspace_configs: dict[str, MCPConfig] = {}
+        self._user_configs: Dict[str, MCPConfig] = {}
+        self._workspace_configs: Dict[str, MCPConfig] = {}
 
         # 合并后的配置
-        self._merged_configs: dict[str, MCPConfig] = {}
+        self._merged_configs: Dict[str, MCPConfig] = {}
 
         # 服务器信息
-        self._servers: dict[str, MCPServerInfo] = {}
+        self._servers: Dict[str, MCPServerInfo] = {}
 
         # 初始化配置
         self._load_all_configs()
@@ -310,7 +311,7 @@ class MCPToolManager:
         self._initialize_servers()
         logger.info(f"Workspace path set to {workspace_path}, MCP configs reloaded")
 
-    def get_all_configs(self) -> dict[str, MCPConfig]:
+    def get_all_configs(self) -> Dict[str, MCPConfig]:
         """获取所有合并后的MCP配置"""
         return self._merged_configs.copy()
 
@@ -318,14 +319,14 @@ class MCPToolManager:
         """获取指定服务器的MCP配置"""
         return self._merged_configs.get(server_name)
 
-    def get_config_sources(self, server_name: str) -> dict[str, bool]:
+    def get_config_sources(self, server_name: str) -> Dict[str, bool]:
         """获取MCP配置来源信息"""
         return {
             "user": server_name in self._user_configs,
             "workspace": server_name in self._workspace_configs,
         }
 
-    def get_config_override_info(self, server_name: str) -> dict[str, Any]:
+    def get_config_override_info(self, server_name: str) -> Dict[str, Any]:
         """获取MCP配置覆盖的详细信息"""
         sources = self.get_config_sources(server_name)
         active_source = None
@@ -351,7 +352,7 @@ class MCPToolManager:
             "is_overridden": sum(sources.values()) > 1,
         }
 
-    def get_all_override_info(self) -> list[dict[str, Any]]:
+    def get_all_override_info(self) -> List[Dict[str, Any]]:
         """获取所有MCP配置的覆盖信息"""
         override_info = []
 
@@ -366,11 +367,11 @@ class MCPToolManager:
         """获取服务器信息"""
         return self._servers.get(server_name)
 
-    def get_all_servers(self) -> dict[str, MCPServerInfo]:
+    def get_all_servers(self) -> Dict[str, MCPServerInfo]:
         """获取所有服务器信息"""
         return self._servers.copy()
 
-    def get_servers_by_status(self, status: str) -> list[MCPServerInfo]:
+    def get_servers_by_status(self, status: str) -> List[MCPServerInfo]:
         """按状态获取服务器"""
         return [server for server in self._servers.values() if server.status == status]
 
@@ -511,7 +512,7 @@ class MCPToolManager:
             server_info.last_error = str(e)
             return False
 
-    async def connect_all_servers(self) -> dict[str, bool]:
+    async def connect_all_servers(self) -> Dict[str, bool]:
         """连接所有服务器"""
         results = {}
 
@@ -520,7 +521,7 @@ class MCPToolManager:
 
         return results
 
-    async def disconnect_all_servers(self) -> dict[str, bool]:
+    async def disconnect_all_servers(self) -> Dict[str, bool]:
         """断开所有服务器连接"""
         results = {}
 
@@ -535,7 +536,7 @@ class MCPToolManager:
         self._load_all_configs()
         logger.info("All MCP configurations reloaded")
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """获取MCP统计信息"""
         # 统计覆盖情况
         override_info = self.get_all_override_info()
@@ -562,8 +563,8 @@ class MCPToolManager:
         }
 
     async def call_tool(
-        self, server_name: str, tool_name: str, arguments: dict[str, Any]
-    ) -> dict[str, Any]:
+        self, server_name: str, tool_name: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """调用MCP工具
 
         Args:
@@ -612,7 +613,7 @@ class MCPToolManager:
                 "error": str(e),
             }
 
-    async def access_resource(self, server_name: str, uri: str) -> dict[str, Any]:
+    async def access_resource(self, server_name: str, uri: str) -> Dict[str, Any]:
         """访问MCP资源
 
         Args:
@@ -658,7 +659,7 @@ class MCPToolManager:
                 "error": str(e),
             }
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "workspace_path": self.workspace_path,

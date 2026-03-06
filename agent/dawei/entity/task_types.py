@@ -12,9 +12,10 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import List, Dict, TYPE_CHECKING, Any
 
 # 只在类型检查时导入，避免运行时循环导入
 if TYPE_CHECKING:
@@ -79,7 +80,7 @@ class ToolCall:
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
-    parameters: dict[str, Any] = field(default_factory=dict)
+    parameters: Dict[str, Any] = field(default_factory=dict)
     result: Any | None = None
     error: str | None = None
     status: str = "pending"  # pending, executing, completed, failed
@@ -116,7 +117,7 @@ class EventEmitter:
     """事件发射器"""
 
     def __init__(self):
-        self._listeners: dict[str, list[Callable]] = {}
+        self._listeners: Dict[str, List[Callable]] = {}
         self._websocket_callback: Callable | None = None
 
     def on(self, event_type: str, callback: Callable):
@@ -171,7 +172,7 @@ class Tool(ABC):
         """工具描述"""
 
     @abstractmethod
-    async def execute(self, parameters: dict[str, Any], context: TaskContext) -> Any:
+    async def execute(self, parameters: Dict[str, Any], context: TaskContext) -> Any:
         """执行工具"""
 
 
@@ -179,15 +180,15 @@ class MessageQueueService:
     """消息队列服务"""
 
     def __init__(self):
-        self._messages: list[dict[str, Any]] = []
-        self._state_changed_handlers: list[Callable] = []
+        self._messages: List[Dict[str, Any]] = []
+        self._state_changed_handlers: List[Callable] = []
 
-    def enqueue(self, message: dict[str, Any]):
+    def enqueue(self, message: Dict[str, Any]):
         """入队消息"""
         self._messages.append(message)
         self._notify_state_changed()
 
-    def dequeue(self) -> dict[str, Any] | None:
+    def dequeue(self) -> Dict[str, Any] | None:
         """出队消息"""
         if self._messages:
             return self._messages.pop(0)
@@ -215,15 +216,15 @@ class CheckpointService(ABC):
     """检查点服务抽象接口"""
 
     @abstractmethod
-    async def create(self, task_id: str, state: dict[str, Any], force: bool = False) -> str:
+    async def create(self, task_id: str, state: Dict[str, Any], force: bool = False) -> str:
         """创建检查点"""
 
     @abstractmethod
-    async def restore(self, checkpoint_id: str) -> dict[str, Any] | None:
+    async def restore(self, checkpoint_id: str) -> Dict[str, Any] | None:
         """恢复检查点"""
 
     @abstractmethod
-    async def list(self, task_id: str) -> list[dict[str, Any]]:
+    async def list(self, task_id: str) -> List[Dict[str, Any]]:
         """列出检查点"""
 
     @abstractmethod
@@ -276,7 +277,7 @@ class SkillCall:
     """Claude Skill 调用信息"""
 
     skill_name: str
-    parameters: dict[str, Any]
+    parameters: Dict[str, Any]
     result: Any | None = None
     error: str | None = None
     execution_time: float = 0.0
@@ -288,7 +289,7 @@ class MCPRequest:
 
     server_name: str
     method: str
-    parameters: dict[str, Any]
+    parameters: Dict[str, Any]
     result: Any | None = None
     error: str | None = None
 
@@ -297,14 +298,14 @@ class MCPRequest:
 class TaskExecutionPlan:
     """任务执行计划"""
 
-    steps: list[dict[str, Any]]
+    steps: List[Dict[str, Any]]
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def add_step(self, step: dict[str, Any]) -> None:
+    def add_step(self, step: Dict[str, Any]) -> None:
         """添加执行步骤"""
         self.steps.append(step)
 
-    def get_step(self, index: int) -> dict[str, Any] | None:
+    def get_step(self, index: int) -> Dict[str, Any] | None:
         """获取指定索引的步骤"""
         if 0 <= index < len(self.steps):
             return self.steps[index]
@@ -327,8 +328,8 @@ class TaskSummary:
     skill_calls: int
     mcp_requests: int
     subtasks_created: int
-    tool_usage: dict[str, dict[str, int]]
-    token_usage: dict[str, Any]
+    tool_usage: Dict[str, Dict[str, int]]
+    token_usage: Dict[str, Any]
     completed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -340,10 +341,10 @@ class TaskState:
     status: str
     initial_mode: str
     current_mode: str
-    messages: list[Any]  # 使用 Any 避免循环导入
-    mode_history: list[dict[str, Any]]
-    skill_calls: list[dict[str, Any]]
-    mcp_requests: list[dict[str, Any]]
-    tool_usage: dict[str, dict[str, int]]
-    token_usage: dict[str, Any]
+    messages: List[Any]  # 使用 Any 避免循环导入
+    mode_history: List[Dict[str, Any]]
+    skill_calls: List[Dict[str, Any]]
+    mcp_requests: List[Dict[str, Any]]
+    tool_usage: Dict[str, Dict[str, int]]
+    token_usage: Dict[str, Any]
     saved_at: datetime = field(default_factory=lambda: datetime.now(UTC))

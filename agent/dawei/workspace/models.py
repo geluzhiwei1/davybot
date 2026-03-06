@@ -33,7 +33,7 @@ class WorkspaceInfo:
     description: str
     created_at: datetime
     is_active: bool = True
-    files_list: list[str] = field(default_factory=list)
+    files_list: List[str] = field(default_factory=list)
     system_environments: SystemEnvironments = field(
         default_factory=SystemEnvironments,
     )  # 系统后端环境如os,python,内存等
@@ -45,7 +45,7 @@ class WorkspaceInfo:
     )  # 用户前端动态上下文信息如打开的文件当前文件选中内容当前模式等
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "WorkspaceInfo":
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkspaceInfo":
         """从字典创建工作区信息"""
         created_at = data.get("created_at")
         if isinstance(created_at, str):
@@ -78,7 +78,7 @@ class WorkspaceInfo:
             user_ui_context=user_ui_context,
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
             "id": self.id,
@@ -115,8 +115,8 @@ class WorkspaceSettings:
     always_allow_followup_questions: bool = True
     followup_auto_approve_timeout_ms: int = 60000
     always_allow_update_todo_list: bool = True
-    allowed_commands: list[str] = field(default_factory=list)
-    denied_commands: list[str] = field(default_factory=list)
+    allowed_commands: List[str] = field(default_factory=list)
+    denied_commands: List[str] = field(default_factory=list)
     max_concurrent_file_reads: int = 5
     max_workspace_files: int = 200
     max_read_file_line: int = -1
@@ -139,7 +139,7 @@ class WorkspaceSettings:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, config_dict: dict[str, Any]) -> "WorkspaceSettings":
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "WorkspaceSettings":
         """从字典创建工作区设置"""
         return cls(
             auto_approval_enabled=config_dict.get("autoApprovalEnabled", True),
@@ -290,7 +290,7 @@ class PluginInstanceConfig(BaseModel):
 
     enabled: bool = True
     activated: bool = False
-    settings: dict[str, Any] = Field(default_factory=dict)
+    settings: Dict[str, Any] = Field(default_factory=dict)
     version: str | None = None
     install_path: str | None = None
 
@@ -304,7 +304,7 @@ class PluginsConfig(BaseModel):
     - 灵活扩展：每个插件可以有自己独特的配置字段
     """
 
-    plugins: dict[str, PluginInstanceConfig] = Field(default_factory=dict)
+    plugins: Dict[str, PluginInstanceConfig] = Field(default_factory=dict)
 
     def get_plugin_config(self, plugin_id: str) -> PluginInstanceConfig | None:
         """获取指定插件的配置
@@ -356,7 +356,7 @@ class WorkspaceConfig(BaseModel):
     plugins: PluginsConfig = Field(default_factory=PluginsConfig)
 
     @classmethod
-    def from_dict(cls, config_dict: dict[str, Any] | None) -> "WorkspaceConfig":
+    def from_dict(cls, config_dict: Dict[str, Any] | None) -> "WorkspaceConfig":
         """从字典创建配置合并默认值
 
         Args:
@@ -374,10 +374,10 @@ class WorkspaceConfig(BaseModel):
         # 更新提供的配置节
         update_data = {}
         for key in cls.model_fields:
-            if key in config_dict and isinstance(config_dict[key], dict):
+            if key in config_dict and isinstance(config_Dict[key], dict):
                 # 合并配置节（保留默认值只更新提供的字段）
                 default_section = getattr(default_config, key).model_dump()
-                update_data[key] = {**default_section, **config_dict[key]}
+                update_data[key] = {**default_section, **config_Dict[key]}
 
         # 特殊处理：插件配置从独立文件加载
         # 插件配置保存在 .dawei/plugins/{plugin_id}.json
@@ -385,7 +385,7 @@ class WorkspaceConfig(BaseModel):
 
         return cls(**update_data)
 
-    def model_dump_custom(self) -> dict[str, Any]:
+    def model_dump_custom(self) -> Dict[str, Any]:
         """转换为字典（自定义序列化）
 
         Returns:

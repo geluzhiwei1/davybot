@@ -9,7 +9,7 @@
 
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.agent import Agent
 from dawei.core import local_context
@@ -67,7 +67,7 @@ class EventForwardingHandler:
         session_id: str,
         task_id: str,
         pdca_phase_callback: Callable | None = None,
-    ) -> dict[str, str]:
+    ) -> Dict[str, str]:
         """为 Agent 设置事件监听器，将任务事件转发到 WebSocket 客户端
 
         Args:

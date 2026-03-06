@@ -8,12 +8,18 @@
 import json
 import os
 import time
-from enum import StrEnum
-from typing import Any, Optional
+from enum import Enum
+from typing import List, Dict, Any, Optional
 
 # ============================================================================
 # Agent 模式枚举
 # ============================================================================
+
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+
+    pass
 
 
 class AgentMode(StrEnum):
@@ -35,7 +41,7 @@ class Config:
     所有配置项都在同一层级，没有嵌套结构
     """
 
-    def __init__(self, config_dict: dict[str, Any] | None = None):
+    def __init__(self, config_dict: Dict[str, Any] | None = None):
         # 默认配置
         # Agent 模式配置（支持PDCA循环）
         self.mode = AgentMode.ORCHESTRATOR  # 默认 Orchestrator 模式
@@ -107,7 +113,7 @@ class Config:
         # 应用环境变量覆盖
         self.apply_env_overrides()
 
-    def update_from_dict(self, config_dict: dict[str, Any]):
+    def update_from_dict(self, config_dict: Dict[str, Any]):
         """从字典更新配置
 
         Args:
@@ -270,7 +276,7 @@ class Config:
 
         self._last_modified = time.time()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典
 
         Returns:
@@ -337,7 +343,7 @@ class Config:
             print(f"Failed to load config from {file_path}: {e}")
             return None
 
-    def validate(self) -> dict[str, list[str]]:
+    def validate(self) -> Dict[str, List[str]]:
         """验证配置有效性
 
         Returns:
@@ -356,7 +362,7 @@ class Config:
 
         return errors
 
-    def _validate_retry_config(self) -> dict[str, list[str]]:
+    def _validate_retry_config(self) -> Dict[str, List[str]]:
         """验证重试配置"""
         errors = []
         if self.max_retries < 0:
@@ -369,7 +375,7 @@ class Config:
             errors.append("max_delay must be >= retry_delay")
         return {"retry": errors} if errors else {}
 
-    def _validate_checkpoint_config(self) -> dict[str, list[str]]:
+    def _validate_checkpoint_config(self) -> Dict[str, List[str]]:
         """验证检查点配置"""
         errors = []
         if self.checkpoint_interval < 10:
@@ -382,7 +388,7 @@ class Config:
             errors.append("max_checkpoints_per_task must be >= 1")
         return {"checkpoint": errors} if errors else {}
 
-    def _validate_context_config(self) -> dict[str, list[str]]:
+    def _validate_context_config(self) -> Dict[str, List[str]]:
         """验证上下文配置"""
         errors = []
         if self.max_context_tokens < 1000:
@@ -401,14 +407,14 @@ class Config:
 
         return {"context": errors} if errors else {}
 
-    def _validate_timeout_config(self) -> dict[str, list[str]]:
+    def _validate_timeout_config(self) -> Dict[str, List[str]]:
         """验证超时配置"""
         errors = []
         if self.tool_execution_timeout < 1:
             errors.append("tool_execution_timeout must be >= 1 second")
         return {"timeout": errors} if errors else {}
 
-    def _validate_logging_config(self) -> dict[str, list[str]]:
+    def _validate_logging_config(self) -> Dict[str, List[str]]:
         """验证日志配置"""
         errors = []
         valid_log_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -416,7 +422,7 @@ class Config:
             errors.append(f"log_level must be one of {valid_log_levels}")
         return {"logging": errors} if errors else {}
 
-    def _validate_task_execution_config(self) -> dict[str, list[str]]:
+    def _validate_task_execution_config(self) -> Dict[str, List[str]]:
         """验证任务执行配置"""
         errors = []
         if self.max_concurrent_subtasks < 1:
@@ -506,7 +512,7 @@ def create_default_config() -> Config:
     return Config()
 
 
-def create_config_from_dict(config_dict: dict[str, Any]) -> Config:
+def create_config_from_dict(config_dict: Dict[str, Any]) -> Config:
     """从字典创建配置
 
     Args:

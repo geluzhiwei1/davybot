@@ -8,7 +8,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any
+from typing import List, Dict, Any
 
 
 class IToolExecutor(ABC):
@@ -21,9 +21,9 @@ class IToolExecutor(ABC):
     async def execute_tool(
         self,
         tool_name: str,
-        tool_args: dict[str, Any],
+        tool_args: Dict[str, Any],
         timeout: float | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """执行工具
 
         Args:
@@ -37,7 +37,7 @@ class IToolExecutor(ABC):
         """
 
     @abstractmethod
-    def list_available_tools(self) -> list[str]:
+    def list_available_tools(self) -> List[str]:
         """列出所有可用工具
 
         Returns:
@@ -46,7 +46,7 @@ class IToolExecutor(ABC):
         """
 
     @abstractmethod
-    def get_tool_schema(self, tool_name: str) -> dict[str, Any] | None:
+    def get_tool_schema(self, tool_name: str) -> Dict[str, Any] | None:
         """获取工具模式
 
         Args:

@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Smart File Editor - Specialized tool for editing large files using diff-based approach
@@ -30,7 +31,7 @@ class SmartFileEditInput(BaseModel):
     """Input for SmartFileEditTool."""
 
     file_path: str = Field(..., description="Path to file to edit (relative to workspace).")
-    edits: list[dict[str, str]] = Field(
+    edits: List[Dict[str, str]] = Field(
         ...,
         description="List of edits to apply. Each edit should have 'search' and 'replace' fields.",
     )
@@ -99,7 +100,7 @@ edits = [
     args_schema: type[BaseModel] = SmartFileEditInput
 
     @safe_tool_operation("smart_file_edit", fallback_value="Error: Failed to edit file")
-    def _run(self, file_path: str, edits: list[dict[str, str]], _chunk_size: int = 50) -> str:
+    def _run(self, file_path: str, edits: List[Dict[str, str]], _chunk_size: int = 50) -> str:
         """Smart edit file using diff-based approach."""
         # Get workspace directory from context
         workspace_dir = None

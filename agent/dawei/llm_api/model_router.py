@@ -11,9 +11,13 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
 
 from dawei import get_dawei_home
 
@@ -137,7 +141,7 @@ class ModelRouter:
     def __init__(
         self,
         config: RouterConfig,
-        cost_config: dict[str, ModelCost] | None = None,
+        cost_config: Dict[str, ModelCost] | None = None,
         user_default_model: str | None = None,
     ):
         """初始化模型路由器
@@ -201,7 +205,7 @@ class ModelRouter:
         context_length: int = 0,
         task_type: TaskType | None = None,
         is_critical: bool = False,
-        available_models: list[str] | None = None,
+        available_models: List[str] | None = None,
     ) -> ModelSelection:
         """根据任务特征选择最优模型
 
@@ -330,7 +334,7 @@ class ModelRouter:
         }
         return mapping.get(task_type)
 
-    def _contains_keywords(self, text: str, keywords: list[str]) -> bool:
+    def _contains_keywords(self, text: str, keywords: List[str]) -> bool:
         """检查文本是否包含关键词"""
         text_lower = text.lower()
         return any(kw.lower() in text_lower for kw in keywords)
@@ -396,7 +400,7 @@ class ModelRouter:
         input_tokens: int,
         output_tokens: int,
         alternative_model: str = "anthropic/claude-opus-4",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """计算成本节省
 
         Args:
@@ -482,7 +486,7 @@ class ModelRouter:
         self.model_health[model] = True
         self.model_failure_count[model] = 0
 
-    def get_model_health_status(self) -> dict[str, dict[str, Any]]:
+    def get_model_health_status(self) -> Dict[str, Dict[str, Any]]:
         """获取所有模型的健康状态
 
         Returns:
@@ -556,7 +560,7 @@ def load_model_router_config(workspace_path: Path | str) -> RouterConfig:
     return RouterConfig(default="deepseek-chat")
 
 
-def load_cost_config(config_path: Path | None = None) -> dict[str, ModelCost]:
+def load_cost_config(config_path: Path | None = None) -> Dict[str, ModelCost]:
     """加载模型定价配置
 
     Args:

@@ -6,7 +6,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 from urllib.parse import urlparse
 
 import yaml
@@ -61,14 +61,14 @@ class UpdateModeRequest(BaseModel):
     description: str
     roleDefinition: str
     whenToUse: str
-    groups: list[str] | None = None
+    groups: List[str] | None = None
     customInstructions: str | None = None
 
 
 class UpdateModeRulesRequest(BaseModel):
     """更新模式规则请求（支持多个文件）"""
 
-    rules: dict[str, str]  # key 是完整文件名（含 .md 扩展名），value 是文件内容
+    rules: Dict[str, str]  # key 是完整文件名（含 .md 扩展名），value 是文件内容
 
 
 class ModeResponse(BaseModel):
@@ -76,14 +76,14 @@ class ModeResponse(BaseModel):
 
     success: bool
     message: str
-    mode: dict[str, Any] | None = None
+    mode: Dict[str, Any] | None = None
 
 
 class ModeRulesResponse(BaseModel):
     """模式规则响应"""
 
     success: bool
-    rules: dict[str, str]  # key 是完整文件名（含 .md 扩展名），value 是文件内容
+    rules: Dict[str, str]  # key 是完整文件名（含 .md 扩展名），value 是文件内容
     directory: str | None = None  # 规则目录路径
 
 
@@ -616,7 +616,7 @@ async def get_proxy_config(
 @router.put("/{workspace_id}/proxy")
 async def update_proxy_config(
     workspace_id: str,
-    proxy_update: dict[str, Any],
+    proxy_update: Dict[str, Any],
     workspace: UserWorkspace = Depends(get_user_workspace),
 ):
     """更新工作区代理配置"""

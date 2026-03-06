@@ -8,7 +8,7 @@ UI环境设置和配置管理
 
 import json
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -28,16 +28,16 @@ router = APIRouter(tags=["workspaces-ui"])
 class UIEnvironmentsUpdate(BaseModel):
     """更新UI环境的请求模型"""
 
-    environments: dict[str, dict[str, str]] | None = None
+    environments: Dict[str, Dict[str, str]] | None = None
     activeEnvironment: str | None = None
 
 
 class UIContextUpdate(BaseModel):
     """更新UI上下文的请求模型"""
 
-    context: dict[str, Any] | None = None
+    context: Dict[str, Any] | None = None
     currentFile: str | None = None
-    openFiles: list[str] | None = None
+    openFiles: List[str] | None = None
 
 
 class SystemEnvironmentsUpdate(BaseModel):

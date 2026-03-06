@@ -4,7 +4,7 @@
 """存储提供者抽象基类"""
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import List, Dict, Any
 
 
 class Storage(ABC):
@@ -19,7 +19,7 @@ class Storage(ABC):
         recursive: bool = False,
         include_hidden: bool = False,
         max_depth: int = 3,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """列出目录内容"""
 
     @abstractmethod

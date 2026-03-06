@@ -11,7 +11,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 # ============================================================================
 # CRITICAL FIX: Chinese IME support on Windows
@@ -174,7 +174,7 @@ class GeweiTUIApp(App):
     SUB_TITLE = "Agent"
 
     # Event handler registry - maps event types to handler methods
-    EVENT_HANDLERS: ClassVar[dict[TaskEventType, str]] = {
+    EVENT_HANDLERS: ClassVar[Dict[TaskEventType, str]] = {
         TaskEventType.CONTENT_STREAM: "_handle_content_stream",
         TaskEventType.REASONING: "_handle_reasoning",
         TaskEventType.TOOL_CALL_START: "_handle_tool_start",
@@ -194,7 +194,7 @@ class GeweiTUIApp(App):
     }
 
     # Command handler registry - maps command actions to handler methods
-    COMMAND_HANDLERS: ClassVar[dict[str, str]] = {
+    COMMAND_HANDLERS: ClassVar[Dict[str, str]] = {
         "pdca.status": "_show_pdca_status",
         "pdca.disable": "_toggle_pdca_off",
         "pdca.enable": "_toggle_pdca_on",

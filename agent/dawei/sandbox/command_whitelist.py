@@ -21,14 +21,14 @@
 
 import re
 import shlex
-from typing import ClassVar
+from typing import List, Dict, ClassVar
 
 
 class CommandWhitelist:
     """命令白名单管理器"""
 
     # 允许的命令及其配置
-    ALLOWED_COMMANDS: ClassVar[dict[str, dict[str, any]]] = {
+    ALLOWED_COMMANDS: ClassVar[Dict[str, Dict[str, any]]] = {
         # 文件操作
         "ls": {
             "max_args": 10,
@@ -416,16 +416,16 @@ class CommandWhitelist:
             return False, f"输入验证错误: {e!s}"
 
     @classmethod
-    def get_command_info(cls, command_name: str) -> dict[str, any]:
+    def get_command_info(cls, command_name: str) -> Dict[str, any]:
         """获取命令配置信息"""
         return cls.ALLOWED_COMMANDS.get(command_name, {})
 
     @classmethod
-    def list_allowed_commands(cls) -> list[str]:
+    def list_allowed_commands(cls) -> List[str]:
         """列出所有允许的命令"""
         return sorted(cls.ALLOWED_COMMANDS.keys())
 
     @classmethod
-    def list_dangerous_commands(cls) -> list[str]:
+    def list_dangerous_commands(cls) -> List[str]:
         """列出所有危险命令"""
         return sorted(cls.DANGEROUS_COMMANDS)

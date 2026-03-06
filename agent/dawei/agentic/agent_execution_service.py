@@ -8,8 +8,9 @@
 """
 
 import uuid
-from datetime import UTC, datetime
-from typing import Any
+from datetime import datetime
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.agentic.agent import Agent
 from dawei.conversation.conversation import Conversation
@@ -52,7 +53,7 @@ class AgentExecutionService:
         llm: str | None = None,
         mode: str | None = None,
         event_callback: Any | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """执行 Agent 任务（统一入口）
 
         这是 UI 任务和定时任务共用的核心执行逻辑。

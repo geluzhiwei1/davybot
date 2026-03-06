@@ -8,8 +8,9 @@
 
 import time
 import uuid
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from dawei.core.events import TaskEvent
 from dawei.sandbox.lightweight_executor import LightweightSandbox
@@ -108,13 +109,13 @@ class ChatHandler(AsyncMessageHandler):
         super().__init__(max_concurrent_tasks=_max_tasks)
 
         # 存储活跃的 Agent 实例
-        self._active_agents: dict[str, Agent] = {}
+        self._active_agents: Dict[str, Agent] = {}
 
         # 存储任务ID到会话ID的映射，用于回调中查找正确的会话ID
-        self._task_to_session_map: dict[str, str] = {}
+        self._task_to_session_map: Dict[str, str] = {}
 
         # 🔧 修复：存储任务ID到事件处理器ID的映射，用于清理
-        self._task_event_handler_ids: dict[str, dict[str, str]] = {}
+        self._task_event_handler_ids: Dict[str, Dict[str, str]] = {}
 
         # 初始化异步任务管理器
         self._task_manager = AsyncTaskManager()
@@ -129,7 +130,7 @@ class ChatHandler(AsyncMessageHandler):
         self.sandbox_executor = LightweightSandbox()
         logger.info("[CHAT_HANDLER] LightweightSandbox initialized (no Docker required)")
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         """获取支持的消息类型"""
         return [
             MessageType.USER_MESSAGE,
@@ -1424,7 +1425,7 @@ class ChatHandler(AsyncMessageHandler):
 
     async def _execute_agent_task(
         self,
-        parameters: dict[str, Any],
+        parameters: Dict[str, Any],
         _context: Any = None,
     ) -> None:
         """执行Agent任务（适配AsyncTaskManager的执行器接口）
@@ -2475,7 +2476,7 @@ class ChatHandler(AsyncMessageHandler):
 class ConnectHandler(AsyncMessageHandler):
     """处理客户端连接成功后的 'connect' 消息。"""
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         return [MessageType.CONNECT]
 
     async def process_message(

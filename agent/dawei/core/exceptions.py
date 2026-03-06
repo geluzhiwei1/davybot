@@ -6,13 +6,13 @@
 Avoids generic Exception catching for better error handling.
 """
 
-from typing import Any
+from typing import List, Dict, Any
 
 
 class BaseError(Exception):
     """Base class for all custom exceptions."""
 
-    def __init__(self, message: str, details: dict[str, Any] | None = None):
+    def __init__(self, message: str, details: Dict[str, Any] | None = None):
         self.message = message
         self.details = details or {}
         super().__init__(self.message)

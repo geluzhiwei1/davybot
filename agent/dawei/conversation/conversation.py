@@ -4,8 +4,9 @@
 import json
 import re
 import uuid
-from datetime import UTC, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from typing import List, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -47,11 +48,11 @@ class Conversation(BaseModel):
     llm_model: str | None = Field(None, description="使用的LLM模型")
 
     # 消息相关
-    messages: list[LLMMessage] = Field(default_factory=list, description="消息列表")
+    messages: List[LLMMessage] = Field(default_factory=list, description="消息列表")
     message_count: int = Field(default=0, description="消息数量")
 
     # 额外元数据
-    metadata: dict[str, Any] = Field(default_factory=dict, description="额外的元数据")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="额外的元数据")
 
     class Config:
         arbitrary_types_allowed = True
@@ -72,22 +73,22 @@ class Conversation(BaseModel):
         return self.messages[0] if self.messages else None
 
     @property
-    def user_messages(self) -> list[UserMessage]:
+    def user_messages(self) -> List[UserMessage]:
         """获取所有用户消息"""
         return [msg for msg in self.messages if isinstance(msg, UserMessage)]
 
     @property
-    def assistant_messages(self) -> list[AssistantMessage]:
+    def assistant_messages(self) -> List[AssistantMessage]:
         """获取所有助手消息"""
         return [msg for msg in self.messages if isinstance(msg, AssistantMessage)]
 
     @property
-    def system_messages(self) -> list[SystemMessage]:
+    def system_messages(self) -> List[SystemMessage]:
         """获取所有系统消息"""
         return [msg for msg in self.messages if isinstance(msg, SystemMessage)]
 
     @property
-    def tool_messages(self) -> list[ToolMessage]:
+    def tool_messages(self) -> List[ToolMessage]:
         """获取所有工具消息"""
         return [msg for msg in self.messages if isinstance(msg, ToolMessage)]
 
@@ -222,7 +223,7 @@ class Conversation(BaseModel):
             return self.messages[index]
         return None
 
-    def get_messages_by_role(self, role: MessageRole) -> list[LLMMessage]:
+    def get_messages_by_role(self, role: MessageRole) -> List[LLMMessage]:
         """根据角色获取消息
 
         Args:
@@ -244,7 +245,7 @@ class Conversation(BaseModel):
             return [msg for msg in self.messages if isinstance(msg, target_class)]
         return []
 
-    def get_recent_messages(self, count: int = 10) -> list[LLMMessage]:
+    def get_recent_messages(self, count: int = 10) -> List[LLMMessage]:
         """获取最近的消息
 
         Args:
@@ -291,9 +292,9 @@ class Conversation(BaseModel):
 
             # 添加时间戳和ID（如果消息没有的话）
             if "timestamp" not in msg_dict:
-                msg_dict["timestamp"] = datetime.now(UTC).isoformat()
+                msg_Dict["timestamp"] = datetime.now(UTC).isoformat()
             if "id" not in msg_dict:
-                msg_dict["id"] = str(uuid.uuid4())
+                msg_Dict["id"] = str(uuid.uuid4())
             messages_data.append(msg_dict)
 
         # 构建完整的对话数据
@@ -326,7 +327,7 @@ class Conversation(BaseModel):
         return cls.from_dict(data)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Conversation":
+    def from_dict(cls, data: Dict[str, Any]) -> "Conversation":
         """从字典创建对话对象
 
         Args:
@@ -380,7 +381,7 @@ class Conversation(BaseModel):
         return conversation
 
     @staticmethod
-    def _parse_message_from_dict(msg_data: dict[str, Any]) -> LLMMessage | None:
+    def _parse_message_from_dict(msg_data: Dict[str, Any]) -> LLMMessage | None:
         """从字典解析消息对象
 
         Args:
@@ -409,7 +410,7 @@ class Conversation(BaseModel):
             additional_kwargs=msg_data.get("additional_kwargs", {}),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """将对话转换为字典格式
 
         Returns:
@@ -422,9 +423,9 @@ class Conversation(BaseModel):
             msg_dict = msg.to_dict()
             # 添加时间戳和ID（如果消息没有的话）
             if "timestamp" not in msg_dict:
-                msg_dict["timestamp"] = datetime.now(UTC).isoformat()
+                msg_Dict["timestamp"] = datetime.now(UTC).isoformat()
             if "id" not in msg_dict:
-                msg_dict["id"] = str(uuid.uuid4())
+                msg_Dict["id"] = str(uuid.uuid4())
             messages_data.append(msg_dict)
 
         return {
@@ -439,7 +440,7 @@ class Conversation(BaseModel):
             "metadata": self.metadata,
         }
 
-    def get_conversation_summary(self) -> dict[str, Any]:
+    def get_conversation_summary(self) -> Dict[str, Any]:
         """获取对话摘要信息
 
         Returns:

@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Scheduled Task Storage
@@ -31,7 +32,7 @@ class ScheduledTaskStorage:
         """
         self.workspace_path = Path(workspace_path)
         self.persistence = WorkspacePersistenceManager(str(workspace_path))
-        self._cache: dict[str, ScheduledTask] = {}
+        self._cache: Dict[str, ScheduledTask] = {}
         self._loaded = False
 
     async def _ensure_loaded(self, fail_on_error: bool = False) -> None:
@@ -118,7 +119,7 @@ class ScheduledTaskStorage:
         await self._ensure_loaded()
         return self._cache.get(task_id)
 
-    async def list_tasks(self) -> list[ScheduledTask]:
+    async def list_tasks(self) -> List[ScheduledTask]:
         """列出所有任务
 
         Returns:
@@ -148,7 +149,7 @@ class ScheduledTaskStorage:
 
         return success
 
-    async def get_due_tasks(self) -> list[ScheduledTask]:
+    async def get_due_tasks(self) -> List[ScheduledTask]:
         """获取到期任务
 
         Returns:
@@ -158,7 +159,7 @@ class ScheduledTaskStorage:
         await self._ensure_loaded()
         return [t for t in self._cache.values() if t.is_due()]
 
-    async def get_pending_tasks(self) -> list[ScheduledTask]:
+    async def get_pending_tasks(self) -> List[ScheduledTask]:
         """获取待处理任务
 
         Returns:

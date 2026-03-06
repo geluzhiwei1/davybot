@@ -7,7 +7,7 @@
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
@@ -84,7 +84,7 @@ class FileStorageConfig(BaseSettings):
 
     upload_dir: str = Field(default="./uploads")
     max_file_size: int = Field(default=10485760)  # 10MB
-    allowed_file_types: list[str] = Field(default=["pdf", "doc", "docx", "txt"])
+    allowed_file_types: List[str] = Field(default=["pdf", "doc", "docx", "txt"])
 
     @field_validator("allowed_file_types", mode="before")
     @classmethod
@@ -337,7 +337,7 @@ class AgentRetryConfig(BaseSettings):
     retry_backoff_factor: float = Field(default=2.0)
     max_delay: float = Field(default=60.0)
     jitter: bool = Field(default=True)
-    retryable_errors: list[str] = Field(
+    retryable_errors: List[str] = Field(
         default=["LLMTimeoutError", "LLMConnectionError", "APIError", "LLMRateLimitError"],
     )
     backoff_strategy: str = Field(default="exponential")
@@ -428,6 +428,46 @@ class MemoryConfig(BaseSettings):
 
 
 # ============================================================================
+# Knowledge Configuration
+# ============================================================================
+
+
+class KnowledgeConfig(BaseSettings):
+    """知识库系统配置"""
+
+    model_config = ConfigDict(
+        env_prefix="KNOWLEDGE_",
+        env_file=[".env", "services/agent-api/.env"],
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="allow",
+    )
+
+    enabled: bool = Field(default=False)
+    vector_store_type: str = Field(default="sqlite-vec")
+    embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
+    dimension: int = Field(default=384)
+
+    # 分块配置
+    chunk_size: int = Field(default=500)
+    chunk_overlap: int = Field(default=50)
+
+    # 检索配置
+    default_top_k: int = Field(default=5)
+    retrieval_mode: str = Field(default="hybrid")
+
+    # RAG 配置
+    rag_context_length: int = Field(default=2000)
+
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def parse_bool(cls, v):
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return v
+
+
+# ============================================================================
 # Skills Configuration
 # ============================================================================
 
@@ -477,7 +517,7 @@ class ToolConfig(BaseSettings):
     )
 
     # 始终可用的工具
-    always_available_tools: list[str] = Field(
+    always_available_tools: List[str] = Field(
         default_factory=lambda: [
             "ask_followup_question",
             "attempt_completion",
@@ -527,7 +567,7 @@ class AnalyticsConfig(BaseSettings):
     anonymize_sanitize_errors: bool = Field(default=True)
 
     # 允许的事件
-    allowed_events: list[str] = Field(
+    allowed_events: List[str] = Field(
         default_factory=lambda: [
             "session_start",
             "session_end",
@@ -590,7 +630,7 @@ class AppConfig(BaseSettings):
     reload: bool = Field(default=True)
 
     # CORS配置
-    cors_origins: list[str] = Field(default=["*"])
+    cors_origins: List[str] = Field(default=["*"])
 
     workspaces_root: str = Field(default_factory=lambda: str(get_dawei_home()))
 
@@ -665,6 +705,7 @@ class Settings(BaseSettings):
     # 功能配置
     compression: CompressionConfig = Field(default_factory=CompressionConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     tool: ToolConfig = Field(default_factory=ToolConfig)
 
@@ -705,7 +746,7 @@ class Settings(BaseSettings):
         """判断是否为测试环境"""
         return self.app.environment.lower() in ("staging", "stage")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         result = {}
         for field_name in self.__fields__:

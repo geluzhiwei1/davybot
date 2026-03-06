@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """上下文管理器（
@@ -44,7 +45,7 @@ class ContextBreakdown:
     workspace_files: int = 0
     tool_definitions: int = 0
     skills: int = 0  # 技能上下文 token
-    files: list[FileTokenUsage] = field(default_factory=list)
+    files: List[FileTokenUsage] = field(default_factory=list)
 
     def total(self) -> int:
         """计算总 token 数"""
@@ -60,7 +61,7 @@ class ContextStats:
     percentage: float  # 使用百分比
     breakdown: ContextBreakdown  # 详细分解
     remaining: int  # 剩余容量
-    warnings: list[str] = field(default_factory=list)  # 警告信息
+    warnings: List[str] = field(default_factory=list)  # 警告信息
 
 
 @dataclass
@@ -160,8 +161,8 @@ class ContextManager:
         self.system_prompt_tokens = 0
         self.conversation_tokens = 0
         self.tool_tokens = 0
-        self.files: dict[str, FileTokenUsage] = {}
-        self.skills: dict[str, SkillContext] = {}  # 技能上下文存储
+        self.files: Dict[str, FileTokenUsage] = {}
+        self.skills: Dict[str, SkillContext] = {}  # 技能上下文存储
 
         self.logger = logging.getLogger(__name__)
 
@@ -326,7 +327,7 @@ class ContextManager:
         """
         return self.skills.get(skill_name)
 
-    def get_all_skills(self) -> dict[str, SkillContext]:
+    def get_all_skills(self) -> Dict[str, SkillContext]:
         """获取所有技能上下文
 
         Returns:
@@ -392,7 +393,7 @@ class ContextManager:
             warnings=warnings,
         )
 
-    def _generate_warnings(self, used: int, _file_tokens: int) -> list[str]:
+    def _generate_warnings(self, used: int, _file_tokens: int) -> List[str]:
         """生成上下文警告"""
         warnings = []
         percentage = (used / self.max_tokens) * 100
@@ -421,12 +422,12 @@ class ContextManager:
 
         return warnings
 
-    def get_warnings(self) -> list[str]:
+    def get_warnings(self) -> List[str]:
         """获取当前警告"""
         stats = self.get_stats()
         return stats.warnings
 
-    def get_files_summary(self) -> list[dict]:
+    def get_files_summary(self) -> List[dict]:
         """获取文件摘要
 
         Returns:
@@ -475,7 +476,7 @@ class ContextManager:
         self.files.clear()
         self.logger.info(f"Cleared {count} files from context")
 
-    def get_optimization_suggestions(self) -> list[str]:
+    def get_optimization_suggestions(self) -> List[str]:
         """获取上下文优化建议
 
         Returns:

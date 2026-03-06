@@ -7,7 +7,7 @@
 """
 
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.domain_adapter import DomainType, get_domain_adapter
 from dawei.agentic.pdca_context import (
@@ -41,8 +41,8 @@ class PDCACycleManager:
         self,
         session_id: str,
         task_description: str,
-        task_goals: list[str] | None = None,
-        success_criteria: list[str] | None = None,
+        task_goals: List[str] | None = None,
+        success_criteria: List[str] | None = None,
         domain: DomainType | None = None,
     ) -> PDCACycleContext:
         """启动新的 PDCA 循环
@@ -104,9 +104,9 @@ class PDCACycleManager:
     async def advance_phase(
         self,
         cycle_id: str,
-        phase_data: dict[str, Any],
+        phase_data: Dict[str, Any],
         next_phase: PDCAPhase | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """推进到下一阶段
 
         Args:
@@ -179,7 +179,7 @@ class PDCACycleManager:
     def _determine_next_phase(
         self,
         cycle: PDCACycleContext,
-        phase_data: dict[str, Any],
+        phase_data: Dict[str, Any],
     ) -> PDCAPhase:
         """根据当前阶段结果决定下一阶段
 
@@ -256,7 +256,7 @@ class PDCACycleManager:
         }
         return suggestions.get(phase, "")
 
-    def get_cycle_status(self, cycle_id: str) -> dict[str, Any] | None:
+    def get_cycle_status(self, cycle_id: str) -> Dict[str, Any] | None:
         """获取循环状态"""
         cycle = self.context_manager.get_cycle(cycle_id)
         if not cycle:
@@ -276,7 +276,7 @@ class PDCACycleManager:
 
         return cycle.should_continue_cycle()
 
-    async def complete_cycle(self, cycle_id: str, final_results: dict[str, Any]) -> dict[str, Any]:
+    async def complete_cycle(self, cycle_id: str, final_results: Dict[str, Any]) -> Dict[str, Any]:
         """完成 PDCA 循环
 
         Args:
@@ -336,7 +336,7 @@ class PDCACycleManager:
         self,
         cycle_id: str,
         phase: PDCAPhase | None = None,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """获取领域特定指导
 
         Args:

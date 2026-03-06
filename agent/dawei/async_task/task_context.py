@@ -10,9 +10,11 @@ import asyncio
 import json
 import threading
 import time
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.logg.logging import get_logger
 
@@ -46,8 +48,8 @@ class TaskContext(ITaskContext):
         """
         self._task_id = task_id
         self._status = TaskStatus.PENDING
-        self._metadata: dict[str, Any] = {}
-        self._data: dict[str, Any] = {}
+        self._metadata: Dict[str, Any] = {}
+        self._data: Dict[str, Any] = {}
         self._checkpoint_service = checkpoint_service
 
         # 执行控制
@@ -63,9 +65,9 @@ class TaskContext(ITaskContext):
         self._last_checkpoint_time: datetime | None = None
 
         # 回调函数
-        self._progress_callbacks: list[ProgressCallback] = []
-        self._state_change_callbacks: list[StateChangeCallback] = []
-        self._start_callbacks: list[StartCallback] = []
+        self._progress_callbacks: List[ProgressCallback] = []
+        self._state_change_callbacks: List[StateChangeCallback] = []
+        self._start_callbacks: List[StartCallback] = []
 
         # 自动检查点
         self._auto_checkpoint_interval = auto_checkpoint_interval
@@ -295,7 +297,7 @@ class TaskContext(ITaskContext):
         self,
         progress: int,
         message: str = "",
-        data: dict[str, Any] | None = None,
+        data: Dict[str, Any] | None = None,
     ) -> None:
         """报告任务进度
 
@@ -450,7 +452,7 @@ class TaskContext(ITaskContext):
                 self.set_status(TaskStatus.RUNNING)
             self._logger.info(f"Task {self._task_id} resumed")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         with self._lock:
             return {
@@ -499,7 +501,7 @@ class SimpleCheckpointService(ICheckpointService):
         # 确保存储目录存在
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
-    async def create(self, task_id: str, state_data: dict[str, Any], _force: bool = False) -> str:
+    async def create(self, task_id: str, state_data: Dict[str, Any], _force: bool = False) -> str:
         """创建检查点
 
         Args:
@@ -561,7 +563,7 @@ class SimpleCheckpointService(ICheckpointService):
             )
             raise  # Fast fail: re-raise serialization errors
 
-    async def restore(self, checkpoint_id: str) -> dict[str, Any] | None:
+    async def restore(self, checkpoint_id: str) -> Dict[str, Any] | None:
         """恢复检查点
 
         Args:
@@ -617,7 +619,7 @@ class SimpleCheckpointService(ICheckpointService):
             )
             raise  # Fast fail: re-raise validation errors
 
-    async def list(self, task_id: str) -> list[CheckpointData]:
+    async def list(self, task_id: str) -> List[CheckpointData]:
         """列出检查点
 
         Args:

@@ -17,7 +17,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawi.websocket.protocol import MessageType
 
@@ -91,7 +91,7 @@ class BaseMessageHandler:
             logger.exception(f"Failed to get workspace {session_id}: {e}")
             raise
 
-    async def send_message(self, session_id: str, message_type: str, **kwargs) -> dict[str, Any]:
+    async def send_message(self, session_id: str, message_type: str, **kwargs) -> Dict[str, Any]:
         """发送消息到客户端
 
         Args:
@@ -115,7 +115,7 @@ class BaseMessageHandler:
             logger.exception(f"Failed to send {message_type} message: {e}")
             raise
 
-    async def send_error(self, session_id: str, error_code: str, error_message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def send_error(self, session_id: str, error_code: str, error_message: str, details: Dict[str, Any] | None = None) -> Dict[str, Any]:
         """发送错误消息
 
         Args:

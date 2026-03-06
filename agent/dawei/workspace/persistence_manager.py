@@ -22,10 +22,11 @@ import json
 import logging
 import os
 from dataclasses import asdict, is_dataclass
-from datetime import UTC, date, datetime, timezone
+from datetime import date, datetime, timezone
+from dawei.core.datetime_compat import UTC
 from enum import Enum
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import List, Dict, Any, TypeVar
 
 import aiofiles
 
@@ -52,7 +53,7 @@ class ResourceLock:
     """资源锁，用于防止并发保存同一个资源"""
 
     def __init__(self):
-        self._locks: dict[str, asyncio.Lock] = {}
+        self._locks: Dict[str, asyncio.Lock] = {}
         self._global_lock = asyncio.Lock()
 
     async def acquire(self, resource_key: str):
@@ -168,7 +169,7 @@ class WorkspacePersistenceManager:
         self,
         resource_type: ResourceType,
         resource_id: str,
-        data: dict[str, Any],
+        data: Dict[str, Any],
         timestamp: str | None = None,
         use_timestamp: bool = False,
     ) -> bool:
@@ -316,7 +317,7 @@ class WorkspacePersistenceManager:
         self,
         resource_type: ResourceType,
         resource_id: str,
-    ) -> dict[str, Any] | None:
+    ) -> Dict[str, Any] | None:
         """从文件加载资源
 
         Args:
@@ -367,7 +368,7 @@ class WorkspacePersistenceManager:
         self,
         resource_type: ResourceType,
         limit: int | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """列出指定类型的所有资源
 
         Args:
@@ -482,7 +483,7 @@ class WorkspacePersistenceManager:
     async def save_conversation(
         self,
         conversation_id: str,
-        conversation_data: dict[str, Any],
+        conversation_data: Dict[str, Any],
     ) -> bool:
         """保存对话
 
@@ -515,11 +516,11 @@ class WorkspacePersistenceManager:
             use_timestamp=False,  # 改为 False，不使用时间戳前缀
         )
 
-    async def load_conversation(self, conversation_id: str) -> dict[str, Any] | None:
+    async def load_conversation(self, conversation_id: str) -> Dict[str, Any] | None:
         """加载对话"""
         return await self.load_resource(ResourceType.CONVERSATION, conversation_id)
 
-    async def list_conversations(self, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_conversations(self, limit: int | None = None) -> List[Dict[str, Any]]:
         """列出所有对话"""
         return await self.list_resources(ResourceType.CONVERSATION, limit)
 
@@ -529,7 +530,7 @@ class WorkspacePersistenceManager:
 
     # ==================== Task Graph 专用方法 ====================
 
-    async def save_task_graph(self, graph_id: str, graph_data: dict[str, Any]) -> bool:
+    async def save_task_graph(self, graph_id: str, graph_data: Dict[str, Any]) -> bool:
         """保存任务图"""
         return await self.save_resource(
             ResourceType.TASK_GRAPH,
@@ -538,11 +539,11 @@ class WorkspacePersistenceManager:
             use_timestamp=False,
         )
 
-    async def load_task_graph(self, graph_id: str) -> dict[str, Any] | None:
+    async def load_task_graph(self, graph_id: str) -> Dict[str, Any] | None:
         """加载任务图"""
         return await self.load_resource(ResourceType.TASK_GRAPH, graph_id)
 
-    async def list_task_graphs(self, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_task_graphs(self, limit: int | None = None) -> List[Dict[str, Any]]:
         """列出所有任务图"""
         return await self.list_resources(ResourceType.TASK_GRAPH, limit)
 
@@ -552,7 +553,7 @@ class WorkspacePersistenceManager:
 
     # ==================== Checkpoint 专用方法 ====================
 
-    async def save_checkpoint(self, checkpoint_id: str, checkpoint_data: dict[str, Any]) -> bool:
+    async def save_checkpoint(self, checkpoint_id: str, checkpoint_data: Dict[str, Any]) -> bool:
         """保存检查点"""
         return await self.save_resource(
             ResourceType.CHECKPOINT,
@@ -561,11 +562,11 @@ class WorkspacePersistenceManager:
             use_timestamp=False,
         )
 
-    async def load_checkpoint(self, checkpoint_id: str) -> dict[str, Any] | None:
+    async def load_checkpoint(self, checkpoint_id: str) -> Dict[str, Any] | None:
         """加载检查点"""
         return await self.load_resource(ResourceType.CHECKPOINT, checkpoint_id)
 
-    async def list_checkpoints(self, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_checkpoints(self, limit: int | None = None) -> List[Dict[str, Any]]:
         """列出所有检查点"""
         return await self.list_resources(ResourceType.CHECKPOINT, limit)
 
@@ -575,7 +576,7 @@ class WorkspacePersistenceManager:
 
     # ==================== Workspace Settings 专用方法 ====================
 
-    async def save_workspace_settings(self, settings: dict[str, Any]) -> bool:
+    async def save_workspace_settings(self, settings: Dict[str, Any]) -> bool:
         """保存workspace设置"""
         return await self.save_resource(
             ResourceType.WORKSPACE_SETTINGS,
@@ -584,6 +585,6 @@ class WorkspacePersistenceManager:
             use_timestamp=False,
         )
 
-    async def load_workspace_settings(self) -> dict[str, Any] | None:
+    async def load_workspace_settings(self) -> Dict[str, Any] | None:
         """加载workspace设置"""
         return await self.load_resource(ResourceType.WORKSPACE_SETTINGS, "workspace")

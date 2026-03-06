@@ -8,7 +8,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import List, Dict, Any
 
 from .types import (
     CheckpointData,
@@ -100,7 +100,7 @@ class IAsyncTaskManager(ABC):
         """
 
     @abstractmethod
-    async def list_tasks(self, status_filter: TaskStatus | None = None) -> list[str]:
+    async def list_tasks(self, status_filter: TaskStatus | None = None) -> List[str]:
         """列出任务
 
         Args:
@@ -173,7 +173,7 @@ class IAsyncTaskManager(ABC):
         """停止任务管理器"""
 
     @abstractmethod
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息
 
         Returns:
@@ -275,7 +275,7 @@ class ITaskContext(ABC):
         self,
         progress: int,
         message: str = "",
-        data: dict[str, Any] | None = None,
+        data: Dict[str, Any] | None = None,
     ) -> None:
         """报告任务进度
 
@@ -303,7 +303,7 @@ class ITaskContext(ABC):
         """获取已执行时间（秒）"""
 
     @abstractmethod
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
 
 
@@ -397,7 +397,7 @@ class IWebSocketStateManager(ABC):
         """
 
     @abstractmethod
-    async def list_connections(self, state_filter: ConnectionState | None = None) -> list[str]:
+    async def list_connections(self, state_filter: ConnectionState | None = None) -> List[str]:
         """列出连接
 
         Args:
@@ -409,7 +409,7 @@ class IWebSocketStateManager(ABC):
         """
 
     @abstractmethod
-    async def get_healthy_connections(self) -> list[str]:
+    async def get_healthy_connections(self) -> List[str]:
         """获取健康的连接
 
         Returns:
@@ -456,7 +456,7 @@ class IWebSocketStateManager(ABC):
         """停止状态管理器"""
 
     @abstractmethod
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息
 
         Returns:
@@ -469,7 +469,7 @@ class ICheckpointService(ABC):
     """检查点服务接口"""
 
     @abstractmethod
-    async def create(self, task_id: str, state_data: dict[str, Any], force: bool = False) -> str:
+    async def create(self, task_id: str, state_data: Dict[str, Any], force: bool = False) -> str:
         """创建检查点
 
         Args:
@@ -483,7 +483,7 @@ class ICheckpointService(ABC):
         """
 
     @abstractmethod
-    async def restore(self, checkpoint_id: str) -> dict[str, Any] | None:
+    async def restore(self, checkpoint_id: str) -> Dict[str, Any] | None:
         """恢复检查点
 
         Args:
@@ -495,7 +495,7 @@ class ICheckpointService(ABC):
         """
 
     @abstractmethod
-    async def list(self, task_id: str) -> list[CheckpointData]:
+    async def list(self, task_id: str) -> List[CheckpointData]:
         """列出检查点
 
         Args:

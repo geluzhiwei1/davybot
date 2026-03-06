@@ -4,7 +4,7 @@ import asyncio
 import functools
 import inspect
 from collections.abc import Callable
-from typing import Any
+from typing import List, Dict, Any
 
 from .errors import (
     CheckpointError,
@@ -41,9 +41,9 @@ class ErrorRegistry:
     """Error type registry."""
 
     def __init__(self):
-        self._error_mappings: dict[type[Exception], ErrorCategory] = {}
-        self._severity_rules: dict[type[Exception], ErrorSeverity] = {}
-        self._recovery_strategies: dict[type[Exception], RecoveryStrategy] = {}
+        self._error_mappings: Dict[type[Exception], ErrorCategory] = {}
+        self._severity_rules: Dict[type[Exception], ErrorSeverity] = {}
+        self._recovery_strategies: Dict[type[Exception], RecoveryStrategy] = {}
         self._register_default_errors()
 
     def _register_default_errors(self):
@@ -271,9 +271,9 @@ class ContextCollector:
     """Error context collector."""
 
     def __init__(self):
-        self.collectors: list[Callable] = []
+        self.collectors: List[Callable] = []
 
-    async def collect(self, base_context: ErrorContext) -> dict[str, Any]:
+    async def collect(self, base_context: ErrorContext) -> Dict[str, Any]:
         """Collect complete error context."""
         context_data = {
             "base_context": {
@@ -310,7 +310,7 @@ class RecoveryExecutor:
     """Recovery executor."""
 
     def __init__(self):
-        self.retry_configs: dict[str, dict[str, Any]] = {
+        self.retry_configs: Dict[str, Dict[str, Any]] = {
             "default": {
                 "max_attempts": 3,
                 "base_delay": 1.0,
@@ -325,7 +325,7 @@ class RecoveryExecutor:
         context: ErrorContext,
         original_func: Callable | None = None,
         original_args: tuple | None = None,
-        original_kwargs: dict[str, Any] | None = None,
+        original_kwargs: Dict[str, Any] | None = None,
     ) -> RecoveryResult:
         """Execute recovery strategy."""
         strategy = error.recovery_strategy
@@ -363,7 +363,7 @@ class RecoveryExecutor:
         context: ErrorContext,
         original_func: Callable | None = None,
         original_args: tuple | None = None,
-        original_kwargs: dict[str, Any] | None = None,
+        original_kwargs: Dict[str, Any] | None = None,
     ) -> RecoveryResult:
         """Execute retry strategy."""
         if not original_func:
@@ -487,7 +487,7 @@ class ErrorHandler:
         context: ErrorContext,
         original_func: Callable | None = None,
         original_args: tuple | None = None,
-        original_kwargs: dict[str, Any] | None = None,
+        original_kwargs: Dict[str, Any] | None = None,
     ) -> ErrorResult:
         """Handle error core method."""
         # 1. Error classification and severity assessment

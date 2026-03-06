@@ -8,7 +8,7 @@
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import List, Dict, Any
 
 
 class ErrorSeverity(Enum):
@@ -51,8 +51,8 @@ class ErrorContext:
     session_id: str | None = None
     trace_id: str | None = None
     args: tuple = field(default_factory=tuple)
-    kwargs: dict[str, Any] = field(default_factory=dict)
-    additional_context: dict[str, Any] = field(default_factory=dict)
+    kwargs: Dict[str, Any] = field(default_factory=dict)
+    additional_context: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -66,7 +66,7 @@ class ClassifiedError:
     context: ErrorContext
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "error_type": self.error.__class__.__name__,
@@ -96,7 +96,7 @@ class RecoveryResult:
     fallback_value: Any | None = None
     retry_count: int = 0
     recovery_message: str | None = None
-    additional_info: dict[str, Any] = field(default_factory=dict)
+    additional_info: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -116,7 +116,7 @@ class GeweiError(Exception):
         self,
         message: str,
         error_code: str | None = None,
-        details: dict[str, Any] | None = None,
+        details: Dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.message = message
@@ -124,7 +124,7 @@ class GeweiError(Exception):
         self.details = details or {}
         self.timestamp = time.time()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "error": self.__class__.__name__,

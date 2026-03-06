@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.logg.logging import get_logger
 
@@ -82,14 +82,14 @@ class RequestQueue:
         self.default_timeout = default_timeout
 
         # 优先级队列（使用堆）
-        self._queue: list[QueuedRequest] = []
+        self._queue: List[QueuedRequest] = []
         self._queue_lock = asyncio.Lock()
 
         # 并发控制
         self._semaphore = asyncio.Semaphore(max_concurrent)
 
         # 任务管理
-        self._running_tasks: dict[str, asyncio.Task] = {}
+        self._running_tasks: Dict[str, asyncio.Task] = {}
         self._running_tasks_lock = asyncio.Lock()
 
         # 队列状态

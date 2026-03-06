@@ -11,7 +11,7 @@ to CORE_EVENT_BUS events.
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.agentic.agent import Agent
 from dawei.agentic.agent_pdca_integration import add_pdca_to_agent
@@ -62,7 +62,7 @@ class AgentBridge:
         self.pdca_extension = None  # PDCA extension (initialized after agent)
 
         # Event tracking
-        self._event_handlers: dict[TaskEventType, str] = {}
+        self._event_handlers: Dict[TaskEventType, str] = {}
         self._is_initialized = False
 
         logger.debug(f"AgentBridge created for workspace: {self.workspace_path}")
@@ -312,7 +312,7 @@ class AgentBridge:
         logger.info("Agent stopped")
         return result
 
-    def get_pdca_status(self) -> dict[str, Any] | None:
+    def get_pdca_status(self) -> Dict[str, Any] | None:
         """Get PDCA cycle status
 
         Returns:

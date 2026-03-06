@@ -338,7 +338,7 @@
                 <div style="width: 280px; display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 600; font-size: 14px;">{{ t('workspaceSettings.skills.editor.files')
-                      }}</span>
+                    }}</span>
                     <el-button size="small" @click="refreshSkillFileTree" :icon="Refresh">
                       {{ t('workspaceSettings.skills.editor.refresh') }}
                     </el-button>
@@ -518,6 +518,11 @@
               </el-table-column>
             </el-table>
           </div>
+        </el-tab-pane>
+
+        <!-- Knowledge Base 知识库管理 Tab -->
+        <el-tab-pane :label="t('workspaceSettings.tabs.knowledge')" name="knowledge">
+          <KnowledgeSettings :workspace-id="props.workspaceId" />
         </el-tab-pane>
 
         <!-- Features Tab (暂时禁用，功能未实现) -->
@@ -772,7 +777,7 @@
 
                 <el-form-item>
                   <el-button @click="loadUIEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                  }}</el-button>
+                    }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -837,7 +842,7 @@
 
                 <el-form-item>
                   <el-button @click="loadSystemEnvironments">{{ t('workspaceSettings.executionEnvironment.refresh')
-                  }}</el-button>
+                    }}</el-button>
                 </el-form-item>
               </el-form>
             </el-tab-pane>
@@ -903,7 +908,8 @@
 
         <!-- 定时任务管理 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.scheduledTasks')" name="scheduled-tasks">
-          <ScheduledTasksPanel v-if="props.workspaceId && activeTab === 'scheduled-tasks'" :workspace-id="props.workspaceId" />
+          <ScheduledTasksPanel v-if="props.workspaceId && activeTab === 'scheduled-tasks'"
+            :workspace-id="props.workspaceId" />
         </el-tab-pane>
 
         <!-- 检查点管理 Tab -->
@@ -912,7 +918,8 @@
         </el-tab-pane>
         <!-- 安全设置 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.security')" name="security">
-          <WorkspaceSecuritySettingsTab v-if="props.workspaceId && activeTab === 'security'" :workspace-id="props.workspaceId" />
+          <WorkspaceSecuritySettingsTab v-if="props.workspaceId && activeTab === 'security'"
+            :workspace-id="props.workspaceId" />
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -1100,8 +1107,7 @@
 
       <template #footer>
         <div style="display: flex; justify-content: flex-end; width: 100%; gap: 8px;">
-          <el-button @click="testProvider" :loading="testingProvider"
-            :disabled="!providerForm.openAiModelId">
+          <el-button @click="testProvider" :loading="testingProvider" :disabled="!providerForm.openAiModelId">
             测试 Tool Call
           </el-button>
           <span v-if="providerTestResult" style="display: flex; align-items: center;">
@@ -1379,6 +1385,7 @@ import FileTreeNode from './FileTreeNode.vue';
 import ScheduledTasksPanel from './ScheduledTasksPanel.vue';
 import CheckpointPanel from './CheckpointPanel.vue';
 import WorkspaceSecuritySettingsTab from '@/components/workspace/WorkspaceSecuritySettingsTab.vue';
+import KnowledgeSettings from '@/components/knowledge/KnowledgeSettings.vue';
 import type { ResourceType } from '@/services/api/services/market';
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';

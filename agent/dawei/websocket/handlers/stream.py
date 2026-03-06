@@ -9,7 +9,7 @@
 import json
 import logging
 from io import BytesIO
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.websocket.protocol import (
     BaseWebSocketMessage,
@@ -33,9 +33,9 @@ class StreamHandler(AsyncMessageHandler, StatefulMessageHandler):
         StatefulMessageHandler.__init__(self)
 
         self.max_chunk_size = max_chunk_size
-        self.active_streams: dict[str, dict[str, Any]] = {}
+        self.active_streams: Dict[str, Dict[str, Any]] = {}
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         """获取支持的消息类型"""
         return [
             MessageType.TASK_NODE_START,
@@ -379,8 +379,8 @@ class StreamHandler(AsyncMessageHandler, StatefulMessageHandler):
         _session_id: str,
         _stream_id: str,
         data: bytes,
-        metadata: dict[str, Any],
-    ) -> dict[str, Any]:
+        metadata: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """处理完整的数据
 
         Args:
@@ -443,7 +443,7 @@ class StreamHandler(AsyncMessageHandler, StatefulMessageHandler):
             # 清理处理器状态
             await self.set_state(f"stream_{stream_id}", None)
 
-    async def get_stream_info(self, stream_id: str) -> dict[str, Any] | None:
+    async def get_stream_info(self, stream_id: str) -> Dict[str, Any] | None:
         """获取流信息
 
         Args:
@@ -455,7 +455,7 @@ class StreamHandler(AsyncMessageHandler, StatefulMessageHandler):
         """
         return self.active_streams.get(stream_id)
 
-    async def get_active_streams(self) -> list[dict[str, Any]]:
+    async def get_active_streams(self) -> List[Dict[str, Any]]:
         """获取所有活跃流
 
         Returns:

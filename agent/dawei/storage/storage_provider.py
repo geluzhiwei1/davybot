@@ -11,7 +11,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 from .config import config_manager
 from .impl.local_filesystem import LocalFileSystemStorage
@@ -29,16 +29,16 @@ class StorageProvider:
     - workspace_storage: 工作区级存储（workspace_path）
     """
 
-    _storage_registry: ClassVar[dict[StorageType, type[Storage]]] = {
+    _storage_registry: ClassVar[Dict[StorageType, type[Storage]]] = {
         StorageType.LOCAL_FILESYSTEM: LocalFileSystemStorage,
     }
 
     _default_storage: ClassVar[Storage | None] = None
-    _default_config: ClassVar[dict[str, Any] | None] = None
+    _default_config: ClassVar[Dict[str, Any] | None] = None
 
     # 两级存储架构的缓存
     _system_storage: ClassVar[Storage | None] = None
-    _workspace_storages: ClassVar[dict[str, Storage]] = {}
+    _workspace_storages: ClassVar[Dict[str, Storage]] = {}
 
     @classmethod
     def register_storage(cls, storage_type: StorageType, storage_class: type[Storage]) -> None:
@@ -73,7 +73,7 @@ class StorageProvider:
         return storage_class(**kwargs)
 
     @classmethod
-    def set_default_config(cls, config: dict[str, Any]) -> None:
+    def set_default_config(cls, config: Dict[str, Any]) -> None:
         """设置默认存储配置
 
         Args:

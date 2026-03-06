@@ -8,7 +8,7 @@
 
 import json
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from pydantic import BaseModel
 
@@ -162,7 +162,7 @@ class PlanExitTool(CustomBaseTool):
             return self.user_workspace.workspace_info.absolute_path
         return "."
 
-    def _check_plan_file(self, session_id: str, workspace_root: str) -> dict[str, Any]:
+    def _check_plan_file(self, session_id: str, workspace_root: str) -> Dict[str, Any]:
         """检查 plan 文件是否存在
 
         Args:
@@ -228,7 +228,7 @@ class PlanExitTool(CustomBaseTool):
 
         return "default"
 
-    def _build_completion_message(self, plan_file_info: dict[str, Any]) -> str:
+    def _build_completion_message(self, plan_file_info: Dict[str, Any]) -> str:
         """构建完成消息
 
         Args:

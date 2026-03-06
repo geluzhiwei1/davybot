@@ -9,7 +9,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import List, Dict, Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +21,13 @@ class FileReference:
         self,
         file_path: str,
         content: ClassVar[str | None] = None,
-        metadata: ClassVar[dict[str, Any] | None] = None,
+        metadata: ClassVar[Dict[str, Any] | None] = None,
     ):
         self.file_path = file_path
         self.content = content
         self.metadata = metadata or {}
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
             "file_path": self.file_path,
@@ -120,7 +120,7 @@ class AtMessageProcessor:
     }
 
     @classmethod
-    def extract_file_references(cls, message: str) -> list[str]:
+    def extract_file_references(cls, message: str) -> List[str]:
         """从消息中提取所有 @文件引用
 
         注意: 跳过 @skill: 引用，这些由 Agent 内部的 FileReferenceParser 处理
@@ -179,7 +179,7 @@ class AtMessageProcessor:
         cls,
         directory_path: str,
         max_items: ClassVar[int] = 50,
-    ) -> tuple[str | None, dict[str, Any]]:
+    ) -> tuple[str | None, Dict[str, Any]]:
         """读取目录内容
 
         Args:
@@ -273,7 +273,7 @@ class AtMessageProcessor:
         cls,
         full_path: str,
         max_size: ClassVar[int] = 10240,
-    ) -> tuple[str | None, dict[str, Any]]:
+    ) -> tuple[str | None, Dict[str, Any]]:
         """读取文件内容
 
         Args:
@@ -340,7 +340,7 @@ class AtMessageProcessor:
         message: str,
         workspace_root: str,
         max_file_size: ClassVar[int] = 10240,
-    ) -> tuple[str, list[FileReference]]:
+    ) -> tuple[str, List[FileReference]]:
         """处理消息中的 @文件引用
 
         Args:
@@ -377,7 +377,7 @@ class AtMessageProcessor:
         return processed_message, file_refs
 
     @classmethod
-    def enhance_message_with_file_content(cls, message: str, file_refs: list[FileReference]) -> str:
+    def enhance_message_with_file_content(cls, message: str, file_refs: List[FileReference]) -> str:
         """将文件引用内容添加到消息中
 
         Args:
@@ -421,7 +421,7 @@ class AtMessageProcessor:
         cls,
         message: str,
         workspace_root: str,
-    ) -> tuple[str, list[FileReference]]:
+    ) -> tuple[str, List[FileReference]]:
         """处理消息并增强内容（一步到位）
 
         Args:

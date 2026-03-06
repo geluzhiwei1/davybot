@@ -14,7 +14,7 @@ import asyncio
 import contextlib
 import logging
 from pathlib import Path
-from typing import ClassVar
+from typing import List, Dict, ClassVar
 
 from dawei.llm_api.llm_provider import LLMProvider
 from dawei.task_graph.persistence_manager import TaskGraphPersistenceManager
@@ -247,7 +247,7 @@ class WorkspaceService:
     """
 
     # 类变量：所有工作区上下文（使用强引用保持活跃）
-    _contexts: ClassVar[dict[str, WorkspaceContext]] = {}
+    _contexts: ClassVar[Dict[str, WorkspaceContext]] = {}
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
 
     @classmethod
@@ -323,7 +323,7 @@ class WorkspaceService:
                 logger.info(f"WorkspaceContext removed: {workspace_id}")
 
     @classmethod
-    def get_all_contexts(cls) -> dict[str, WorkspaceContext]:
+    def get_all_contexts(cls) -> Dict[str, WorkspaceContext]:
         """获取所有活跃的工作区上下文（用于监控）"""
         return dict(cls._contexts)
 

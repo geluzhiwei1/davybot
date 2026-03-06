@@ -8,9 +8,10 @@
 import asyncio
 import uuid
 from collections import deque
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.core.error_handler import handle_errors
 from dawei.core.errors import (
@@ -58,6 +59,28 @@ def is_memory_enabled(user_workspace) -> bool:
     return config.memory.enabled
 
 
+def is_knowledge_enabled(user_workspace) -> bool:
+    """检查知识库系统是否启用（使用统一配置）
+
+    Args:
+        user_workspace: UserWorkspace instance
+
+    Returns:
+        True if knowledge system is enabled, False otherwise
+
+    Raises:
+        RuntimeError: If config is not loaded (Fast Fail)
+
+    Examples:
+        >>> ws = UserWorkspace("/path/to/workspace")
+        >>> await ws.initialize()
+        >>> is_knowledge_enabled(ws)
+        True
+    """
+    config = user_workspace.get_config()  # Fast Fail if not loaded
+    return config.knowledge.enabled
+
+
 class Agent:
     """重构后的 Agent 主类
 
@@ -68,7 +91,7 @@ class Agent:
         self,
         user_workspace: UserWorkspace,
         execution_engine: TaskGraphExecutionEngine,
-        config: Any | dict[str, Any] | None = None,
+        config: Any | Dict[str, Any] | None = None,
     ):
         """初始化 Agent
         Args:
@@ -196,8 +219,56 @@ class Agent:
                 self.logger.warning(f"Failed to initialize plan workflow: {e}", exc_info=True)
                 # Plan workflow is optional, continue without it
 
+        # 【新增】Knowledge 系统（可选）
+        self.knowledge_service = None
+        self.knowledge_degraded = False
+        if is_knowledge_enabled(self.user_workspace):
+            try:
+                from dawei.knowledge.service import KnowledgeService
+
+                workspace_id = self.user_workspace.workspace_id or str(self.user_workspace.uuid)
+                workspace_path = str(self.user_workspace.absolute_path)
+
+                # Build knowledge config from settings
+                knowledge_config = self.config.knowledge
+
+                # Create KnowledgeService
+                self.knowledge_service = KnowledgeService(
+                    workspace_id=workspace_id,
+                    config={
+                        "vector_store": {
+                            "type": knowledge_config.vector_store_type,
+                            "db_path": f"{workspace_path}/.dawei/knowledge_vectors.db",
+                            "dimension": knowledge_config.dimension,
+                        },
+                        "chunking": {
+                            "chunk_size": knowledge_config.chunk_size,
+                            "chunk_overlap": knowledge_config.chunk_overlap,
+                        },
+                        "embeddings": {
+                            "model_name": knowledge_config.embedding_model,
+                        },
+                        "retrieval": {
+                            "default_top_k": knowledge_config.default_top_k,
+                            "default_mode": knowledge_config.retrieval_mode,
+                        },
+                    }
+                )
+
+                # Initialize service (async, will be completed in Agent.initialize())
+                self.logger.info("Knowledge service created, will be initialized during Agent.initialize()")
+
+            except Exception as e:
+                # Fast Fail: Knowledge system is explicitly enabled but failed to initialize
+                self.logger.error(
+                    f"Knowledge system is enabled but failed to initialize: {e}. System will continue without knowledge capabilities.",
+                    exc_info=True,
+                )
+                self.knowledge_degraded = True
+                self.knowledge_service = None
+
         # 统计信息
-        self.tool_usage: dict[str, ToolUsage] = {}
+        self.tool_usage: Dict[str, ToolUsage] = {}
         self.token_usage = TokenUsage()
         # 【内存优化】使用 deque 限制模型选择历史记录数量，防止无限增长
         self.selected_models: deque = deque(maxlen=1000)  # 保留最近1000条记录
@@ -219,7 +290,7 @@ class Agent:
     async def create_with_default_engine(
         cls,
         user_workspace: UserWorkspace,
-        config: Any | dict[str, Any] | None = None,
+        config: Any | Dict[str, Any] | None = None,
     ) -> "Agent":
         """使用默认执行引擎创建 Agent 实例
 
@@ -337,6 +408,27 @@ class Agent:
         # 初始化执行引擎（如果需要）
         if hasattr(self.execution_engine, "initialize"):
             await self.execution_engine.initialize()
+
+        # 【新增】初始化 KnowledgeService（异步）
+        if self.knowledge_service is not None:
+            try:
+                await self.knowledge_service.initialize()
+                self.logger.info("Knowledge service initialized successfully")
+
+                # 注入到 ToolExecutor
+                if hasattr(self.execution_engine, "tool_call_service"):
+                    tool_call_service = self.execution_engine.tool_call_service
+                    if hasattr(tool_call_service, "inject_knowledge_service"):
+                        tool_call_service.inject_knowledge_service(self.knowledge_service)
+                        self.logger.info("Knowledge service injected into tools")
+
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to initialize knowledge service: {e}. Knowledge features will be disabled.",
+                    exc_info=True,
+                )
+                self.knowledge_degraded = True
+                self.knowledge_service = None
 
         # 标记为已初始化
         self._initialized = True
@@ -868,7 +960,7 @@ class Agent:
         )
 
     @handle_errors(component="agent", operation="get_task_statistics")
-    async def get_task_statistics(self, task_id: str) -> dict[str, Any]:
+    async def get_task_statistics(self, task_id: str) -> Dict[str, Any]:
         """获取任务统计信息
 
         Args:
@@ -1042,7 +1134,7 @@ class Agent:
         memory_type: str = "fact",
         confidence: float = 0.8,
         energy: float = 1.0,
-        keywords: list[str] | None = None,
+        keywords: List[str] | None = None,
     ) -> str | None:
         """Add a memory entry
 
@@ -1093,7 +1185,7 @@ class Agent:
         object_: str | None = None,
         memory_type: str | None = None,
         only_valid: bool = True,
-    ) -> list[Any]:
+    ) -> List[Any]:
         """Query memories
 
         Args:
@@ -1126,7 +1218,7 @@ class Agent:
             self.logger.error(f"Failed to query memory: {e}", exc_info=True)
             return []
 
-    async def search_memories(self, query: str, limit: int = 50) -> list[Any]:
+    async def search_memories(self, query: str, limit: int = 50) -> List[Any]:
         """Search memories by keyword
 
         Args:
@@ -1146,7 +1238,7 @@ class Agent:
             self.logger.error(f"Failed to search memories: {e}", exc_info=True)
             return []
 
-    async def get_memory_stats(self) -> dict[str, Any] | None:
+    async def get_memory_stats(self) -> Dict[str, Any] | None:
         """Get memory statistics
 
         Returns:
@@ -1169,7 +1261,7 @@ class Agent:
             # Re-raise to ensure caller is aware of the failure
             raise
 
-    async def extract_memories_from_conversation(self) -> dict[str, Any]:
+    async def extract_memories_from_conversation(self) -> Dict[str, Any]:
         """手动触发从当前对话中提取记忆
 
         Returns:
@@ -1189,10 +1281,10 @@ class Agent:
 
     async def retrieve_associative_memories(
         self,
-        entities: list[str],
+        entities: List[str],
         hops: int = 1,
         min_energy: float = 0.2,
-    ) -> list[Any]:
+    ) -> List[Any]:
         """Retrieve memories via associative graph traversal
 
         Args:
@@ -1255,7 +1347,7 @@ class Agent:
             self.logger.warning(f"Failed to initialize conversation compressor: {e}", exc_info=True)
             self.conversation_compressor = None
 
-    def get_compression_config(self) -> dict[str, Any] | None:
+    def get_compression_config(self) -> Dict[str, Any] | None:
         """获取当前压缩配置
 
         Returns:

@@ -10,9 +10,14 @@
 import json
 import uuid
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime, timezone
-from enum import StrEnum
-from typing import Any, ClassVar, Literal, Union
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from enum import Enum
+
+class StrEnum(str, Enum):
+    """String enum for Python 3.10 compatibility"""
+    pass
+from typing import List, Dict, Any, ClassVar, Literal, Union
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -162,15 +167,15 @@ class BaseWebSocketMessage(BaseModel, ABC):
         extra = "forbid"  # 禁止额外字段，确保严格验证
 
     @abstractmethod
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """将消息转换为字典格式"""
 
     @classmethod
     @abstractmethod
-    def from_dict(cls, data: dict[str, Any]) -> "BaseWebSocketMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "BaseWebSocketMessage":
         """从字典创建消息实例"""
 
-    def to_websocket_format(self) -> dict[str, Any]:
+    def to_websocket_format(self) -> Dict[str, Any]:
         """转换为WebSocket传输格式
 
         支持Pydantic v1和v2的序列化方法
@@ -188,8 +193,8 @@ class UserWebSocketMessage(BaseWebSocketMessage):
 
     type: MessageType = MessageType.USER_MESSAGE
     content: str = Field(..., description="用户消息内容")
-    metadata: dict[str, Any] | None = Field(None, description="消息元数据")
-    user_ui_context: dict[str, Any] | None = Field(None, description="用户UI上下文信息")
+    metadata: Dict[str, Any] | None = Field(None, description="消息元数据")
+    user_ui_context: Dict[str, Any] | None = Field(None, description="用户UI上下文信息")
 
     @field_validator("content")
     @classmethod
@@ -198,12 +203,12 @@ class UserWebSocketMessage(BaseWebSocketMessage):
             raise ValueError("消息内容不能为空")
         return v.strip()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "UserWebSocketMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "UserWebSocketMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -214,10 +219,10 @@ class AssistantWebSocketMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.ASSISTANT_MESSAGE
     content: str = Field(..., description="助手消息内容")
     task_id: str | None = Field(None, description="关联的任务ID")
-    metadata: dict[str, Any] | None = Field(None, description="消息元数据")
-    tool_calls: list[ToolCall] | None = Field(None, description="工具调用列表")
+    metadata: Dict[str, Any] | None = Field(None, description="消息元数据")
+    tool_calls: List[ToolCall] | None = Field(None, description="工具调用列表")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         result = self.to_websocket_format()
         if self.tool_calls:
@@ -225,13 +230,13 @@ class AssistantWebSocketMessage(BaseWebSocketMessage):
             tool_calls_dict = []
             for tool_call in self.tool_calls:
                 tc_dict = tool_call.dict()
-                tc_dict["id"] = tc_dict.pop("tool_call_id")
+                tc_Dict["id"] = tc_dict.pop("tool_call_id")
                 tool_calls_dict.append(tc_dict)
             result["tool_calls"] = tool_calls_dict
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AssistantWebSocketMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AssistantWebSocketMessage":
         """从字典创建实例"""
         tool_calls = None
         if data.get("tool_calls"):
@@ -292,14 +297,14 @@ class SystemWebSocketMessage(BaseWebSocketMessage):
 
     type: MessageType = MessageType.SYSTEM_MESSAGE
     content: str = Field(..., description="系统消息内容")
-    metadata: dict[str, Any] | None = Field(None, description="消息元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="消息元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SystemWebSocketMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "SystemWebSocketMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -312,12 +317,12 @@ class ConversationInfoMessage(BaseWebSocketMessage):
     title: str | None = Field(None, description="会话标题")
     created_at: str | None = Field(None, description="创建时间(ISO格式)")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ConversationInfoMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ConversationInfoMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -335,12 +340,12 @@ class TaskStatusUpdateMessage(BaseWebSocketMessage):
         description="更新时间戳",
     )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskStatusUpdateMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskStatusUpdateMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -351,18 +356,18 @@ class TaskGraphUpdateMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.TASK_GRAPH_UPDATE
     graph_id: str = Field(..., description="任务图ID")
     update_type: str = Field(..., description="更新类型")
-    data: dict[str, Any] = Field(..., description="更新数据")
+    data: Dict[str, Any] = Field(..., description="更新数据")
     timestamp: str = Field(
         default_factory=lambda: datetime.now(UTC).isoformat(),
         description="更新时间戳",
     )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskGraphUpdateMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskGraphUpdateMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -377,12 +382,12 @@ class StreamReasoningMessage(BaseWebSocketMessage):
     content: str = Field(..., description="推理内容")
     user_message_id: str | None = Field(None, description="用户消息ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StreamReasoningMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StreamReasoningMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -405,7 +410,7 @@ class StreamReasoningMessage(BaseWebSocketMessage):
     @classmethod
     def from_event_data(
         cls,
-        event_data: dict[str, Any],
+        event_data: Dict[str, Any],
         session_id: str,
         task_id: str,
     ) -> "StreamReasoningMessage":
@@ -428,12 +433,12 @@ class StreamContentMessage(BaseWebSocketMessage):
     message_id: str | None = Field(None, description="消息ID，用于标识单个消息气泡")
     content: str = Field(..., description="流式内容片段")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StreamContentMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StreamContentMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -456,7 +461,7 @@ class StreamContentMessage(BaseWebSocketMessage):
     @classmethod
     def from_event_data(
         cls,
-        event_data: dict[str, Any],
+        event_data: Dict[str, Any],
         session_id: str,
         task_id: str,
     ) -> "StreamContentMessage":
@@ -478,10 +483,10 @@ class StreamToolCallMessage(BaseWebSocketMessage):
     task_id: str = Field(..., description="任务ID")
     task_node_id: str | None = Field(None, description="任务节点ID")  # 🔧 新增：任务节点ID字段
     tool_call: ToolCall = Field(..., description="工具调用信息")
-    all_tool_calls: list[ToolCall] = Field(default_factory=list, description="所有工具调用")
+    all_tool_calls: List[ToolCall] = Field(default_factory=list, description="所有工具调用")
     user_message_id: str | None = Field(None, description="用户消息ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         result = self.to_websocket_format()
 
@@ -492,7 +497,7 @@ class StreamToolCallMessage(BaseWebSocketMessage):
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StreamToolCallMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StreamToolCallMessage":
         """从字典创建实例"""
         tool_call = ToolCall(**data["tool_call"])
         all_tool_calls = [ToolCall(**tc) for tc in data.get("all_tool_calls", [])]
@@ -530,15 +535,15 @@ class StreamUsageMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.STREAM_USAGE
     task_id: str = Field(..., description="任务ID")
     task_node_id: str | None = Field(None, description="任务节点ID")
-    data: dict[str, Any] = Field(..., description="使用统计数据")
+    data: Dict[str, Any] = Field(..., description="使用统计数据")
     user_message_id: str | None = Field(None, description="用户消息ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StreamUsageMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StreamUsageMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -560,7 +565,7 @@ class StreamUsageMessage(BaseWebSocketMessage):
     @classmethod
     def from_event_data(
         cls,
-        event_data: dict[str, Any],
+        event_data: Dict[str, Any],
         session_id: str,
         task_id: str,
     ) -> "StreamUsageMessage":
@@ -583,13 +588,13 @@ class StreamCompleteMessage(BaseWebSocketMessage):
     message_id: str | None = Field(None, description="消息ID，用于标识单个消息气泡")
     reasoning_content: str | None = Field(None, description="推理内容")
     content: str | None = Field(None, description="完成内容")
-    tool_calls: list[ToolCall] = Field(default_factory=list, description="工具调用列表")
+    tool_calls: List[ToolCall] = Field(default_factory=list, description="工具调用列表")
     finish_reason: str | None = Field(None, description="完成原因")
-    usage: dict[str, Any] | None = Field(None, description="使用统计")
+    usage: Dict[str, Any] | None = Field(None, description="使用统计")
     user_message_id: str | None = Field(None, description="用户消息ID")
     conversation_id: str | None = Field(None, description="会话ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         result = self.to_websocket_format()
         if self.tool_calls:
@@ -597,13 +602,13 @@ class StreamCompleteMessage(BaseWebSocketMessage):
             tool_calls_dict = []
             for tool_call in self.tool_calls:
                 tc_dict = tool_call.dict()
-                tc_dict["id"] = tc_dict.pop("tool_call_id")
+                tc_Dict["id"] = tc_dict.pop("tool_call_id")
                 tool_calls_dict.append(tc_dict)
             result["tool_calls"] = tool_calls_dict
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StreamCompleteMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StreamCompleteMessage":
         """从字典创建实例"""
         tool_calls = []
         if data.get("tool_calls"):
@@ -649,7 +654,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
     @classmethod
     def from_event_data(
         cls,
-        event_data: dict[str, Any],
+        event_data: Dict[str, Any],
         session_id: str,
         task_id: str,
         conversation_id: str | None = None,
@@ -676,22 +681,22 @@ class StreamErrorMessage(BaseWebSocketMessage):
     task_id: str = Field(..., description="任务ID")
     task_node_id: str | None = Field(None, description="任务节点ID")
     error: str = Field(..., description="错误信息")
-    details: dict[str, Any] | None = Field(None, description="错误详情")
+    details: Dict[str, Any] | None = Field(None, description="错误详情")
     user_message_id: str | None = Field(None, description="用户消息ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StreamErrorMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StreamErrorMessage":
         """从字典创建实例"""
         return cls(**data)
 
     @classmethod
     def from_stream_message(
         cls,
-        stream_msg: StreamErrorMessage | dict[str, Any],
+        stream_msg: StreamErrorMessage | Dict[str, Any],
         session_id: str,
         task_id: str,
         task_node_id: str | None = None,
@@ -724,16 +729,16 @@ class FollowupQuestionMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.FOLLOWUP_QUESTION
     task_id: str = Field(..., description="任务ID")
     question: str = Field(..., description="问题内容")
-    suggestions: list[str] = Field(default_factory=list, description="建议答案列表")
+    suggestions: List[str] = Field(default_factory=list, description="建议答案列表")
     tool_call_id: str = Field(..., description="工具调用ID，用于响应对应")
     user_message_id: str | None = Field(None, description="用户消息ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "FollowupQuestionMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "FollowupQuestionMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -747,12 +752,12 @@ class FollowupResponseMessage(BaseWebSocketMessage):
     response: str = Field(..., description="用户回复内容")
     user_message_id: str | None = Field(None, description="用户消息ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "FollowupResponseMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "FollowupResponseMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -784,15 +789,15 @@ class ToolCallStartMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.TOOL_CALL_START
     task_id: str = Field(..., description="任务ID")
     tool_name: str = Field(..., description="工具名称")
-    tool_input: dict[str, Any] = Field(..., description="工具输入参数")
+    tool_input: Dict[str, Any] = Field(..., description="工具输入参数")
     tool_call_id: str | None = Field(None, description="工具调用ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolCallStartMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolCallStartMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -813,12 +818,12 @@ class ToolCallProgressMessage(BaseWebSocketMessage):
     estimated_remaining_time: float | None = Field(None, description="预计剩余时间（秒）")
     stream_output: str | None = Field(None, description="流式输出内容（实时显示）")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolCallProgressMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolCallProgressMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -835,15 +840,15 @@ class ToolCallResultMessage(BaseWebSocketMessage):
     error_message: str | None = Field(None, description="错误消息")
     error_code: str | None = Field(None, description="错误代码")
     execution_time: float | None = Field(None, description="执行时间（毫秒）")
-    performance_metrics: dict[str, Any] | None = Field(None, description="性能指标")
+    performance_metrics: Dict[str, Any] | None = Field(None, description="性能指标")
     workspace_id: str | None = Field(None, description="工作区ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolCallResultMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolCallResultMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -854,15 +859,15 @@ class ErrorMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.ERROR
     code: str = Field(..., description="错误代码")
     message: str = Field(..., description="错误消息")
-    details: dict[str, Any] | None = Field(None, description="错误详情")
+    details: Dict[str, Any] | None = Field(None, description="错误详情")
     recoverable: bool = Field(True, description="是否可恢复")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ErrorMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ErrorMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -873,14 +878,14 @@ class WarningMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.WARNING
     code: str = Field(..., description="警告代码")
     message: str = Field(..., description="警告消息")
-    details: dict[str, Any] | None = Field(None, description="警告详情")
+    details: Dict[str, Any] | None = Field(None, description="警告详情")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "WarningMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "WarningMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -891,12 +896,12 @@ class HeartbeatMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.HEARTBEAT
     message: str | None = Field(None, description="心跳消息内容")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "HeartbeatMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "HeartbeatMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -905,14 +910,14 @@ class StateSyncMessage(BaseWebSocketMessage):
     """状态同步消息"""
 
     type: MessageType = MessageType.STATE_SYNC
-    data: dict[str, Any] = Field(..., description="同步数据")
+    data: Dict[str, Any] = Field(..., description="同步数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StateSyncMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StateSyncMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -921,15 +926,15 @@ class StateUpdateMessage(BaseWebSocketMessage):
     """状态更新消息"""
 
     type: MessageType = MessageType.STATE_UPDATE
-    data: dict[str, Any] = Field(..., description="更新数据")
+    data: Dict[str, Any] = Field(..., description="更新数据")
     path: str | None = Field(None, description="更新路径")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StateUpdateMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "StateUpdateMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -940,12 +945,12 @@ class ConnectMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.CONNECT
     message: str = Field("连接已建立", description="连接消息")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ConnectMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ConnectMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -956,12 +961,12 @@ class DisconnectMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.DISCONNECT
     reason: str | None = Field(None, description="断开原因")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DisconnectMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "DisconnectMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -975,14 +980,14 @@ class LLMApiRequestMessage(BaseWebSocketMessage):
     model: str = Field(..., description="模型名称")
     request_type: str = Field(default="chat", description="请求类型 (chat, completion等)")
     input_tokens: int | None = Field(None, description="输入token数量")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LLMApiRequestMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "LLMApiRequestMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -994,15 +999,15 @@ class LLMApiResponseMessage(BaseWebSocketMessage):
     task_id: str = Field(..., description="任务ID")
     response_type: str = Field(..., description="响应类型 (reasoning, content, tool_call, usage)")
     content: str | None = Field(None, description="响应内容")
-    data: dict[str, Any] | None = Field(None, description="响应数据（用于tool_call等复杂类型）")
+    data: Dict[str, Any] | None = Field(None, description="响应数据（用于tool_call等复杂类型）")
     is_streaming: bool = Field(True, description="是否为流式响应")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LLMApiResponseMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "LLMApiResponseMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1015,15 +1020,15 @@ class LLMApiCompleteMessage(BaseWebSocketMessage):
     provider: str = Field(..., description="LLM提供商")
     model: str = Field(..., description="模型名称")
     finish_reason: str | None = Field(None, description="完成原因 (stop, length, tool_calls等)")
-    usage: dict[str, Any] | None = Field(None, description="Token使用统计")
+    usage: Dict[str, Any] | None = Field(None, description="Token使用统计")
     duration_ms: int | None = Field(None, description="请求耗时（毫秒）")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LLMApiCompleteMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "LLMApiCompleteMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1038,14 +1043,14 @@ class LLMApiErrorMessage(BaseWebSocketMessage):
     error_code: str = Field(..., description="错误代码")
     error_message: str = Field(..., description="错误消息")
     is_retryable: bool = Field(False, description="是否可重试")
-    details: dict[str, Any] | None = Field(None, description="错误详情")
+    details: Dict[str, Any] | None = Field(None, description="错误详情")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LLMApiErrorMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "LLMApiErrorMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1058,14 +1063,14 @@ class AgentStartMessage(BaseWebSocketMessage):
     agent_mode: str = Field(..., description="Agent模式 ")
     user_message: str = Field(..., description="用户原始消息")
     workspace_id: str = Field(..., description="工作区ID")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentStartMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentStartMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1078,14 +1083,14 @@ class AgentModeSwitchMessage(BaseWebSocketMessage):
     old_mode: str = Field(..., description="旧模式")
     new_mode: str = Field(..., description="新模式")
     reason: str = Field(..., description="切换原因")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentModeSwitchMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentModeSwitchMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1098,14 +1103,14 @@ class AgentThinkingMessage(BaseWebSocketMessage):
     thinking_content: str = Field(..., description="思考内容")
     step_id: str | None = Field(None, description="思考步骤ID")
     is_complete: bool = Field(False, description="是否完成")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentThinkingMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentThinkingMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1118,16 +1123,16 @@ class AgentCompleteMessage(BaseWebSocketMessage):
     result_summary: str = Field(..., description="结果摘要")
     total_duration_ms: int = Field(..., description="总耗时（毫秒）")
     tasks_completed: int = Field(0, description="完成任务数")
-    tools_used: list[str] = Field(default_factory=list, description="使用的工具列表")
+    tools_used: List[str] = Field(default_factory=list, description="使用的工具列表")
     conversation_id: str | None = Field(None, description="会话ID（用于新建会话时返回给前端）")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentCompleteMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentCompleteMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1144,12 +1149,12 @@ class AgentStopMessage(BaseWebSocketMessage):
         description="停止时间",
     )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentStopMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentStopMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1165,14 +1170,14 @@ class AgentStoppedMessage(BaseWebSocketMessage):
     )
     result_summary: str = Field(..., description="停止时的结果摘要")
     partial: bool = Field(True, description="是否为部分完成（未完全执行）")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentStoppedMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentStoppedMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1185,14 +1190,14 @@ class TaskNodeStartMessage(BaseWebSocketMessage):
     task_node_id: str = Field(..., description="节点ID")
     node_type: str = Field(..., description="节点类型")
     description: str = Field(..., description="节点描述")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskNodeStartMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskNodeStartMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1206,14 +1211,14 @@ class TaskNodeProgressMessage(BaseWebSocketMessage):
     progress: int = Field(..., ge=0, le=100, description="进度百分比")
     status: str = Field(..., description="状态")
     message: str = Field(..., description="进度消息")
-    data: dict[str, Any] | None = Field(None, description="进度数据")
+    data: Dict[str, Any] | None = Field(None, description="进度数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskNodeProgressMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskNodeProgressMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1226,14 +1231,14 @@ class TaskNodeCompleteMessage(BaseWebSocketMessage):
     task_node_id: str = Field(..., description="节点ID")
     result: Any | None = Field(None, description="执行结果")
     duration_ms: int = Field(..., description="耗时（毫秒）")
-    metadata: dict[str, Any] | None = Field(None, description="其他元数据")
+    metadata: Dict[str, Any] | None = Field(None, description="其他元数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskNodeCompleteMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskNodeCompleteMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1243,14 +1248,14 @@ class TodoUpdateMessage(BaseWebSocketMessage):
 
     type: MessageType = MessageType.TODO_UPDATE
     task_node_id: str = Field(..., description="任务节点ID")
-    todos: list[dict[str, Any]] = Field(..., description="TODO列表")
+    todos: List[Dict[str, Any]] = Field(..., description="TODO列表")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TodoUpdateMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TodoUpdateMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1265,12 +1270,12 @@ class TaskNodeStopMessage(BaseWebSocketMessage):
     task_node_id: str = Field(..., description="任务节点ID")
     reason: str | None = Field(None, description="停止原因")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskNodeStopMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskNodeStopMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1286,12 +1291,12 @@ class TaskNodeStoppedMessage(BaseWebSocketMessage):
     )
     reason: str | None = Field(None, description="停止原因")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskNodeStoppedMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskNodeStoppedMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1322,12 +1327,12 @@ class ModeSwitchMessage(BaseWebSocketMessage):
             raise ValueError(f"Invalid mode: '{v}'. Valid modes: {', '.join(valid_modes)}")
         return v
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ModeSwitchMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ModeSwitchMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1344,12 +1349,12 @@ class ModeSwitchedMessage(BaseWebSocketMessage):
     )
     message: str = Field(..., description="切换消息")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ModeSwitchedMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ModeSwitchedMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1358,16 +1363,16 @@ class ContextUpdateMessage(BaseWebSocketMessage):
     """上下文使用更新消息（后端→前端）"""
 
     type: MessageType = MessageType.CONTEXT_UPDATE
-    stats: dict[str, Any] = Field(..., description="上下文统计信息")
-    warnings: list[str] = Field(default_factory=list, description="警告信息")
+    stats: Dict[str, Any] = Field(..., description="上下文统计信息")
+    warnings: List[str] = Field(default_factory=list, description="警告信息")
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ContextUpdateMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "ContextUpdateMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1379,19 +1384,19 @@ class PDACycleStartMessage(BaseWebSocketMessage):
     cycle_id: str = Field(..., description="PDCA 循环 ID")
     domain: str = Field(..., description="任务领域")
     task_description: str = Field(..., description="任务描述")
-    task_goals: list[str] = Field(default_factory=list, description="任务目标")
-    success_criteria: list[str] = Field(default_factory=list, description="成功标准")
+    task_goals: List[str] = Field(default_factory=list, description="任务目标")
+    success_criteria: List[str] = Field(default_factory=list, description="成功标准")
     start_time: str = Field(
         default_factory=lambda: datetime.now(UTC).isoformat(),
         description="开始时间",
     )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PDACycleStartMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "PDACycleStartMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1402,7 +1407,7 @@ class PDCAStatusUpdateMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.PDCA_STATUS_UPDATE
     cycle_id: str = Field(..., description="PDCA 循环 ID")
     current_phase: str = Field(..., description="当前阶段 (plan/do/check/act)")
-    phases: dict[str, str] = Field(
+    phases: Dict[str, str] = Field(
         ...,
         description="各阶段状态: {'plan': 'pending'|'in_progress'|'completed', ...}",
     )
@@ -1415,12 +1420,12 @@ class PDCAStatusUpdateMessage(BaseWebSocketMessage):
         description="更新时间",
     )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PDCAStatusUpdateMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "PDCAStatusUpdateMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1433,18 +1438,18 @@ class PDCAPhaseAdvanceMessage(BaseWebSocketMessage):
     from_phase: str = Field(..., description="源阶段")
     to_phase: str = Field(..., description="目标阶段")
     reason: str = Field(..., description="推进原因")
-    phase_data: dict[str, Any] | None = Field(None, description="阶段数据")
+    phase_data: Dict[str, Any] | None = Field(None, description="阶段数据")
     timestamp: str = Field(
         default_factory=lambda: datetime.now(UTC).isoformat(),
         description="推进时间",
     )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PDCAPhaseAdvanceMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "PDCAPhaseAdvanceMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1459,7 +1464,7 @@ class PDACycleCompleteMessage(BaseWebSocketMessage):
     completion: float = Field(..., ge=0, le=100, description="最终完成度")
     result_summary: str = Field(..., description="结果摘要")
     lessons_learned: str | None = Field(None, description="经验教训")
-    next_steps: list[str] | None = Field(None, description="后续步骤")
+    next_steps: List[str] | None = Field(None, description="后续步骤")
     start_time: str = Field(..., description="开始时间")
     end_time: str = Field(
         default_factory=lambda: datetime.now(UTC).isoformat(),
@@ -1467,12 +1472,12 @@ class PDACycleCompleteMessage(BaseWebSocketMessage):
     )
     duration_seconds: float | None = Field(None, description="总耗时（秒）")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PDACycleCompleteMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "PDACycleCompleteMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1487,20 +1492,20 @@ class A2UIServerEventMessage(BaseWebSocketMessage):
     """
 
     type: MessageType = MessageType.A2UI_SERVER_EVENT
-    messages: list[dict[str, Any]] = Field(
+    messages: List[Dict[str, Any]] = Field(
         ...,
         description="A2UI消息列表，每个消息包含beginRendering/surfaceUpdate/dataModelUpdate/deleteSurface之一",
     )
-    metadata: dict[str, Any] | None = Field(None, description="可选的元数据（标题、描述等）")
+    metadata: Dict[str, Any] | None = Field(None, description="可选的元数据（标题、描述等）")
     session_id: str | None = Field(None, description="会话ID")
     task_node_id: str | None = Field(None, description="任务节点ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "A2UIServerEventMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "A2UIServerEventMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1516,15 +1521,15 @@ class A2UIUserActionMessage(BaseWebSocketMessage):
     component_id: str = Field(..., description="触发操作的组件ID")
     action_name: str = Field(..., description="操作名称（如button的action.name）")
     timestamp: str = Field(..., description="操作时间戳")
-    context: dict[str, Any] | None = Field(None, description="操作上下文数据")
+    context: Dict[str, Any] | None = Field(None, description="操作上下文数据")
     session_id: str | None = Field(None, description="会话ID")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return self.to_websocket_format()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "A2UIUserActionMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> "A2UIUserActionMessage":
         """从字典创建实例"""
         return cls(**data)
 
@@ -1602,7 +1607,7 @@ class MessageValidator:
     """消息验证器，支持所有WebSocket消息类型"""
 
     # 消息类型映射表（优化后）
-    _message_class_map: ClassVar[dict[str, type[BaseWebSocketMessage]]] = {
+    _message_class_map: ClassVar[Dict[str, type[BaseWebSocketMessage]]] = {
         # 基础消息通信
         MessageType.USER_MESSAGE: UserWebSocketMessage,
         MessageType.ASSISTANT_MESSAGE: AssistantWebSocketMessage,
@@ -1664,7 +1669,7 @@ class MessageValidator:
     }
 
     @classmethod
-    def validate(cls, data: dict[str, Any]) -> BaseWebSocketMessage | None:
+    def validate(cls, data: Dict[str, Any]) -> BaseWebSocketMessage | None:
         """验证消息数据并创建相应的消息对象
 
         Args:
@@ -1714,7 +1719,7 @@ class MessageValidator:
         return cls._message_class_map.get(message_type)
 
     @classmethod
-    def validate_user_message(cls, data: dict[str, Any]) -> bool:
+    def validate_user_message(cls, data: Dict[str, Any]) -> bool:
         """验证用户消息"""
         try:
             message = cls.validate(data)
@@ -1735,7 +1740,7 @@ class MessageValidator:
             raise  # Fast Fail
 
     @classmethod
-    def validate_assistant_message(cls, data: dict[str, Any]) -> bool:
+    def validate_assistant_message(cls, data: Dict[str, Any]) -> bool:
         """验证助手消息"""
         try:
             message = cls.validate(data)
@@ -1756,7 +1761,7 @@ class MessageValidator:
             raise  # Fast Fail
 
     @classmethod
-    def validate_task_node_progress_message(cls, data: dict[str, Any]) -> bool:
+    def validate_task_node_progress_message(cls, data: Dict[str, Any]) -> bool:
         """验证任务节点进度消息"""
         try:
             message = cls.validate(data)
@@ -1780,7 +1785,7 @@ class MessageValidator:
             raise  # Fast Fail
 
     @classmethod
-    def validate_error_message(cls, data: dict[str, Any]) -> bool:
+    def validate_error_message(cls, data: Dict[str, Any]) -> bool:
         """验证错误消息"""
         try:
             message = cls.validate(data)
@@ -1895,7 +1900,7 @@ class MessageSerializer:
         session_id: str,
         code: str,
         message: str,
-        details: ClassVar[dict[str, Any] | None] = None,
+        details: ClassVar[Dict[str, Any] | None] = None,
         recoverable: ClassVar[bool] = True,
     ) -> ErrorMessage:
         """创建错误消息"""
@@ -1920,7 +1925,7 @@ class MessageSerializer:
         progress: int,
         status: str,
         message: str,
-        data: dict[str, Any] | None = None,
+        data: Dict[str, Any] | None = None,
     ) -> "TaskNodeProgressMessage":
         """创建任务节点进度消息"""
         return TaskNodeProgressMessage(
@@ -1937,7 +1942,7 @@ class MessageSerializer:
     def create_user_message(
         session_id: str,
         content: str,
-        metadata: dict[str, Any] | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> UserWebSocketMessage:
         """创建用户消息"""
         return UserWebSocketMessage(session_id=session_id, content=content, metadata=metadata)
@@ -1947,8 +1952,8 @@ class MessageSerializer:
         session_id: str,
         content: str,
         task_id: str | None = None,
-        metadata: dict[str, Any] | None = None,
-        tool_calls: list[ToolCall] | None = None,
+        metadata: Dict[str, Any] | None = None,
+        tool_calls: List[ToolCall] | None = None,
     ) -> AssistantWebSocketMessage:
         """创建助手消息"""
         return AssistantWebSocketMessage(
@@ -1965,7 +1970,7 @@ class StandardizedEventMessage(BaseModel):
     """标准化的事件消息格式"""
 
     event: str = Field(..., description="事件类型")
-    data: dict[str, Any] = Field(..., description="事件数据")
+    data: Dict[str, Any] = Field(..., description="事件数据")
     session_id: str | None = Field(None, description="会话ID")
     timestamp: str | None = Field(None, description="时间戳")
 
@@ -1977,7 +1982,7 @@ class EventMessageSerializer:
     """事件消息序列化器"""
 
     @staticmethod
-    def serialize(event: str, data: dict[str, Any], session_id: str | None = None) -> str:
+    def serialize(event: str, data: Dict[str, Any], session_id: str | None = None) -> str:
         """序列化事件消息
 
         Args:
@@ -2034,8 +2039,8 @@ class MemoryEntryMessage(BaseModel):
     energy: float
     access_count: int
     memory_type: str
-    keywords: list[str]
-    metadata: dict[str, Any]
+    keywords: List[str]
+    metadata: Dict[str, Any]
 
     class Config:
         extra = "allow"
@@ -2049,7 +2054,7 @@ class MemoryCreatedMessage(BaseWebSocketMessage):
     )
     data: MemoryEntryMessage = Field(..., description="创建的记忆条目")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "type": self.type.value,
@@ -2065,9 +2070,9 @@ class MemoryRetrievedMessage(BaseWebSocketMessage):
     type: Literal[MessageType.MEMORY_ENTRY_RETRIEVED] = Field(
         default=MessageType.MEMORY_ENTRY_RETRIEVED,
     )
-    data: dict[str, Any] = Field(..., description="检索数据，包含memory_id和access_count")
+    data: Dict[str, Any] = Field(..., description="检索数据，包含memory_id和access_count")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "type": self.type.value,
@@ -2081,9 +2086,9 @@ class MemoryStatsMessage(BaseWebSocketMessage):
     """记忆统计消息"""
 
     type: Literal[MessageType.MEMORY_STATS] = Field(default=MessageType.MEMORY_STATS)
-    data: dict[str, Any] = Field(..., description="记忆统计数据")
+    data: Dict[str, Any] = Field(..., description="记忆统计数据")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "type": self.type.value,
@@ -2114,7 +2119,7 @@ class ContextPageLoadedMessage(BaseWebSocketMessage):
     type: Literal[MessageType.CONTEXT_PAGE_LOADED] = Field(default=MessageType.CONTEXT_PAGE_LOADED)
     data: ContextPageMessage = Field(..., description="加载的上下文页")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "type": self.type.value,
@@ -2128,7 +2133,7 @@ class MemoryEventSerializer:
     """记忆事件序列化器"""
 
     @staticmethod
-    def serialize_memory_created(session_id: str, memory: dict[str, Any]) -> str:
+    def serialize_memory_created(session_id: str, memory: Dict[str, Any]) -> str:
         """序列化记忆创建事件"""
         message = MemoryCreatedMessage(session_id=session_id, data=MemoryEntryMessage(**memory))
         return json.dumps(message.to_dict())
@@ -2143,13 +2148,13 @@ class MemoryEventSerializer:
         return json.dumps(message.to_dict())
 
     @staticmethod
-    def serialize_memory_stats(session_id: str, stats: dict[str, Any]) -> str:
+    def serialize_memory_stats(session_id: str, stats: Dict[str, Any]) -> str:
         """序列化记忆统计事件"""
         message = MemoryStatsMessage(session_id=session_id, data=stats)
         return json.dumps(message.to_dict())
 
     @staticmethod
-    def serialize_context_page_loaded(session_id: str, page: dict[str, Any]) -> str:
+    def serialize_context_page_loaded(session_id: str, page: Dict[str, Any]) -> str:
         """序列化上下文页加载事件"""
         message = ContextPageLoadedMessage(session_id=session_id, data=ContextPageMessage(**page))
         return json.dumps(message.to_dict())

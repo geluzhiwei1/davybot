@@ -34,7 +34,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei.sandbox.command_whitelist import CommandWhitelist
 from dawei.sandbox.sandbox_manager import SandboxConfig, SandboxManager
@@ -113,7 +113,7 @@ class SecureCommandExecutor:
         command: str,
         workspace_path: Path,
         user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """安全地执行命令
 
         Args:
@@ -206,7 +206,7 @@ class SecureCommandExecutor:
         logger.debug("[SECURE_EXECUTOR] 使用subprocess执行")
         return self._execute_with_subprocess(command, workspace_path)
 
-    def _execute_with_subprocess(self, command: str, workspace_path: Path) -> dict[str, Any]:
+    def _execute_with_subprocess(self, command: str, workspace_path: Path) -> Dict[str, Any]:
         """使用subprocess执行(带限制)"""
         start_time = time.time()
 
@@ -445,7 +445,7 @@ class SecureCommandExecutor:
         command: str,
         workspace_path: Path,
         user_id: str = "unknown",
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """异步执行命令
 
         Args:
@@ -463,7 +463,7 @@ class SecureCommandExecutor:
             lambda: self.execute(command, workspace_path, user_id),
         )
 
-    def health_check(self) -> dict[str, Any]:
+    def health_check(self) -> Dict[str, Any]:
         """健康检查
 
         Returns:

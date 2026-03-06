@@ -11,9 +11,10 @@ import json
 import logging
 import os
 import uuid
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -69,7 +70,7 @@ class WorkspaceResponse(BaseModel):
     """工作区响应"""
 
     success: bool
-    workspace: dict[str, Any] | None = None
+    workspace: Dict[str, Any] | None = None
     message: str | None = None
     error: str | None = None
 
@@ -78,7 +79,7 @@ class WorkspaceListResponse(BaseModel):
     """工作区列表响应"""
 
     success: bool
-    workspaces: list[dict[str, Any]]
+    workspaces: List[Dict[str, Any]]
     total: int
 
 

@@ -5,7 +5,7 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from dawei import get_dawei_home
 from dawei.config.settings import get_settings
@@ -49,7 +49,7 @@ class WorkspaceManager:
                 if "id" in workspace:
                     self.workspaces_mapping[workspace["id"]] = workspace
 
-    def get_workspace_by_id(self, workspace_id: str) -> dict[str, Any] | None:
+    def get_workspace_by_id(self, workspace_id: str) -> Dict[str, Any] | None:
         """根据UUID获取工作区信息
 
         如果第一次未找到，会自动重新加载并重试一次
@@ -63,7 +63,7 @@ class WorkspaceManager:
 
         return workspace
 
-    def get_all_workspaces(self) -> list[dict[str, Any]]:
+    def get_all_workspaces(self) -> List[Dict[str, Any]]:
         """获取所有工作区"""
         return list(self.workspaces_mapping.values())
 

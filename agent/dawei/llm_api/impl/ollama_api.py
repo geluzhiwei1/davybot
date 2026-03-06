@@ -10,7 +10,7 @@ API文档：https://github.com/ollama/ollama/blob/main/docs/api.md
 
 import json
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import List, Dict, Any
 
 import aiohttp
 
@@ -53,7 +53,7 @@ class OllamaParser(StreamChunkParser):
         self.final_usage = None
         self.is_done = False
 
-    def parse_chunk(self, chunk: dict[str, Any]) -> list[StreamMessages]:
+    def parse_chunk(self, chunk: Dict[str, Any]) -> List[StreamMessages]:
         """解析Ollama格式的数据块
 
         Args:
@@ -169,7 +169,7 @@ class OllamaClient(OpenaiCompatibleClient):
         ```
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, config: Dict[str, Any]) -> None:
         """初始化Ollama客户端
 
         Args:
@@ -196,7 +196,7 @@ class OllamaClient(OpenaiCompatibleClient):
 
         self.logger.info(f"Initialized Ollama client for model: {self.model}")
 
-    def _prepare_headers(self) -> dict[str, str]:
+    def _prepare_headers(self) -> Dict[str, str]:
         """准备请求头
 
         Ollama不需要Authorization头，但可以包含其他自定义头
@@ -213,7 +213,7 @@ class OllamaClient(OpenaiCompatibleClient):
 
     def _prepare_request_params(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         stream: bool = True,
     ) -> dict[str, Any]:
         """准备请求参数
@@ -272,7 +272,7 @@ class OllamaClient(OpenaiCompatibleClient):
     @log_performance("ollama_api.create_message")
     async def create_message(
         self,
-        messages: list[LLMMessage],
+        messages: List[LLMMessage],
         **kwargs,
     ) -> AsyncGenerator[StreamMessages, None]:
         """创建消息，使用Ollama的流式API
@@ -369,7 +369,7 @@ class OllamaClient(OpenaiCompatibleClient):
         async for content in processor.process_message(ollama_stream_generator(), task_id, context):
             yield content
 
-    async def generate(self, messages: list[LLMMessage], **kwargs) -> ChatResult:
+    async def generate(self, messages: List[LLMMessage], **kwargs) -> ChatResult:
         """生成文本（非流式）
 
         Args:
@@ -439,7 +439,7 @@ class OllamaClient(OpenaiCompatibleClient):
 
 
 # 工厂函数
-def create_ollama_client(config: dict[str, Any]) -> OllamaClient:
+def create_ollama_client(config: Dict[str, Any]) -> OllamaClient:
     """创建Ollama客户端的工厂函数
 
     Args:

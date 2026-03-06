@@ -13,7 +13,7 @@
 
 import logging
 import re
-from typing import Any
+from typing import List, Dict, Any
 
 
 class SensitiveInfoFilter(logging.Filter):
@@ -147,7 +147,7 @@ def sanitize_for_log(message: str, max_length: int = 1000) -> str:
     return filter_instance.sanitize_string(message)
 
 
-def sanitize_dict(data: dict[str, Any], exclude_keys: list[str] | None = None) -> dict[str, Any]:
+def sanitize_dict(data: Dict[str, Any], exclude_keys: List[str] | None = None) -> Dict[str, Any]:
     """过滤字典中的敏感信息
 
     Args:

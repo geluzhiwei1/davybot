@@ -11,7 +11,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -32,7 +32,7 @@ class LLMSettingsUpdate(BaseModel):
     """更新 LLM 配置的请求模型"""
 
     currentApiConfigName: str | None = None
-    modeApiConfigs: dict[str, str] | None = Field(default_factory=dict)
+    modeApiConfigs: Dict[str, str] | None = Field(default_factory=dict)
 
 
 class LLMProviderCreate(BaseModel):

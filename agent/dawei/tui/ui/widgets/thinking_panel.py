@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """ThinkingPanel Widget
@@ -20,7 +21,7 @@ class ThinkingPanel(Static):
     def __init__(self, max_lines: int = 10, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_lines = max_lines
-        self._thinking_history: list[str] = []
+        self._thinking_history: List[str] = []
 
     def watch_thinking_content(self, _old_content: str, _new_content: str) -> None:
         """Update display when thinking content changes

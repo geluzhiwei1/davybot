@@ -10,9 +10,10 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -365,7 +366,7 @@ class WorkspacePersistenceHelper:
         except Exception as e:
             logger.error(f"Failed to send persistence failure alert: {e}", exc_info=True)
 
-    async def _log_persistence_failure(self, alert_data: dict[str, Any]):
+    async def _log_persistence_failure(self, alert_data: Dict[str, Any]):
         """将持久化失败记录到日志文件
 
         Args:
@@ -394,7 +395,7 @@ class WorkspacePersistenceHelper:
         self,
         limit: int = 100,
         resource_type: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """获取持久化失败记录
 
         Args:

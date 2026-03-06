@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Skills工具 - 将skills能力暴露给agent
@@ -245,9 +246,9 @@ Returns the complete content of the resource file."""
 
 
 def create_skills_tools(
-    skills_roots: list[Path] | None = None,
+    skills_roots: List[Path] | None = None,
     current_mode: str | None = None,
-) -> list[CustomBaseTool]:
+) -> List[CustomBaseTool]:
     """创建所有skills相关的工具 - 支持多级加载
 
     Args:

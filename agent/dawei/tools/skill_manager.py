@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Skills管理器 - 实现渐进式skills功能
@@ -33,7 +34,7 @@ class Skill:
     mode: str | None = None  # mode-specific skill
     scope: str = "global"  # "global" or "project"
     is_loaded: bool = False  # 是否已加载完整内容
-    resources: list[Path] = field(default_factory=list)  # 额外资源文件
+    resources: List[Path] = field(default_factory=list)  # 额外资源文件
 
     def __hash__(self):
         return hash((self.name, self.mode, self.scope, self.path))
@@ -62,7 +63,7 @@ class Skill:
             logger.exception(f"Failed to load skill content from {self.path}: {e}")
             return ""
 
-    def get_resources(self) -> dict[str, Path]:
+    def get_resources(self) -> Dict[str, Path]:
         """获取skill目录下的所有资源文件"""
         if not self.resources:
             skill_dir = self.path.parent
@@ -80,7 +81,7 @@ class SkillManager:
     负责发现、管理和加载skills
     """
 
-    def __init__(self, skills_roots: list[Path] | None = None, current_mode: str | None = None):
+    def __init__(self, skills_roots: List[Path] | None = None, current_mode: str | None = None):
         """初始化SkillManager - 支持多级加载
 
         Args:
@@ -93,9 +94,9 @@ class SkillManager:
         self.skills_roots = skills_roots or [get_dawei_home()]
         self.current_mode = current_mode
 
-        # skill注册表: name -> list[Skill]
+        # skill注册表: name -> List[Skill]
         # 同一个name可能有多个Skill（不同scope/mode）
-        self._skills: dict[str, list[Skill]] = {}
+        self._skills: Dict[str, List[Skill]] = {}
 
         # 是否已初始化
         self._initialized = False
@@ -239,7 +240,7 @@ class SkillManager:
             logger.exception(f"Failed to parse frontmatter from {skill_file}: {e}")
             return None, None
 
-    def get_all_skills(self, reload: bool = False) -> list[Skill]:
+    def get_all_skills(self, reload: bool = False) -> List[Skill]:
         """获取所有可用的skills（只包含元数据）
 
         Args:
@@ -253,7 +254,7 @@ class SkillManager:
             self.discover_skills(force=True)
 
         # 收集所有skills，按优先级排序
-        all_skills: list[Skill] = []
+        all_skills: List[Skill] = []
         seen: set[tuple[str, str | None]] = set()
 
         # 按新的三级优先级顺序添加
@@ -277,7 +278,7 @@ class SkillManager:
 
         return all_skills
 
-    def find_matching_skills(self, query: str, reload: bool = False) -> list[Skill]:
+    def find_matching_skills(self, query: str, reload: bool = False) -> List[Skill]:
         """根据查询语句找到匹配的skills
 
         Args:
@@ -345,9 +346,9 @@ class SkillManager:
                     return skill.load_content()
 
         # 如果没有找到匹配的，返回第一个
-        return skills_list[0].load_content()
+        return skills_List[0].load_content()
 
-    def get_skill_resources(self, skill_name: str) -> dict[str, Path]:
+    def get_skill_resources(self, skill_name: str) -> Dict[str, Path]:
         """获取指定skill的资源文件
 
         Args:

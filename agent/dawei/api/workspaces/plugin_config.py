@@ -12,7 +12,7 @@
 """
 
 import logging
-from typing import Any
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -52,7 +52,7 @@ class UpdatePluginConfigRequest(BaseModel):
     """更新插件配置请求"""
 
     plugin_id: str = Field(..., description="插件 ID")
-    config: dict[str, Any] = Field(..., description="配置值（键值对）")
+    config: Dict[str, Any] = Field(..., description="配置值（键值对）")
 
 
 class ResetPluginConfigRequest(BaseModel):
@@ -65,10 +65,10 @@ class PluginConfigResponse(BaseModel):
     """插件配置响应"""
 
     success: bool = Field(..., description="是否成功")
-    config_schema: dict[str, Any] | None = Field(None, description="配置 Schema")
-    config: dict[str, Any] = Field(..., description="当前配置值")
-    existing_config: dict[str, Any] | None = Field(None, description="已存在的配置值（与config相同）")
-    form_config: dict[str, Any] | None = Field(None, description="前端表单配置")
+    config_schema: Dict[str, Any] | None = Field(None, description="配置 Schema")
+    config: Dict[str, Any] = Field(..., description="当前配置值")
+    existing_config: Dict[str, Any] | None = Field(None, description="已存在的配置值（与config相同）")
+    form_config: Dict[str, Any] | None = Field(None, description="前端表单配置")
     message: str | None = Field(None, description="提示消息")
 
 
@@ -76,7 +76,7 @@ class PluginListResponse(BaseModel):
     """插件列表响应"""
 
     success: bool
-    plugins: dict[str, dict[str, Any]] = Field(default_factory=dict, description="所有插件的配置信息 {plugin_id: {schema, config}}")
+    plugins: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="所有插件的配置信息 {plugin_id: {schema, config}}")
 
 
 # ============================================================================

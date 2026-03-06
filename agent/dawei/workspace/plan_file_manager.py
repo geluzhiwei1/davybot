@@ -7,9 +7,10 @@
 """
 
 import logging
-from datetime import UTC, datetime, timezone
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +228,7 @@ class PlanFileManager:
 
         return plan_path
 
-    def list_plan_files(self, limit: int = 10) -> list[dict[str, Any]]:
+    def list_plan_files(self, limit: int = 10) -> List[Dict[str, Any]]:
         """列出计划文件
 
         Args:
@@ -297,7 +298,7 @@ class PlanFileManager:
         plan_path = self._get_latest_plan_path(session_id)
         return plan_path is not None and plan_path.exists()
 
-    def get_plan_metadata(self, session_id: str) -> dict[str, Any]:
+    def get_plan_metadata(self, session_id: str) -> Dict[str, Any]:
         """获取计划文件的元数据
 
         Args:

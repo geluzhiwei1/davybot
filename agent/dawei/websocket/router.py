@@ -1,4 +1,5 @@
 # Copyright (c) 2025 格律至微
+from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """消息路由器
@@ -41,7 +42,7 @@ class MessageHandler(ABC):
         """
 
     @abstractmethod
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         """获取支持的消息类型列表
 
         Returns:
@@ -71,10 +72,10 @@ class MessageRouter:
 
         """
         self.websocket_manager = websocket_manager
-        self.handlers: dict[str, list[MessageHandler]] = {}
-        self.global_handlers: list[MessageHandler] = []
-        self.middleware: list[Callable] = []
-        self.error_handlers: list[Callable] = []
+        self.handlers: Dict[str, List[MessageHandler]] = {}
+        self.global_handlers: List[MessageHandler] = []
+        self.middleware: List[Callable] = []
+        self.error_handlers: List[Callable] = []
 
     async def start(self):
         """启动路由器"""
@@ -322,13 +323,13 @@ class MessageRouter:
         for error_handler in self.error_handlers:
             await error_handler(session_id, message, error, handler)
 
-    def get_handlers_for_type(self, message_type: str) -> list[MessageHandler]:
+    def get_handlers_for_type(self, message_type: str) -> List[MessageHandler]:
         """获取指定消息类型的处理器列表"""
         handlers = self.handlers.get(message_type, []).copy()
         handlers.extend(self.global_handlers)
         return handlers
 
-    def get_all_handlers(self) -> dict[str, list[MessageHandler]]:
+    def get_all_handlers(self) -> Dict[str, List[MessageHandler]]:
         """获取所有处理器"""
         result = {}
         for message_type, handlers in self.handlers.items():
@@ -359,7 +360,7 @@ class HeartbeatHandler(MessageHandler):
         # 返回pong响应
         return MessageSerializer.create_heartbeat_message(session_id=session_id, message="pong")
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         return [MessageType.HEARTBEAT]
 
 
@@ -384,7 +385,7 @@ class ErrorHandler(MessageHandler):
 
         return None
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> List[str]:
         return [MessageType.ERROR, MessageType.WARNING]
 
     async def on_register(self, router: MessageRouter):
