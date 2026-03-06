@@ -53,7 +53,7 @@ class AutocompleteInputBox(Input):
         """Load available skills from SkillManager"""
         try:
             from dawei.tools.skill_manager import SkillManager
-            from dawei.config import get_dawei_home
+            from dawei import get_dawei_home
 
             # Build skills roots
             skills_roots = [self.workspace_path, get_dawei_home]

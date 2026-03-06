@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 
 
 def get_pid_file_path(port: int, pid_dir: Path | None = None) -> Path:

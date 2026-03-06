@@ -141,7 +141,7 @@ class StorageProvider:
 
         """
         if cls._system_storage is None:
-            from dawei.config import get_dawei_home
+            from dawei import get_dawei_home
 
             dawei_home = get_dawei_home()
 

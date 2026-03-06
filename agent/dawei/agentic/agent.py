@@ -373,7 +373,7 @@ class Agent:
                 from pathlib import Path
 
                 from dawei.tools.skill_manager import SkillManager
-                from dawei.config import get_dawei_home 
+                from dawei import get_dawei_home 
 
                 # 构建技能管理器，包含工作区和用户技能目录
                 skills_roots = [Path(self.user_workspace.absolute_path), get_dawei_home]

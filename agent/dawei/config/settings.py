@@ -14,21 +14,7 @@ from pydantic_settings import BaseSettings
 
 # 导入统一的日志配置
 from dawei.config.logging_config import LoggingConfig
-
-
-def get_dawei_home() -> str:
-    """从环境变量获取DAWEI_HOME，默认值为 ~/.dawei
-    此函数需要在load_dotenv()之后调用
-
-    Returns:
-        str: 工作区根目录的绝对路径
-
-    """
-    # 从环境变量获取，如果不存在则使用默认值 ~/.dawei
-    dawei_home = os.environ.get("DAWEI_HOME", "~/.dawei")
-    # 展开波浪号并转换为绝对路径
-    return str(Path(dawei_home).expanduser().resolve())
-
+from dawei import get_dawei_home
 
 class DatabaseConfig(BaseSettings):
     """数据库配置 - 使用 SQLite"""
@@ -606,9 +592,7 @@ class AppConfig(BaseSettings):
     # CORS配置
     cors_origins: list[str] = Field(default=["*"])
 
-    # 工作目录配置
-    # workspaces_root 直接从环境变量获取，默认为 ~/.dawei
-    workspaces_root: str = Field(default_factory=get_dawei_home)
+    workspaces_root: str = Field(default_factory=lambda: str(get_dawei_home()))
 
     def __init__(self, **data):
         """初始化配置"""

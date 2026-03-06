@@ -74,7 +74,8 @@
     "operations": "Operations",
     "settings": "Settings",
     "management": "Management",
-    "configuration": "Configuration"
+    "configuration": "Configuration",
+    "reset": "Reset"
   },
   "time": {
     "justNow": "Just now",

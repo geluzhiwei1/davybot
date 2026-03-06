@@ -11,6 +11,7 @@ Provides core functionality for the AI agent system:
 - Conversation management
 """
 
+import os
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
@@ -29,6 +30,14 @@ if env_path:
 __version__ = "1.0.0"
 __author__ = "Dawei Team"
 __description__ = "AI agent API with dawei as top-level package"
+
+def get_dawei_home() -> Path:
+    """从环境变量获取DAWEI_HOME，默认值为 ~/.dawei
+    Returns:
+        str: 工作区根目录的绝对路径
+    """
+    dawei_home = os.environ.get("DAWEI_HOME", "~/.dawei")
+    return Path(dawei_home).expanduser().resolve()
 
 # 核心模块导入
 from . import (

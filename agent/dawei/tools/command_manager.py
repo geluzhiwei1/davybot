@@ -23,7 +23,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 
 import frontmatter
 
@@ -70,7 +70,7 @@ class CommandManager:
 
         """
         self.workspace_root = workspace_root
-        self.user_root = user_root or Path(get_dawei_home())
+        self.user_root = user_root or get_dawei_home()
 
         # 命令注册表: name -> Command（高优先级覆盖低优先级）
         self._commands: dict[str, Command] = {}

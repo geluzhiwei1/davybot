@@ -24,7 +24,7 @@ from dawei.workspace.models import WorkspaceInfo
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/workspaces", tags=["workspaces-crud"])
+router = APIRouter(tags=["workspaces-crud"])
 
 
 # ==================== 请求/响应模型 ====================
@@ -163,7 +163,7 @@ async def validate_path(request: ValidatePathRequest):
 # ==================== 创建工作区 API ====================
 
 
-@router.post("", response_model=WorkspaceResponse, status_code=201)
+@router.post("/", response_model=WorkspaceResponse, status_code=201)
 async def create_workspace(request: CreateWorkspaceRequest):
     """创建工作区
 
@@ -350,7 +350,7 @@ async def _register_workspace_in_system_index(
 # ==================== 读取工作区列表 API ====================
 
 
-@router.get("", response_model=WorkspaceListResponse)
+@router.get("/", response_model=WorkspaceListResponse)
 async def get_workspaces(
     include_inactive: bool = Query(False, description="是否包含已停用的工作区"),
 ):

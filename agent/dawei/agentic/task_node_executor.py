@@ -14,7 +14,7 @@ from dawei.agentic.checkpoint_manager import (
     CheckpointType,
     IntelligentCheckpointManager,
 )
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.core.errors import CheckpointError, LLMError
 from dawei.core.events import TaskEventType, emit_typed_event
 from dawei.entity.lm_messages import (

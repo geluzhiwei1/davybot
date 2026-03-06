@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 # 导入服务依赖
 from dawei.api.services import get_workspace_file_service
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.storage.storage import Storage
 from dawei.storage.storage_provider import StorageProvider
 from dawei.tools.skill_manager import SkillManager
@@ -792,7 +792,7 @@ async def get_global_stats():
 
     # 3. 统计用户级 modes (agents) 总数
     modes_count = 0
-    modes_file = Path(get_dawei_home()) / ".dawei" / "modes.yaml"
+    modes_file = get_dawei_home() / ".dawei" / "modes.yaml"
     if modes_file.exists():
         with modes_file.open(encoding="utf-8") as f:
             modes_data = yaml.safe_load(f)

@@ -34,9 +34,9 @@ class WebSocketServer:
         from pathlib import Path
 
         # 使用 get_dawei_home 获取标准路径
-        from dawei.config import get_dawei_home
+        from dawei import get_dawei_home
 
-        session_root = str(Path(get_dawei_home()) / "sessions")
+        session_root = str(get_dawei_home() / "sessions")
         self.storage = LocalFileSystemStorage(root_dir=session_root)
 
         self.websocket_manager = WebSocketManager()

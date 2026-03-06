@@ -13,18 +13,7 @@ from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
-
-
-def get_dawei_home() -> Path:
-    """获取 DAWEI_HOME 路径
-
-    Returns:
-        Path: DAWEI_HOME 目录的绝对路径（默认 ~/.dawei）
-
-    """
-    dawei_home = os.environ.get("DAWEI_HOME", "~/.dawei")
-    return Path(dawei_home).expanduser().resolve()
-
+from dawei import get_dawei_home
 
 def get_log_dir() -> Path:
     """获取日志目录路径
@@ -33,7 +22,7 @@ def get_log_dir() -> Path:
         Path: 日志目录的绝对路径（DAWEI_HOME/logs）
 
     """
-    return Path(get_dawei_home()) / "logs"
+    return get_dawei_home() / "logs"
 
 
 class LoggingConfig(BaseSettings):

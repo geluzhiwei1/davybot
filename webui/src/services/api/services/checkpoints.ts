@@ -19,7 +19,7 @@ import type {
 
 // 检查点 API 服务类
 export class CheckpointsApiService {
-  private baseUrl = "/checkpoints"
+  private baseUrl = "/api/checkpoints"
 
   // 获取检查点列表
   async getCheckpoints(params?: {
@@ -37,8 +37,8 @@ export class CheckpointsApiService {
     task_graph_id?: string
     page?: number
     limit?: number
-  }): Promise<CheckpointListItem[]> {
-    return await httpClient.get<CheckpointListItem[]>(`${this.baseUrl}/list`, params)
+  }): Promise<CheckpointListResponse> {
+    return await httpClient.get<CheckpointListResponse>(`${this.baseUrl}/list`, params)
   }
 
   // 获取检查点详情

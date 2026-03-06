@@ -69,10 +69,11 @@ export interface RestoreCheckpointResponse {
 
 // 检查点列表响应
 export interface CheckpointListResponse {
-  checkpoints: CheckpointListItem[]
+  items: CheckpointListItem[]
   total: number
   page: number
   limit: number
+  pages: number
 }
 
 // 检查点统计信息

@@ -10,7 +10,7 @@ from typing import Any, get_type_hints
 
 from pydantic import BaseModel
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -197,7 +197,7 @@ class CustomToolProvider(ToolProvider):
 
                 # Build skills_roots with workspace and global paths
                 skills_roots = []
-                dawei_home = Path(get_dawei_home())
+                dawei_home = get_dawei_home()
 
                 # Level 1: Workspace (优先级最高) - if workspace_path provided
                 if self.workspace_path:

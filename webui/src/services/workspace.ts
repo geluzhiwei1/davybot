@@ -93,15 +93,19 @@ export interface WorkspaceResponse {
 }
 
 /**
- * Workspace Service
+ * Workspace CRUD Service
+ *
+ * 工作区CRUD操作服务
  */
-export const workspaceService = {
+export class WorkspaceCrudService {
+  private baseUrl = '/api/workspaces'
+
   /**
    * 验证工作区路径
    */
   async validatePath(data: ValidatePathRequest): Promise<ValidatePathResponse> {
-    return await httpClient.post<ValidatePathResponse>('/workspaces/workspaces/validate-path', data)
-  },
+    return await httpClient.post<ValidatePathResponse>(`${this.baseUrl}/validate-path`, data)
+  }
 
   /**
    * 获取工作区列表
@@ -109,22 +113,22 @@ export const workspaceService = {
   async getWorkspaces(params?: {
     include_inactive?: boolean
   }): Promise<WorkspaceListResponse> {
-    return await httpClient.get<WorkspaceListResponse>('/workspaces/workspaces', params)
-  },
+    return await httpClient.get<WorkspaceListResponse>(this.baseUrl, params)
+  }
 
   /**
    * 获取工作区详情
    */
   async getWorkspaceInfo(workspaceId: string): Promise<WorkspaceResponse> {
-    return await httpClient.get<WorkspaceResponse>(`/workspaces/workspaces/${workspaceId}/info`)
-  },
+    return await httpClient.get<WorkspaceResponse>(`${this.baseUrl}/${workspaceId}/info`)
+  }
 
   /**
    * 创建工作区
    */
   async createWorkspace(data: CreateWorkspaceRequest): Promise<WorkspaceResponse> {
-    return await httpClient.post<WorkspaceResponse>('/workspaces/workspaces', data)
-  },
+    return await httpClient.post<WorkspaceResponse>(this.baseUrl, data)
+  }
 
   /**
    * 更新工作区
@@ -133,8 +137,8 @@ export const workspaceService = {
     workspaceId: string,
     data: UpdateWorkspaceRequest
   ): Promise<WorkspaceResponse> {
-    return await httpClient.put<WorkspaceResponse>(`/workspaces/workspaces/${workspaceId}`, data)
-  },
+    return await httpClient.put<WorkspaceResponse>(`${this.baseUrl}/${workspaceId}`, data)
+  }
 
   /**
    * 删除工作区
@@ -149,10 +153,23 @@ export const workspaceService = {
     if (deleteFiles !== undefined) params.delete_files = String(deleteFiles)
 
     return await httpClient.delete<WorkspaceResponse>(
-      `/workspaces/workspaces/${workspaceId}`,
+      `${this.baseUrl}/${workspaceId}`,
       { params }
     )
   }
+}
+
+// 创建单例实例
+const workspaceCrudService = new WorkspaceCrudService()
+
+// 导出兼容的对象接口（向后兼容）
+export const workspaceService = {
+  validatePath: (data: ValidatePathRequest) => workspaceCrudService.validatePath(data),
+  getWorkspaces: (params?: { include_inactive?: boolean }) => workspaceCrudService.getWorkspaces(params),
+  getWorkspaceInfo: (workspaceId: string) => workspaceCrudService.getWorkspaceInfo(workspaceId),
+  createWorkspace: (data: CreateWorkspaceRequest) => workspaceCrudService.createWorkspace(data),
+  updateWorkspace: (workspaceId: string, data: UpdateWorkspaceRequest) => workspaceCrudService.updateWorkspace(workspaceId, data),
+  deleteWorkspace: (workspaceId: string, deleteConfig?: boolean, deleteFiles?: boolean) => workspaceCrudService.deleteWorkspace(workspaceId, deleteConfig, deleteFiles)
 }
 
 export default workspaceService

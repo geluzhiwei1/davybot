@@ -74,7 +74,8 @@
     "operations": "操作",
     "settings": "设置",
     "management": "管理",
-    "configuration": "配置"
+    "configuration": "配置",
+    "reset": "重置"
   },
   "time": {
     "justNow": "刚刚",

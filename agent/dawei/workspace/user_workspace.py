@@ -20,7 +20,7 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.conversation.conversation import Conversation, create_conversation
 # from dawei.core.events import CORE_EVENT_BUS  # REMOVED: CORE_EVENT_BUS deleted
 from dawei.entity.llm_config import LLMConfig

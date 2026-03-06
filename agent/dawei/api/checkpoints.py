@@ -33,3 +33,25 @@ async def get_checkpoint_statistics():
         "latest_checkpoint": None,
         "oldest_checkpoint": None,
     }
+
+
+@router.get("/list")
+async def list_checkpoints(page: int = 1, limit: int = 100):
+    """获取检查点列表
+
+    Args:
+        page: 页码（从1开始）
+        limit: 每页数量
+
+    Returns:
+        检查点列表
+    """
+    # TODO: Implement actual checkpoint listing from all workspaces
+    # For now, return empty list
+    return {
+        "items": [],
+        "total": 0,
+        "page": page,
+        "limit": limit,
+        "pages": 0,
+    }

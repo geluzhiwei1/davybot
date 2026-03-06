@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 
 logger = logging.getLogger(__name__)
 

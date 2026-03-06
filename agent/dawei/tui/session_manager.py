@@ -52,11 +52,11 @@ class SessionManager:
             workspace_path: Path to workspace directory
 
         """
-        from dawei.config import get_dawei_home
+        from dawei import get_dawei_home
 
         self.workspace_path = Path(workspace_path).resolve()
         # Use global sessions directory in DAWEI_HOME
-        dawei_home = Path(get_dawei_home())
+        dawei_home = get_dawei_home()
         self.sessions_dir = dawei_home / "sessions"
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.current_session: ChatSession | None = None

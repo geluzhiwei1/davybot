@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 
 
 class DaweiStructureValidationError(Exception):
@@ -380,7 +380,7 @@ def validate_dawei_on_startup(dawei_home: Path | None = None) -> None:
 
     # Get DAWEI_HOME
     if dawei_home is None:
-        dawei_home = Path(get_dawei_home())
+        dawei_home = get_dawei_home()
 
     logger.info("=== Validating .dawei directory structure ===")
     logger.info(f"DAWEI_HOME: {dawei_home}")

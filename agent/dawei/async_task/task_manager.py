@@ -55,7 +55,7 @@ class AsyncTaskManager(IAsyncTaskManager):
         storage_path = self.config.checkpoint_storage_path
         if not storage_path:
             # 使用默认全局路径
-            from dawei.config import get_dawei_home
+            from dawei import get_dawei_home
             storage_path = str(get_dawei_home()) + "/checkpoints"
 
         self._checkpoint_service = checkpoint_service or SimpleCheckpointService(

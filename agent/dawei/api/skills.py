@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.core.validators import validate_dict_key
 from dawei.tools.skill_manager import Skill, SkillManager
 from dawei.workspace.workspace_manager import workspace_manager
@@ -97,7 +97,7 @@ async def list_skills(
     返回技能的摘要信息，包括名称、描述、模式和范围
     """
     # 构建skills_roots，始终包含全局user目录 (DAWEI_HOME)
-    dawei_home = Path(get_dawei_home())
+    dawei_home = get_dawei_home()
     skills_roots = [dawei_home]
 
     # 自动检测 workspace_id（如果未提供）
@@ -185,7 +185,7 @@ async def search_skills(
         return SkillSearchResponse(query=query, results=[], total=0)
 
     # 构建skills_roots，始终包含全局user目录（与list_skills保持一致）
-    skills_roots = [Path(get_dawei_home())]  # 全局user目录 (DAWEI_HOME)
+    skills_roots = [get_dawei_home()]  # 全局user目录 (DAWEI_HOME)
 
     # 自动检测 workspace_id（如果未提供）
     workspace_id = _auto_detect_workspace_id(workspace_id, "search_skills")
@@ -249,7 +249,7 @@ async def get_skill(
 ):
     """获取特定技能的详细信息"""
     # 构建skills_roots，始终包含全局user目录（与list_skills保持一致）
-    skills_roots = [Path(get_dawei_home())]  # 全局user目录 (DAWEI_HOME)
+    skills_roots = [get_dawei_home()]  # 全局user目录 (DAWEI_HOME)
 
     # 自动检测 workspace_id（如果未提供）
     workspace_id = _auto_detect_workspace_id(workspace_id, "get_skill")
@@ -353,7 +353,7 @@ async def delete_skill(
 ):
     """删除指定技能"""
     # 构建skills_roots
-    skills_roots = [Path(get_dawei_home())]
+    skills_roots = [get_dawei_home()]
 
     if workspace_id:
         workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
@@ -425,7 +425,7 @@ async def update_skill(
 ):
     """更新指定技能"""
     # 构建skills_roots
-    skills_roots = [Path(get_dawei_home())]
+    skills_roots = [get_dawei_home()]
 
     if workspace_id:
         workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
@@ -527,7 +527,7 @@ async def get_skill_content(
 ):
     """获取技能的完整内容（包括SKILL.md全文）"""
     # 构建skills_roots
-    skills_roots = [Path(get_dawei_home())]
+    skills_roots = [get_dawei_home()]
 
     # 自动检测 workspace_id（如果未提供）
     workspace_id = _auto_detect_workspace_id(workspace_id, "get_skill_content")
@@ -596,7 +596,7 @@ async def create_skill(
     # 确定创建路径
     if request.scope == "user":
         # 用户级技能：创建在全局用户目录
-        skills_root = Path(get_dawei_home())
+        skills_root = get_dawei_home()
     else:
         # 工作区级技能：需要 workspace_id
         if not workspace_id:
@@ -737,7 +737,7 @@ async def get_skill_file_tree(
 ):
     """获取技能的文件树结构"""
     # 构建skills_roots
-    skills_roots = [Path(get_dawei_home())]
+    skills_roots = [get_dawei_home()]
 
     if workspace_id:
         workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
@@ -785,7 +785,7 @@ async def get_skill_file_content(
 ):
     """获取技能目录中指定文件的内容"""
     # 构建skills_roots
-    skills_roots = [Path(get_dawei_home())]
+    skills_roots = [get_dawei_home()]
 
     if workspace_id:
         workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
@@ -861,7 +861,7 @@ async def update_skill_file_content(
         raise HTTPException(status_code=400, detail="Request body is required")
 
     # 构建skills_roots
-    skills_roots = [Path(get_dawei_home())]
+    skills_roots = [get_dawei_home()]
 
     if workspace_id:
         workspace_info = workspace_manager.get_workspace_by_id(workspace_id)

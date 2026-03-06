@@ -1,6 +1,6 @@
 /* eslint-disable */
 <template>
-  <el-drawer v-model="visible" :title="t('workspaceSettings.title')" direction="rtl" :size="'80%'"
+  <el-drawer v-model="visible" :title="t('workspaceSettings.title')" direction="ltr" :size="'80%'"
     class="workspace-settings-drawer" @close="handleClose">
     <template #header>
       <div class="drawer-header">

@@ -7,7 +7,7 @@
 import { httpClient } from './http';
 
 class PrivacyConfigClient {
-  private baseUrl = '/privacy';
+  private baseUrl = '/api/privacy';
 
   /**
    * 获取隐私配置

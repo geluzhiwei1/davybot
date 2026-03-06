@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.memory.memory_graph import MemoryEntry, MemoryGraph, MemoryType
 
 # Router following the same pattern as files.py

@@ -17,9 +17,9 @@ import type {
 
 // 工作区API服务类
 export class WorkspacesApiService {
-  private baseUrl = '/workspaces';
-  // CRUD operations use /workspaces/workspaces prefix
-  private crudUrl = `${this.baseUrl}/workspaces`;
+  private baseUrl = '/api/workspaces';
+  // CRUD operations use /api/workspaces prefix
+  private crudUrl = this.baseUrl;
 
   // 获取工作区列表
   async getWorkspaces(params?: {
@@ -134,7 +134,7 @@ export class WorkspacesApiService {
     if (params?.order !== undefined) queryParams.append('order', params.order)
 
     const queryString = queryParams.toString()
-    const url = `/workspaces/${workspaceId}/conversations/${conversationId}${queryString ? `?${queryString}` : ''}`
+    const url = `/api/workspaces/${workspaceId}/conversations/${conversationId}${queryString ? `?${queryString}` : ''}`
 
     const response = await httpClient.get<{
       success: boolean;
@@ -154,7 +154,7 @@ export class WorkspacesApiService {
       success: boolean;
       message: string;
     }>(
-      `/workspaces/${workspaceId}/conversations/${conversationId}`
+      `/api/workspaces/${workspaceId}/conversations/${conversationId}`
     );
     return response;
   }
@@ -170,7 +170,7 @@ export class WorkspacesApiService {
       message: string;
       deletedCount: number;
     }>(
-      `/workspaces/${workspaceId}/conversations`
+      `/api/workspaces/${workspaceId}/conversations`
     );
     return response;
   }

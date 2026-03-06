@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.workspace.user_security_settings import UserSecuritySettings
 
 logger = logging.getLogger(__name__)

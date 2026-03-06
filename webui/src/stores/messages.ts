@@ -305,8 +305,10 @@ export const useMessageStore = defineStore('messages', () => {
     logger.debug(`[MessageStore] Adding message to workspace: ${targetWorkspaceId}`, {
       messageId: message.id,
       role: message.role,
-      contentLength: message.content.reduce((sum, c) => sum + (('text' in c) ? c.text?.length || 0 : 0), 0),
-      contentTypes: message.content.map(c => c.type),
+      contentLength: Array.isArray(message.content)
+        ? message.content.reduce((sum, c) => sum + (('text' in c) ? c.text?.length || 0 : 0), 0)
+        : 0,
+      contentTypes: Array.isArray(message.content) ? message.content.map(c => c.type) : [],
       currentWorkspaceId: getCurrentWorkspaceId(),
       targetWorkspaceId
     })

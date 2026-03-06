@@ -12,7 +12,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class TUIConfig:
                     return current_llm
 
             # Try user settings (DAWEI_HOME)
-            user_settings_file = Path(get_dawei_home()) / "settings.json"
+            user_settings_file = get_dawei_home() / "settings.json"
             if user_settings_file.exists():
                 with Path(user_settings_file).open() as f:
                     settings = json.load(f)

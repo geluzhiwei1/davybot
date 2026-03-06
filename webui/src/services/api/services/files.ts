@@ -14,7 +14,7 @@ import type {
 
 // 文件API服务类
 export class FilesApiService {
-  private baseUrl = '/files';
+  private baseUrl = '/api/workspaces';
 
   // 获取文件内容
   async getFileContent(workspaceId: string, filePath: string, options?: {
@@ -26,12 +26,12 @@ export class FilesApiService {
       path: filePath,
       ...options
     };
-    return await httpClient.get<FileContent>(`/workspaces/${workspaceId}/files`, params);
+    return await httpClient.get<FileContent>(`${this.baseUrl}/${workspaceId}/files`, params);
   }
 
   // 保存文件内容
   async saveFileContent(workspaceId: string, data: FileSaveRequest): Promise<FileSaveResponse> {
-    return await httpClient.post<FileSaveResponse>(`/workspaces/${workspaceId}/files`, data);
+    return await httpClient.post<FileSaveResponse>(`${this.baseUrl}/${workspaceId}/files`, data);
   }
 
   // 创建文件
@@ -45,7 +45,7 @@ export class FilesApiService {
     size: number;
     createdAt: string;
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/files/create`, data);
+    return await httpClient.post(`${this.baseUrl}/${workspaceId}/files/create`, data);
   }
 
   // 删除文件
@@ -56,7 +56,7 @@ export class FilesApiService {
       path: filePath,
       ...options
     };
-    return await httpClient.delete<void>(`/workspaces/${workspaceId}/files`, { params });
+    return await httpClient.delete<void>(`${this.baseUrl}/${workspaceId}/files`, { params });
   }
 
   // 复制文件
@@ -70,7 +70,7 @@ export class FilesApiService {
     size: number;
     copiedAt: string;
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/files/copy`, data);
+    return await httpClient.post(`/api/workspaces/${workspaceId}/files/copy`, data);
   }
 
   // 移动文件
@@ -84,7 +84,7 @@ export class FilesApiService {
     size: number;
     movedAt: string;
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/files/move`, data);
+    return await httpClient.post(`/api/workspaces/${workspaceId}/files/move`, data);
   }
 
   // 重命名文件
@@ -96,7 +96,7 @@ export class FilesApiService {
     newPath: string;
     renamedAt: string;
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/files/rename`, data);
+    return await httpClient.post(`/api/workspaces/${workspaceId}/files/rename`, data);
   }
 
   // 创建目录
@@ -107,7 +107,7 @@ export class FilesApiService {
     path: string;
     createdAt: string;
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/directories`, data);
+    return await httpClient.post(`/api/workspaces/${workspaceId}/directories`, data);
   }
 
   // 删除目录
@@ -119,7 +119,7 @@ export class FilesApiService {
       path: dirPath,
       ...options
     };
-    return await httpClient.delete<void>(`/workspaces/${workspaceId}/directories`, { params });
+    return await httpClient.delete<void>(`/api/workspaces/${workspaceId}/directories`, { params });
   }
 
   // 获取文件信息
@@ -141,7 +141,7 @@ export class FilesApiService {
     language?: string;
   }> {
     const params = { path: filePath };
-    return await httpClient.get(`/workspaces/${workspaceId}/files/info`, params);
+    return await httpClient.get(`/api/workspaces/${workspaceId}/files/info`, params);
   }
 
   // 获取文件历史版本
@@ -174,7 +174,7 @@ export class FilesApiService {
       path: filePath,
       ...params
     };
-    return await httpClient.get(`/workspaces/${workspaceId}/files/history`, requestParams);
+    return await httpClient.get(`/api/workspaces/${workspaceId}/files/history`, requestParams);
   }
 
   // 恢复文件到指定版本
@@ -188,7 +188,7 @@ export class FilesApiService {
     restoredAt: string;
     backupPath?: string;
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/files/restore`, data);
+    return await httpClient.post(`/api/workspaces/${workspaceId}/files/restore`, data);
   }
 
   // 搜索文件内容
@@ -198,7 +198,7 @@ export class FilesApiService {
     searchTime: number;
     hasMore: boolean;
   }> {
-    return await httpClient.get(`/workspaces/${workspaceId}/files/search`, searchParams);
+    return await httpClient.get(`/api/workspaces/${workspaceId}/files/search`, searchParams);
   }
 
   // 上传文件
@@ -226,13 +226,13 @@ export class FilesApiService {
       formData.append('createBackup', data.createBackup.toString());
     }
 
-    return await httpClient.upload(`/workspaces/${workspaceId}/files/upload`, formData);
+    return await httpClient.upload(`/api/workspaces/${workspaceId}/files/upload`, formData);
   }
 
   // 下载文件
   async downloadFile(workspaceId: string, filePath: string): Promise<Blob> {
     const params = { path: filePath };
-    return await httpClient.download(`/workspaces/${workspaceId}/files/download`, { params });
+    return await httpClient.download(`/api/workspaces/${workspaceId}/files/download`, { params });
   }
 
   // 获取文件预览
@@ -253,7 +253,7 @@ export class FilesApiService {
       path: filePath,
       ...options
     };
-    return await httpClient.get(`/workspaces/${workspaceId}/files/preview`, params);
+    return await httpClient.get(`/api/workspaces/${workspaceId}/files/preview`, params);
   }
 
   // 获取文件差异
@@ -273,7 +273,7 @@ export class FilesApiService {
     version1?: string;
     version2?: string;
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/files/diff`, data);
+    return await httpClient.post(`/api/workspaces/${workspaceId}/files/diff`, data);
   }
 
   // 批量操作文件
@@ -298,7 +298,7 @@ export class FilesApiService {
       failed: number;
     };
   }> {
-    return await httpClient.post(`/workspaces/${workspaceId}/files/batch`, data);
+    return await httpClient.post(`/api/workspaces/${workspaceId}/files/batch`, data);
   }
 
   // 获取文件统计信息
@@ -320,7 +320,7 @@ export class FilesApiService {
       modifiedAt: string;
     }>;
   }> {
-    return await httpClient.get(`/workspaces/${workspaceId}/files/stats`, params);
+    return await httpClient.get(`/api/workspaces/${workspaceId}/files/stats`, params);
   }
 
   // 获取工作区文件列表（用于@命令提示）

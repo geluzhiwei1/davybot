@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.core.decorators import safe_system_operation
 
 # Import MCP SDK (required dependency)

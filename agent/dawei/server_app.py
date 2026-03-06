@@ -115,7 +115,7 @@ from dawei.api import market
 from dawei.api import privacy
 from dawei.api import scheduled_tasks
 from dawei.api import container_runtime
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 
 
 

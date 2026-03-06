@@ -105,14 +105,14 @@ class WorkspacePersistenceManager:
             workspace_path: workspace根目录
 
         """
-        from dawei.config import get_dawei_home
+        from dawei import get_dawei_home
 
         self.workspace_path = Path(workspace_path)
         self.persistence_dir = self.workspace_path / ".dawei"
         self.lock_dir = self.persistence_dir / ".locks"
 
         # 全局目录（在 DAWEI_HOME 下）
-        dawei_home = Path(get_dawei_home())
+        dawei_home = get_dawei_home()
         self.checkpoints_dir = dawei_home / "checkpoints"
         self.sessions_dir = dawei_home / "sessions"  # 全局会话目录
 

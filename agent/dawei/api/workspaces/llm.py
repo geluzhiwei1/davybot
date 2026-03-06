@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from dawei.config import get_dawei_home
+from dawei import get_dawei_home
 from dawei.workspace.user_workspace import UserWorkspace
 
 logger = logging.getLogger(__name__)
@@ -259,7 +259,7 @@ async def create_llm_provider(
 
     if save_location == "user":
         # 保存到用户级配置
-        settings_file = Path(get_dawei_home()) / "settings.json"
+        settings_file = get_dawei_home() / "settings.json"
     else:
         # 保存到工作区级配置
         settings_file = workspace.user_config_dir / "settings.json"
@@ -566,7 +566,7 @@ async def delete_llm_provider(
 
     # 确定 provider 在哪个配置文件中
     workspace_settings_file = workspace.user_config_dir / "settings.json"
-    user_settings_file = Path(get_dawei_home()) / "settings.json"
+    user_settings_file = get_dawei_home() / "settings.json"
 
     # 查找 provider：先工作区，后用户级
     settings_file = None

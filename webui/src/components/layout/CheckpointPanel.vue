@@ -169,7 +169,8 @@ const loadCheckpoints = async () => {
       page: 1,
       limit: 100,
     });
-    checkpoints.value = result;
+    // API返回的是 { items: [], total: 0, page: 1, limit: 100, pages: 0 }
+    checkpoints.value = result.items || [];
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load checkpoints";
     console.error("Failed to load checkpoints:", e);
