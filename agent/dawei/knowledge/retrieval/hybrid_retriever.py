@@ -190,10 +190,11 @@ class HybridRetriever:
                 )
 
                 if not entity_matches:
-                    logger.debug("No matching entities found in graph")
+                    logger.info("No matching entities found in graph, falling back to vector search")
                     return []
 
                 entities = [entity_id for entity_id, score in entity_matches]
+                logger.info(f"Found {len(entities)} matching entities via search_entities")
 
             results = []
 
@@ -203,23 +204,29 @@ class HybridRetriever:
                 if not entity:
                     continue
 
-                # Add entity as a result if it has content
-                if entity.properties.get("content"):
-                    score = self._calculate_graph_relevance(entity, query.query)
-                    results.append(
-                        RetrievalResult(
-                            id=entity.id,
-                            content=entity.properties.get("content", ""),
-                            score=score,
-                            source="graph",
-                            metadata={
-                                "entity_id": entity.id,
-                                "entity_type": entity.type,
-                                "entity_name": entity.name,
-                                **entity.properties
-                            },
-                        )
+                # Get content from entity (try multiple fields)
+                content = (
+                    entity.properties.get("content") or
+                    entity.description or
+                    entity.name
+                )
+
+                # Always add entity as a result
+                score = self._calculate_graph_relevance(entity, query.query)
+                results.append(
+                    RetrievalResult(
+                        id=entity.id,
+                        content=content,
+                        score=score,
+                        source="graph",
+                        metadata={
+                            "entity_id": entity.id,
+                            "entity_type": entity.type,
+                            "entity_name": entity.name,
+                            **entity.properties
+                        },
                     )
+                )
 
                 # Find neighbors for broader context
                 neighbors = await self.graph_store.find_neighbors(
@@ -228,8 +235,14 @@ class HybridRetriever:
                 )
 
                 for neighbor in neighbors:
-                    # Skip if neighbor doesn't have content
-                    if not neighbor.properties.get("content"):
+                    # Skip if neighbor doesn't have any meaningful content
+                    neighbor_content = (
+                        neighbor.properties.get("content") or
+                        neighbor.description or
+                        neighbor.name
+                    )
+
+                    if not neighbor_content or neighbor_content == neighbor.name:
                         continue
 
                     # Score based on proximity and relevance
@@ -238,7 +251,7 @@ class HybridRetriever:
                     results.append(
                         RetrievalResult(
                             id=neighbor.id,
-                            content=neighbor.properties.get("content", neighbor.name),
+                            content=neighbor_content,
                             score=score,
                             source="graph",
                             metadata={
@@ -261,6 +274,7 @@ class HybridRetriever:
                     seen.add(result.id)
                     unique_results.append(result)
 
+            logger.info(f"Graph search returned {len(unique_results)} results from {len(entities)} entities")
             return unique_results[: query.top_k]
 
         except Exception as e:

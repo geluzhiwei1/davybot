@@ -85,6 +85,30 @@ export const knowledgeBasesApi = {
     const response = await axios.get(`${API_BASE}/bases/${baseId}/stats`)
     return response.data
   },
+
+  /**
+   * 获取图谱实体
+   */
+  getGraphEntities: async (baseId: string, params?: {
+    limit?: number
+    offset?: number
+    entity_type?: string
+  }) => {
+    const response = await axios.get(`${API_BASE}/bases/${baseId}/graph/entities`, { params })
+    return response.data
+  },
+
+  /**
+   * 获取图谱关系
+   */
+  getGraphRelations: async (baseId: string, params?: {
+    limit?: number
+    offset?: number
+    relation_type?: string
+  }) => {
+    const response = await axios.get(`${API_BASE}/bases/${baseId}/graph/relations`, { params })
+    return response.data
+  },
 }
 
 export const knowledgeApi = {

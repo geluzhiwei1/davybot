@@ -1126,6 +1126,23 @@
     "ruleBased": "Rule-based",
     "llm": "LLM-based",
     "nerModel": "NER Model",
-    "auto": "Auto"
+    "auto": "Auto",
+    "graphLoading": "Loading knowledge graph...",
+    "noGraphData": "No graph data available",
+    "loadGraphFailed": "Failed to load graph",
+    "graphLoaded": "Graph loaded successfully ({count} entities)",
+    "searchEntities": "Search entities...",
+    "filterEntityType": "Filter entity type",
+    "entityDetails": "Entity Details",
+    "entityName": "Entity Name",
+    "entityType": "Entity Type",
+    "description": "Description",
+    "connections": "Connections",
+    "properties": "Properties",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit Fullscreen",
+    "selectBaseFirst": "Please select a knowledge base first"
   }
 }

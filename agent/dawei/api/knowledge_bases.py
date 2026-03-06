@@ -3,6 +3,7 @@
 
 """Knowledge Base Management API - Multi-tenancy support"""
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Optional
@@ -725,9 +726,328 @@ async def get_document_from_base(base_id: str, document_id: str):
     )
 
 
+@router.post("/{base_id}/reindex")
+async def reindex_knowledge_base(base_id: str):
+    """Rebuild all indexes for a knowledge base (vector, fulltext, graph)
+
+    Args:
+        base_id: Knowledge base ID
+
+    Returns:
+        Re-indexing status with statistics
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
+
+    base_storage_path = manager._get_storage_path(base_id)
+    uploads_dir = base_storage_path / "uploads"
+
+    # Check if there are uploaded files
+    if not uploads_dir.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No uploads directory found. Please upload documents first.",
+        )
+
+    uploaded_files = list(uploads_dir.iterdir())
+    if not uploaded_files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No uploaded files found. Please upload documents first.",
+        )
+
+    logger.info(f"Starting re-indexing for knowledge base {base_id} with {len(uploaded_files)} files")
+
+    # Import required modules
+    from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
+    from dawei.knowledge.models import VectorDocument
+    from dawei.knowledge.parsers.docx_parser import DocxParser
+    from dawei.knowledge.parsers.markdown_parser import MarkdownParser
+    from dawei.knowledge.parsers.pdf_parser import PDFParser
+    from dawei.knowledge.parsers.text_parser import TextParser
+    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+    from dawei.knowledge.models import GraphEntity, GraphRelation
+    from dawei.knowledge.extraction import (
+        ExtractionFactory,
+        ExtractionStrategyType,
+    )
+
+    # Select appropriate parser based on file type
+    parser_map = {
+        ".pdf": PDFParser,
+        ".docx": DocxParser,
+        ".txt": TextParser,
+        ".md": MarkdownParser,
+        ".markdown": MarkdownParser,
+    }
+
+    # Initialize stores
+    vector_db_path = base_storage_path / "vectors.db"
+    vector_store = SQLiteVecVectorStore(
+        db_path=str(vector_db_path),
+        dimension=kb.settings.embedding_dimension,
+    )
+    await vector_store.initialize()
+
+    fulltext_store = manager.get_fulltext_store(base_id)
+    await fulltext_store.initialize()
+
+    graph_store = manager.get_graph_store(base_id)
+    await graph_store.initialize()
+
+    # Clear old graph data
+    await graph_store.clear()
+    logger.info("Cleared old graph data")
+
+    # Get embedding manager
+    embedding_service = manager.get_embedding_manager(base_id, model_type="MINILM")
+
+    # Determine chunk size from knowledge base settings
+    chunk_size = kb.settings.chunk_size
+    chunk_overlap = kb.settings.chunk_overlap
+    chunk_strategy_name = kb.settings.chunk_strategy
+
+    strategy_map = {
+        "recursive": ChunkingStrategy.RECURSIVE,
+        "semantic": ChunkingStrategy.SEMANTIC,
+    }
+    chunk_strategy = strategy_map.get(chunk_strategy_name, ChunkingStrategy.RECURSIVE)
+
+    chunker = TextChunker(
+        config=ChunkingConfig(
+            strategy=chunk_strategy,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        ),
+    )
+
+    # Get extraction strategy
+    extraction_strategy = kb.settings.extraction_strategy or "rule_based"
+    extractor = ExtractionFactory.create(extraction_strategy)
+
+    # Statistics
+    total_documents = 0
+    total_chunks = 0
+    total_entities = 0
+    total_relations = 0
+    errors = []
+
+    # Process each file
+    for file_path in uploaded_files:
+        try:
+            file_extension = file_path.suffix.lower()
+            if file_extension not in parser_map:
+                logger.warning(f"Unsupported file type: {file_extension}, skipping {file_path.name}")
+                errors.append(f"Skipped {file_path.name}: unsupported file type")
+                continue
+
+            parser_class = parser_map.get(file_extension, TextParser)
+            parser = parser_class()
+
+            # Parse document
+            document = await parser.parse(file_path)
+            logger.info(f"Parsed document: {file_path.name}")
+
+            # Chunk document
+            chunks = await chunker.chunk(document)
+            logger.info(f"Document chunked into {len(chunks)} chunks")
+
+            # Generate embeddings
+            chunk_texts = [chunk.content for chunk in chunks]
+            embeddings = await embedding_service.embed_documents(chunk_texts)
+
+            # Add to vector store
+            vector_docs = []
+            for chunk, embedding in zip(chunks, embeddings, strict=True):
+                metadata_copy = dict(chunk.metadata)
+                for key, value in metadata_copy.items():
+                    if hasattr(value, 'isoformat'):
+                        metadata_copy[key] = value.isoformat()
+
+                vector_doc = VectorDocument(
+                    id=chunk.id,
+                    embedding=embedding,
+                    content=chunk.content,
+                    metadata={
+                        **metadata_copy,
+                        "document_id": chunk.document_id,
+                        "chunk_index": chunk.chunk_index,
+                        "base_id": base_id,
+                        "file_name": file_path.name,
+                    },
+                )
+                vector_docs.append(vector_doc)
+
+            await vector_store.add(vector_docs)
+            logger.info(f"Added {len(vector_docs)} chunks to vector store")
+
+            # Add to full-text store
+            await fulltext_store.add_documents(chunks)
+            logger.info(f"Added {len(chunks)} chunks to full-text index")
+
+            # Create document entity
+            doc_entity = GraphEntity(
+                id=f"doc_{document.id}",
+                type="document",
+                name=file_path.name,
+                description=f"Document: {file_path.name}",
+                properties={
+                    "file_size": document.metadata.file_size,
+                    "file_type": document.metadata.file_type,
+                },
+                base_id=base_id,
+            )
+            await graph_store.add_entity(doc_entity)
+            total_entities += 1
+
+            # Create chunk entities and extract knowledge
+            entity_id_map = {}
+
+            for i, chunk in enumerate(chunks):
+                # Create chunk entity
+                chunk_entity = GraphEntity(
+                    id=chunk.id,
+                    type="chunk",
+                    name=f"Chunk {i}",
+                    description=chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content,
+                    properties={
+                        "chunk_index": i,
+                        "document_id": chunk.document_id,
+                        "content": chunk.content,
+                    },
+                    base_id=base_id,
+                )
+                await graph_store.add_entity(chunk_entity)
+                total_entities += 1
+
+                # Document -> chunk relation
+                doc_chunk_relation = GraphRelation(
+                    id=f"rel_{doc_entity.id}_{chunk.id}",
+                    from_entity=doc_entity.id,
+                    to_entity=chunk.id,
+                    relation_type="contains",
+                    properties={"order": i},
+                    base_id=base_id,
+                )
+                await graph_store.add_relation(doc_chunk_relation)
+                total_relations += 1
+
+                # Knowledge extraction from chunk content
+                try:
+                    extraction_result = await extractor.extract(
+                        chunk.content,
+                        chunk_id=chunk.id,
+                        document_id=document.id,
+                    )
+
+                    # Add extracted entities
+                    for entity in extraction_result.entities:
+                        entity_id = f"entity_{hash(entity.name)}_{base_id}"
+
+                        if entity.name not in entity_id_map:
+                            entity_id_map[entity.name] = entity_id
+
+                            graph_entity = GraphEntity(
+                                id=entity_id,
+                                type=entity.type,
+                                name=entity.name,
+                                description=entity.properties.get("description", ""),
+                                properties={
+                                    **entity.properties,
+                                    "confidence": entity.confidence,
+                                    "source": "extraction",
+                                },
+                                base_id=base_id,
+                            )
+                            await graph_store.add_entity(graph_entity)
+                            total_entities += 1
+
+                        # Chunk -> entity relation
+                        chunk_entity_relation = GraphRelation(
+                            id=f"rel_{chunk.id}_{entity_id_map[entity.name]}",
+                            from_entity=chunk.id,
+                            to_entity=entity_id_map[entity.name],
+                            relation_type="mentions",
+                            properties={
+                                "confidence": entity.confidence,
+                                "strategy": extraction_strategy,
+                            },
+                            base_id=base_id,
+                        )
+                        await graph_store.add_relation(chunk_entity_relation)
+                        total_relations += 1
+
+                    # Add extracted relations
+                    for relation in extraction_result.relations:
+                        from_id = entity_id_map.get(relation.from_entity)
+                        to_id = entity_id_map.get(relation.to_entity)
+
+                        if from_id and to_id:
+                            graph_relation = GraphRelation(
+                                id=f"rel_{from_id}_{to_id}_{relation.relation_type}",
+                                from_entity=from_id,
+                                to_entity=to_id,
+                                relation_type=relation.relation_type,
+                                properties={
+                                    **relation.properties,
+                                    "confidence": relation.confidence,
+                                    "strategy": extraction_strategy,
+                                },
+                                base_id=base_id,
+                            )
+                            await graph_store.add_relation(graph_relation)
+                            total_relations += 1
+
+                except Exception as e:
+                    logger.warning(f"Failed to extract knowledge from chunk {i}: {e}")
+
+            total_documents += 1
+            total_chunks += len(chunks)
+            logger.info(f"Successfully indexed {file_path.name}")
+
+        except Exception as e:
+            error_msg = f"Failed to index {file_path.name}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            errors.append(error_msg)
+
+    # Update knowledge base stats
+    kb.stats.total_documents = total_documents
+    kb.stats.total_chunks = total_chunks
+    kb.stats.total_entities = total_entities
+    kb.stats.total_relations = total_relations
+    kb.stats.indexed_documents = total_documents
+    kb.stats.last_indexed_at = None  # Will be set by default factory
+    kb.stats.last_updated_at = None  # Will be set by default factory
+    manager._save_metadata()
+
+    logger.info(
+        f"Re-indexing complete: {total_documents} documents, "
+        f"{total_chunks} chunks, {total_entities} entities, "
+        f"{total_relations} relations"
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "base_id": base_id,
+            "message": "Knowledge base re-indexed successfully",
+            "stats": {
+                "total_documents": total_documents,
+                "total_chunks": total_chunks,
+                "total_entities": total_entities,
+                "total_relations": total_relations,
+            },
+            "errors": errors if errors else None,
+        },
+    )
+
+
 @router.post("/{base_id}/documents/{document_id}/reindex")
 async def reindex_document_in_base(base_id: str, document_id: str):
-    """Re-index a document in a knowledge base
+    """Re-index a single document in a knowledge base
 
     Args:
         base_id: Knowledge base ID
@@ -741,22 +1061,9 @@ async def reindex_document_in_base(base_id: str, document_id: str):
     if not kb:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
 
-    # TODO: Implement document re-indexing
-    # This would involve:
-    # 1. Finding the original file
-    # 2. Re-parsing and chunking
-    # 3. Removing old chunks from vector store
-    # 4. Adding new chunks
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "success": True,
-            "document_id": document_id,
-            "base_id": base_id,
-            "message": "Document re-indexed successfully",
-        },
-    )
+    # TODO: Implement single document re-indexing
+    # For now, redirect to full re-index
+    return await reindex_knowledge_base(base_id)
 
 
 # ============================================================================
@@ -926,3 +1233,209 @@ async def search_default_base(
 
     # Delegate to base-specific search
     return await search_in_base(default_kb.id, query, mode, top_k)
+
+
+@router.get("/{base_id}/graph/entities")
+async def get_graph_entities(
+    base_id: str,
+    limit: int = Query(100, ge=1, le=10000, description="Maximum number of entities to return"),
+    offset: int = Query(0, ge=0, description="Number of entities to skip"),
+    entity_type: str | None = Query(None, description="Filter by entity type"),
+):
+    """Get entities from knowledge graph
+
+    Args:
+        base_id: Knowledge base ID
+        limit: Maximum number of entities
+        offset: Number of entities to skip
+        entity_type: Optional entity type filter
+
+    Returns:
+        List of graph entities
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Knowledge base not found"
+        )
+
+    try:
+        graph_store = manager.get_graph_store(base_id)
+        await graph_store.initialize()
+
+        # Get all entities (filter by type if specified)
+        entities = []
+        entity_ids = set()
+
+        # Simple implementation: query from database
+        import aiosqlite
+
+        base_storage_path = manager._get_storage_path(base_id)
+        graph_db_path = base_storage_path / "graph.db"
+
+        if not graph_db_path.exists():
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "success": True,
+                    "entities": [],
+                    "total": 0,
+                }
+            )
+
+        async with aiosqlite.connect(graph_db_path) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Build query
+            query = "SELECT * FROM entities"
+            params = []
+
+            if entity_type:
+                query += " WHERE type = ?"
+                params.append(entity_type)
+
+            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+
+            cursor = await db.execute(query, params)
+            rows = await cursor.fetchall()
+
+            for row in rows:
+                entities.append({
+                    "id": row["id"],
+                    "type": row["type"],
+                    "name": row["name"],
+                    "description": row["description"],
+                    "properties": json.loads(row["properties"]) if row["properties"] else {},
+                    "base_id": row["base_id"],
+                    "created_at": row["created_at"],
+                })
+                entity_ids.add(row["id"])
+
+        # Get total count
+        async with aiosqlite.connect(graph_db_path) as db:
+            count_query = "SELECT COUNT(*) FROM entities"
+            if entity_type:
+                count_query += " WHERE type = ?"
+                cursor = await db.execute(count_query, [entity_type] if entity_type else ())
+            else:
+                cursor = await db.execute(count_query)
+            total = (await cursor.fetchone())[0]
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "entities": entities,
+                "total": total,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get graph entities: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get graph entities: {str(e)}"
+        )
+
+
+@router.get("/{base_id}/graph/relations")
+async def get_graph_relations(
+    base_id: str,
+    limit: int = Query(100, ge=1, le=10000, description="Maximum number of relations to return"),
+    offset: int = Query(0, ge=0, description="Number of relations to skip"),
+    relation_type: str | None = Query(None, description="Filter by relation type"),
+):
+    """Get relations from knowledge graph
+
+    Args:
+        base_id: Knowledge base ID
+        limit: Maximum number of relations
+        offset: Number of relations to skip
+        relation_type: Optional relation type filter
+
+    Returns:
+        List of graph relations
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Knowledge base not found"
+        )
+
+    try:
+        # Get relations from database
+        import aiosqlite
+
+        base_storage_path = manager._get_storage_path(base_id)
+        graph_db_path = base_storage_path / "graph.db"
+
+        if not graph_db_path.exists():
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "success": True,
+                    "relations": [],
+                    "total": 0,
+                }
+            )
+
+        async with aiosqlite.connect(graph_db_path) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Build query
+            query = "SELECT * FROM relations"
+            params = []
+
+            if relation_type:
+                query += " WHERE relation_type = ?"
+                params.append(relation_type)
+
+            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+
+            cursor = await db.execute(query, params)
+            rows = await cursor.fetchall()
+
+            relations = []
+            for row in rows:
+                relations.append({
+                    "id": row["id"],
+                    "from_entity": row["from_entity"],
+                    "to_entity": row["to_entity"],
+                    "relation_type": row["relation_type"],
+                    "properties": json.loads(row["properties"]) if row["properties"] else {},
+                    "weight": row["weight"],
+                    "base_id": row["base_id"],
+                    "created_at": row["created_at"],
+                })
+
+        # Get total count
+        async with aiosqlite.connect(graph_db_path) as db:
+            count_query = "SELECT COUNT(*) FROM relations"
+            if relation_type:
+                count_query += " WHERE relation_type = ?"
+                cursor = await db.execute(count_query, [relation_type] if relation_type else ())
+            else:
+                cursor = await db.execute(count_query)
+            total = (await cursor.fetchone())[0]
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "relations": relations,
+                "total": total,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get graph relations: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get graph relations: {str(e)}"
+        )

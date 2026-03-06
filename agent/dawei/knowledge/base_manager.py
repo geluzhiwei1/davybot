@@ -426,12 +426,16 @@ class KnowledgeBaseManager:
             base_id: Knowledge base ID
 
         Returns:
-            None (graph store disabled temporarily)
+            SQLiteGraphStore instance
         """
-        # TODO: Implement graph store with full abstract method implementations
-        # For now, return None to disable graph functionality
-        logger.warning(f"Graph store is temporarily disabled for knowledge base {base_id}")
-        return None
+        from dawei.knowledge.graph.sqlite_graph_store import SQLiteGraphStore
+
+        base_storage_path = self._get_storage_path(base_id)
+        graph_db_path = base_storage_path / "graph.db"
+
+        graph_store = SQLiteGraphStore(db_path=str(graph_db_path))
+
+        return graph_store
 
     def list_base_documents(
         self, base_id: str, skip: int = 0, limit: int = 10

@@ -1,28 +1,15 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <div class="knowledge-settings">
-    <!-- 顶部提示 -->
-    <el-alert :title="t('knowledge.title')" type="info" :closable="false" show-icon style="margin-bottom: 20px">
-      <template #default>
-        <p style="margin: 0; font-size: 13px;">
-          {{ t('knowledge.description') }}
-        </p>
-      </template>
-    </el-alert>
-
     <!-- 操作按钮 -->
     <div class="knowledge-actions">
       <!-- 知识库选择器 -->
-      <KnowledgeBaseSelector
-        v-model="selectedBaseId"
-        @update:modelValue="handleBaseIdChange"
-        @change="handleBaseChange"
-        style="width: 300px;"
-      />
+      <KnowledgeBaseSelector v-model="selectedBaseId" @update:modelValue="handleBaseIdChange" @change="handleBaseChange"
+        style="width: 300px;" />
 
       <el-button type="primary" :icon="Upload" @click="showUploadDialog">
         {{ t('knowledge.uploadDocument') }}
@@ -38,67 +25,14 @@
       </el-button>
     </div>
 
-    <!-- 统计卡片 -->
-    <el-row :gutter="16" style="margin: 20px 0;">
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <el-icon :size="28" color="#409EFF"><Document /></el-icon>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.totalDocuments }}</div>
-              <div class="stat-label">{{ t('knowledge.totalDocuments') }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <el-icon :size="28" color="#67C23A"><Grid /></el-icon>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.totalChunks }}</div>
-              <div class="stat-label">{{ t('knowledge.totalChunks') }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <el-icon :size="28" color="#E6A23C"><DataLine /></el-icon>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.avgRelevance }}</div>
-              <div class="stat-label">{{ t('knowledge.avgRelevance') }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <el-icon :size="28" color="#F56C6C"><Clock /></el-icon>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.lastIndexed }}</div>
-              <div class="stat-label">{{ t('knowledge.lastIndexed') }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
     <!-- 内部标签页 -->
     <el-tabs v-model="innerTab" type="border-card">
       <!-- 文档列表 -->
       <el-tab-pane :label="t('knowledge.documents')" name="documents">
         <!-- 搜索和过滤 -->
         <div class="search-bar">
-          <el-input
-            v-model="searchQuery"
-            :placeholder="t('knowledge.searchPlaceholder')"
-            :prefix-icon="Search"
-            clearable
-            style="width: 300px;"
-          />
+          <el-input v-model="searchQuery" :placeholder="t('knowledge.searchPlaceholder')" :prefix-icon="Search"
+            clearable style="width: 300px;" />
           <el-select v-model="filterType" :placeholder="t('knowledge.filterType')" style="width: 150px;">
             <el-option label="全部" value="all" />
             <el-option label="PDF" value="pdf" />
@@ -109,14 +43,8 @@
         </div>
 
         <!-- 文档表格 -->
-        <el-table
-          :data="filteredDocuments"
-          v-loading="isLoading"
-          :element-loading-text="t('knowledge.loading')"
-          stripe
-          height="calc(100vh - 500px)"
-          style="width: 100%; margin-top: 16px;"
-        >
+        <el-table :data="filteredDocuments" v-loading="isLoading" :element-loading-text="t('knowledge.loading')" stripe
+          height="calc(100vh - 500px)" style="width: 100%; margin-top: 16px;">
           <el-table-column prop="file_name" :label="t('knowledge.fileName')" min-width="200" show-overflow-tooltip />
           <el-table-column prop="file_type" :label="t('knowledge.fileType')" width="100">
             <template #default="{ row }">
@@ -152,16 +80,10 @@
         </el-table>
 
         <!-- 分页 -->
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="totalCount"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          style="margin-top: 16px; justify-content: center;"
-          @size-change="handleSizeChange"
-          @current-change="handlePageChange"
-        />
+        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :total="totalCount"
+          :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next"
+          style="margin-top: 16px; justify-content: center;" @size-change="handleSizeChange"
+          @current-change="handlePageChange" />
       </el-tab-pane>
 
       <!-- 智能搜索 -->
@@ -169,13 +91,8 @@
         <div class="rag-search">
           <!-- 查询输入 -->
           <div class="search-box">
-            <el-input
-              v-model="ragQuery"
-              type="textarea"
-              :rows="3"
-              :placeholder="t('knowledge.ragQueryPlaceholder')"
-              @keydown.enter.ctrl="handleRAGSearch"
-            />
+            <el-input v-model="ragQuery" type="textarea" :rows="3" :placeholder="t('knowledge.ragQueryPlaceholder')"
+              @keydown.enter.ctrl="handleRAGSearch" />
             <div class="search-controls">
               <el-select v-model="searchMode" :placeholder="t('knowledge.searchMode')" style="width: 150px;">
                 <el-option label="Hybrid" value="hybrid" />
@@ -216,7 +133,9 @@
                 </div>
                 <div class="result-actions">
                   <el-button size="small" text @click="copyContent(result)">
-                    <el-icon><DocumentCopy /></el-icon>
+                    <el-icon>
+                      <DocumentCopy />
+                    </el-icon>
                     {{ t('knowledge.copy') }}
                   </el-button>
                 </div>
@@ -234,35 +153,25 @@
                 </el-button>
               </div>
             </template>
-            <el-input
-              :model-value="ragContext"
-              type="textarea"
-              :rows="10"
-              readonly
-            />
+            <el-input :model-value="ragContext" type="textarea" :rows="10" readonly />
           </el-card>
         </div>
+      </el-tab-pane>
+
+      <!-- 知识图谱 -->
+      <el-tab-pane :label="t('knowledge.graph')" name="graph">
+        <GraphVisualization v-if="selectedBaseId" :base-id="selectedBaseId" />
+        <el-empty v-else :description="t('knowledge.selectBaseFirst')" />
       </el-tab-pane>
     </el-tabs>
 
     <!-- 上传文档对话框 -->
-    <el-dialog
-      v-model="uploadDialogVisible"
-      :title="t('knowledge.uploadDocument')"
-      width="600px"
-    >
-      <el-upload
-        ref="uploadRef"
-        class="upload-demo"
-        drag
-        :action="uploadActionUrl"
-        :on-success="handleUploadSuccess"
-        :on-error="handleUploadError"
-        :before-upload="beforeUpload"
-        :file-list="uploadFileList"
-        multiple
-      >
-        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+    <el-dialog v-model="uploadDialogVisible" :title="t('knowledge.uploadDocument')" width="600px">
+      <el-upload ref="uploadRef" class="upload-demo" drag :action="uploadActionUrl" :on-success="handleUploadSuccess"
+        :on-error="handleUploadError" :before-upload="beforeUpload" :file-list="uploadFileList" multiple>
+        <el-icon class="el-icon--upload">
+          <UploadFilled />
+        </el-icon>
         <div class="el-upload__text">
           {{ t('knowledge.uploadText') }}
         </div>
@@ -275,11 +184,7 @@
     </el-dialog>
 
     <!-- 文档预览对话框 -->
-    <el-dialog
-      v-model="previewDialogVisible"
-      :title="previewDocument?.file_name"
-      width="700px"
-    >
+    <el-dialog v-model="previewDialogVisible" :title="previewDocument?.file_name" width="700px">
       <div v-if="previewDocument" class="document-preview">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item :label="t('knowledge.fileType')">
@@ -298,21 +203,12 @@
           </el-descriptions-item>
         </el-descriptions>
         <el-divider />
-        <el-input
-          :model-value="previewContent"
-          type="textarea"
-          :rows="15"
-          readonly
-        />
+        <el-input :model-value="previewContent" type="textarea" :rows="15" readonly />
       </div>
     </el-dialog>
 
     <!-- 设置对话框 -->
-    <el-dialog
-      v-model="settingsDialogVisible"
-      :title="t('knowledge.settings')"
-      width="500px"
-    >
+    <el-dialog v-model="settingsDialogVisible" :title="t('knowledge.settings')" width="500px">
       <el-form :model="settings" label-width="160px">
         <el-form-item :label="t('knowledge.chunkSize')">
           <el-input-number v-model="settings.chunkSize" :min="100" :max="2000" :step="50" />
@@ -379,12 +275,7 @@
     </el-dialog>
 
     <!-- 知识库管理对话框 -->
-    <el-dialog
-      v-model="baseManagerDialogVisible"
-      title="知识库管理"
-      width="90%"
-      :close-on-click-modal="false"
-    >
+    <el-dialog v-model="baseManagerDialogVisible" title="知识库管理" width="90%" :close-on-click-modal="false">
       <KnowledgeBaseManager @close="baseManagerDialogVisible = false" />
     </el-dialog>
   </div>
@@ -413,6 +304,7 @@ import type { DocumentInfo, SearchResult, Stats, KnowledgeBase, ExtractionStrate
 import { logger } from '@/utils/logger'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import KnowledgeBaseManager from './KnowledgeBaseManager.vue'
+import GraphVisualization from './GraphVisualization.vue'
 
 const { t } = useI18n()
 
@@ -705,7 +597,7 @@ const saveSettings = async () => {
           chunk_strategy: settings.value.chunkStrategy,
           embedding_model: settings.value.embeddingModel,
           embedding_dimension: settings.value.embeddingModel === 'bge-m3' ? 1024 :
-                            settings.value.embeddingModel === 'jina-v4' ? 768 : 384,
+            settings.value.embeddingModel === 'jina-v4' ? 768 : 384,
           extraction_strategy: settings.value.extractionStrategy,
           default_top_k: 5,
           default_mode: 'hybrid',

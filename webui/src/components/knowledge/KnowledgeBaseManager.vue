@@ -1,13 +1,5 @@
 <template>
   <div class="knowledge-base-manager">
-    <div class="header">
-      <h2>知识库管理</h2>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        创建知识库
-      </el-button>
-    </div>
-
     <!-- 知识库列表 -->
     <el-table :data="knowledgeBases" v-loading="loading" stripe>
       <el-table-column prop="name" label="名称" min-width="200">
@@ -48,13 +40,7 @@
 
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
-          <el-button
-            v-if="!row.is_default"
-            link
-            type="primary"
-            size="small"
-            @click="handleSetDefault(row)"
-          >
+          <el-button v-if="!row.is_default" link type="primary" size="small" @click="handleSetDefault(row)">
             设为默认
           </el-button>
           <el-button link type="primary" size="small" @click="handleEdit(row)">
@@ -68,50 +54,25 @@
     </el-table>
 
     <!-- 创建/编辑对话框 -->
-    <el-dialog
-      v-model="showCreateDialog"
-      :title="editingBase ? '编辑知识库' : '创建知识库'"
-      width="600px"
-    >
+    <el-dialog v-model="showCreateDialog" :title="editingBase ? '编辑知识库' : '创建知识库'" width="600px">
       <el-form :model="formData" label-width="120px">
         <el-form-item label="名称">
-          <el-input
-            v-model="formData.name"
-            placeholder="输入知识库名称"
-            maxlength="100"
-            show-word-limit
-          />
+          <el-input v-model="formData.name" placeholder="输入知识库名称" maxlength="100" show-word-limit />
         </el-form-item>
 
         <el-form-item label="描述">
-          <el-input
-            v-model="formData.description"
-            type="textarea"
-            placeholder="输入知识库描述"
-            :rows="3"
-            maxlength="500"
-            show-word-limit
-          />
+          <el-input v-model="formData.description" type="textarea" placeholder="输入知识库描述" :rows="3" maxlength="500"
+            show-word-limit />
         </el-form-item>
 
         <el-divider content-position="left">高级设置</el-divider>
 
         <el-form-item label="分块大小">
-          <el-input-number
-            v-model="formData.settings!.chunk_size"
-            :min="100"
-            :max="10000"
-            :step="100"
-          />
+          <el-input-number v-model="formData.settings!.chunk_size" :min="100" :max="10000" :step="100" />
         </el-form-item>
 
         <el-form-item label="分块重叠">
-          <el-input-number
-            v-model="formData.settings!.chunk_overlap"
-            :min="0"
-            :max="1000"
-            :step="50"
-          />
+          <el-input-number v-model="formData.settings!.chunk_overlap" :min="0" :max="1000" :step="50" />
         </el-form-item>
 
         <el-form-item label="嵌入模型">

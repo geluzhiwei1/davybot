@@ -100,10 +100,10 @@ class LLMExtractor(ExtractionStrategy):
 
         try:
             # Import message types
-            from dawei.entity.lm_messages import LLMMessage, Role
+            from dawei.entity.lm_messages import UserMessage, MessageRole
 
             # Create message
-            messages = [LLMMessage(role=Role.USER, content=prompt)]
+            messages = [UserMessage(role=MessageRole.USER, content=prompt)]
 
             # Call LLM service
             logger.info("Calling LLM for knowledge extraction...")
