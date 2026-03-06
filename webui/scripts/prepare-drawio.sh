@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPS_DRAWIO="$PROJECT_ROOT/../deps/drawio"
 PUBLIC_DRAWIO="$PROJECT_ROOT/public/drawio"
-DRAWIO_REPO="git@github.com:geluzhiwei1/drawio.git"
+DRAWIO_REPO="https://github.com/geluzhiwei1/drawio.git"
 
 echo -e "${YELLOW}正在检查 drawio 资源...${NC}"
 
@@ -44,7 +44,7 @@ if git clone "$DRAWIO_REPO" "$DEPS_DRAWIO"; then
 else
     echo -e "${RED}✗ clone drawio 失败${NC}"
     echo -e "${RED}请手动执行以下命令：${NC}"
-    echo -e "${RED}  cd /home/dev007/ws/davybot/deps${NC}"
-    echo -e "${RED}  git clone git@github.com:geluzhiwei1/drawio.git${NC}"
+    echo -e "${RED}  cd davybot/deps${NC}"
+    echo -e "${RED}  git clone https://github.com/geluzhiwei1/drawio.git${NC}"
     exit 1
 fi
