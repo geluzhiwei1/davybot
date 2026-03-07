@@ -552,6 +552,27 @@ class ToolConfig(BaseSettings):
     max_concurrent_executions: int = Field(default=3)
 
 
+class SupportSystemConfig(BaseSettings):
+    """支持系统配置"""
+
+    model_config = ConfigDict(
+        env_prefix="SUPPORT_SYSTEM_",
+        env_file=[".env", "services/agent-api/.env"],
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="allow",
+    )
+
+    # 支持系统 URL
+    url: str = Field(default="http://localhost:8766", alias="SUPPORT_SYSTEM_URL")
+    verify_ssl: bool = Field(default=True, alias="SUPPORT_SYSTEM_VERIFY_SSL")
+
+    # OAuth 配置
+    oauth_client_id: str = Field(default="davybot", alias="OAUTH_CLIENT_ID")
+    oauth_client_secret: str = Field(default="davybot-secret-key", alias="OAUTH_CLIENT_SECRET")
+    oauth_redirect_uri: str = Field(default="http://localhost:8465/api/auth/callback", alias="OAUTH_REDIRECT_URI")
+
+
 # ============================================================================
 # Analytics Configuration
 # ============================================================================
@@ -722,6 +743,7 @@ class Settings(BaseSettings):
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     tool: ToolConfig = Field(default_factory=ToolConfig)
+    support_system: SupportSystemConfig = Field(default_factory=SupportSystemConfig)
 
     @classmethod
     def load_from_env(cls, env_file: str = ".env") -> "Settings":

@@ -127,6 +127,12 @@ export {
   getFeaturedMarketResources
 } from './services/market';
 
+// Support System API Service
+export {
+  SupportApiService,
+  supportApi
+} from './services/support';
+
 // Slash Commands类型
 export type {
   SlashCommand,
@@ -153,6 +159,26 @@ export type {
   FeaturedResponse,
   CategoryResponse
 } from './services/market';
+
+// Support System API types
+export type {
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
+  RefreshTokenRequest,
+  RefreshTokenResponse,
+  UserInfo,
+  SendVerificationCodeRequest,
+  SendVerificationCodeResponse,
+  VerifyCodeRequest,
+  TokenStats,
+  TokenUsageEntry,
+  UserProfile,
+  UpdateProfileRequest,
+  HealthCheckResponse,
+  ServiceInfoResponse
+} from './services/support';
 
 // 工作区便捷函数
 export {
@@ -238,6 +264,7 @@ import { SkillsApiService, skillsApi } from './services/skills';
 import { ScheduledTasksApiService, scheduledTasksApi } from './services/scheduledTasks';
 import { MemoryApiService, createMemoryApiService } from './services/memory';
 import { MarketApiService, marketApi } from './services/market';
+import { SupportApiService, supportApi } from './services/support';
 import type { HttpConfig, WebSocketConfig } from './types';
 
 export class ApiManager {
@@ -295,6 +322,10 @@ export class ApiManager {
 
   getMarketApi(): MarketApiService {
     return marketApi;
+  }
+
+  getSupportApi(): SupportApiService {
+    return supportApi;
   }
 
   getScheduledTasksApi(): ScheduledTasksApiService {

@@ -101,7 +101,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
       tagType: 'primary',
       dividerTitle: 'OpenAI兼容 配置'
     },
-    docsUrl: 'http://www.davybot.com/books/providers/llm.html#openai',
+    docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#openai',
     models: [
       // OpenAI兼容模式不提供预定义模型，用户可以自由输入
     ],
@@ -118,7 +118,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
   //     tagType: 'success',
   //     dividerTitle: 'DeepSeek 配置'
   //   },
-  //   docsUrl: 'http://www.davybot.com/books/providers/llm.html#deepseek',
+  //   docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#deepseek',
   //   models: [
   //     'deepseek-chat',
   //     'deepseek-coder',
@@ -137,7 +137,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
   //     tagType: 'success',
   //     dividerTitle: 'Moonshot 配置'
   //   },
-  //   docsUrl: 'http://www.davybot.com/books/providers/llm.html#moonshot',
+  //   docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#moonshot',
   //   models: [
   //     'moonshot-v1-8k',
   //     'moonshot-v1-32k',
@@ -156,7 +156,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
   //     tagType: 'success',
   //     dividerTitle: 'Qwen 配置'
   //   },
-  //   docsUrl: 'http://www.davybot.com/books/providers/llm.html#qwen',
+  //   docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#qwen',
   //   models: [
   //     'qwen-turbo',
   //     'qwen-plus',
@@ -177,7 +177,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
       tagType: 'success',
       dividerTitle: 'GLM 配置'
     },
-    docsUrl: 'http://www.davybot.com/books/providers/llm.html#glm',
+    docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#glm',
     models: [
       'glm-5',
       'glm-4.7',
@@ -197,7 +197,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
   //     tagType: 'warning',
   //     dividerTitle: 'Gemini 配置'
   //   },
-  //   docsUrl: 'http://www.davybot.com/books/providers/llm.html#gemini',
+  //   docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#gemini',
   //   models: [
   //     'gemini-2.0-flash-exp',
   //     'gemini-1.5-pro',
@@ -217,7 +217,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
   //     tagType: 'danger',
   //     dividerTitle: 'Claude 配置'
   //   },
-  //   docsUrl: 'http://www.davybot.com/books/providers/llm.html#claude',
+  //   docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#claude',
   //   models: [
   //     'claude-3-5-sonnet-20241022',
   //     'claude-3-5-haiku-20241022',
@@ -238,7 +238,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
   //     tagType: 'info',
   //     dividerTitle: 'MiniMax 配置'
   //   },
-  //   docsUrl: 'http://www.davybot.com/books/providers/llm.html#minimax',
+  //   docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#minimax',
   //   models: [
   //     'MiniMax-M2.5',
   //     'MiniMax-M2.5-highspeed',
@@ -258,7 +258,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
   //     tagType: 'primary',
   //     dividerTitle: 'OpenRouter 配置'
   //   },
-  //   docsUrl: 'http://www.davybot.com/books/providers/llm.html#openrouter',
+  //   docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#openrouter',
   //   models: [
   //     'openai/gpt-4o',
   //     'openai/gpt-4o-mini',
@@ -281,7 +281,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, ProviderFullConfig> = {
       tagType: 'info',
       dividerTitle: 'Ollama 配置'
     },
-    docsUrl: 'http://www.davybot.com/books/providers/llm.html#ollama',
+    docsUrl: 'http://www.davybot.com/books/book/providers/llm.html#ollama',
     models: [
       'qwen3.5:9b',
       'llama3.1',

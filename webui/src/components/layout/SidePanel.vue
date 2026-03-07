@@ -120,9 +120,6 @@
       </div>
     </div>
 
-    <!-- 用户设置抽屉 -->
-    <UserSettingsDrawer v-model="isUserSettingsVisible" />
-
     <!-- 文件上传对话框 -->
     <FileUploadDialog v-model="isUploadDialogVisible" :workspace-id="workspaceId" parent-path="" parent-name=""
       @success="handleUploadSuccess" />
@@ -186,7 +183,6 @@ import {
   ChatDotRound, Folder, Document, Plus, Delete,
   FolderAdd, Edit, CopyDocument, Upload, Refresh, Download, Close
 } from '@element-plus/icons-vue';
-import UserSettingsDrawer from './UserSettingsDrawer.vue';
 import FileUploadDialog from '@/components/FileUploadDialog.vue';
 import { useMobile } from '@/composables/useMobile';
 
@@ -276,9 +272,6 @@ const handleTaskCompleteRefresh = async (event: unknown) => {
     }
   }
 }
-
-// 用户设置抽屉
-const isUserSettingsVisible = ref(false);
 
 // 文件上传对话框
 const isUploadDialogVisible = ref(false);

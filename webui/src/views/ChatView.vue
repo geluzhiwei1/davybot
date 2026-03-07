@@ -39,9 +39,6 @@
           <el-tooltip :content="t('sidePanel.switchWorkspace')" placement="right">
             <el-button :icon="Switch" @click="handleSwitchWorkspace" text circle />
           </el-tooltip>
-          <el-tooltip :content="t('sidePanel.userSettings')" placement="right">
-            <el-button :icon="User" @click="handleUserSettings" text circle />
-          </el-tooltip>
         </div>
       </div>
     </el-aside>
@@ -151,9 +148,6 @@
     <!-- Global Image Viewer -->
     <ImageViewer v-model:visible="globalImageViewerVisible" :images="globalImageViewerImages"
       :initial-index="globalImageViewerIndex" />
-
-    <!-- 用户设置抽屉 -->
-    <UserSettingsDrawer v-model="isUserSettingsVisible" />
   </el-container>
 </template>
 
@@ -193,7 +187,6 @@ import BottomBar from '@/components/layout/BottomBar.vue';
 import WorkspaceSettingsDrawer from '@/components/layout/WorkspaceSettingsDrawer.vue';
 import KnowledgeDrawer from '@/components/layout/KnowledgeDrawer.vue';
 import MemoryDrawer from '@/components/layout/MemoryDrawer.vue';
-import UserSettingsDrawer from '@/components/layout/UserSettingsDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
 import ImageViewer from '@/components/chat/ImageViewer.vue';
@@ -243,7 +236,6 @@ const isChatPanelCollapsed = ref(false);
 const isSettingsDrawerVisible = ref(false);
 const isKnowledgeDrawerVisible = ref(false);
 const isMemoryDrawerVisible = ref(false);
-const isUserSettingsVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
 // 移动端侧边栏抽屉状态
@@ -582,11 +574,6 @@ const handleOpenKnowledgeDrawer = () => {
 // 打开记忆抽屉
 const handleOpenMemoryDrawer = () => {
   isMemoryDrawerVisible.value = true;
-};
-
-// 用户设置
-const handleUserSettings = () => {
-  isUserSettingsVisible.value = true;
 };
 
 const getValidWorkspaceId = async (): Promise<string | null> => {
