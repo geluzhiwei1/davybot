@@ -462,7 +462,7 @@ class ToolManager:
                 tool_dict = tool_config.to_dict()
                 # 如果有可调用对象，添加到字典中
                 if tool_config.callable:
-                    tool_Dict["callable"] = tool_config.callable
+                    tool_dict["callable"] = tool_config.callable
                 all_tools.append(tool_dict)
 
         logger.info(f"Loaded {len(all_tools)} enabled tools")
