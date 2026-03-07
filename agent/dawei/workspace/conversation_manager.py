@@ -375,13 +375,13 @@ class WorkspaceConversationManager:
                 msg_dict = msg.to_dict()
 
             # 确保 content 字段是字符串格式(处理OpenAI格式的content对象)
-            if "content" in msg_dict and isinstance(msg_Dict["content"], dict):
+            if "content" in msg_dict and isinstance(msg_dict["content"], dict):
                 # OpenAI格式: {"type": "text", "text": "..."}
-                if msg_Dict["content"].get("type") == "text":
-                    msg_Dict["content"] = msg_Dict["content"].get("text", "")
+                if msg_dict["content"].get("type") == "text":
+                    msg_dict["content"] = msg_dict["content"].get("text", "")
                 else:
                     # 其他类型,转为JSON字符串
-                    msg_Dict["content"] = json.dumps(msg_Dict["content"])
+                    msg_dict["content"] = json.dumps(msg_dict["content"])
 
             messages_data.append(msg_dict)
 

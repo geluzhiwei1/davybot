@@ -312,7 +312,7 @@ class IntelligentCheckpointManager:
 
                 # 从字典恢复 CheckpointData
                 try:
-                    checkpoint_type_value = checkpoint_Dict["metadata"]["checkpoint_type"]
+                    checkpoint_type_value = checkpoint_dict["metadata"]["checkpoint_type"]
                     checkpoint_type = CheckpointType(checkpoint_type_value)
                 except ValueError:
                     self.logger.exception("Invalid checkpoint type '{checkpoint_type_value}': ")
@@ -323,19 +323,19 @@ class IntelligentCheckpointManager:
                     )
 
                 metadata = CheckpointMetadata(
-                    checkpoint_id=checkpoint_Dict["metadata"]["checkpoint_id"],
-                    task_id=checkpoint_Dict["metadata"]["task_id"],
+                    checkpoint_id=checkpoint_dict["metadata"]["checkpoint_id"],
+                    task_id=checkpoint_dict["metadata"]["task_id"],
                     checkpoint_type=checkpoint_type,
-                    created_at=datetime.fromisoformat(checkpoint_Dict["metadata"]["created_at"]),
-                    size_bytes=checkpoint_Dict["metadata"]["size_bytes"],
-                    checksum=checkpoint_Dict["metadata"]["checksum"],
-                    tags=checkpoint_Dict["metadata"]["tags"],
-                    parent_checkpoint_id=checkpoint_Dict["metadata"].get("parent_checkpoint_id"),
+                    created_at=datetime.fromisoformat(checkpoint_dict["metadata"]["created_at"]),
+                    size_bytes=checkpoint_dict["metadata"]["size_bytes"],
+                    checksum=checkpoint_dict["metadata"]["checksum"],
+                    tags=checkpoint_dict["metadata"]["tags"],
+                    parent_checkpoint_id=checkpoint_dict["metadata"].get("parent_checkpoint_id"),
                 )
 
                 checkpoint_data = CheckpointData(
                     metadata=metadata,
-                    state=checkpoint_Dict["state"],
+                    state=checkpoint_dict["state"],
                     diff_from_previous=checkpoint_dict.get("diff_from_previous"),
                     compressed=checkpoint_dict.get("compressed", False),
                 )
@@ -497,7 +497,7 @@ class IntelligentCheckpointManager:
             all_checkpoints = await self.persistence_manager.list_checkpoints()
             for cp_dict in all_checkpoints:
                 if cp_dict.get("metadata", {}).get("task_id") == task_id:
-                    metadata = cp_Dict["metadata"]
+                    metadata = cp_dict["metadata"]
                     checkpoint_list.append({
                         "checkpoint_id": metadata["checkpoint_id"],
                         "task_id": metadata["task_id"],

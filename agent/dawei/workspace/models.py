@@ -20,6 +20,7 @@ from dawei.entity.system_info import (
     UserUIContext,
     UserUIEnvironments,
 )
+from dawei.config.settings import KnowledgeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -349,6 +350,7 @@ class WorkspaceConfig(BaseModel):
     checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
     compression: CompressionConfig = Field(default_factory=CompressionConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -397,6 +399,7 @@ class WorkspaceConfig(BaseModel):
             "checkpoint": self.checkpoint.model_dump(),
             "compression": self.compression.model_dump(),
             "memory": self.memory.model_dump(),
+            "knowledge": self.knowledge.model_dump(),
             "skills": self.skills.model_dump(),
             "tools": self.tools.model_dump(),
             "logging": self.logging.model_dump(),

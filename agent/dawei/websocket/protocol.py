@@ -230,7 +230,7 @@ class AssistantWebSocketMessage(BaseWebSocketMessage):
             tool_calls_dict = []
             for tool_call in self.tool_calls:
                 tc_dict = tool_call.dict()
-                tc_Dict["id"] = tc_dict.pop("tool_call_id")
+                tc_dict["id"] = tc_dict.pop("tool_call_id")
                 tool_calls_dict.append(tc_dict)
             result["tool_calls"] = tool_calls_dict
         return result
@@ -602,7 +602,7 @@ class StreamCompleteMessage(BaseWebSocketMessage):
             tool_calls_dict = []
             for tool_call in self.tool_calls:
                 tc_dict = tool_call.dict()
-                tc_Dict["id"] = tc_dict.pop("tool_call_id")
+                tc_dict["id"] = tc_dict.pop("tool_call_id")
                 tool_calls_dict.append(tc_dict)
             result["tool_calls"] = tool_calls_dict
         return result

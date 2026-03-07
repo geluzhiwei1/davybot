@@ -767,7 +767,7 @@ class UserWorkspace:
                     with config_file.open(encoding="utf-8") as f:
                         config_data = json.load(f)
 
-                    plugins_config_Dict[plugin_id] = PluginInstanceConfig.model_validate(config_data)
+                    plugins_config_dict[plugin_id] = PluginInstanceConfig.model_validate(config_data)
                     logger.debug(f"Loaded plugin config: {plugin_id}")
                 except Exception as e:
                     logger.warning(f"Failed to load plugin config {config_file}: {e}")
@@ -1067,15 +1067,15 @@ class UserWorkspace:
                 msg_dict = {}
 
             # 确保 content 字段是字符串格式(处理OpenAI格式的content对象)
-            if "content" in msg_dict and isinstance(msg_Dict["content"], dict):
+            if "content" in msg_dict and isinstance(msg_dict["content"], dict):
                 # OpenAI格式: {"type": "text", "text": "..."}
-                if msg_Dict["content"].get("type") == "text":
-                    msg_Dict["content"] = msg_Dict["content"].get("text", "")
+                if msg_dict["content"].get("type") == "text":
+                    msg_dict["content"] = msg_dict["content"].get("text", "")
                 else:
                     # 其他类型,转为JSON字符串
                     import json
 
-                    msg_Dict["content"] = json.dumps(msg_Dict["content"])
+                    msg_dict["content"] = json.dumps(msg_dict["content"])
 
             messages_data.append(msg_dict)
 
@@ -1966,7 +1966,7 @@ class UserWorkspace:
             for task in all_tasks:
                 # 🔥 修复：使用 task_node_id 而不是 task_id，且 to_dict() 不是异步方法
                 task_id = task.task_node_id
-                nodes_Dict[task_id] = task.to_dict()
+                nodes_dict[task_id] = task.to_dict()
 
             task_data = {
                 "task_graph_id": task_graph.task_node_id,

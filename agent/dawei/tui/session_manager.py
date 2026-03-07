@@ -259,8 +259,8 @@ class SessionManager:
             session = ChatSession(
                 session_id=file_session_id,
                 workspace=session_dict.get("workspace", str(self.workspace_path)),
-                created_at=session_Dict["created_at"],
-                updated_at=session_Dict["updated_at"],
+                created_at=session_dict["created_at"],
+                updated_at=session_dict["updated_at"],
                 messages=messages,
                 settings=session_dict.get("settings", {}),
                 metadata=session_dict.get("metadata", {}),
@@ -320,8 +320,8 @@ class SessionManager:
                     sessions.append(
                         {
                             "session_id": session_id,  # Use the found ID
-                            "created_at": session_Dict["created_at"],
-                            "updated_at": session_Dict["updated_at"],
+                            "created_at": session_dict["created_at"],
+                            "updated_at": session_dict["updated_at"],
                             "message_count": session_dict.get("message_count", len(session_dict.get("messages", []))),
                             "file": str(session_file),
                         },

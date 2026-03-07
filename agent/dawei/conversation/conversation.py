@@ -292,9 +292,9 @@ class Conversation(BaseModel):
 
             # 添加时间戳和ID（如果消息没有的话）
             if "timestamp" not in msg_dict:
-                msg_Dict["timestamp"] = datetime.now(UTC).isoformat()
+                msg_dict["timestamp"] = datetime.now(UTC).isoformat()
             if "id" not in msg_dict:
-                msg_Dict["id"] = str(uuid.uuid4())
+                msg_dict["id"] = str(uuid.uuid4())
             messages_data.append(msg_dict)
 
         # 构建完整的对话数据
@@ -423,9 +423,9 @@ class Conversation(BaseModel):
             msg_dict = msg.to_dict()
             # 添加时间戳和ID（如果消息没有的话）
             if "timestamp" not in msg_dict:
-                msg_Dict["timestamp"] = datetime.now(UTC).isoformat()
+                msg_dict["timestamp"] = datetime.now(UTC).isoformat()
             if "id" not in msg_dict:
-                msg_Dict["id"] = str(uuid.uuid4())
+                msg_dict["id"] = str(uuid.uuid4())
             messages_data.append(msg_dict)
 
         return {

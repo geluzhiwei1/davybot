@@ -151,7 +151,7 @@ class BaseLLMMessage(BaseModel, ABC):
             for tool_call in self.tool_calls:
                 tool_call_dict = tool_call.dict()
                 # 将 tool_call_id 映射为 id 以兼容 OpenAI 格式
-                tool_call_Dict["id"] = tool_call_dict.pop("tool_call_id")
+                tool_call_dict["id"] = tool_call_dict.pop("tool_call_id")
                 tool_calls_openai.append(tool_call_dict)
             result["tool_calls"] = tool_calls_openai
 
