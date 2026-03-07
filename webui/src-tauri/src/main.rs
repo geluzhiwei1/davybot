@@ -319,15 +319,12 @@ async fn select_directory() -> Result<Option<String>, String> {
 /// 使用系统默认浏览器打开 URL
 #[tauri::command]
 async fn open_by_system_browser(url: String) -> Result<(), String> {
-    use tauri_plugin_shell::process::Command;
-
     // 验证 URL 格式
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return Err("URL 必须以 http:// 或 https:// 开头".to_string());
     }
 
-    // 使用 shell plugin 的 open 方法
-    // 这会在系统默认浏览器中打开 URL
+    // 使用系统默认浏览器打开 URL
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("cmd")
@@ -498,8 +495,7 @@ fn main() {
         .unwrap_or_default()
         == "1";
 
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init());
+    let builder = tauri::Builder::default();
 
     // 设置窗口事件和 DevTools
     let builder = builder.setup(move |app| {

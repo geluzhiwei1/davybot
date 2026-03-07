@@ -7,7 +7,182 @@
   <div class="workspaces-view">
     <!-- 顶部语言选择器和登录按钮 -->
     <div class="top-bar">
-      <div class="top-bar-right">
+      <div class="top-actions-container">
+        <!-- 远程访问 -->
+        <el-popover :width="400" trigger="click" placement="bottom-end" @show="handleRemotePopoverShow">
+          <template #reference>
+            <el-button :loading="remoteLoading">
+              <el-icon v-if="!remoteConfig.running && !remoteLoading">
+                <Connection />
+              </el-icon>
+              <el-icon v-else-if="remoteConfig.running">
+                <CircleCheck />
+              </el-icon>
+              远程访问
+            </el-button>
+          </template>
+
+          <!-- 远程访问配置面板 -->
+          <div class="remote-access-panel">
+            <!-- 服务控制按钮区域 -->
+            <div class="service-control-section">
+              <div class="control-buttons">
+                <el-button type="primary" :loading="remoteActionLoading" :disabled="remoteConfig.running"
+                  :icon="VideoPlay" @click="handleStartRemoteService" size="default">
+                  开启服务
+                </el-button>
+                <el-button type="danger" :loading="remoteActionLoading" :disabled="!remoteConfig.running"
+                  :icon="VideoPause" @click="handleStopRemoteService" size="default">
+                  关闭服务
+                </el-button>
+                <el-button :icon="Refresh" @click="handleRefreshRemoteStatus" :loading="remoteStatusLoading"
+                  size="default">
+                  刷新
+                </el-button>
+              </div>
+            </div>
+
+            <!-- 配置选项 -->
+            <div class="remote-config-section">
+              <div class="config-item">
+                <div class="config-item-header">
+                  <el-icon>
+                    <Connection />
+                  </el-icon>
+                  <span class="config-label">允许远程访问</span>
+                </div>
+                <el-switch v-model="remoteConfig.allowRemote" :loading="remoteConfigLoading"
+                  @change="handleRemoteConfigChange" />
+              </div>
+
+              <div class="config-item">
+                <div class="config-item-header">
+                  <el-icon>
+                    <Monitor />
+                  </el-icon>
+                  <span class="config-label">允许 SSH 访问</span>
+                </div>
+                <el-switch v-model="remoteConfig.allowSSH" :loading="remoteConfigLoading"
+                  @change="handleSSHConfigChange" />
+              </div>
+
+              <!-- NAT 配置信息 -->
+              <div v-if="natConfig" class="nat-config-info">
+                <el-divider style="margin: 12px 0;" />
+                <div class="config-info-title">系统配置</div>
+                <div class="config-info-item">
+                  <span class="config-info-key">支持系统 URL:</span>
+                  <span class="config-info-value">{{ natConfig.support_system_url }}</span>
+                </div>
+                <div class="config-info-item">
+                  <span class="config-info-key">OAuth 客户端 ID:</span>
+                  <span class="config-info-value">{{ natConfig.oauth_client_id }}</span>
+                </div>
+                <div class="config-info-item">
+                  <span class="config-info-key">NAT 服务器地址:</span>
+                  <span class="config-info-value">{{ natConfig.default_nat_server_addr }}</span>
+                </div>
+                <div class="config-info-item">
+                  <span class="config-info-key">支持的服务类型:</span>
+                  <div class="service-types-tags">
+                    <el-tag v-for="type in natConfig.supported_service_types" :key="type" size="small"
+                      :type="getServiceTypeColor(type)">
+                      {{ type.toUpperCase() }}
+                    </el-tag>
+                  </div>
+                </div>
+                <div class="config-info-item">
+                  <span class="config-info-key">客户端名称:</span>
+                  <span class="config-info-value">{{ natConfig.user_client_name }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 服务状态 -->
+            <div class="remote-status-section" v-if="remoteConfig.allowRemote">
+              <el-divider style="margin: 12px 0;" />
+              <div class="status-header">
+                <span class="status-title">服务状态</span>
+                <el-tag :type="remoteConfig.running ? 'success' : 'info'" size="small">
+                  {{ remoteConfig.running ? '运行中' : '已停止' }}
+                </el-tag>
+              </div>
+
+              <!-- NAT 服务详细信息 -->
+              <div class="nat-service-details">
+                <div class="service-detail-item">
+                  <span class="service-detail-key">客户端 ID:</span>
+                  <span class="service-detail-value">{{ natServiceStatus.client_id || '未连接' }}</span>
+                </div>
+                <div class="service-detail-item">
+                  <span class="service-detail-key">客户端名称:</span>
+                  <span class="service-detail-value">{{ natServiceStatus.client_name || '未设置' }}</span>
+                </div>
+                <div class="service-detail-item">
+                  <span class="service-detail-key">隧道数量:</span>
+                  <span class="service-detail-value">{{ natServiceStatus.tunnel_count }}</span>
+                </div>
+              </div>
+
+              <!-- 隧道列表 -->
+              <div v-if="remoteConfig.running && remoteTunnels.length > 0" class="tunnels-section">
+                <div class="tunnels-section-title">活跃隧道 ({{ remoteTunnels.length }})</div>
+                <div class="tunnels-list">
+                  <div v-for="tunnel in remoteTunnels" :key="tunnel.tunnel_id" class="tunnel-item">
+                    <div class="tunnel-main">
+                      <div class="tunnel-header">
+                        <div class="tunnel-name">
+                          <el-icon>
+                            <Link />
+                          </el-icon>
+                          {{ tunnel.name }}
+                        </div>
+                        <el-tag size="small" type="primary">{{ tunnel.service_type }}</el-tag>
+                      </div>
+                      <div class="tunnel-url">
+                        <span class="url-label">公网地址:</span>
+                        <a :href="tunnel.public_url" target="_blank" class="url-link">{{ tunnel.public_url }}</a>
+                      </div>
+                      <div class="tunnel-meta">
+                        <span class="meta-item">
+                          <span class="meta-label">本地端口:</span>
+                          <span class="meta-value">{{ tunnel.local_port }}</span>
+                        </span>
+                        <span class="meta-item">
+                          <span class="meta-label">创建时间:</span>
+                          <span class="meta-value">{{ formatTime(tunnel.created_at) }}</span>
+                        </span>
+                        <span class="meta-item">
+                          <span class="meta-label">隧道 ID:</span>
+                          <span class="meta-value tunnel-id">{{ tunnel.tunnel_id }}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 空状态 -->
+              <div v-else-if="!remoteConfig.running" class="empty-tunnels">
+                <el-icon>
+                  <Link />
+                </el-icon>
+                <span>未启动</span>
+              </div>
+            </div>
+
+            <!-- 提示信息 -->
+            <div v-if="!remoteConfig.allowRemote" class="remote-hint">
+              <el-icon>
+                <InfoFilled />
+              </el-icon>
+              <span>启用远程访问后，可将本地服务暴露到公网</span>
+            </div>
+          </div>
+        </el-popover>
+        <!-- 分隔线 -->
+        <div class="action-divider"></div>
+
         <!-- 登录状态 -->
         <div class="auth-section-top" v-if="authenticated && authenticatedUser">
           <el-dropdown @command="handleUserMenuCommand">
@@ -16,7 +191,9 @@
                 {{ authenticatedUser.nickname?.charAt(0)?.toUpperCase() || 'U' }}
               </el-avatar>
               <span class="user-nickname">{{ authenticatedUser.nickname || 'User' }}</span>
-              <el-icon><ArrowDown /></el-icon>
+              <el-icon>
+                <ArrowDown />
+              </el-icon>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -29,7 +206,9 @@
                   </div>
                 </el-dropdown-item>
                 <el-dropdown-item divided :command="'logout'">
-                  <el-icon><SwitchButton /></el-icon>
+                  <el-icon>
+                    <SwitchButton />
+                  </el-icon>
                   {{ t('userSettings.profile.logout') }}
                 </el-dropdown-item>
               </el-dropdown-menu>
@@ -40,7 +219,9 @@
         <!-- 未登录状态 -->
         <div class="auth-section-top" v-else>
           <el-button type="primary" @click="handleLogin" :loading="loggingIn" size="small">
-            <el-icon><User /></el-icon>
+            <el-icon>
+              <User />
+            </el-icon>
             {{ t('userSettings.profile.login') }}
           </el-button>
         </div>
@@ -49,6 +230,7 @@
         <div class="language-selector-wrapper">
           <LanguageSelector />
         </div>
+
       </div>
     </div>
 
@@ -261,7 +443,15 @@ import {
   Star,
   User,
   ArrowDown,
-  SwitchButton
+  SwitchButton,
+  Connection,
+  CircleCheck,
+  Monitor,
+  Link,
+  VideoPlay,
+  VideoPause,
+  Refresh,
+  InfoFilled
 } from '@element-plus/icons-vue';
 import WorkspaceFormDialog from '@/components/workspace/WorkspaceFormDialog.vue';
 import WorkspaceDeleteDialog from '@/components/workspace/WorkspaceDeleteDialog.vue';
@@ -275,6 +465,7 @@ import { getGlobalStats, getWorkspaceStats } from '@/services/api/services/works
 import { useI18n } from 'vue-i18n';
 import type { UserSecuritySettings } from '@/services/api/types';
 import { authService, type UserInfo } from '@/services/auth';
+import { httpClient } from '@/services/api/http';
 
 const { t } = useI18n();
 
@@ -326,6 +517,52 @@ const authenticated = ref(false);
 const authenticatedUser = ref<UserInfo | null>(null);
 const loggingIn = ref(false);
 const loggingOut = ref(false);
+
+// 远程访问配置
+interface RemoteConfig {
+  allowRemote: boolean;
+  allowSSH: boolean;
+  running: boolean;
+}
+
+interface TunnelInfo {
+  tunnel_id: string;
+  name: string;
+  service_type: string;
+  local_port: number;
+  public_url: string;
+  created_at: string;
+}
+
+interface NATConfig {
+  support_system_url: string;
+  oauth_client_id: string;
+  default_nat_server_addr: string;
+  supported_service_types: string[];
+  user_client_name: string;
+}
+
+interface NATServiceStatus {
+  running: boolean;
+  client_id: string | null;
+  client_name: string | null;
+  tunnels: TunnelInfo[];
+  tunnel_count: number;
+}
+
+const remoteConfig = ref<RemoteConfig>({
+  allowRemote: false,
+  allowSSH: false,
+  running: false
+});
+
+const natConfig = ref<NATConfig | null>(null);
+const natServiceStatus = ref<NATServiceStatus | null>(null);
+const remoteTunnels = ref<TunnelInfo[]>([]);
+const remoteLoading = ref(false);
+const remoteConfigLoading = ref(false);
+const remoteActionLoading = ref(false);
+const remoteStatusLoading = ref(false);
 
 // 处理安全配置更新
 const handleSecuritySettingsUpdate = (value: UserSecuritySettings) => {
@@ -412,7 +649,7 @@ const handleOAuthMessage = (event: MessageEvent) => {
     return;
   }
 
-  const { type, data, error } = event.data;
+  const { type, error } = event.data;
 
   if (type === 'oauth_login_success') {
     // 登录成功，刷新用户信息
@@ -556,6 +793,280 @@ const handleWorkspaceDeleted = async () => {
   await loadGlobalStats();
 };
 
+// ==================== 远程访问功能 ====================
+
+// API 基础 URL
+const REMOTE_API_BASE = '/api/users/me/remote';
+
+// 处理远程访问 Popover 显示
+const handleRemotePopoverShow = async () => {
+  await refreshRemoteStatus();
+};
+
+// 刷新远程服务状态
+const refreshRemoteStatus = async () => {
+  try {
+    remoteStatusLoading.value = true;
+
+    // 并行获取配置和状态
+    const [configRes, statusRes] = await Promise.all([
+      httpClient.get(`${REMOTE_API_BASE}/nat/config`),
+      httpClient.get(`${REMOTE_API_BASE}/nat/status`)
+    ]);
+
+    console.log('Config response:', configRes);
+
+    // httpClient.get() 返回的是 response.data，格式是 { success: boolean, data: T, message: string }
+    if (configRes && typeof configRes === 'object' && 'success' in configRes) {
+      if ((configRes as any).success && (configRes as any).data) {
+        const config = (configRes as any).data;
+        console.log('Processed config:', config);
+        natConfig.value = config as NATConfig;
+        console.log('Final natConfig:', natConfig.value);
+        // 配置接口返回成功，说明允许远程访问
+        remoteConfig.value.allowRemote = true;
+      } else {
+        console.error('Config API returned success=false');
+        remoteConfig.value.allowRemote = false;
+      }
+    } else {
+      console.error('Config API returned invalid response format');
+      remoteConfig.value.allowRemote = false;
+    }
+
+    console.log('Status response:', statusRes);
+
+    // 状态接口直接返回 NATServiceStatus，没有包装
+    if (statusRes && typeof statusRes === 'object') {
+      const natStatus = statusRes as NATServiceStatus;
+      natServiceStatus.value = natStatus;
+      remoteConfig.value.running = natStatus.running || false;
+      remoteConfig.value.allowRemote = true; // 状态能获取说明服务可用
+
+      // 获取隧道列表
+      if (natStatus.running) {
+        remoteTunnels.value = natStatus.tunnels || [];
+      } else {
+        remoteTunnels.value = [];
+      }
+    } else {
+      console.error('Status API returned invalid response format');
+    }
+  } catch (error) {
+    console.error('Failed to refresh remote status:', error);
+    ElMessage.error('无法加载远程访问配置，请检查网络连接');
+    // API 不可用时，默认不允许远程访问
+    remoteConfig.value.allowRemote = false;
+    remoteConfig.value.running = false;
+    remoteTunnels.value = [];
+    natConfig.value = null;
+    natServiceStatus.value = null;
+  } finally {
+    remoteStatusLoading.value = false;
+  }
+};
+
+// 加载远程隧道列表
+const loadRemoteTunnels = async () => {
+  try {
+    const response = await httpClient.get(`${REMOTE_API_BASE}/nat/tunnels`);
+    if (response.status === 200) {
+      remoteTunnels.value = response.data;
+    } else {
+      remoteTunnels.value = [];
+    }
+  } catch (error) {
+    console.error('Failed to load tunnels:', error);
+    remoteTunnels.value = [];
+  }
+};
+
+// 处理允许远程配置变更
+const handleRemoteConfigChange = async (value: boolean) => {
+  // 这里可以保存用户偏好设置到本地存储或服务器
+  console.log('Remote access config changed:', value);
+  if (!value) {
+    // 如果关闭远程访问，同时停止服务
+    if (remoteConfig.value.running) {
+      await handleStopRemoteService();
+    }
+  }
+};
+
+// 处理 SSH 配置变更
+const handleSSHConfigChange = async (value: boolean) => {
+  console.log('SSH config changed:', value);
+  // 这里可以保存 SSH 配置
+  // 如果服务正在运行，需要动态添加/删除 SSH 隧道
+  if (remoteConfig.value.running && value) {
+    await addSSHService();
+  }
+};
+
+// 添加 SSH 服务
+const addSSHService = async () => {
+  try {
+    remoteActionLoading.value = true;
+
+    const response = await httpClient.post(`${REMOTE_API_BASE}/nat/services/add`, {
+      name: 'ssh',
+      service_type: 'ssh',
+      local_port: 22
+    });
+
+    if (response.status === 200) {
+      const result = response.data as { success: boolean; message: string };
+      if (result.success) {
+        ElMessage.success('SSH 服务添加成功');
+        await loadRemoteTunnels();
+      } else {
+        ElMessage.error(result.message || 'SSH 服务添加失败');
+      }
+    } else {
+      ElMessage.error('SSH 服务添加失败');
+    }
+  } catch (error) {
+    console.error('Failed to add SSH service:', error);
+    ElMessage.error('SSH 服务添加失败');
+  } finally {
+    remoteActionLoading.value = false;
+  }
+};
+
+// 启动远程服务
+const handleStartRemoteService = async () => {
+  try {
+    remoteActionLoading.value = true;
+
+    // 准备服务配置
+    const services = [];
+
+    // 始终添加 Web UI
+    services.push({
+      name: 'web-ui',
+      type: 'http',
+      local_port: 8460
+    });
+
+    // 添加 API
+    services.push({
+      name: 'api',
+      type: 'http',
+      local_port: 8465
+    });
+
+    // 如果允许 SSH，添加 SSH 服务
+    if (remoteConfig.value.allowSSH) {
+      services.push({
+        name: 'ssh',
+        type: 'ssh',
+        local_port: 22
+      });
+    }
+
+    const response = await httpClient.post(`${REMOTE_API_BASE}/nat/start`, {
+      nat_server_addr: 'localhost:8888',
+      services: services
+    });
+
+    if (response.status === 200) {
+      const result = response.data as { success: boolean; message: string; tunnels: typeof remoteTunnels.value };
+      if (result.success) {
+        remoteConfig.value.running = true;
+        remoteTunnels.value = result.tunnels || [];
+        ElMessage.success(result.message || '远程服务启动成功');
+      } else {
+        ElMessage.error(result.message || '远程服务启动失败');
+      }
+    } else {
+      const error = response.data as { detail?: string };
+      ElMessage.error(error.detail || '远程服务启动失败');
+    }
+  } catch (error) {
+    console.error('Failed to start remote service:', error);
+    ElMessage.error('远程服务启动失败');
+  } finally {
+    remoteActionLoading.value = false;
+  }
+};
+
+// 停止远程服务
+const handleStopRemoteService = async () => {
+  try {
+    remoteActionLoading.value = true;
+
+    const response = await httpClient.post(`${REMOTE_API_BASE}/nat/stop`, {});
+
+    if (response.status === 200) {
+      const result = response.data as { success: boolean; message: string };
+      if (result.success) {
+        remoteConfig.value.running = false;
+        remoteTunnels.value = [];
+        ElMessage.success('远程服务已停止');
+      } else {
+        ElMessage.error(result.message || '远程服务停止失败');
+      }
+    } else {
+      ElMessage.error('远程服务停止失败');
+    }
+  } catch (error) {
+    console.error('Failed to stop remote service:', error);
+    ElMessage.error('远程服务停止失败');
+  } finally {
+    remoteActionLoading.value = false;
+  }
+};
+
+// 刷新远程状态（按钮点击）
+const handleRefreshRemoteStatus = async () => {
+  await refreshRemoteStatus();
+  ElMessage.success('状态已刷新');
+};
+
+// 格式化时间
+const formatTime = (isoString: string) => {
+  try {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 1) {
+      return '刚刚';
+    } else if (minutes < 60) {
+      return `${minutes}分钟前`;
+    } else if (hours < 24) {
+      return `${hours}小时前`;
+    } else if (days < 7) {
+      return `${days}天前`;
+    } else {
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  } catch (_error) {
+    return isoString;
+  }
+};
+
+// 获取服务类型标签颜色
+const getServiceTypeColor = (type: string) => {
+  const colorMap: Record<string, string> = {
+    'http': 'primary',
+    'https': 'success',
+    'ssh': 'warning',
+    'tcp': 'info',
+    'udp': 'danger'
+  };
+  return colorMap[type] || 'info';
+};
+
 onMounted(async () => {
   await loadWorkspaces();
   await loadGlobalStats();
@@ -590,14 +1101,28 @@ onUnmounted(() => {
   justify-content: flex-end;
 }
 
-.top-bar-right {
+.top-actions-container {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.action-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--el-border-color);
+  flex-shrink: 0;
 }
 
 .language-selector-wrapper {
   position: relative;
+  flex-shrink: 0;
 }
 
 /* 认证区域顶部样式 */
@@ -791,13 +1316,6 @@ onUnmounted(() => {
   text-align: center;
   margin-bottom: var(--spacing-3xl);
   animation: fadeInUp 0.8s var(--ease-out);
-}
-
-.language-selector-wrapper {
-  position: absolute;
-  top: 0;
-  right: 0;
-  margin-top: -8px;
 }
 
 .hero-badge {
@@ -1220,5 +1738,275 @@ onUnmounted(() => {
   .workspace-card {
     padding: var(--spacing-lg);
   }
+}
+
+/* ====================
+   REMOTE ACCESS PANEL
+   ==================== */
+.remote-access-panel {
+  padding: 4px 0;
+}
+
+.service-control-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.control-buttons .el-button {
+  flex: 1;
+}
+
+.remote-config-section {
+  margin-bottom: 8px;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.config-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.nat-config-info {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.config-info-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.config-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.config-info-key {
+  color: #606266;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.config-info-value {
+  color: #909399;
+  text-align: right;
+  word-break: break-all;
+  margin-left: 12px;
+}
+
+.service-types-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: 12px;
+}
+
+.remote-status-section {
+  margin-top: 12px;
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.status-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.nat-service-details {
+  margin-bottom: 12px;
+  padding: 8px;
+  background-color: #f0f9ff;
+  border-radius: 4px;
+  border: 1px solid #e1f5fe;
+}
+
+.service-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.service-detail-key {
+  color: #606266;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.service-detail-value {
+  color: #409eff;
+  text-align: right;
+  word-break: break-all;
+  margin-left: 12px;
+  font-family: 'Courier New', monospace;
+}
+
+.tunnels-section {
+  margin-top: 12px;
+}
+
+.tunnels-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.tunnels-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.tunnel-item {
+  margin-bottom: 8px;
+  padding: 12px;
+  background-color: #f5f7fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.2s;
+}
+
+.tunnel-item:hover {
+  background-color: #ecf5ff;
+  border-color: #409eff;
+}
+
+.tunnel-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tunnel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tunnel-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tunnel-url {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.url-label {
+  color: #606266;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.url-link {
+  color: #409eff;
+  text-decoration: none;
+  word-break: break-all;
+  transition: color 0.2s;
+}
+
+.url-link:hover {
+  color: #66b1ff;
+  text-decoration: underline;
+}
+
+.tunnel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-label {
+  color: #909399;
+  font-weight: 500;
+}
+
+.meta-value {
+  color: #606266;
+}
+
+.meta-value.tunnel-id {
+  font-family: 'Courier New', monospace;
+  color: #909399;
+  font-size: 10px;
+}
+
+.empty-tunnels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #909399;
+  gap: 8px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border: 1px dashed #dcdfe6;
+}
+
+.remote-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #ecf5ff;
+  border-radius: 6px;
+  color: #409eff;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.remote-hint .el-icon {
+  flex-shrink: 0;
 }
 </style>

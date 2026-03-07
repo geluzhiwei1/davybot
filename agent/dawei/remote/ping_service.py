@@ -194,23 +194,25 @@ class PingService:
 
         try:
             # 发送ping请求
-            url = f"{self.support_system_url}/api/remote/ping"
+            url = f"{self.support_system_url}support/api/remote/ping"
             response = await self._client.post(url, json=ping_data)
 
             if response.status_code == 200:
-                logger.debug(f"Ping successful: {ping_data['agent_id']} - "
+                logger.debug(f"Ping successful: URL={url}, "
+                           f"Agent={ping_data['agent_id']}, "
                            f"OS: {ping_data['system_info']['os_name']} "
                            f"({ping_data['system_info']['os_version']})")
             else:
                 logger.warning(f"Ping failed with status {response.status_code}: "
-                            f"{response.text}")
+                            f"URL={url}, "
+                            f"Response={response.text}")
 
         except httpx.ConnectError as e:
-            logger.warning(f"Failed to connect to Support System: {e}")
+            logger.warning(f"Failed to connect to Support System: URL={url}, Error={e}")
         except httpx.TimeoutException:
-            logger.warning("Ping request timed out")
+            logger.warning(f"Ping request timed out: URL={url}")
         except Exception as e:
-            logger.error(f"Unexpected error sending ping: {e}")
+            logger.error(f"Unexpected error sending ping: URL={url}, Error={e}")
 
     def _get_hostname(self) -> str:
         """获取主机名"""

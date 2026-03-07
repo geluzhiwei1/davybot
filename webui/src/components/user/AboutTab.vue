@@ -5,25 +5,8 @@
 
 <template>
   <div class="about-tab">
-    <div class="hero-section">
-      <div class="hero-badge">
-        <span class="badge-dot"></span>
-        <span>{{ t('workspaces.platformName') }}</span>
-      </div>
-      <h1 class="hero-title">
-        {{ t('workspaces.title') }}
-        <span class="text-gradient">{{ t('workspaces.workspace') }}</span>
-      </h1>
-      <p class="hero-description">
-        {{ t('workspaces.description') }}
-      </p>
-    </div>
-
-    <el-divider />
-
     <div class="about-section">
-      <el-result icon="success" :title="t('userSettings.about.title')"
-        :sub-title="t('userSettings.about.subtitle')">
+      <el-result icon="success" :title="t('userSettings.about.title')" :sub-title="t('userSettings.about.subtitle')">
         <template #extra>
           <el-descriptions :column="1" border>
             <el-descriptions-item :label="t('userSettings.about.version')">v{{ appVersion
@@ -140,6 +123,7 @@ const elementVersion = '2.13.1'; // Hardcode version or import from package
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -147,9 +131,12 @@ const elementVersion = '2.13.1'; // Hardcode version or import from package
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }

@@ -213,7 +213,7 @@ async def exchange_code_for_token(code: str) -> dict:
     Raises:
         HTTPException: 如果交换失败
     """
-    token_url = f"{SUPPORT_SYSTEM_URL}/auth/oauth/token"
+    token_url = f"{SUPPORT_SYSTEM_URL}/support/auth/oauth/token"
 
     payload = {
         "grant_type": "authorization_code",
@@ -513,7 +513,7 @@ async def login_page():
     实际使用中，客户端应该直接打开OAuth授权URL
     """
     auth_url = (
-        f"{SUPPORT_SYSTEM_URL}/auth/oauth/authorize"
+        f"{SUPPORT_SYSTEM_URL}/support/auth/oauth/authorize"
         f"?client_id={OAUTH_CLIENT_ID}"
         f"&redirect_uri={OAUTH_REDIRECT_URI}"
         f"&response_type=code"
