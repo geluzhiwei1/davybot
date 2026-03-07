@@ -1262,20 +1262,15 @@ async def get_graph_entities(
         )
 
     try:
-        graph_store = manager.get_graph_store(base_id)
-        await graph_store.initialize()
-
-        # Get all entities (filter by type if specified)
-        entities = []
-        entity_ids = set()
-
         # Simple implementation: query from database
         import aiosqlite
 
         base_storage_path = manager._get_storage_path(base_id)
         graph_db_path = base_storage_path / "graph.db"
 
+        # Check if graph database exists first
         if not graph_db_path.exists():
+            logger.info(f"Graph database not found for base {base_id}, returning empty result")
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
@@ -1284,6 +1279,27 @@ async def get_graph_entities(
                     "total": 0,
                 }
             )
+
+        # Try to initialize graph store (creates tables if needed)
+        try:
+            graph_store = manager.get_graph_store(base_id)
+            await graph_store.initialize()
+        except Exception as init_error:
+            logger.error(f"Failed to initialize graph store: {init_error}", exc_info=True)
+            # If initialization fails, return empty result rather than error
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "success": True,
+                    "entities": [],
+                    "total": 0,
+                    "error": f"Graph store initialization failed: {str(init_error)}",
+                }
+            )
+
+        # Get all entities (filter by type if specified)
+        entities = []
+        entity_ids = set()
 
         async with aiosqlite.connect(graph_db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -1374,13 +1390,32 @@ async def get_graph_relations(
         base_storage_path = manager._get_storage_path(base_id)
         graph_db_path = base_storage_path / "graph.db"
 
+        # Check if graph database exists first
         if not graph_db_path.exists():
+            logger.info(f"Graph database not found for base {base_id}, returning empty result")
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
                     "success": True,
                     "relations": [],
                     "total": 0,
+                }
+            )
+
+        # Try to initialize graph store (creates tables if needed)
+        try:
+            graph_store = manager.get_graph_store(base_id)
+            await graph_store.initialize()
+        except Exception as init_error:
+            logger.error(f"Failed to initialize graph store: {init_error}", exc_info=True)
+            # If initialization fails, return empty result rather than error
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "success": True,
+                    "relations": [],
+                    "total": 0,
+                    "error": f"Graph store initialization failed: {str(init_error)}",
                 }
             )
 

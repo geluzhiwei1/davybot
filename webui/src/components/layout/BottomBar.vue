@@ -147,7 +147,7 @@ const fetchModes = async (forceReload = false) => {
   try {
     const reloadParam = forceReload ? '?reload=true' : '';
     const data = await httpClient.get<{ success: boolean; modes: Mode[] }>(
-      `/workspaces/${workspaceId}/modes${reloadParam}`
+      `/api/workspaces/${workspaceId}/modes${reloadParam}`
     );
     if (data.success && Array.isArray(data.modes)) {
       modes.value = data.modes;
@@ -173,7 +173,7 @@ const fetchLLMs = async (forceReload = false) => {
   try {
     const reloadParam = forceReload ? '?reload=true' : '';
     const data = await httpClient.get<{ success: boolean; models: LLM[] }>(
-      `/workspaces/${workspaceId}/llms${reloadParam}`
+      `/api/workspaces/${workspaceId}/llms${reloadParam}`
     );
     if (data.success && Array.isArray(data.models)) {
       llms.value = data.models;

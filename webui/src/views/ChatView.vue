@@ -14,9 +14,6 @@
             <el-tooltip content="收起侧边栏" placement="right">
               <el-button :icon="Fold" @click="toggleSidePanel" text circle />
             </el-tooltip>
-            <el-tooltip :content="isChatPanelCollapsed ? '显示对话框' : '隐藏对话框'" placement="right">
-              <el-button :icon="isChatPanelCollapsed ? DArrowRight : DArrowLeft" @click="toggleChatPanel" text circle />
-            </el-tooltip>
           </template>
           <template v-else>
             <el-tooltip content="展开侧边栏" placement="right">
@@ -55,8 +52,7 @@
 
     <el-container v-show="!isChatPanelCollapsed" class="main-content">
       <el-header height="auto">
-        <TopBar :is-side-panel-collapsed="isChatPanelCollapsed" @open-settings="handleOpenSettings"
-          @toggle-side-panel="toggleChatPanel" />
+        <TopBar @open-settings="handleOpenSettings" />
       </el-header>
       <el-main>
         <!-- Agents 下拉监控面板 -->
@@ -163,7 +159,7 @@ import { appConfig } from '@/config/app.config';
 import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
-import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User, Grid, Connection } from '@element-plus/icons-vue';
+import { Fold, Expand, Setting, Switch, Grid, Connection } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { useMobile } from '@/composables/useMobile';
 
@@ -438,10 +434,6 @@ const toggleSidePanel = () => {
     sidePanelWidth.value = savedSidePanelWidth.value;
   }
   isSidePanelCollapsed.value = !isSidePanelCollapsed.value;
-};
-
-const toggleChatPanel = () => {
-  isChatPanelCollapsed.value = !isChatPanelCollapsed.value;
 };
 
 const fetchFileContent = async (node: { path: string; name: string; is_directory?: boolean }): Promise<{ content: string; type: string }> => {

@@ -7,8 +7,6 @@
   <el-header class="top-bar">
     <div class="left-content">
       <el-button @click="$emit('toggle-mobile-panel')" class="mobile-menu-button" :icon="Menu" text circle />
-      <el-button @click="$emit('toggle-side-panel')" :icon="isSidePanelCollapsed ? DArrowRight : DArrowLeft" text
-        circle />
       <div>
         <h2 class="agent-name">{{ agentName }}</h2>
       </div>
@@ -93,18 +91,10 @@ import { useI18n } from 'vue-i18n';
 import { useChatStore } from '@/stores/chat';
 import { useWorkspaceStore } from '@/stores/workspace';
 import { ElHeader, ElButton, ElTag, ElButtonGroup, ElTooltip, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus';
-import { Menu, DArrowLeft, DArrowRight, ZoomIn, ZoomOut } from '@element-plus/icons-vue';
+import { Menu, ZoomIn, ZoomOut } from '@element-plus/icons-vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 import LanguageSelector from '@/components/LanguageSelector.vue';
 import { useZoom } from '@/composables/useZoom';
-
-interface Props {
-  isSidePanelCollapsed?: boolean;
-}
-
-withDefaults(defineProps<Props>(), {
-  isSidePanelCollapsed: false
-});
 
 const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
