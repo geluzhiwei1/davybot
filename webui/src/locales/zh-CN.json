@@ -763,7 +763,18 @@
       "saveSuccess": "个人信息保存成功",
       "usernamePlaceholder": "请输入用户名",
       "emailPlaceholder": "请输入邮箱",
-      "bioPlaceholder": "请输入个人简介"
+      "bioPlaceholder": "请输入个人简介",
+      "login": "登录",
+      "logout": "登出",
+      "notLoggedIn": "未登录",
+      "loginHint": "登录后可同步您的配置和使用数据",
+      "loginInProgress": "请在浏览器中完成登录...",
+      "loginSuccess": "登录成功",
+      "loginFailed": "登录失败，请重试",
+      "logoutConfirm": "确定要登出吗？",
+      "logoutSuccess": "登出成功",
+      "logoutFailed": "登出失败",
+      "unknownUser": "未知用户"
     },
     "preferences": {
       "theme": "主题",

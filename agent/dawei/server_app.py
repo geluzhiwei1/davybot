@@ -110,6 +110,7 @@ from fastapi.staticfiles import StaticFiles
 # Import API routers
 from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces, users
 from dawei.api import knowledge_bases  # Multi-knowledge base support
+from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces, users, auth
 from dawei.api.exception_handlers import register_exception_handlers
 from dawei.websocket.handlers.chat import ConnectHandler
 from dawei.websocket.ws_server import websocket_server
@@ -252,6 +253,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Dawei Server] ⚠ Failed to initialize scheduler: {e}")
 
+    # Initialize Remote Ping Service
+    try:
+        from dawei.remote import start_ping_service
+        await start_ping_service()
+        print("[Dawei Server] ✓ Remote ping service started")
+    except ImportError as e:
+        print(f"[Dawei Server] ⚠ Remote ping service module not available: {e}")
+    except Exception as e:
+        print(f"[Dawei Server] ⚠ Failed to start remote ping service: {e}")
+
     yield
 
     # Shutdown LLM API protection layer
@@ -289,6 +300,15 @@ async def lifespan(app: FastAPI):
         print(f"[Dawei Server] ⚠ Knowledge base module not available during shutdown: {e}")
     except Exception as e:
         print(f"[Dawei Server] ⚠ Failed to cleanup embedding managers: {e}")
+    # Shutdown Remote Ping Service
+    try:
+        from dawei.remote import stop_ping_service
+        await stop_ping_service()
+        print("[Dawei Server] ✓ Remote ping service stopped")
+    except ImportError as e:
+        print(f"[Dawei Server] ⚠ Remote ping service module not available during shutdown: {e}")
+    except Exception as e:
+        print(f"[Dawei Server] ⚠ Failed to stop remote ping service: {e}")
 
 
 def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
@@ -341,6 +361,7 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     app.include_router(skills.router)
     app.include_router(scheduled_tasks.router)
     app.include_router(checkpoints.router)
+    app.include_router(auth.router)  # OAuth2 authentication
 
     # Knowledge Base Management API (Multi-tenancy support)
     app.include_router(knowledge_bases.router)

@@ -12,90 +12,38 @@
       </div>
 
       <div v-if="!collapsed" class="content-area" :class="{ 'has-mobile-close': isMobileDrawer }">
-        <!-- 侧边栏切换按钮 -->
-        <div class="sidebar-tabs" :class="{ 'mobile-tabs': isMobileDrawer }">
-          <button :class="['tab-button', { active: activeTab === 'conversations' }]"
-            @click="activeTab = 'conversations'" data-testid="conversations-tab">
-            <el-icon>
-              <ChatDotRound />
-            </el-icon>
-            <span>{{ t('sidePanel.conversations') }}</span>
-          </button>
-          <button :class="['tab-button', { active: activeTab === 'files' }]" @click="activeTab = 'files'"
-            data-testid="files-tab">
-            <el-icon>
-              <Folder />
-            </el-icon>
-            <span>{{ t('sidePanel.workspace') }}</span>
-          </button>
-          <button v-if="!memoryPanelDisabled" :class="['tab-button', { active: activeTab === 'memory' }]"
-            @click="activeTab = 'memory'" data-testid="memory-tab">
-            <el-icon>
-              <Connection />
-            </el-icon>
-            <span>{{ t('sidePanel.memory') }}</span>
-          </button>
-        </div>
-
-        <!-- 历史会话面板 -->
-        <div v-show="activeTab === 'conversations'" class="tab-panel">
-          <div class="panel-content">
-            <div class="conversation-actions">
-              <el-button :icon="Refresh" @click="loadConversations" size="small" :title="t('sidePanel.refresh')">
-              </el-button>
-              <el-button type="primary" :icon="Plus" @click="handleNewChat" class="flex-1" size="small">{{
-                t('sidePanel.newConversation') }}</el-button>
-              <el-button type="danger" :icon="Delete" @click="handleDeleteAllConversations" class="flex-1"
-                size="small">{{ t('sidePanel.deleteAll') }}</el-button>
-            </div>
-            <el-scrollbar>
-              <el-menu :default-active="activeConversationId" @select="handleSelectConversation" v-loading="loading"
-                class="conversation-menu">
-                <el-menu-item v-for="conv in conversations" :key="conv.id" :index="conv.id"
-                  class="conversation-menu-item">
-                  <div class="conversation-item">
-                    <div class="conv-content">
-                      <span class="conv-title">{{ conv.title }}</span>
-                      <span class="conv-date">{{ formatDate(conv.lastUpdated) }}</span>
-                      <span class="conv-id">ID: {{ conv.id }}</span>
+        <el-collapse v-model="activeCollapse" class="sidebar-collapse" :class="{ 'mobile-collapse': isMobileDrawer }">
+          <!-- 工作区面板 -->
+          <el-collapse-item name="workspace" class="collapse-item">
+            <template #title>
+              <div class="collapse-title">
+                <el-icon>
+                  <Folder />
+                </el-icon>
+                <span>{{ t('sidePanel.workspace') }}</span>
+              </div>
+            </template>
+            <div class="collapse-content">
+              <el-scrollbar>
+                <div v-loading="filesLoading">
+                  <div v-if="filesError" class="error-text">{{ filesError }}</div>
+                  <div v-else>
+                    <!-- 文件操作按钮 -->
+                    <div class="file-operations">
+                      <el-tooltip :content="t('sidePanel.refresh')" placement="top">
+                        <el-button :icon="Refresh" text circle size="small" @click="handleRefreshFiles" />
+                      </el-tooltip>
+                      <el-tooltip :content="t('sidePanel.uploadFile')" placement="top">
+                        <el-button :icon="Upload" text circle size="small" @click="handleUploadFile()" />
+                      </el-tooltip>
+                      <el-tooltip :content="t('sidePanel.newFile')" placement="top">
+                        <el-button :icon="Document" text circle size="small" @click="handleCreateFile()" />
+                      </el-tooltip>
+                      <el-tooltip :content="t('sidePanel.newDirectory')" placement="top">
+                        <el-button :icon="FolderAdd" text circle size="small" @click="handleCreateDirectory()" />
+                      </el-tooltip>
                     </div>
-                    <el-button :icon="Delete" type="danger" text circle size="small" class="conv-delete-btn"
-                      @click.stop="handleDeleteConversation(conv)" :title="t('sidePanel.deleteConversation')" />
-                  </div>
-                </el-menu-item>
-              </el-menu>
-              <el-empty v-if="!loading && conversations.length === 0" :description="t('sidePanel.noConversations')"
-                :image-size="60" />
-            </el-scrollbar>
-          </div>
-        </div>
-
-        <!-- 项目文件面板 -->
-        <div v-show="activeTab === 'files'" class="tab-panel">
-          <div class="panel-content">
-            <el-scrollbar>
-              <div v-loading="filesLoading">
-                <div v-if="filesError" class="error-text">{{ filesError }}</div>
-                <div v-else>
-                  <!-- 项目文件树 -->
-                  <div class="section-block">
-                    <div class="section-header">
-                      <h4>{{ t('sidePanel.fileTree') }}</h4>
-                      <div class="file-actions">
-                        <el-tooltip :content="t('sidePanel.refresh')" placement="top">
-                          <el-button :icon="Refresh" text circle size="small" @click="handleRefreshFiles" />
-                        </el-tooltip>
-                        <el-tooltip :content="t('sidePanel.uploadFile')" placement="top">
-                          <el-button :icon="Upload" text circle size="small" @click="handleUploadFile()" />
-                        </el-tooltip>
-                        <el-tooltip :content="t('sidePanel.newFile')" placement="top">
-                          <el-button :icon="Document" text circle size="small" @click="handleCreateFile()" />
-                        </el-tooltip>
-                        <el-tooltip :content="t('sidePanel.newDirectory')" placement="top">
-                          <el-button :icon="FolderAdd" text circle size="small" @click="handleCreateDirectory()" />
-                        </el-tooltip>
-                      </div>
-                    </div>
+                    <!-- 文件树 -->
                     <el-tree ref="fileTreeRef" :data="nestedFileTree" :props="defaultProps" node-key="path" lazy
                       :load="loadTreeNode" @node-click="handleTreeNodeClick" @node-contextmenu="handleNodeContextMenu"
                       :expand-on-click-node="false" :highlight-current="true" draggable :allow-drag="allowDrag"
@@ -123,15 +71,52 @@
                       :image-size="40" />
                   </div>
                 </div>
-              </div>
-            </el-scrollbar>
-          </div>
-        </div>
+              </el-scrollbar>
+            </div>
+          </el-collapse-item>
 
-        <!-- 记忆面板 -->
-        <div v-if="!memoryPanelDisabled" v-show="activeTab === 'memory'" class="tab-panel">
-          <MemoryBrowser v-if="workspaceId" :workspace-id="workspaceId" @select-memory="handleSelectMemory" />
-        </div>
+          <!-- 会话面板 -->
+          <el-collapse-item name="conversations" class="collapse-item">
+            <template #title>
+              <div class="collapse-title">
+                <el-icon>
+                  <ChatDotRound />
+                </el-icon>
+                <span>{{ t('sidePanel.conversations') }}</span>
+              </div>
+            </template>
+            <div class="collapse-content">
+              <!-- 会话操作按钮 -->
+              <div class="conversation-operations">
+                <el-button :icon="Refresh" @click="loadConversations" size="small" :title="t('sidePanel.refresh')">
+                </el-button>
+                <el-button type="primary" :icon="Plus" @click="handleNewChat" class="flex-1" size="small">{{
+                  t('sidePanel.newConversation') }}</el-button>
+                <el-button type="danger" :icon="Delete" @click="handleDeleteAllConversations" class="flex-1"
+                  size="small">{{ t('sidePanel.deleteAll') }}</el-button>
+              </div>
+              <el-scrollbar>
+                <el-menu :default-active="activeConversationId" @select="handleSelectConversation" v-loading="loading"
+                  class="conversation-menu">
+                  <el-menu-item v-for="conv in conversations" :key="conv.id" :index="conv.id"
+                    class="conversation-menu-item">
+                    <div class="conversation-item">
+                      <div class="conv-content">
+                        <span class="conv-title">{{ conv.title }}</span>
+                        <span class="conv-date">{{ formatDate(conv.lastUpdated) }}</span>
+                        <span class="conv-id">ID: {{ conv.id }}</span>
+                      </div>
+                      <el-button :icon="Delete" type="danger" text circle size="small" class="conv-delete-btn"
+                        @click.stop="handleDeleteConversation(conv)" :title="t('sidePanel.deleteConversation')" />
+                    </div>
+                  </el-menu-item>
+                </el-menu>
+                <el-empty v-if="!loading && conversations.length === 0" :description="t('sidePanel.noConversations')"
+                  :image-size="60" />
+              </el-scrollbar>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
       </div>
     </div>
 
@@ -199,11 +184,10 @@ import { apiManager } from '@/services/api';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import {
   ChatDotRound, Folder, Document, Plus, Delete,
-  FolderAdd, Edit, CopyDocument, Upload, Refresh, Connection, Download, Close
+  FolderAdd, Edit, CopyDocument, Upload, Refresh, Download, Close
 } from '@element-plus/icons-vue';
 import UserSettingsDrawer from './UserSettingsDrawer.vue';
 import FileUploadDialog from '@/components/FileUploadDialog.vue';
-import MemoryBrowser from './MemoryBrowser.vue';
 import { useMobile } from '@/composables/useMobile';
 
 const chatStore = useChatStore();
@@ -244,10 +228,6 @@ const updateTempConversation = (tempId: string, realId: string) => {
 const props = defineProps({
   collapsed: Boolean,
   workspaceId: String,
-  memoryPanelDisabled: {
-    type: Boolean,
-    default: false
-  },
   // 移动端抽屉模式
   isMobileDrawer: {
     type: Boolean,
@@ -303,20 +283,13 @@ const isUserSettingsVisible = ref(false);
 // 文件上传对话框
 const isUploadDialogVisible = ref(false);
 
-// 当前激活的标签页（默认选择"工作区"）
-const activeTab = ref<'conversations' | 'files' | 'memory'>('files');
+// 当前激活的折叠面板（默认展开工作区）
+const activeCollapse = ref(['workspace']);
 
 // 移动端抽屉模式处理
 const handleCloseMobileDrawer = () => {
   emit('close-mobile-drawer');
 };
-
-// 监听 memoryPanelDisabled 变化，如果当前是 memory tab 且被禁用，切换到 files tab
-watch(() => props.memoryPanelDisabled, (newDisabled) => {
-  if (newDisabled && activeTab.value === 'memory') {
-    activeTab.value = 'files';
-  }
-});
 
 // 历史会话
 const conversations = ref<unknown[]>([]);
@@ -938,11 +911,6 @@ const handleQuickDelete = async (nodeData: unknown) => {
   }
 };
 
-// Handle memory selection
-const handleSelectMemory = (_memoryId: string) => {
-  // Future: Could open memory details or use memory in chat
-};
-
 const formatDate = (date: string): string => {
   if (!date) return '';
   const d = new Date(date);
@@ -998,74 +966,129 @@ defineExpose({
   min-height: 0;
 }
 
-/* 侧边栏切换标签 */
-.sidebar-tabs {
+/* 折叠面板样式 */
+.sidebar-collapse {
+  flex: 1;
+  overflow: hidden;
   display: flex;
-  gap: 4px;
-  padding: 12px 12px 8px 12px;
-  border-bottom: 1px solid var(--el-border-color-light);
-  flex-shrink: 0;
+  flex-direction: column;
+  border: none;
+  height: 100%;
 }
 
-.tab-button {
+.sidebar-collapse :deep(.el-collapse-item) {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.sidebar-collapse :deep(.el-collapse-item__wrap) {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--el-text-color-secondary);
-  transition: all 0.2s;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
 }
 
-.tab-button:hover {
-  background: var(--el-fill-color-light);
+/* 展开的项应该占据所有可用空间 */
+.sidebar-collapse :deep(.el-collapse-item.is-active) {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-collapse :deep(.el-collapse-item.is-active .el-collapse-item__wrap) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sidebar-collapse :deep(.el-collapse-item__content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  padding: 0 !important;
+}
+
+.sidebar-collapse :deep(.el-collapse-item__header) {
+  height: 48px;
+  line-height: 48px;
+  padding: 0 16px;
+  background-color: var(--el-fill-color-blank);
+  font-weight: 500;
+  user-select: none;
+}
+
+.sidebar-collapse :deep(.el-collapse-item__header:hover) {
+  background-color: var(--el-fill-color-light);
+}
+
+.sidebar-collapse :deep(.el-collapse-item__wrap) {
+  border-bottom: none;
+}
+
+.sidebar-collapse :deep(.el-collapse-item__content) {
+  padding: 0;
+}
+
+.collapse-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   color: var(--el-text-color-primary);
 }
 
-.tab-button.active {
-  background: var(--el-color-primary);
-  color: #ffffff;
-  border-color: var(--el-color-primary);
+.collapse-title .el-icon {
+  font-size: 18px;
+  color: var(--el-color-primary);
 }
 
-.tab-button .el-icon {
-  font-size: 16px;
-}
-
-/* 标签面板 */
-.tab-panel {
+.collapse-content {
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 }
 
-.panel-content {
+.collapse-content .el-scrollbar {
   flex: 1;
+  height: 100%;
   overflow: hidden;
+}
+
+.collapse-content .el-scrollbar :deep(.el-scrollbar__wrap) {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.collapse-content .el-scrollbar :deep(.el-scrollbar__view) {
+  height: 100%;
+}
+
+/* 文件操作按钮 */
+.file-operations {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 12px;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background-color: var(--el-fill-color-blank);
 }
 
-.panel-content .el-scrollbar {
-  flex: 1;
-  overflow-y: auto;
-  height: 100%;
-}
-
-.panel-content .el-scrollbar .el-scrollbar__wrap {
-  height: 100%;
-  overflow-y: auto;
+/* 会话操作按钮 */
+.conversation-operations {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background-color: var(--el-fill-color-blank);
 }
 
 .conversation-item {
@@ -1218,56 +1241,6 @@ defineExpose({
   color: var(--el-text-color-secondary);
 }
 
-.section-block {
-  margin-bottom: 16px;
-}
-
-.section-block:last-child {
-  margin-bottom: 0;
-}
-
-.section-block h4 {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 8px;
-  text-transform: uppercase;
-}
-
-.ws-name {
-  font-weight: bold;
-  font-size: 13px;
-}
-
-.ws-path {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-  margin-top: 4px;
-}
-
-.open-files-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.open-file-item {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.open-file-item:hover {
-  background-color: var(--el-fill-color-light);
-}
-
-.open-file-item .file-name {
-  flex-grow: 1;
-  margin-left: 8px;
-  font-size: 13px;
-}
-
 .error-text {
   color: var(--el-color-error);
   font-size: 12px;
@@ -1283,30 +1256,8 @@ defineExpose({
   width: 100%;
 }
 
-.conversation-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
 .flex-1 {
   flex: 1;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.section-header h4 {
-  margin: 0;
-}
-
-.file-actions {
-  display: flex;
-  gap: 4px;
 }
 
 .custom-tree-node {
@@ -1459,34 +1410,47 @@ defineExpose({
   padding-top: 56px;
 }
 
-.sidebar-tabs.mobile-tabs {
-  position: sticky;
-  top: 0;
-  background-color: var(--el-bg-color-page);
-  z-index: 5;
-  padding: 16px;
+/* 移动端折叠面板样式 */
+.sidebar-collapse.mobile-collapse :deep(.el-collapse-item__header) {
+  height: 52px;
+  line-height: 52px;
+  padding: 0 16px;
+}
+
+.sidebar-collapse.mobile-collapse .collapse-content {
+  flex: 1;
+  min-height: 0;
 }
 
 /* 移动端优化 */
 @media (max-width: 767px) {
-  .tab-button {
-    min-height: var(--touch-target-min, 44px);
-    font-size: 14px;
+  .sidebar-collapse :deep(.el-collapse-item__header) {
+    height: 52px;
+    line-height: 52px;
+    font-size: 15px;
+  }
+
+  .collapse-title {
+    font-size: 15px;
+  }
+
+  .collapse-title .el-icon {
+    font-size: 20px;
+  }
+
+  .conversation-operations {
+    flex-wrap: wrap;
+    gap: 8px;
     padding: 12px 16px;
   }
 
-  .conversation-actions {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .conversation-actions .el-button {
+  .conversation-operations .el-button {
     flex: 1 1 calc(50% - 4px);
     min-height: var(--touch-target-min, 44px);
   }
 
-  .panel-content {
-    padding: 16px;
+  .file-operations {
+    padding: 12px 16px;
   }
 
   .el-tree-node {

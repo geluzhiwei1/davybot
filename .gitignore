@@ -25,3 +25,12 @@ deps/*
 
 .playwright-cli/
 .claude/
+
+# Local development configuration (mirrors, etc.)
+.uvrc
+uv.toml
+.pip/
+.piprc
+.npmrc
+.pypirc
+.cargo/config.toml.local

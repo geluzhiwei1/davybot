@@ -758,7 +758,18 @@
       "saveSuccess": "Profile saved successfully",
       "usernamePlaceholder": "Enter username",
       "emailPlaceholder": "Enter email",
-      "bioPlaceholder": "Enter bio"
+      "bioPlaceholder": "Enter bio",
+      "login": "Login",
+      "logout": "Logout",
+      "notLoggedIn": "Not Logged In",
+      "loginHint": "Login to sync your settings and usage data",
+      "loginInProgress": "Please complete login in the browser...",
+      "loginSuccess": "Login successful",
+      "loginFailed": "Login failed, please try again",
+      "logoutConfirm": "Are you sure you want to logout?",
+      "logoutSuccess": "Logout successful",
+      "logoutFailed": "Logout failed",
+      "unknownUser": "Unknown User"
     },
     "preferences": {
       "theme": "Theme",

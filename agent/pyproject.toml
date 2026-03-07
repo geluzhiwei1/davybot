@@ -60,6 +60,7 @@ dev = [
     "types-PyYAML",
     "types-aiofiles",
     "pre-commit>=3.6.0",
+    "fastapi[standard]"
 ]
 docs = [
     "markitdown",

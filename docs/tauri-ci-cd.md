@@ -180,7 +180,6 @@ strategy:
 在 `scripts/copy-resources.py` 中修改 pip 安装源：
 ```python
 pip install -e . -i https://pypi.org/simple/  # 官方源
-pip install -e . -i https://mirrors.aliyun.com/pypi/simple/  # 阿里云
 ```
 
 ## 故障排查

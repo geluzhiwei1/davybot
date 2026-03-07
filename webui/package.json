@@ -27,18 +27,19 @@
     }
   },
   "scripts": {
-    "dev": "vite --host",
-    "build": "vite build",
+    "dev": "bash scripts/prepare-drawio.sh && vite --host",
+    "build": "bash scripts/prepare-drawio.sh && vite build",
     "build:old": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix --cache",
     "format": "prettier --write src/",
+    "prepare-drawio": "bash scripts/prepare-drawio.sh",
     "tauri": "tauri",
-    "dev:tauri": "tauri dev",
-    "build:tauri": "tauri build",
-    "build:tauri:regular": "tauri build --config src-tauri/tauri.conf.json",
+    "dev:tauri": "bash scripts/prepare-drawio.sh && tauri dev",
+    "build:tauri": "bash scripts/prepare-drawio.sh && tauri build",
+    "build:tauri:regular": "bash scripts/prepare-drawio.sh && tauri build --config src-tauri/tauri.conf.json",
     "build:tauri:standalone": "run-s-os",
     "build:tauri:standalone:win": "powershell -ExecutionPolicy Bypass -File ../../scripts/build-standalone-win.ps1",
     "build:tauri:standalone:win:bat": "cmd /c ..\\..\\scripts\\bundle-standalone-win.bat",
@@ -95,6 +96,7 @@
     "vue-echarts": "^8.0.1",
     "vue-i18n": "^11.0.0",
     "vue-router": "^4.6.3",
+    "vue-web-terminal": "^3.4.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {

@@ -27,6 +27,9 @@
 
         <!-- 下部按钮 -->
         <div class="bottom-buttons">
+          <el-tooltip :content="t('sidePanel.memory')" placement="right">
+            <el-button :icon="Connection" @click="handleOpenMemoryDrawer" text circle />
+          </el-tooltip>
           <el-tooltip :content="t('knowledge.title')" placement="right">
             <el-button :icon="Grid" @click="handleOpenKnowledgeDrawer" text circle />
           </el-tooltip>
@@ -46,8 +49,7 @@
     <!-- 左侧内容区 - 桌面端固定侧边栏,移动端隐藏 -->
     <el-aside v-show="!isSidePanelCollapsed && !isMobile" class="content-panel" :width="sidePanelWidth + 'px'">
       <SidePanel ref="sidePanelRef" @open-file="handleOpenFile" :side-panel-collapsed="isSidePanelCollapsed"
-        :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined"
-        :memory-panel-disabled="false" />
+        :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-aside>
 
     <!-- 左侧面板拖动分隔条 (仅桌面端) -->
@@ -106,7 +108,6 @@
         :side-panel-collapsed="false"
         :chat-panel-collapsed="false"
         :workspace-id="chatStore.workspaceId ?? undefined"
-        :memory-panel-disabled="true"
         :is-mobile-drawer="true"
         @close-mobile-drawer="isMobileSidePanelOpen = false"
       />
@@ -139,6 +140,9 @@
     <!-- 知识库抽屉 -->
     <KnowledgeDrawer v-model="isKnowledgeDrawerVisible" :workspace-id="chatStore.workspaceId ?? undefined" />
 
+    <!-- 记忆抽屉 -->
+    <MemoryDrawer v-model="isMemoryDrawerVisible" :workspace-id="chatStore.workspaceId ?? undefined" />
+
     <!-- 追问问题对话框 -->
     <FollowupQuestionDialog v-model:visible="showFollowupDialog" :question="followupData.question"
       :suggestions="followupData.suggestions" :tool-call-id="followupData.toolCallId" :task-id="followupData.taskId"
@@ -165,7 +169,7 @@ import { appConfig } from '@/config/app.config';
 import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
-import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User, Grid } from '@element-plus/icons-vue';
+import { Fold, Expand, DArrowLeft, DArrowRight, Setting, Switch, User, Grid, Connection } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { useMobile } from '@/composables/useMobile';
 
@@ -188,6 +192,7 @@ import ServerStatusIndicator from '@/components/ServerStatusIndicator.vue';
 import BottomBar from '@/components/layout/BottomBar.vue';
 import WorkspaceSettingsDrawer from '@/components/layout/WorkspaceSettingsDrawer.vue';
 import KnowledgeDrawer from '@/components/layout/KnowledgeDrawer.vue';
+import MemoryDrawer from '@/components/layout/MemoryDrawer.vue';
 import UserSettingsDrawer from '@/components/layout/UserSettingsDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
@@ -237,6 +242,7 @@ const isSidePanelCollapsed = ref(false);
 const isChatPanelCollapsed = ref(false);
 const isSettingsDrawerVisible = ref(false);
 const isKnowledgeDrawerVisible = ref(false);
+const isMemoryDrawerVisible = ref(false);
 const isUserSettingsVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
@@ -571,6 +577,11 @@ const handleOpenSettings = () => {
 // 打开知识库抽屉
 const handleOpenKnowledgeDrawer = () => {
   isKnowledgeDrawerVisible.value = true;
+};
+
+// 打开记忆抽屉
+const handleOpenMemoryDrawer = () => {
+  isMemoryDrawerVisible.value = true;
 };
 
 // 用户设置
