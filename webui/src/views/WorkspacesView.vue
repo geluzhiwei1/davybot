@@ -275,154 +275,153 @@
       </div>
     </div>
 
-    <!-- 主内容区域：Tab 结构 -->
+    <!-- 主内容区域 -->
     <div class="main-content">
-      <el-tabs v-model="activeTab" type="border-card" class="workspace-tabs">
-        <!-- Tab 1: 工作区列表 -->
-        <el-tab-pane :label="t('workspaces.tabs.workspaces')" name="workspaces">
-          <div class="tab-content">
-            <!-- Tool Bar -->
-            <div class="toolbar-section">
-              <div class="toolbar-left">
-                <h2>{{ t('workspaces.myWorkspaces') }}</h2>
-                <span class="workspace-count">{{ t('workspaces.workspaceCount', { count: workspaces.length }) }}</span>
-              </div>
-              <div class="toolbar-right">
-                <el-button type="primary" :icon="Plus" @click="showCreateDialog">
-                  {{ t('workspaces.createWorkspace') }}
-                </el-button>
-              </div>
-            </div>
+      <!-- 工作区列表（独立展示） -->
+      <div class="workspaces-section">
+        <!-- Tool Bar -->
+        <div class="toolbar-section">
+          <div class="toolbar-left">
+            <h2>{{ t('workspaces.myWorkspaces') }}</h2>
+            <span class="workspace-count">{{ t('workspaces.workspaceCount', { count: workspaces.length }) }}</span>
+          </div>
+          <div class="toolbar-right">
+            <el-button type="primary" :icon="Plus" @click="showCreateDialog">
+              {{ t('workspaces.createWorkspace') }}
+            </el-button>
+          </div>
+        </div>
 
-            <!-- Workspaces Grid -->
-            <div class="workspaces-container" v-loading="isLoading" :element-loading-text="t('workspaces.loading')">
-              <transition-group name="workspace-card" tag="div" class="workspaces-grid">
-                <div v-for="(workspace, index) in workspaces" :key="workspace.id" class="workspace-card"
-                  :style="{ 'animation-delay': `${index * 100}ms` }" @click="goToChat(workspace.id)">
-                  <div class="card-decoration"></div>
-                  <div class="card-glow"></div>
+        <!-- Workspaces Grid -->
+        <div class="workspaces-container" v-loading="isLoading" :element-loading-text="t('workspaces.loading')">
+          <transition-group name="workspace-card" tag="div" class="workspaces-grid">
+            <div v-for="(workspace, index) in workspaces" :key="workspace.id" class="workspace-card"
+              :style="{ 'animation-delay': `${index * 100}ms` }" @click="goToChat(workspace.id)">
+              <div class="card-decoration"></div>
+              <div class="card-glow"></div>
 
-                  <div class="card-header">
-                    <div class="workspace-icon-wrapper">
-                      <div class="workspace-icon">
-                        <el-icon :size="28">
-                          <OfficeBuilding />
-                        </el-icon>
-                      </div>
-                      <div class="icon-pulse"></div>
-                    </div>
-                    <div class="workspace-meta">
-                      <h3 class="workspace-name">{{ workspace.display_name || workspace.name }}</h3>
-                      <div v-if="workspace.path" class="workspace-path">
-                        <el-icon>
-                          <Folder />
-                        </el-icon>
-                        {{ workspace.path }}
-                      </div>
-                      <div class="workspace-id">ID: {{ workspace.id.slice(0, 8) }}...</div>
-                    </div>
-                  </div>
-
-                  <p v-if="workspace.description" class="workspace-description">
-                    {{ workspace.description }}
-                  </p>
-
-                  <!-- 工作区统计信息 -->
-                  <div class="workspace-stats" v-if="workspaceStats[workspace.id]">
-                    <div class="workspace-stat-item">
-                      <el-icon :size="16">
-                        <Star />
-                      </el-icon>
-                      <span>{{ workspaceStats[workspace.id].skillsCount }} {{ t('workspaces.stats.skills') }}</span>
-                    </div>
-                    <div class="workspace-stat-item">
-                      <el-icon :size="16">
-                        <User />
-                      </el-icon>
-                      <span>{{ workspaceStats[workspace.id].agentsCount }} {{ t('workspaces.stats.agents') }}</span>
-                    </div>
-                  </div>
-
-                  <div class="card-footer">
-                    <div class="workspace-date">
-                      <el-icon>
-                        <Calendar />
-                      </el-icon>
-                      <span>{{ formatDate(workspace.created_at || workspace.createdAt) }}</span>
-                    </div>
-                    <div class="workspace-actions">
-                      <!-- 独立的操作按钮 -->
-                      <el-button type="primary" :icon="ArrowRight" @click.stop="goToChat(workspace.id)" size="small"
-                        class="action-btn enter-btn">
-                        {{ t('workspaces.enter') }}
-                      </el-button>
-                      <el-button :icon="Edit" @click.stop="showEditDialog(workspace)" size="small"
-                        class="action-btn edit-btn">
-                        {{ t('workspaces.edit') }}
-                      </el-button>
-                      <el-button type="danger" :icon="Delete" @click.stop="showDeleteDialogFn(workspace)" size="small"
-                        class="action-btn delete-btn">
-                        {{ t('workspaces.delete') }}
-                      </el-button>
-                    </div>
-                  </div>
-                </div>
-              </transition-group>
-
-              <!-- Empty State -->
-              <transition name="fade">
-                <div v-if="workspaces.length === 0 && !isLoading" class="empty-state">
-                  <div class="empty-icon">
-                    <el-icon :size="64">
-                      <FolderOpened />
+              <div class="card-header">
+                <div class="workspace-icon-wrapper">
+                  <div class="workspace-icon">
+                    <el-icon :size="28">
+                      <OfficeBuilding />
                     </el-icon>
                   </div>
-                  <h3>{{ t('workspaces.noWorkspaces') }}</h3>
-                  <p>{{ t('workspaces.noWorkspacesDesc') }}</p>
-                  <el-button type="primary" size="large" :icon="Plus" @click="showCreateDialog">
-                    {{ t('workspaces.createWorkspace') }}
+                  <div class="icon-pulse"></div>
+                </div>
+                <div class="workspace-meta">
+                  <h3 class="workspace-name">{{ workspace.display_name || workspace.name }}</h3>
+                  <div v-if="workspace.path" class="workspace-path">
+                    <el-icon>
+                      <Folder />
+                    </el-icon>
+                    {{ workspace.path }}
+                  </div>
+                  <div class="workspace-id">ID: {{ workspace.id.slice(0, 8) }}...</div>
+                </div>
+              </div>
+
+              <p v-if="workspace.description" class="workspace-description">
+                {{ workspace.description }}
+              </p>
+
+              <!-- 工作区统计信息 -->
+              <div class="workspace-stats" v-if="workspaceStats[workspace.id]">
+                <div class="workspace-stat-item">
+                  <el-icon :size="16">
+                    <Star />
+                  </el-icon>
+                  <span>{{ workspaceStats[workspace.id].skillsCount }} {{ t('workspaces.stats.skills') }}</span>
+                </div>
+                <div class="workspace-stat-item">
+                  <el-icon :size="16">
+                    <User />
+                  </el-icon>
+                  <span>{{ workspaceStats[workspace.id].agentsCount }} {{ t('workspaces.stats.agents') }}</span>
+                </div>
+              </div>
+
+              <div class="card-footer">
+                <div class="workspace-date">
+                  <el-icon>
+                    <Calendar />
+                  </el-icon>
+                  <span>{{ formatDate(workspace.created_at || workspace.createdAt) }}</span>
+                </div>
+                <div class="workspace-actions">
+                  <!-- 独立的操作按钮 -->
+                  <el-button type="primary" :icon="ArrowRight" @click.stop="goToChat(workspace.id)" size="small"
+                    class="action-btn enter-btn">
+                    {{ t('workspaces.enter') }}
+                  </el-button>
+                  <el-button :icon="Edit" @click.stop="showEditDialog(workspace)" size="small"
+                    class="action-btn edit-btn">
+                    {{ t('workspaces.edit') }}
+                  </el-button>
+                  <el-button type="danger" :icon="Delete" @click.stop="showDeleteDialogFn(workspace)" size="small"
+                    class="action-btn delete-btn">
+                    {{ t('workspaces.delete') }}
                   </el-button>
                 </div>
-              </transition>
+              </div>
             </div>
-          </div>
+          </transition-group>
 
-          <!-- Dialogs -->
-          <WorkspaceFormDialog v-model="showFormDialog" :workspace="currentWorkspace" @created="handleWorkspaceCreated"
-            @updated="handleWorkspaceUpdated" />
+          <!-- Empty State -->
+          <transition name="fade">
+            <div v-if="workspaces.length === 0 && !isLoading" class="empty-state">
+              <div class="empty-icon">
+                <el-icon :size="64">
+                  <FolderOpened />
+                </el-icon>
+              </div>
+              <h3>{{ t('workspaces.noWorkspaces') }}</h3>
+              <p>{{ t('workspaces.noWorkspacesDesc') }}</p>
+              <el-button type="primary" size="large" :icon="Plus" @click="showCreateDialog">
+                {{ t('workspaces.createWorkspace') }}
+              </el-button>
+            </div>
+          </transition>
+        </div>
+      </div>
 
-          <WorkspaceDeleteDialog v-model="showDeleteDialog" :workspace="currentWorkspace"
-            @deleted="handleWorkspaceDeleted" />
-        </el-tab-pane>
-
-        <!-- Tab 2: 偏好设置 -->
+      <!-- Tab 结构（设置相关） -->
+      <el-tabs v-model="activeTab" type="border-card" class="workspace-tabs">
+        <!-- Tab 1: 偏好设置 -->
         <el-tab-pane :label="t('workspaces.tabs.preferences')" name="preferences">
           <div class="tab-content">
             <PreferencesTab />
           </div>
         </el-tab-pane>
 
-        <!-- Tab 4: 安全设置 -->
+        <!-- Tab 2: 安全设置 -->
         <el-tab-pane :label="t('workspaces.tabs.security')" name="security">
           <div class="tab-content">
             <SecuritySettingsTab v-model="securitySettings" @update:model-value="handleSecuritySettingsUpdate" />
           </div>
         </el-tab-pane>
 
-        <!-- Tab 5: 快捷键 -->
+        <!-- Tab 3: 快捷键 -->
         <el-tab-pane :label="t('workspaces.tabs.shortcuts')" name="shortcuts">
           <div class="tab-content">
             <ShortcutsTab />
           </div>
         </el-tab-pane>
 
-        <!-- Tab 6: 关于 -->
+        <!-- Tab 4: 关于 -->
         <el-tab-pane :label="t('workspaces.tabs.about')" name="about">
           <div class="tab-content">
             <AboutTab />
           </div>
         </el-tab-pane>
       </el-tabs>
+
+      <!-- Dialogs -->
+      <WorkspaceFormDialog v-model="showFormDialog" :workspace="currentWorkspace" @created="handleWorkspaceCreated"
+        @updated="handleWorkspaceUpdated" />
+
+      <WorkspaceDeleteDialog v-model="showDeleteDialog" :workspace="currentWorkspace"
+        @deleted="handleWorkspaceDeleted" />
     </div>
   </div>
 </template>
@@ -469,8 +468,8 @@ import { httpClient } from '@/services/api/http';
 
 const { t } = useI18n();
 
-// 当前激活的 tab
-const activeTab = ref('workspaces');
+// 当前激活的 tab（默认偏好设置）
+const activeTab = ref('preferences');
 
 interface Workspace {
   id: string;
@@ -1085,12 +1084,12 @@ onUnmounted(() => {
 <style scoped>
 .workspaces-view {
   min-height: 100vh;
+  height: auto;
   padding: var(--spacing-2xl);
   background:
     radial-gradient(at 40% 20%, rgba(var(--color-primary-rgb), 0.05) 0px, transparent 50%),
     radial-gradient(at 80% 0%, rgba(var(--color-accent-rgb), 0.04) 0px, transparent 50%),
     radial-gradient(at 0% 50%, rgba(var(--color-primary-rgb), 0.03) 0px, transparent 50%);
-  overflow-y: auto;
 }
 
 /* 顶部栏 */
@@ -1177,12 +1176,16 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+/* 工作区独立区域 */
+.workspaces-section {
+  margin-bottom: 40px;
+}
+
 .workspace-tabs {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
 }
 
 .workspace-tabs :deep(.el-tabs__header) {
@@ -1197,7 +1200,6 @@ onUnmounted(() => {
 
 .tab-content {
   padding: var(--spacing-2xl);
-  min-height: 500px;
 }
 
 /* ====================
@@ -1280,7 +1282,7 @@ onUnmounted(() => {
    ==================== */
 .toolbar-section {
   max-width: 1400px;
-  margin: 0 auto 40px;
+  margin: 0 auto 24px;
   padding: 20px 30px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);

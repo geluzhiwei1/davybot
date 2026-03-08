@@ -127,9 +127,10 @@ const handleGlobalError = (error: Error, instance: unknown, info: string) => {
 }
 
 .app-wrapper {
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
 }
 
