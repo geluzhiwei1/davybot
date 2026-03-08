@@ -2076,6 +2076,59 @@ const initRulesVditor = () => {
     cache: {
       enable: false,
     },
+    toolbar: [
+      // 标题和基础格式
+      'headings',
+      'bold',
+      'italic',
+      'strike',
+      '|',
+      // 列表
+      'list',
+      'ordered-list',
+      'check',
+      'outdent',
+      'indent',
+      '|',
+      // 引用和代码
+      'quote',
+      'code',
+      'inline-code',
+      '|',
+      // 插入功能
+      'insert-before',
+      'insert-after',
+      '|',
+      // 媒体和链接
+      'link',
+      'upload',
+      'table',
+      'emoji',
+      '|',
+      // 分割线
+      'line',
+      '|',
+      // 编辑操作
+      'undo',
+      'redo',
+      '|',
+      // 视图和预览
+      'both',
+      'preview',
+      'fullscreen',
+      'outline',
+      '|',
+      // 主题配置
+      'edit-mode',
+      'code-theme',
+      'content-theme',
+      '|',
+      // 高级功能
+      'export',
+      'devtools',
+      'info',
+      'help',
+    ],
     input: (value: string) => {
       // 更新当前文件的内容
       if (currentRuleFile.value) {
@@ -2543,6 +2596,59 @@ const initSkillVditor = (initialContent: string = '') => {
     cache: {
       enable: false,
     },
+    toolbar: [
+      // 标题和基础格式
+      'headings',
+      'bold',
+      'italic',
+      'strike',
+      '|',
+      // 列表
+      'list',
+      'ordered-list',
+      'check',
+      'outdent',
+      'indent',
+      '|',
+      // 引用和代码
+      'quote',
+      'code',
+      'inline-code',
+      '|',
+      // 插入功能
+      'insert-before',
+      'insert-after',
+      '|',
+      // 媒体和链接
+      'link',
+      'upload',
+      'table',
+      'emoji',
+      '|',
+      // 分割线
+      'line',
+      '|',
+      // 编辑操作
+      'undo',
+      'redo',
+      '|',
+      // 视图和预览
+      'both',
+      'preview',
+      'fullscreen',
+      'outline',
+      '|',
+      // 主题配置
+      'edit-mode',
+      'code-theme',
+      'content-theme',
+      '|',
+      // 高级功能
+      'export',
+      'devtools',
+      'info',
+      'help',
+    ],
     input: (value: string) => {
       // 实时更新内容到当前文件对象
       if (currentSkillFile.value) {

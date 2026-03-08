@@ -715,27 +715,57 @@ const initVditor = () => {
     cache: { enable: false },
     placeholder: '请输入 Markdown 内容...',
     toolbar: [
+      // 标题和基础格式
       'headings',
       'bold',
       'italic',
       'strike',
       '|',
+      // 列表
       'list',
       'ordered-list',
       'check',
+      'outdent',
+      'indent',
       '|',
+      // 引用和代码
       'quote',
       'code',
       'inline-code',
+      '|',
+      // 插入功能
+      'insert-before',
+      'insert-after',
+      '|',
+      // 媒体和链接
       'link',
-      '|',
+      'upload',
       'table',
+      'emoji',
       '|',
+      // 分割线
+      'line',
+      '|',
+      // 编辑操作
       'undo',
       'redo',
       '|',
+      // 视图和预览
+      'both',
       'preview',
       'fullscreen',
+      'outline',
+      '|',
+      // 主题配置
+      'edit-mode',
+      'code-theme',
+      'content-theme',
+      '|',
+      // 高级功能
+      'export',
+      'devtools',
+      'info',
+      'help',
     ],
     input: (value: string) => {
       editableContent.value = value
@@ -928,6 +958,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+  user-select: none;
 }
 
 .dirty-indicator {
