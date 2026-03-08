@@ -121,8 +121,13 @@
     </div>
 
     <!-- 文件上传对话框 -->
-    <FileUploadDialog v-model="isUploadDialogVisible" :workspace-id="workspaceId" parent-path="" parent-name=""
-      @success="handleUploadSuccess" />
+    <FileUploadDialog
+      v-model="isUploadDialogVisible"
+      :workspace-id="workspaceId"
+      :parent-path="uploadTargetPath"
+      :parent-name="uploadTargetName"
+      @success="handleUploadSuccess"
+    />
 
     <!-- 文件右键菜单 -->
     <teleport to="body">
@@ -275,6 +280,8 @@ const handleTaskCompleteRefresh = async (event: unknown) => {
 
 // 文件上传对话框
 const isUploadDialogVisible = ref(false);
+const uploadTargetPath = ref('');
+const uploadTargetName = ref('');
 
 // 当前激活的折叠面板（默认展开工作区）
 const activeCollapse = ref(['workspace']);
@@ -662,6 +669,37 @@ const handleRefreshFiles = async () => {
 
 // 打开上传文件对话框
 const handleUploadFile = () => {
+  // 获取当前选中节点，如果没有选中则上传到根目录
+  const fileTreeComponent = fileTreeRef.value as any;
+  let currentNode = null;
+
+  if (fileTreeComponent && fileTreeComponent.getCurrentKey) {
+    const currentKey = fileTreeComponent.getCurrentKey();
+    if (currentKey) {
+      // 从文件树中查找当前节点
+      const findNode = (nodes: any[], key: string): any => {
+        for (const node of nodes) {
+          if (node.path === key) return node;
+          if (node.children) {
+            const found = findNode(node.children, key);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      currentNode = findNode(nestedFileTree.value, currentKey);
+    }
+  }
+
+  // 设置上传目标
+  if (currentNode && currentNode.type === 'directory') {
+    uploadTargetPath.value = currentNode.path;
+    uploadTargetName.value = currentNode.name;
+  } else {
+    uploadTargetPath.value = '';
+    uploadTargetName.value = '';
+  }
+
   isUploadDialogVisible.value = true;
 };
 

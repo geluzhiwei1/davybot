@@ -34,14 +34,9 @@
       <div class="upload-area">
         <el-upload
           ref="uploadRef"
-          :action="uploadUrl"
-          :headers="uploadHeaders"
-          :data="uploadData"
           :auto-upload="false"
           :on-change="handleFileChange"
           :on-remove="handleFileRemove"
-          :on-success="handleUploadSuccess"
-          :on-error="handleUploadError"
           :file-list="fileList"
           :multiple="true"
           drag
@@ -100,7 +95,7 @@ import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { UploadFilled, Folder, FolderOpened } from '@element-plus/icons-vue';
 import type { UploadInstance, UploadUserFile, UploadProps } from 'element-plus';
-import { httpClient } from '@/services/api/http';
+import { filesApi } from '@/services/api/services/files';
 
 interface Props {
   modelValue: boolean;
@@ -137,31 +132,12 @@ const parentDirectoryPath = computed(() => {
 const uploadType = ref<'file' | 'folder'>('file');
 const uploading = ref(false);
 const fileList = ref<UploadUserFile[]>([]);
-const selectedFolderInfo = ref<unknown>(null);
+const selectedFolderInfo = ref<{
+  fileCount: number;
+  files: File[];
+} | null>(null);
 const uploadRef = ref<UploadInstance>();
 const folderInputRef = ref<HTMLInputElement>();
-
-// 上传URL
-const uploadUrl = computed(() => {
-  if (!props.workspaceId) {
-    return '';
-  }
-  return `/workspaces/${props.workspaceId}/files/upload`;
-});
-
-// 上传头部
-const uploadHeaders = computed(() => {
-  return {
-    // 如果需要认证，可以在这里添加token
-  };
-});
-
-// 上传附加数据
-const uploadData = computed(() => {
-  return {
-    parent_path: props.parentPath || ''
-  };
-});
 
 // 处理文件选择
 const handleFileChange: UploadProps['onChange'] = (uploadFile, uploadFiles) => {
@@ -192,16 +168,6 @@ const handleFolderSelect = (event: Event) => {
   }
 };
 
-// 处理上传成功
-const handleUploadSuccess = (response: unknown, file: UploadUserFile) => {
-  ElMessage.success(`${file.name} 上传成功`);
-};
-
-// 处理上传错误
-const handleUploadError = (error: Error, file: UploadUserFile) => {
-  ElMessage.error(`${file.name} 上传失败`);
-};
-
 // 执行上传
 const handleUpload = async () => {
   if (uploadType.value === 'folder') {
@@ -226,15 +192,22 @@ const uploadFiles = async () => {
   uploading.value = true;
 
   try {
-    await uploadRef.value?.submit();
+    // 使用 filesApi 服务上传每个文件
+    for (const fileItem of fileList.value) {
+      if (fileItem.raw) {
+        await filesApi.uploadFile(props.workspaceId, {
+          file: fileItem.raw,
+          path: props.parentPath || undefined,
+        });
+        ElMessage.success(`${fileItem.name} 上传成功`);
+      }
+    }
 
-    // 等待所有文件上传完成
-    setTimeout(() => {
-      ElMessage.success('文件上传完成');
-      handleClose();
-      emit('success');
-    }, 1000);
-  } catch {
+    ElMessage.success('文件上传完成');
+    handleClose();
+    emit('success');
+  } catch (error) {
+    console.error('文件上传失败:', error);
     ElMessage.error('文件上传失败');
   } finally {
     uploading.value = false;
@@ -269,15 +242,14 @@ const uploadFolder = async () => {
       formData.append('files', file, relativePath);
     }
 
-    await httpClient.upload(
-      `/workspaces/${props.workspaceId}/files/upload-folder`,
-      formData
-    );
+    // 使用 filesApi 服务上传文件夹
+    await filesApi.uploadFolder(props.workspaceId, formData);
 
     ElMessage.success('文件夹上传完成');
     handleClose();
     emit('success');
-  } catch {
+  } catch (error) {
+    console.error('文件夹上传失败:', error);
     ElMessage.error('文件夹上传失败');
   } finally {
     uploading.value = false;
