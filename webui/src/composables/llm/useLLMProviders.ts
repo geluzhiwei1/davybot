@@ -1,12 +1,34 @@
 import { ref, computed } from 'vue';
 import { apiManager } from '@/services/api';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import type { LLMProvider } from '@/types/llm';
+
+interface ProviderConfig {
+  apiProvider?: string;
+  openAiBaseUrl?: string;
+  openAiApiKey?: string;
+  openAiModelId?: string;
+  openAiLegacyFormat?: boolean;
+  openAiHeaders?: Record<string, string>;
+  ollamaBaseUrl?: string;
+  ollamaModelId?: string;
+  ollamaApiKey?: string;
+  diffEnabled?: boolean;
+  todoListEnabled?: boolean;
+  fuzzyMatchThreshold?: number;
+  rateLimitSeconds?: number;
+  consecutiveMistakeLimit?: number;
+  enableReasoningEffort?: boolean;
+  toolChoice?: string | null;
+  temperature?: number | null;
+  source?: string;
+  config?: ProviderConfig;
+}
 
 export function useLLMProviders(workspaceId: string) {
   const llmSettings = ref({
     currentApiConfigName: null as string | null,
-    allConfigs: {} as Record<string, unknown>,
+    allConfigs: {} as Record<string, ProviderConfig>,
     modeApiConfigs: {
       orchestrator: '',
       plan: '',
@@ -29,17 +51,20 @@ export function useLLMProviders(workspaceId: string) {
     apiProvider: 'openai',
     openAiBaseUrl: 'https://api.openai.com/v1',
     openAiApiKey: '',
-    openAiModelId: 'gpt-4',
+    openAiModelId: 'gpt-4o-mini',
     openAiLegacyFormat: false,
-    ollamaBaseUrl: 'http://localhost:11434',
-    ollamaModelId: 'llama2',
+    openAiHeaders: {} as Record<string, string>,
+    ollamaBaseUrl: 'http://localhost:11434/v1',
+    ollamaModelId: 'qwen3.5:9b',
     ollamaApiKey: '',
     diffEnabled: true,
     todoListEnabled: true,
-    fuzzyMatchThreshold: 0.8,
+    fuzzyMatchThreshold: 1,
     rateLimitSeconds: 0,
-    consecutiveMistakeLimit: 5,
-    enableReasoningEffort: false,
+    consecutiveMistakeLimit: 3,
+    enableReasoningEffort: true,
+    toolChoice: 'required' as string | null,
+    temperature: 1.0 as number | null,
     saveLocation: 'user' as 'user' | 'workspace'
   });
 
@@ -48,15 +73,15 @@ export function useLLMProviders(workspaceId: string) {
     const providers: LLMProvider[] = [];
 
     // 添加用户级配置
-    Object.entries(llmSettings.value.allConfigs).forEach(([name, config]: [string, unknown]) => {
-      const providerConfig = config as { source?: string; config?: unknown };
+    Object.entries(llmSettings.value.allConfigs).forEach(([name, config]: [string, ProviderConfig]) => {
+      const providerConfig = config.config || config;
       providers.push({
         name,
-        source: providerConfig.source || 'user',
+        source: config.source || 'user',
         is_default: name === llmSettings.value.currentApiConfigName,
-        apiProvider: '',
-        modelId: '',
-        baseUrl: '',
+        apiProvider: providerConfig.apiProvider || 'openai',
+        modelId: providerConfig.openAiModelId || providerConfig.ollamaModelId || 'N/A',
+        baseUrl: providerConfig.openAiBaseUrl || providerConfig.ollamaBaseUrl || 'N/A',
         config: providerConfig
       } as LLMProvider);
     });
@@ -73,12 +98,29 @@ export function useLLMProviders(workspaceId: string) {
       // 类型转换以适配API响应
       llmSettings.value = {
         currentApiConfigName: response.settings.current_config || '',
-        allConfigs: response.settings.user?.concat(response.settings.workspace || []).reduce((acc, item) => {
-          acc[item.name] = item;
-          return acc;
-        }, {} as Record<string, unknown>) || {},
+        allConfigs: {} as Record<string, ProviderConfig>,
         modeApiConfigs: response.settings.mode_configs || {}
       };
+
+      // 合并用户级和工作区级配置到 allConfigs
+      const userConfigs = response.settings.user || [];
+      const workspaceConfigs = response.settings.workspace || [];
+
+      for (const item of userConfigs) {
+        const configData = item.config.config || item.config;
+        llmSettings.value.allConfigs[item.name] = {
+          ...configData,
+          source: 'user'
+        };
+      }
+
+      for (const item of workspaceConfigs) {
+        const configData = item.config.config || item.config;
+        llmSettings.value.allConfigs[item.name] = {
+          ...configData,
+          source: 'workspace'
+        };
+      }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       ElMessage.error(err.response?.data?.detail || '加载LLM配置失败');
@@ -88,115 +130,12 @@ export function useLLMProviders(workspaceId: string) {
     }
   };
 
-  // 显示创建Provider对话框
-  const showCreateProviderDialog = () => {
-    editingProvider.value = null;
-    providerForm.value = {
-      name: '',
-      apiProvider: 'openai',
-      openAiBaseUrl: 'https://api.openai.com/v1',
-      openAiApiKey: '',
-      openAiModelId: 'gpt-4',
-      openAiLegacyFormat: false,
-      ollamaBaseUrl: 'http://localhost:11434',
-      ollamaModelId: 'llama2',
-      ollamaApiKey: '',
-      diffEnabled: true,
-      todoListEnabled: true,
-      fuzzyMatchThreshold: 0.8,
-      rateLimitSeconds: 0,
-      consecutiveMistakeLimit: 5,
-      enableReasoningEffort: false,
-      saveLocation: 'user'
-    };
-    customHeadersText.value = '';
-    showProviderDialog.value = true;
-  };
-
-  // 查看Provider
-  const viewProvider = (provider: LLMProvider) => {
-    viewingProvider.value = provider;
-    showViewProviderDialog.value = true;
-  };
-
-  // 编辑Provider
-  const editProvider = (provider: LLMProvider) => {
-    editingProvider.value = provider.name;
-    const config = llmSettings.value.allConfigs[provider.name] as {
-      config?: Record<string, unknown>;
-    };
-    const providerConfig = config?.config || {};
-
-    providerForm.value = {
-      name: provider.name,
-      apiProvider: (providerConfig.apiProvider as string) || 'openai',
-      openAiBaseUrl: (providerConfig.openAiBaseUrl as string) || 'https://api.openai.com/v1',
-      openAiApiKey: (providerConfig.openAiApiKey as string) || '',
-      openAiModelId: (providerConfig.openAiModelId as string) || 'gpt-4',
-      openAiLegacyFormat: (providerConfig.openAiLegacyFormat as boolean) || false,
-      ollamaBaseUrl: (providerConfig.ollamaBaseUrl as string) || 'http://localhost:11434',
-      ollamaModelId: (providerConfig.ollamaModelId as string) || 'llama2',
-      ollamaApiKey: (providerConfig.ollamaApiKey as string) || '',
-      diffEnabled: (providerConfig.diffEnabled as boolean) !== false,
-      todoListEnabled: (providerConfig.todoListEnabled as boolean) !== false,
-      fuzzyMatchThreshold: (providerConfig.fuzzyMatchThreshold as number) || 0.8,
-      rateLimitSeconds: (providerConfig.rateLimitSeconds as number) || 0,
-      consecutiveMistakeLimit: (providerConfig.consecutiveMistakeLimit as number) || 5,
-      enableReasoningEffort: (providerConfig.enableReasoningEffort as boolean) || false,
-      saveLocation: (providerConfig.saveLocation as 'user' | 'workspace') || 'user'
-    };
-
-    // 处理自定义headers
-    if (providerConfig.openAiHeaders) {
-      try {
-        customHeadersText.value = JSON.stringify(providerConfig.openAiHeaders, null, 2);
-      } catch {
-        customHeadersText.value = '';
-      }
-    } else {
-      customHeadersText.value = '';
-    }
-
-    showProviderDialog.value = true;
-  };
-
-  // 删除Provider
-  const deleteProvider = async (providerName: string) => {
-    if (!workspaceId) return;
-
-    try {
-      await ElMessageBox.confirm(
-        `确定要删除 Provider "${providerName}" 吗?此操作不可恢复。`,
-        '确认删除',
-        {
-          confirmButtonText: '删除',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }
-      );
-
-      saving.value = true;
-      await apiManager.getWorkspacesApi().deleteLLMProvider(workspaceId, providerName);
-      ElMessage.success('Provider 删除成功');
-      await loadLLMSettings();
-    } catch (error: unknown) {
-      if (error !== 'cancel') {
-        const err = error as { response?: { data?: { detail?: string } } };
-        ElMessage.error(err.response?.data?.detail || '删除失败');
-        console.error('Failed to delete provider:', error);
-      }
-    } finally {
-      saving.value = false;
-    }
-  };
-
   // 获取Provider显示名称
   const getProviderDisplayName = (apiProvider: string) => {
     const names: Record<string, string> = {
-      openai: 'OpenAI',
-      ollama: 'Ollama',
-      anthropic: 'Anthropic',
-      azure: 'Azure OpenAI'
+      openai: 'OpenAI兼容',
+      glm: 'GLM (智谱)',
+      ollama: 'Ollama (本地)'
     };
     return names[apiProvider] || apiProvider;
   };
@@ -205,9 +144,8 @@ export function useLLMProviders(workspaceId: string) {
   const getProviderTagType = (apiProvider: string) => {
     const types: Record<string, string> = {
       openai: 'primary',
-      ollama: 'success',
-      anthropic: 'warning',
-      azure: 'info'
+      glm: 'success',
+      ollama: 'info'
     };
     return types[apiProvider] || 'default';
   };
@@ -224,10 +162,6 @@ export function useLLMProviders(workspaceId: string) {
     providerForm,
     providerList,
     loadLLMSettings,
-    showCreateProviderDialog,
-    viewProvider,
-    editProvider,
-    deleteProvider,
     getProviderDisplayName,
     getProviderTagType
   };

@@ -26,59 +26,59 @@
         <div class="bottom-buttons">
           <el-tooltip :content="t('sidePanel.memory')" placement="right">
             <el-button @click="handleOpenMemoryDrawer" text circle>
-              <Icon icon="arcticons:breeno-memory" width="32" height="32" />
+              <Icon icon="arcticons:breeno-memory" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <el-tooltip :content="t('knowledge.title')" placement="right">
             <el-button @click="handleOpenKnowledgeDrawer" text circle>
-              <Icon icon="hugeicons:knowledge-02" width="32" height="32" />
+              <Icon icon="hugeicons:knowledge-02" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <!-- 语言模型 -->
           <el-tooltip :content="t('workspaceSettings.tabs.llmProvider')" placement="right">
             <el-button @click="handleOpenLLMDrawer" text circle>
-              <Icon icon="hugeicons:ai-brain-05" width="32" height="32" />
+              <Icon icon="hugeicons:ai-brain-05" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <!-- 技能 -->
           <el-tooltip :content="t('workspaceSettings.tabs.skills')" placement="right">
             <el-button @click="handleOpenSkillsDrawer" text circle>
-              <Icon icon="streamline-color:wind-flow-2" width="32" height="32" />
+              <Icon icon="streamline-color:wind-flow-2" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <!-- 智能体 -->
           <el-tooltip :content="t('workspaceSettings.tabs.agents')" placement="right">
             <el-button @click="handleOpenAgentsDrawer" text circle>
-              <Icon icon="streamline-ultimate:professions-man-astronaut-bold" width="32" height="32" />
+              <Icon icon="streamline-ultimate:professions-man-astronaut-bold" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <!-- 插件 -->
           <el-tooltip :content="t('workspaceSettings.tabs.plugins')" placement="right">
             <el-button @click="handleOpenPluginsDrawer" text circle>
-              <Icon icon="streamline-freehand:plugin-jigsaw-puzzle" width="32" height="32" />
+              <Icon icon="streamline-freehand:plugin-jigsaw-puzzle" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <!-- MCP -->
           <el-tooltip :content="t('workspaceSettings.tabs.mcpServers')" placement="right">
             <el-button @click="handleOpenMCPDrawer" text circle>
-              <Icon icon="octicon:mcp-24" width="32" height="32" />
+              <Icon icon="octicon:mcp-24" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <!-- 定时任务 -->
           <el-tooltip :content="t('workspaceSettings.tabs.scheduledTasks')" placement="right">
             <el-button @click="handleOpenScheduledTasksDrawer" text circle>
-              <Icon icon="cil:calendar" width="32" height="32" />
+              <Icon icon="cil:calendar" width="24" height="24" />
             </el-button>
           </el-tooltip>
 
           <el-tooltip :content="t('workspaceSettings.title')" placement="right">
             <el-button @click="handleOpenSettings" text circle>
-              <Icon icon="streamline-flex:keyboard-option-setting-gear-solid" width="32" height="32" />
+              <Icon icon="streamline-flex:keyboard-option-setting-gear-solid" width="24" height="24" />
             </el-button>
           </el-tooltip>
           <el-tooltip :content="t('sidePanel.switchWorkspace')" placement="right">
             <el-button @click="handleSwitchWorkspace" text circle>
-              <Icon icon="hugeicons:new-office" width="32" height="32" />
+              <Icon icon="hugeicons:new-office" width="24" height="24" />
             </el-button>
           </el-tooltip>
         </div>
