@@ -16,13 +16,6 @@ This package provides a comprehensive set of tools organized by functionality:
 """
 
 # Original tools
-from .browser_tools import (
-    BrowserActionTool,
-    ClickElementTool,
-    NavigatePageTool,
-    TakeScreenshotTool,
-    TypeTextTool,
-)
 from .command_tools import ExecuteCommandTool, RunSlashCommandTool, ShellCommandTool
 from .diff_applier import ApplyDiffTool
 from .document_parser import DocumentParsingTool
@@ -80,12 +73,6 @@ __all__ = [
     "WriteToFileTool",
     "ApplyDiffTool",  # Enhanced version from edit_tools
     "SmartFileEditTool",  # New tool for large file editing
-    # Browser Tools
-    "BrowserActionTool",
-    "NavigatePageTool",
-    "ClickElementTool",
-    "TypeTextTool",
-    "TakeScreenshotTool",
     # Command Tools
     "ExecuteCommandTool",
     "RunSlashCommandTool",

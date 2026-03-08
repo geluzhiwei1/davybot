@@ -94,7 +94,6 @@ class CustomToolProvider(ToolProvider):
             # workflow_tools are now imported directly in custom_tools.__init__.py from workflow_tools_fixed
             from .custom_base_tool import CustomBaseTool
             from .custom_tools import (
-                browser_tools,
                 command_tools,
                 diff_applier,
                 document_parser,
@@ -110,7 +109,6 @@ class CustomToolProvider(ToolProvider):
                 edit_tools,
                 read_tools,
                 search_tools,
-                browser_tools,
                 command_tools,
                 mcp_tools,
                 document_parser,
