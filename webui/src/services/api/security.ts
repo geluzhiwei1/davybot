@@ -14,7 +14,7 @@ import type {
  * 用户级安全配置 API 服务
  */
 export class UsersSecurityApiService {
-  private baseUrl = '/api/users/me/security';
+  private baseUrl = '/users/me/security';
 
   /**
    * 获取用户安全配置
@@ -47,7 +47,7 @@ export class WorkspaceSecurityApiService {
   private baseUrl: string;
 
   constructor(workspaceId: string) {
-    this.baseUrl = `/api/workspaces/${workspaceId}/security-settings`;
+    this.baseUrl = `/workspaces/${workspaceId}/security-settings`;
   }
 
   /**

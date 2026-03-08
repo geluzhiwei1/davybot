@@ -13,7 +13,7 @@ import type {
 } from './types';
 
 class PluginConfigClient {
-  private baseUrl = '/api/workspaces';
+  private baseUrl = '/workspaces';
 
   /**
    * 获取所有插件的配置

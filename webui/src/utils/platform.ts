@@ -31,7 +31,7 @@ export function getPlatform(): Platform {
 /**
  * Get backend API base URL based on platform
  *
- * In Web mode: uses proxy or localhost
+ * In Web mode: always uses proxy in development, direct URL in production
  * In Tauri mode: uses configured remote server or localhost
  */
 export function getApiBaseUrl(): string {
@@ -40,17 +40,16 @@ export function getApiBaseUrl(): string {
     return import.meta.env.VITE_API_BASE_URL
   }
 
-  // DEBUG: Always log the Tauri detection (disabled for performance)
   const tauriDetected = isTauri();
+  const isDev = import.meta.env.DEV;
 
-  // Force Web mode in development (Vite dev server)
-  // This ensures we always use the Vite proxy in development
-  if (import.meta.env.DEV) {
-    const devUrl = ''; // Use empty string - paths will be proxied based on their prefix
-    return devUrl;
+  // Development mode: always use Vite proxy
+  // The proxy will handle routing to the correct backend
+  if (isDev) {
+    return '/api';
   }
 
-  // Default configuration for production
+  // Production configuration
   if (tauriDetected) {
     // Tauri mode: connect to remote server or localhost
     // You can configure this to point to your production server

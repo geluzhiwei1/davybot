@@ -796,7 +796,7 @@ const handleWorkspaceDeleted = async () => {
 // ==================== 远程访问功能 ====================
 
 // API 基础 URL
-const REMOTE_API_BASE = '/api/users/me/remote';
+const REMOTE_API_BASE = '/users/me/remote';
 
 // 处理远程访问 Popover 显示
 const handleRemotePopoverShow = async () => {

@@ -346,7 +346,7 @@ class SkillManager:
                     return skill.load_content()
 
         # 如果没有找到匹配的，返回第一个
-        return skills_List[0].load_content()
+        return skills_list[0].load_content()
 
     def get_skill_resources(self, skill_name: str) -> Dict[str, Path]:
         """获取指定skill的资源文件

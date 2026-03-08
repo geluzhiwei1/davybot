@@ -146,7 +146,7 @@ const uploadUrl = computed(() => {
   if (!props.workspaceId) {
     return '';
   }
-  return `/api/workspaces/${props.workspaceId}/files/upload`;
+  return `/workspaces/${props.workspaceId}/files/upload`;
 });
 
 // 上传头部

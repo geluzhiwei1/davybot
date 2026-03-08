@@ -117,6 +117,9 @@ class ChatHandler(AsyncMessageHandler):
         # 🔧 修复：存储任务ID到事件处理器ID的映射，用于清理
         self._task_event_handler_ids: Dict[str, Dict[str, str]] = {}
 
+        # 🔧 修复：跟踪每个任务的 LLM API 状态，用于停止时清理
+        self._task_llm_api_state: Dict[str, Dict[str, Any]] = {}
+
         # 初始化异步任务管理器
         self._task_manager = AsyncTaskManager()
 
@@ -1700,6 +1703,9 @@ class ChatHandler(AsyncMessageHandler):
                             duration_ms=duration_ms,
                         )
                         llm_api_active = False
+
+                        # 🔧 修复：清理 LLM API 状态
+                        self._task_llm_api_state.pop(task_id, None)
                 # 处理完成接收事件
                 elif event_type_enum == TaskEventType.COMPLETE_RECEIVED:
                     # event_data 是 CompleteMessage 对象，使用 from_stream_message 方法
@@ -1731,12 +1737,23 @@ class ChatHandler(AsyncMessageHandler):
                             duration_ms=duration_ms,
                         )
                         llm_api_active = False
+
+                        # 🔧 修复：清理 LLM API 状态
+                        self._task_llm_api_state.pop(task_id, None)
                 # 处理内容流事件
                 elif event_type_enum == TaskEventType.CONTENT_STREAM:
                     # 如果是第一个内容块，发送 LLM API 请求开始消息
                     if not llm_api_active:
                         llm_api_active = True
                         llm_request_start_time = event.timestamp
+
+                        # 🔧 修复：记录 LLM API 状态，用于停止时清理
+                        self._task_llm_api_state[task_id] = {
+                            "active": True,
+                            "start_time": event.timestamp,
+                            "provider": "unknown",
+                            "model": "unknown",
+                        }
 
                         # 从 agent 获取 LLM 提供商信息和 workspace_id
                         current_llm_provider = "unknown"
@@ -1783,6 +1800,11 @@ class ChatHandler(AsyncMessageHandler):
                                     logger.info(
                                         f"[CHAT_HANDLER] Extracted LLM info: provider={provider}, model={model}",
                                     )
+
+                                    # 🔧 修复：更新 LLM API 状态
+                                    if task_id in self._task_llm_api_state:
+                                        self._task_llm_api_state[task_id]["provider"] = provider
+                                        self._task_llm_api_state[task_id]["model"] = model
                                 else:
                                     logger.warning(
                                         f"[CHAT_HANDLER] Current config has no 'config' attribute: {current_config}",
@@ -2234,6 +2256,31 @@ class ChatHandler(AsyncMessageHandler):
         # 查找对应的Agent实例
         if task_id not in self._active_agents:
             logger.warning(f"No active agent found for task {task_id}")
+
+            # 🔧 修复：清理 LLM API 状态（即使 Agent 已经完成）
+            if task_id in self._task_llm_api_state:
+                try:
+                    llm_state = self._task_llm_api_state[task_id]
+                    if llm_state.get("active", False):
+                        import time
+                        duration_ms = int((time.time() - llm_state["start_time"]) * 1000) if llm_state.get("start_time") else None
+
+                        llm_complete_message = LLMApiCompleteMessage(
+                            session_id=session_id,
+                            task_id=task_id,
+                            provider=llm_state.get("provider", "unknown"),
+                            model=llm_state.get("model", "unknown"),
+                            finish_reason="stopped",
+                            usage=None,
+                            duration_ms=duration_ms,
+                        )
+                        await self.send_message(session_id, llm_complete_message)
+                        logger.info(f"Sent LLMApiCompleteMessage for task {task_id} (already completed)")
+                except Exception as llm_msg_error:
+                    logger.error(f"Failed to send LLMApiCompleteMessage: {llm_msg_error}", exc_info=True)
+
+                self._task_llm_api_state.pop(task_id, None)
+
             # Agent可能已经完成或被清理，这实际上不是错误
             # 发送停止确认消息，告知用户任务已经结束
             stopped_message = AgentStoppedMessage(
@@ -2263,6 +2310,30 @@ class ChatHandler(AsyncMessageHandler):
             # 🔧 修复：清理事件处理器
             await self._cleanup_event_handlers(task_id, agent)
 
+            # 🔧 修复：如果 LLM API 还在活跃状态，发送完成消息
+            if task_id in self._task_llm_api_state and self._task_llm_api_state[task_id].get("active", False):
+                import time
+                llm_state = self._task_llm_api_state[task_id]
+                duration_ms = int((time.time() - llm_state["start_time"]) * 1000) if llm_state.get("start_time") else None
+
+                try:
+                    llm_complete_message = LLMApiCompleteMessage(
+                        session_id=session_id,
+                        task_id=task_id,
+                        provider=llm_state.get("provider", "unknown"),
+                        model=llm_state.get("model", "unknown"),
+                        finish_reason="stopped",  # 标记为停止
+                        usage=None,
+                        duration_ms=duration_ms,
+                    )
+                    await self.send_message(session_id, llm_complete_message)
+                    logger.info(f"Sent LLMApiCompleteMessage for task {task_id} (stopped)")
+                except Exception as llm_msg_error:
+                    logger.error(f"Failed to send LLMApiCompleteMessage: {llm_msg_error}", exc_info=True)
+
+                # 清理 LLM API 状态
+                self._task_llm_api_state.pop(task_id, None)
+
             # 发送停止确认消息
             try:
                 stopped_message = AgentStoppedMessage(
@@ -2288,6 +2359,30 @@ class ChatHandler(AsyncMessageHandler):
 
             # 🔧 修复：清理事件处理器
             await self._cleanup_event_handlers(task_id, agent)
+
+            # 🔧 修复：清理 LLM API 状态（即使停止失败）
+            if task_id in self._task_llm_api_state:
+                try:
+                    llm_state = self._task_llm_api_state[task_id]
+                    if llm_state.get("active", False):
+                        import time
+                        duration_ms = int((time.time() - llm_state["start_time"]) * 1000) if llm_state.get("start_time") else None
+
+                        llm_complete_message = LLMApiCompleteMessage(
+                            session_id=session_id,
+                            task_id=task_id,
+                            provider=llm_state.get("provider", "unknown"),
+                            model=llm_state.get("model", "unknown"),
+                            finish_reason="error",
+                            usage=None,
+                            duration_ms=duration_ms,
+                        )
+                        await self.send_message(session_id, llm_complete_message)
+                        logger.info(f"Sent LLMApiCompleteMessage for task {task_id} (error)")
+                except Exception as llm_msg_error:
+                    logger.error(f"Failed to send LLMApiCompleteMessage: {llm_msg_error}", exc_info=True)
+
+                self._task_llm_api_state.pop(task_id, None)
 
             # 发送错误消息，但不重新抛出异常
             try:

@@ -350,7 +350,7 @@ class ConversationCompressor:
         most_critical = []
         for idx in key_indices:
             if idx < len(messages) - preserve_count:
-                meta = metadata_List[idx]
+                meta = metadata_list[idx]
                 # 只保留错误和工具调用
                 if meta.key_reason in ["error", "tool_call", "tool_response"]:
                     most_critical.append(messages[idx])

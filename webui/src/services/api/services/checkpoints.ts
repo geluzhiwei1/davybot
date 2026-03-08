@@ -19,7 +19,7 @@ import type {
 
 // 检查点 API 服务类
 export class CheckpointsApiService {
-  private baseUrl = "/api/checkpoints"
+  private baseUrl = "/checkpoints"
 
   // 获取检查点列表
   async getCheckpoints(params?: {

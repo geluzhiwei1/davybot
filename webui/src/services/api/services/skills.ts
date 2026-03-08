@@ -88,7 +88,7 @@ export interface SkillFileContentResponse {
 
 // Skills API 服务类
 export class SkillsApiService {
-  private baseUrl = '/api/skills';
+  private baseUrl = '/skills';
 
   /**
    * 获取所有可用的技能列表

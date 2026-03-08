@@ -13,7 +13,7 @@ import type {
 
 // 定时任务API服务类
 export class ScheduledTasksApiService {
-  private baseUrl = '/api/workspaces';
+  private baseUrl = '/workspaces';
 
   // 获取工作区的所有定时任务
   async getScheduledTasks(workspaceId: string): Promise<ScheduledTasksListResponse> {

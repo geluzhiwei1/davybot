@@ -98,7 +98,7 @@ export interface WorkspaceResponse {
  * 工作区CRUD操作服务
  */
 export class WorkspaceCrudService {
-  private baseUrl = '/api/workspaces'
+  private baseUrl = '/workspaces'
 
   /**
    * 验证工作区路径

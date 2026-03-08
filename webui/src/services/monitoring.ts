@@ -20,7 +20,7 @@ import type {
 } from '@/types/monitoring';
 
 export class MonitoringService {
-  private baseUrl = '/api/taskgraph';
+  private baseUrl = '/taskgraph';
   private systemUrl = '';
 
   /**

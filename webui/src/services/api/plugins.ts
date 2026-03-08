@@ -12,7 +12,7 @@
 import { httpClient } from './http'
 import type { PluginInfo, PluginSettings } from '@/types/plugins'
 
-const BASE_URL = '/api/workspaces'
+const BASE_URL = '/workspaces'
 
 export interface PluginListOptions {
   plugin_type?: string
