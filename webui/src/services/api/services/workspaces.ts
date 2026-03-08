@@ -473,6 +473,159 @@ export class WorkspacesApiService {
     }
   }
 
+  // ==================== MCP Server Management API ====================
+
+  // 获取所有MCP服务器
+  async getMCPServers(workspaceId: string): Promise<{
+    success: boolean;
+    servers: Array<{
+      name: string;
+      command: string;
+      args: string[];
+      cwd: string | null;
+      always_allow: string[];
+      timeout: number;
+      disabled: boolean;
+    }>;
+  }> {
+    try {
+      return await httpClient.get<{
+        success: boolean;
+        servers: Array<{
+          name: string;
+          command: string;
+          args: string[];
+          cwd: string | null;
+          always_allow: string[];
+          timeout: number;
+          disabled: boolean;
+        }>;
+      }>(`${this.baseUrl}/${workspaceId}/mcp-servers`);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 创建MCP服务器
+  async createMCPServer(
+    workspaceId: string,
+    data: {
+      name: string;
+      command: string;
+      args?: string[];
+      cwd?: string;
+      always_allow?: string[];
+      timeout?: number;
+      disabled?: boolean;
+    }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    server: {
+      name: string;
+      command: string;
+      args: string[];
+      cwd: string | null;
+      always_allow: string[];
+      timeout: number;
+      disabled: boolean;
+    } | null;
+  }> {
+    try {
+      return await httpClient.post<{
+        success: boolean;
+        message: string;
+        server: {
+          name: string;
+          command: string;
+          args: string[];
+          cwd: string | null;
+          always_allow: string[];
+          timeout: number;
+          disabled: boolean;
+        } | null;
+      }>(`${this.baseUrl}/${workspaceId}/mcp-servers`, data);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 更新MCP服务器
+  async updateMCPServer(
+    workspaceId: string,
+    serverName: string,
+    data: {
+      command?: string;
+      args?: string[];
+      cwd?: string;
+      always_allow?: string[];
+      timeout?: number;
+      disabled?: boolean;
+    }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    server: {
+      name: string;
+      command: string;
+      args: string[];
+      cwd: string | null;
+      always_allow: string[];
+      timeout: number;
+      disabled: boolean;
+    } | null;
+  }> {
+    try {
+      return await httpClient.put<{
+        success: boolean;
+        message: string;
+        server: {
+          name: string;
+          command: string;
+          args: string[];
+          cwd: string | null;
+          always_allow: string[];
+          timeout: number;
+          disabled: boolean;
+        } | null;
+      }>(`${this.baseUrl}/${workspaceId}/mcp-servers/${serverName}`, data);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 删除MCP服务器
+  async deleteMCPServer(workspaceId: string, serverName: string): Promise<{
+    success: boolean;
+    message: string;
+    server: null;
+  }> {
+    try {
+      return await httpClient.delete<{
+        success: boolean;
+        message: string;
+        server: null;
+      }>(`${this.baseUrl}/${workspaceId}/mcp-servers/${serverName}`);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // 测试MCP服务器连接
+  async testMCPServer(workspaceId: string, serverName: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    try {
+      return await httpClient.post<{
+        success: boolean;
+        message: string;
+      }>(`${this.baseUrl}/${workspaceId}/mcp-servers/${serverName}/test`, {});
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   // 获取用户UI环境信息
   async getUIEnvironments(workspaceId: string): Promise<UserUIEnvironments> {
     try {
@@ -1504,7 +1657,12 @@ export const {
   updatePluginConfig,
   enablePlugin,
   disablePlugin,
-  reloadWorkspaceConfig
+  reloadWorkspaceConfig,
+  getMCPServers,
+  createMCPServer,
+  updateMCPServer,
+  deleteMCPServer,
+  testMCPServer
 } = {
   getWorkspaces: workspacesApi.getWorkspaces.bind(workspacesApi),
   getWorkspaceInfo: workspacesApi.getWorkspaceInfo.bind(workspacesApi),
@@ -1566,5 +1724,10 @@ export const {
   updatePluginConfig: workspacesApi.updatePluginConfig.bind(workspacesApi),
   enablePlugin: workspacesApi.enablePlugin.bind(workspacesApi),
   disablePlugin: workspacesApi.disablePlugin.bind(workspacesApi),
-  reloadWorkspaceConfig: workspacesApi.reloadWorkspaceConfig.bind(workspacesApi)
+  reloadWorkspaceConfig: workspacesApi.reloadWorkspaceConfig.bind(workspacesApi),
+  getMCPServers: workspacesApi.getMCPServers.bind(workspacesApi),
+  createMCPServer: workspacesApi.createMCPServer.bind(workspacesApi),
+  updateMCPServer: workspacesApi.updateMCPServer.bind(workspacesApi),
+  deleteMCPServer: workspacesApi.deleteMCPServer.bind(workspacesApi),
+  testMCPServer: workspacesApi.testMCPServer.bind(workspacesApi)
 };

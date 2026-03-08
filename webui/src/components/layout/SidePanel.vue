@@ -342,6 +342,9 @@ const loadConversations = async () => {
     const convs = await apiManager.getWorkspacesApi().getConversations(props.workspaceId);
     conversations.value = convs?.items || [];
 
+    // 同步到 workspaceStore，让 TopBar 能获取到会话列表
+    await workspaceStore.loadConversations(props.workspaceId);
+
     if (conversations.value.length > 0 && !activeConversationId.value) {
       // 按更新时间排序，选择最新的会话
       const sortedConversations = [...conversations.value].sort((a: any, b: any) => {
@@ -424,10 +427,14 @@ const handleNewChat = () => {
 
   // Set as currently selected conversation
   activeConversationId.value = tempConversationId;
+  // 更新 workspace store，标记为临时会话
+  workspaceStore.createTempConversation();
 };
 
 const handleSelectConversation = (id: string) => {
   activeConversationId.value = id;
+  // 更新 workspace store，让 TopBar 能获取到当前会话
+  workspaceStore.setConversation(id);
   chatStore.loadConversation(id);
 };
 
@@ -457,6 +464,8 @@ const handleDeleteConversation = async (conv: unknown) => {
       if (activeConversationId.value === conv.id) {
         activeConversationId.value = null;
         chatStore.clearChat();
+        // 清空 workspace store 中的当前会话
+        workspaceStore.clearCurrentConversation();
       }
     } else {
       ElMessage.error(result.message || '删除失败');
@@ -499,6 +508,8 @@ const handleDeleteAllConversations = async () => {
       // 清空当前选中
       activeConversationId.value = null;
       chatStore.clearChat();
+      // 清空 workspace store 中的当前会话
+      workspaceStore.clearCurrentConversation();
     } else {
       ElMessage.error(result.message || '删除失败');
     }

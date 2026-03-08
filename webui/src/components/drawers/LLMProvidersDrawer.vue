@@ -13,11 +13,15 @@
 
         <div class="provider-actions" style="margin-top: 16px; display: flex; gap: 8px;">
           <el-button type="primary" @click="showCreateProviderDialog">
-            <el-icon><Plus /></el-icon>
+            <el-icon>
+              <Plus />
+            </el-icon>
             添加 Provider
           </el-button>
           <el-button @click="loadLLMSettings" :loading="loading">
-            <el-icon><Refresh /></el-icon>
+            <el-icon>
+              <Refresh />
+            </el-icon>
             刷新
           </el-button>
         </div>
@@ -29,8 +33,7 @@
           <template #default="scope">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span>{{ scope.row.name }}</span>
-              <el-tag v-if="scope.row.name === llmSettings.currentApiConfigName" type="success"
-                size="small">默认</el-tag>
+              <el-tag v-if="scope.row.name === llmSettings.currentApiConfigName" type="success" size="small">默认</el-tag>
             </div>
           </template>
         </el-table-column>
@@ -60,10 +63,9 @@
             <div style="display: flex; gap: 4px; flex-wrap: wrap;">
               <el-tag v-if="scope.row.config.config?.diffEnabled || scope.row.config.diffEnabled" size="small"
                 type="info">Diff</el-tag>
-              <el-tag v-if="scope.row.config.config?.todoListEnabled || scope.row.config.todoListEnabled"
-                size="small" type="info">TODO</el-tag>
-              <el-tag
-                v-if="scope.row.config.config?.enableReasoningEffort || scope.row.config.enableReasoningEffort"
+              <el-tag v-if="scope.row.config.config?.todoListEnabled || scope.row.config.todoListEnabled" size="small"
+                type="info">TODO</el-tag>
+              <el-tag v-if="scope.row.config.config?.enableReasoningEffort || scope.row.config.enableReasoningEffort"
                 size="small" type="warning">推理</el-tag>
             </div>
           </template>
@@ -138,35 +140,26 @@
           </el-form-item>
         </template>
 
-        <!-- Ollama 配置 -->
+        <!-- Ollama 配置 (使用 OpenAI 兼容字段) -->
         <template v-if="providerForm.apiProvider === 'ollama'">
           <el-form-item label="Base URL" required>
-            <el-input v-model="providerForm.ollamaBaseUrl" placeholder="http://localhost:11434/v1" />
+            <el-input v-model="providerForm.openAiBaseUrl" placeholder="http://localhost:11434/v1" />
+            <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+              Ollama 使用 OpenAI 兼容接口 (/v1/chat/completions)
+            </div>
           </el-form-item>
 
           <el-form-item label="模型 ID" required>
-            <el-input v-model="providerForm.ollamaModelId" placeholder="qwen3.5:9b" />
+            <el-input v-model="providerForm.openAiModelId" placeholder="qwen2.5:7b" />
           </el-form-item>
 
           <el-form-item label="API Key">
-            <el-input v-model="providerForm.ollamaApiKey" type="password" placeholder="可选" show-password />
+            <el-input v-model="providerForm.openAiApiKey" type="password" placeholder="ollama (可选)" show-password />
           </el-form-item>
         </template>
 
         <!-- 高级设置 -->
         <el-divider content-position="left">高级设置</el-divider>
-
-        <el-form-item label="启用差异编辑">
-          <el-switch v-model="providerForm.diffEnabled" />
-        </el-form-item>
-
-        <el-form-item label="启用 TODO 列表">
-          <el-switch v-model="providerForm.todoListEnabled" />
-        </el-form-item>
-
-        <el-form-item label="启用推理增强">
-          <el-switch v-model="providerForm.enableReasoningEffort" />
-        </el-form-item>
 
         <el-form-item label="模糊匹配阈值">
           <el-input-number v-model="providerForm.fuzzyMatchThreshold" :min="0" :max="1" :step="0.1" :precision="2"
@@ -174,8 +167,7 @@
         </el-form-item>
 
         <el-form-item label="速率限制（秒）">
-          <el-input-number v-model="providerForm.rateLimitSeconds" :min="0" :max="60" :step="1"
-            style="width: 200px;" />
+          <el-input-number v-model="providerForm.rateLimitSeconds" :min="0" :max="60" :step="1" style="width: 200px;" />
         </el-form-item>
 
         <el-form-item label="连续错误限制">
@@ -205,8 +197,10 @@
             </el-tag>
           </span>
           <div style="display: flex; gap: 8px; margin-left: auto;">
-            <el-button @click="testProvider" :loading="testingProvider" :disabled="!providerForm.openAiModelId && !providerForm.ollamaModelId">
-              <el-icon><Document /></el-icon>
+            <el-button @click="testProvider" :loading="testingProvider" :disabled="!providerForm.openAiModelId">
+              <el-icon>
+                <Document />
+              </el-icon>
               测试
             </el-button>
             <el-button @click="showProviderDialog = false">取消</el-button>
@@ -331,10 +325,7 @@ const showCreateProviderDialog = () => {
     enableReasoningEffort: true,
     toolChoice: 'required',
     temperature: 1.0,
-    saveLocation: 'user' as 'user' | 'workspace',
-    ollamaBaseUrl: 'http://localhost:11434/v1',
-    ollamaModelId: 'qwen3.5:9b',
-    ollamaApiKey: ''
+    saveLocation: 'user' as 'user' | 'workspace'
   };
   customHeadersText.value = '';
   showProviderDialog.value = true;
@@ -388,10 +379,7 @@ const editProvider = (provider: LLMProvider) => {
     enableReasoningEffort: config.enableReasoningEffort ?? true,
     toolChoice: config.toolChoice ?? 'required',
     temperature: config.temperature ?? 1.0,
-    saveLocation: 'user' as 'user' | 'workspace',
-    ollamaBaseUrl: config.ollamaBaseUrl || 'http://localhost:11434/v1',
-    ollamaModelId: config.ollamaModelId || 'qwen3.5:9b',
-    ollamaApiKey: config.ollamaApiKey || ''
+    saveLocation: 'user' as 'user' | 'workspace'
   };
 
   // 序列化 headers 到文本
@@ -407,7 +395,7 @@ const editProvider = (provider: LLMProvider) => {
 // Test provider Tool Call support
 const testProvider = async () => {
   if (!props.workspaceId) return;
-  if (!providerForm.value.openAiModelId && !providerForm.value.ollamaModelId) {
+  if (!providerForm.value.openAiModelId) {
     ElMessage.error('请填写模型 ID');
     return;
   }

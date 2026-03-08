@@ -21,6 +21,7 @@ from .crud import router as crud_router
 from .files import router as files_router
 from .graphs import router as graphs_router
 from .llm import router as llm_router
+from .mcp_servers import router as mcp_servers_router
 from .models import *
 from .plugin_config import router as plugin_config_router
 from .plugins import router as plugins_router
@@ -42,6 +43,7 @@ router.include_router(ui_settings_router)
 router.include_router(crud_router)
 router.include_router(plugins_router)
 router.include_router(plugin_config_router)
+router.include_router(mcp_servers_router)  # 新增:MCP服务器管理 API
 
 # 注册记忆系统路由器
 # Note: Memory router has its own prefix with workspace_id: /api/workspaces/{workspace_id}/memory

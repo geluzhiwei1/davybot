@@ -163,11 +163,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
    */
   const loadConversations = async (workspaceId: string): Promise<void> => {
     try {
-      const response = await apiManager.getConversationsApi().getConversations({
-        workspaceId: workspaceId,
-      }) as unknown
-      // Backend returns {conversations: [...]} not {items: [...]}
-      conversationList.value = response.conversations || response.items || []
+      // 使用和 SidePanel 相同的 API 方法，避免路径错误
+      const response = await apiManager.getWorkspacesApi().getConversations(workspaceId) as unknown
+      // Backend returns {items: [...]}
+      conversationList.value = response.items || []
 
       // 如果有会话列表且当前没有选中会话，自动选择最近的一次对话
       if (conversationList.value.length > 0 && !currentConversationId.value) {

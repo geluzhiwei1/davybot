@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <el-header class="top-bar">
@@ -32,13 +32,7 @@
       <div class="zoom-controls">
         <el-button-group>
           <el-tooltip :content="t('topBar.zoomOut')" placement="bottom">
-            <el-button
-              :icon="ZoomOut"
-              :disabled="!canZoomOut"
-              @click="handleZoomOut"
-              text
-              size="small"
-            />
+            <el-button :icon="ZoomOut" :disabled="!canZoomOut" @click="handleZoomOut" text size="small" />
           </el-tooltip>
           <el-dropdown @command="handleZoomCommand" trigger="click">
             <el-button text size="small" class="zoom-display">
@@ -64,13 +58,7 @@
             </template>
           </el-dropdown>
           <el-tooltip :content="t('topBar.zoomIn')" placement="bottom">
-            <el-button
-              :icon="ZoomIn"
-              :disabled="!canZoomIn"
-              @click="handleZoomIn"
-              text
-              size="small"
-            />
+            <el-button :icon="ZoomIn" :disabled="!canZoomIn" @click="handleZoomIn" text size="small" />
           </el-tooltip>
         </el-button-group>
       </div>
@@ -139,8 +127,11 @@ const conversationTitle = computed(() => {
     return t('topBar.newConversation');
   }
   if (currentConversation.value) {
-    return currentConversation.value.title || currentConversation.value.name || t('topBar.unnamedConversation');
+    // 尝试多个可能的字段名（后端可能使用不同的命名）
+    const conv = currentConversation.value as any;
+    return conv?.title || conv?.name || t('topBar.unnamedConversation');
   }
+
   return t('topBar.selectOrCreateConversation');
 });
 
@@ -217,7 +208,8 @@ const statusText = computed(() => {
   padding: 6px 12px;
   background: var(--el-fill-color-light);
   border-radius: 6px;
-  max-width: 300px; /* 减少最大宽度，为右侧内容留出更多空间 */
+  max-width: 300px;
+  /* 减少最大宽度，为右侧内容留出更多空间 */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -247,7 +239,8 @@ const statusText = computed(() => {
   }
 
   .conversation-title {
-    max-width: 120px; /* 移动端进一步减少宽度 */
+    max-width: 120px;
+    /* 移动端进一步减少宽度 */
     font-size: 13px;
     padding: 4px 8px;
   }

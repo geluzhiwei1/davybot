@@ -220,6 +220,27 @@ export const useMarketStore = defineStore('market', () => {
       if (response.success) {
         ElMessage.success(`安装 ${name} 成功`);
 
+        // 关键步骤：调用后端API重新加载配置
+        try {
+          const { apiManager } = await import('@/services/api');
+          const workspacesApi = apiManager.getWorkspacesApi();
+
+          // 根据资源类型重新加载对应配置
+          const configType = type === 'plugin' ? 'tools' : type;
+          const result = await workspacesApi.reloadWorkspaceConfig(
+            currentWorkspaceId.value,
+            configType,
+            true  // 强制重新加载
+          );
+
+          if (result.success) {
+            console.log('[MarketStore] Config reload result:', result);
+          }
+        } catch (error) {
+          console.error('[MarketStore] Failed to reload config:', error);
+          // 即使重新加载失败,也继续刷新前端列表
+        }
+
         // Refresh installed resources
         await loadInstalledResources(type);
 

@@ -1073,8 +1073,11 @@
           "enableMonitoringHelp": "Monitor and track resource usage",
           "limitExceededAction": "Action When Limit Exceeded",
           "actionWarn": "Warn",
+          "actionWarnHelp": "Log a warning but continue execution",
           "actionTerminate": "Terminate",
-          "actionPause": "Pause"
+          "actionTerminateHelp": "Immediately stop the task execution",
+          "actionPause": "Pause",
+          "actionPauseHelp": "Pause execution and wait for user confirmation"
         },
         "advanced": {
           "title": "Advanced Security Options",

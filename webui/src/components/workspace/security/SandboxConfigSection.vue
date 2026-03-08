@@ -196,7 +196,7 @@ const detectContainerRuntime = async () => {
   try {
     // 调用后端 API 进行检测
     const response = await fetch('/api/system/container-runtime/detect', {
-      method: 'POST',
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },

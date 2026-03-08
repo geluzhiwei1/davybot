@@ -24,16 +24,7 @@
 
         <!-- 下部按钮 -->
         <div class="bottom-buttons">
-          <el-tooltip :content="t('sidePanel.memory')" placement="right">
-            <el-button @click="handleOpenMemoryDrawer" text circle>
-              <Icon icon="arcticons:breeno-memory" width="24" height="24" />
-            </el-button>
-          </el-tooltip>
-          <el-tooltip :content="t('knowledge.title')" placement="right">
-            <el-button @click="handleOpenKnowledgeDrawer" text circle>
-              <Icon icon="hugeicons:knowledge-02" width="24" height="24" />
-            </el-button>
-          </el-tooltip>
+
           <!-- 语言模型 -->
           <el-tooltip :content="t('workspaceSettings.tabs.llmProvider')" placement="right">
             <el-button @click="handleOpenLLMDrawer" text circle>
@@ -70,7 +61,16 @@
               <Icon icon="cil:calendar" width="24" height="24" />
             </el-button>
           </el-tooltip>
-
+          <el-tooltip :content="t('sidePanel.memory')" placement="right">
+            <el-button @click="handleOpenMemoryDrawer" text circle>
+              <Icon icon="arcticons:breeno-memory" width="24" height="24" />
+            </el-button>
+          </el-tooltip>
+          <el-tooltip :content="t('knowledge.title')" placement="right">
+            <el-button @click="handleOpenKnowledgeDrawer" text circle>
+              <Icon icon="hugeicons:knowledge-02" width="24" height="24" />
+            </el-button>
+          </el-tooltip>
           <el-tooltip :content="t('workspaceSettings.title')" placement="right">
             <el-button @click="handleOpenSettings" text circle>
               <Icon icon="streamline-flex:keyboard-option-setting-gear-solid" width="24" height="24" />

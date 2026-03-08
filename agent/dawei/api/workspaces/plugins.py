@@ -116,15 +116,30 @@ async def get_plugin_manager(
     workspace_id = workspace.uuid  # Use workspace.uuid, not workspace_id (which doesn't exist)
     workspace_path = Path(workspace.workspace_path)
 
+    # Ensure workspace is initialized before accessing plugins
+    logger.info(f"[Plugin API] Getting plugin manager for workspace {workspace_id}")
+    if not workspace.is_initialized():
+        logger.info(f"[Plugin API] Workspace not initialized, initializing...")
+        await workspace.initialize()
+        logger.info(f"[Plugin API] Workspace initialized successfully")
+
     # Use cached manager to ensure state consistency across API calls
     manager = get_cached_plugin_manager(workspace_id, workspace_path)
 
     # Load plugins if not already loaded
-    if not manager.loader.list_loaded_plugins():
+    loaded_plugins = manager.loader.list_loaded_plugins()
+    logger.info(f"[Plugin API] Currently loaded plugins: {loaded_plugins}")
+
+    if not loaded_plugins:
         try:
             # Load plugin settings from workspace
+            logger.info(f"[Plugin API] Loading plugin config for workspace...")
             if workspace.plugins_config is None:
+                logger.info(f"[Plugin API] plugins_config is None, loading from disk...")
                 await workspace._load_plugins_config()
+                logger.info(f"[Plugin API] plugins_config loaded: {workspace.plugins_config}")
+            else:
+                logger.info(f"[Plugin API] plugins_config already exists with {len(workspace.plugins_config.plugins)} plugins")
 
             # Convert plugins_config to settings dict for discover_and_load_all
             settings_for_load = {}
@@ -168,8 +183,15 @@ async def list_plugins(
     - plugin_type: Filter by plugin type (channel, tool, service, memory)
     - activated_only: Only show activated plugins
     """
+    logger.info(f"[DEBUG] list_plugins called - workspace_id={workspace.uuid}, plugin_type={plugin_type}")
+
+    loaded_plugins = manager.loader.list_loaded_plugins()
+    logger.info(f"[DEBUG] Loaded plugins in manager: {loaded_plugins}")
+
     ptype = PluginType(plugin_type) if plugin_type else None
     plugins = manager.list_plugins(plugin_type=ptype, activated_only=activated_only)
+
+    logger.info(f"[DEBUG] Plugins from list_plugins: {plugins}")
 
     # Return in format expected by frontend
     # Build plugin info with manifest data and registration state
@@ -188,6 +210,7 @@ async def list_plugins(
         }
         plugin_list.append(plugin_info)
 
+    logger.info(f"[DEBUG] Returning {len(plugin_list)} plugins")
     return {"plugins": plugin_list}
 
 
@@ -846,3 +869,4 @@ async def send_feishu_test_message(
     if success:
         return {"success": True, "plugin_id": plugin_id, "message": "测试消息发送成功！", "sent_content": test_message, "receive_id": receive_id}
     return {"success": False, "error": "消息发送失败，请检查配置和权限"}
+# Trigger reload Sun Mar  8 07:59:02 PM CST 2026

@@ -83,7 +83,7 @@ class AuthService {
    * @param onLoginSuccess 登录成功回调
    */
   startPolling(onLoginSuccess: (user: UserInfo) => void): void {
-    let startTime = Date.now();
+    const startTime = Date.now();
 
     this.pollTimer = window.setInterval(async () => {
       // 检查是否超时

@@ -33,7 +33,7 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "lint": "eslint . --fix --cache",
+    "lint": "node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js . --fix --cache",
     "format": "prettier --write src/",
     "prepare-drawio": "bash scripts/prepare-drawio.sh",
     "tauri": "tauri",

@@ -10,9 +10,6 @@ interface ProviderConfig {
   openAiModelId?: string;
   openAiLegacyFormat?: boolean;
   openAiHeaders?: Record<string, string>;
-  ollamaBaseUrl?: string;
-  ollamaModelId?: string;
-  ollamaApiKey?: string;
   diffEnabled?: boolean;
   todoListEnabled?: boolean;
   fuzzyMatchThreshold?: number;
@@ -54,9 +51,6 @@ export function useLLMProviders(workspaceId: string) {
     openAiModelId: 'gpt-4o-mini',
     openAiLegacyFormat: false,
     openAiHeaders: {} as Record<string, string>,
-    ollamaBaseUrl: 'http://localhost:11434/v1',
-    ollamaModelId: 'qwen3.5:9b',
-    ollamaApiKey: '',
     diffEnabled: true,
     todoListEnabled: true,
     fuzzyMatchThreshold: 1,
@@ -74,14 +68,21 @@ export function useLLMProviders(workspaceId: string) {
 
     // 添加用户级配置
     Object.entries(llmSettings.value.allConfigs).forEach(([name, config]: [string, ProviderConfig]) => {
-      const providerConfig = config.config || config;
+      // 处理嵌套的config结构：如果是嵌套格式则提取内部config
+      const extractedConfig = config && typeof config === 'object' && 'config' in config
+        ? (config as { config?: ProviderConfig }).config
+        : config;
+
+      // 确保extractedConfig不为undefined
+      const providerConfig: ProviderConfig = extractedConfig || {};
+
       providers.push({
         name,
         source: config.source || 'user',
         is_default: name === llmSettings.value.currentApiConfigName,
         apiProvider: providerConfig.apiProvider || 'openai',
-        modelId: providerConfig.openAiModelId || providerConfig.ollamaModelId || 'N/A',
-        baseUrl: providerConfig.openAiBaseUrl || providerConfig.ollamaBaseUrl || 'N/A',
+        modelId: providerConfig.openAiModelId || 'N/A',
+        baseUrl: providerConfig.openAiBaseUrl || 'N/A',
         config: providerConfig
       } as LLMProvider);
     });
@@ -107,17 +108,25 @@ export function useLLMProviders(workspaceId: string) {
       const workspaceConfigs = response.settings.workspace || [];
 
       for (const item of userConfigs) {
-        const configData = item.config.config || item.config;
+        // 处理嵌套的config结构：item.config.config 或 item.config
+        const configData = item.config && typeof item.config === 'object' && 'config' in item.config
+          ? (item.config as { config?: ProviderConfig }).config
+          : item.config;
+
         llmSettings.value.allConfigs[item.name] = {
-          ...configData,
+          ...(configData || {}),
           source: 'user'
         };
       }
 
       for (const item of workspaceConfigs) {
-        const configData = item.config.config || item.config;
+        // 处理嵌套的config结构：item.config.config 或 item.config
+        const configData = item.config && typeof item.config === 'object' && 'config' in item.config
+          ? (item.config as { config?: ProviderConfig }).config
+          : item.config;
+
         llmSettings.value.allConfigs[item.name] = {
-          ...configData,
+          ...(configData || {}),
           source: 'workspace'
         };
       }

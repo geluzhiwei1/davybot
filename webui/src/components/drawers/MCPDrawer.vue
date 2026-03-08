@@ -20,8 +20,8 @@
       </div>
 
       <!-- MCP Servers Table -->
-      <el-table :data="mcpServerList" stripe style="width: 100%;">
-        <el-table-column prop="name" label="名称" width="200" />
+      <el-table :data="mcpServerList" stripe style="width: 100%;" max-height="calc(100vh - 300px)">
+        <el-table-column prop="name" label="名称" width="180" />
 
         <el-table-column prop="command" label="命令" show-overflow-tooltip>
           <template #default="scope">
@@ -29,9 +29,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="cwd" label="工作目录" width="200" show-overflow-tooltip />
+        <el-table-column prop="cwd" label="工作目录" width="180" show-overflow-tooltip />
 
-        <el-table-column prop="timeout" label="超时(秒)" width="100" align="center">
+        <el-table-column prop="timeout" label="超时(秒)" width="90" align="center">
           <template #default="scope">
             {{ scope.row.timeout || 30 }}
           </template>
@@ -45,11 +45,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="scope">
-            <el-button size="small" @click="editMcpServer(scope.row)">编辑</el-button>
-            <el-button size="small" type="info" @click="testMcpServer(scope.row.name)">测试</el-button>
-            <el-button size="small" type="danger" @click="deleteMcpServer(scope.row.name)">删除</el-button>
+            <el-button link type="primary" size="small" @click="editMcpServer(scope.row)">
+              编辑
+            </el-button>
+            <el-button link type="success" size="small" @click="testMcpServer(scope.row.name)">
+              测试
+            </el-button>
+            <el-button link type="danger" size="small" @click="deleteMcpServer(scope.row.name)">
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -58,13 +64,83 @@
       <el-empty v-if="!loadingMCP && mcpServerList.length === 0" description="暂无MCP服务器配置" style="margin-top: 40px;">
         <el-button type="primary" @click="showCreateMcpDialog">添加第一个服务器</el-button>
       </el-empty>
+
+      <!-- MCP Server 编辑/创建对话框 -->
+      <el-dialog
+        v-model="showMcpDialog"
+        :title="editingMcpServer ? '编辑MCP服务器' : '添加MCP服务器'"
+        width="700px"
+        :close-on-click-modal="false"
+      >
+        <el-form :model="mcpForm" label-width="120px">
+          <el-form-item label="服务器名称" required>
+            <el-input
+              v-model="mcpForm.name"
+              placeholder="MCP服务器名称（唯一标识）"
+              :disabled="!!editingMcpServer"
+            />
+          </el-form-item>
+
+          <el-form-item label="命令" required>
+            <el-input v-model="mcpForm.command" placeholder="例如: npx, uvx, python" />
+          </el-form-item>
+
+          <el-form-item label="参数">
+            <el-input
+              v-model="mcpForm.argsText"
+              type="textarea"
+              :rows="3"
+              placeholder="每行一个参数，例如：&#10;-y&#10;@modelcontextprotocol/server-filesystem"
+            />
+            <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+              每行一个参数
+            </div>
+          </el-form-item>
+
+          <el-form-item label="工作目录">
+            <el-input v-model="mcpForm.cwd" placeholder="可选，默认为当前工作目录" />
+          </el-form-item>
+
+          <el-form-item label="超时时间">
+            <el-input-number
+              v-model="mcpForm.timeout"
+              :min="10"
+              :max="600"
+              :step="10"
+              style="width: 100%;"
+            />
+            <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+              秒（默认300秒）
+            </div>
+          </el-form-item>
+
+          <el-form-item label="自动允许工具">
+            <el-input
+              v-model="mcpForm.alwaysAllowText"
+              type="textarea"
+              :rows="3"
+              placeholder="每行一个工具名称，这些工具将自动授权无需确认"
+            />
+            <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+              每行一个工具名称
+            </div>
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button @click="showMcpDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveMcpServer" :loading="savingMcp">
+            {{ editingMcpServer ? '更新' : '创建' }}
+          </el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Plus, Refresh } from '@element-plus/icons-vue';
-import { onMounted, watch } from 'vue';
+import { Plus } from '@element-plus/icons-vue';
+import { watch, onMounted } from 'vue';
 import { useMCP } from '@/composables/mcp/useMCP';
 
 const props = defineProps<{
@@ -75,11 +151,16 @@ const {
   mcpServerList,
   loadingMCP,
   loadMCPServers,
+  showMcpDialog,
   showCreateMcpDialog,
   editMcpServer,
+  saveMcpServer,
   deleteMcpServer,
-  testMcpServer
-} = useMCP(props.workspaceId || '');
+  testMcpServer,
+  mcpForm,
+  savingMcp,
+  editingMcpServer
+} = useMCP(props.workspaceId);
 
 onMounted(() => {
   if (props.workspaceId) {
@@ -102,5 +183,13 @@ watch(() => props.workspaceId, (newId) => {
 
 .drawer-content {
   padding: 0;
+}
+
+code {
+  background-color: var(--el-fill-color-light);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
 }
 </style>
