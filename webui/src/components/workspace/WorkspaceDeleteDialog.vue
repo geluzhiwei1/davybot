@@ -84,14 +84,15 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
-import { workspaceService } from '@/services/workspace'
+import { workspacesApi } from '@/services/api/services/workspaces'
 import { useI18n } from 'vue-i18n'
+import { type WorkspaceDetail } from '@/services/workspace'
 
 const { t } = useI18n()
 
 interface Props {
   modelValue: boolean
-  workspace?: unknown
+  workspace?: WorkspaceDetail
 }
 
 interface Emits {
@@ -121,7 +122,7 @@ const handleDelete = async () => {
   try {
     deleting.value = true
 
-    const response = await workspaceService.deleteWorkspace(
+    const response = await workspacesApi.deleteWorkspace(
       props.workspace.id,
       deleteConfig.value,
       deleteFiles.value
@@ -132,17 +133,22 @@ const handleDelete = async () => {
       emit('deleted', props.workspace.id)
       handleClose()
     } else {
-      ElMessage.error(response.error || '删除失败')
+      ElMessage.error(response.message || '删除失败')
     }
   } catch (error: unknown) {
     console.error('Delete workspace error:', error)
     // 如果是 404 错误，说明工作区已经被删除了，不算失败
-    if (error.response?.status === 404) {
-      ElMessage.success('工作区已删除')
-      emit('deleted', props.workspace.id)
-      handleClose()
+    if (error && typeof error === 'object' && 'response' in error) {
+      const err = error as { response?: { status?: number; data?: { detail?: string } } };
+      if (err.response?.status === 404) {
+        ElMessage.success('工作区已删除')
+        emit('deleted', props.workspace.id)
+        handleClose()
+      } else {
+        ElMessage.error(err.response?.data?.detail || '删除失败')
+      }
     } else {
-      ElMessage.error(error.response?.data?.detail || '删除失败')
+      ElMessage.error('删除失败')
     }
   } finally {
     deleting.value = false

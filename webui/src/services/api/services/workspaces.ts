@@ -12,24 +12,27 @@ import type {
   PaginatedResponse,
   UserUIEnvironments,
   UserUIContext,
-  ProxyConfig
+  ProxyConfig,
+  ValidatePathRequest,
+  ValidatePathResponse,
+  FileTreeNode,
+  SystemEnvironments
 } from '../types';
+
+// 重新导出类型以供外部使用
+export type { ValidatePathRequest, ValidatePathResponse };
 
 // 工作区API服务类
 export class WorkspacesApiService {
   private baseUrl = '/workspaces';
-  // CRUD operations use /workspaces prefix
   private crudUrl = this.baseUrl;
 
   // 获取工作区列表
   async getWorkspaces(params?: {
-    page?: number;
-    limit?: number;
-    sortBy?: 'name' | 'createdAt' | 'updatedAt';
-    sortOrder?: 'asc' | 'desc';
-    search?: string;
+    include_inactive?: boolean;
   }): Promise<Workspace[]> {
-    const response = await httpClient.get<{ workspaces: Workspace[] }>(this.crudUrl, params);
+    // 使用新的 /list 端点
+    const response = await httpClient.get<{ workspaces: Workspace[] }>(`${this.crudUrl}/list`, params);
     return response.workspaces;
   }
 
@@ -75,8 +78,24 @@ export class WorkspacesApiService {
   }
 
   // 删除工作区
-  async deleteWorkspace(workspaceId: string): Promise<{ message: string }> {
-    return await httpClient.delete<{ message: string }>(`${this.crudUrl}/${workspaceId}`);
+  async deleteWorkspace(
+    workspaceId: string,
+    deleteConfig?: boolean,
+    deleteFiles?: boolean
+  ): Promise<{ success: boolean; message: string; workspace?: Workspace }> {
+    const params: Record<string, string> = {};
+    if (deleteConfig !== undefined) params.delete_config = String(deleteConfig);
+    if (deleteFiles !== undefined) params.delete_files = String(deleteFiles);
+
+    return await httpClient.delete<{ success: boolean; message: string; workspace?: Workspace }>(
+      `${this.crudUrl}/${workspaceId}`,
+      { params }
+    );
+  }
+
+  // 验证工作区路径
+  async validatePath(data: ValidatePathRequest): Promise<ValidatePathResponse> {
+    return await httpClient.post<ValidatePathResponse>(`${this.baseUrl}/validate-path`, data);
   }
 
   // 获取历史对话
@@ -277,7 +296,7 @@ export class WorkspacesApiService {
         recursive: params?.recursive ?? true  // 默认启用递归
       };
 
-      const response = await httpClient.get<{ success: boolean; type: string; files: unknown[] }>(
+      const response = await httpClient.get<{ success: boolean; type: string; files: FileTreeNode[] }>(
         `${this.baseUrl}/${workspaceId}/files`,
         requestParams
       );
@@ -1394,16 +1413,23 @@ export class WorkspacesApiService {
     message?: string;
   }> {
     try {
-      return await httpClient.get<{
+      const response = await httpClient.get<{
         success: boolean;
         config: {
-          plugins: Record<string, unknown>;
+          plugins: Record<string, {
+            enabled: boolean;
+            activated: boolean;
+            settings: Record<string, unknown>;
+            version?: string;
+            install_path?: string;
+          }>;
           max_plugins: number;
           auto_discovery: boolean;
           enabled: boolean;
         };
         message?: string;
       }>(`${this.baseUrl}/${workspaceId}/plugins/config`);
+      return response;
     } catch (error) {
       throw this.handleError(error);
     }
@@ -1587,8 +1613,11 @@ export class WorkspacesApiService {
 
   // 错误处理
   private handleError(error: unknown): never {
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
+    if (error && typeof error === 'object' && 'response' in error) {
+      const err = error as { response?: { data?: { message?: string } } };
+      if (err.response?.data?.message) {
+        throw new Error(err.response.data.message);
+      }
     }
     throw error;
   }
@@ -1605,6 +1634,7 @@ export const {
   createWorkspace,
   updateWorkspace,
   deleteWorkspace,
+  validatePath,
   getConversations,
   getConversationById,
   deleteConversation,
@@ -1628,6 +1658,8 @@ export const {
   updateProxyConfig,
   getUIContext,
   updateUIContext,
+  getSystemEnvironments,
+  updateSystemEnvironments,
   createFileOrDirectory,
   deleteFileOrDirectory,
   copyFileOrDirectory,
@@ -1638,6 +1670,7 @@ export const {
   updateLLMSettings,
   createLLMProvider,
   updateLLMProvider,
+  testLLMProvider,
   deleteLLMProvider,
   getModeSettings,
   updateModeSettings,
@@ -1729,5 +1762,6 @@ export const {
   createMCPServer: workspacesApi.createMCPServer.bind(workspacesApi),
   updateMCPServer: workspacesApi.updateMCPServer.bind(workspacesApi),
   deleteMCPServer: workspacesApi.deleteMCPServer.bind(workspacesApi),
-  testMCPServer: workspacesApi.testMCPServer.bind(workspacesApi)
+  testMCPServer: workspacesApi.testMCPServer.bind(workspacesApi),
+  validatePath: workspacesApi.validatePath.bind(workspacesApi)
 };

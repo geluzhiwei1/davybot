@@ -35,21 +35,34 @@ export function getPlatform(): Platform {
  * In Tauri mode: uses configured remote server or localhost
  */
 export function getApiBaseUrl(): string {
-  // Check if environment variable is set AND not empty
+  const tauriDetected = isTauri();
+  const isDev = import.meta.env.DEV;
+
+  // Debug logging
+  if (import.meta.env.DEV) {
+    console.log('[getApiBaseUrl] isDev:', isDev);
+    console.log('[getApiBaseUrl] tauriDetected:', tauriDetected);
+    console.log('[getApiBaseUrl] Current page origin:', window.location.origin);
+    console.log('[getApiBaseUrl] VITE_API_BASE_URL from env:', import.meta.env.VITE_API_BASE_URL);
+  }
+
+  // Development mode: ALWAYS use proxy, ignore ALL environment variables
+  // This prevents .env.tauri from interfering with web development
+  if (isDev) {
+    const devUrl = '/api';  // Relative path - will use browser's origin
+    if (import.meta.env.DEV) {
+      console.log('[getApiBaseUrl] DEV MODE - Using proxy URL:', devUrl);
+      console.log('[getApiBaseUrl] Full API URL will be:', window.location.origin + devUrl);
+    }
+    return devUrl;
+  }
+
+  // Production mode: use environment variables (including .env.tauri for Tauri builds)
   if (import.meta.env.VITE_API_BASE_URL && import.meta.env.VITE_API_BASE_URL.trim() !== '') {
     return import.meta.env.VITE_API_BASE_URL
   }
 
-  const tauriDetected = isTauri();
-  const isDev = import.meta.env.DEV;
-
-  // Development mode: always use Vite proxy
-  // The proxy will handle routing to the correct backend
-  if (isDev) {
-    return '/api';
-  }
-
-  // Production configuration
+  // Production configuration fallback
   if (tauriDetected) {
     // Tauri mode: connect to remote server or localhost
     // You can configure this to point to your production server
@@ -66,35 +79,37 @@ export function getApiBaseUrl(): string {
  * Get WebSocket base URL based on platform
  */
 export function getWsBaseUrl(): string {
-  // Check if environment variable is set
-  if (import.meta.env.VITE_WS_BASE_URL) {
-    return import.meta.env.VITE_WS_BASE_URL
-  }
-
   const tauriDetected = isTauri();
   const isDev = import.meta.env.DEV;
   const hostname = window.location.hostname;
 
-  // Development mode: check if accessing via localhost or remote IP
-  if (isDev) {
-    // If accessing via localhost, use Vite proxy
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // Construct WebSocket URL from current page URL
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host; // includes hostname and port (e.g., localhost:5175)
-      const devUrl = `${protocol}//${host}/ws`;
-      return devUrl;
-    } else {
-      // Accessing via remote IP - use the same IP as the frontend but with backend port
-      // This ensures we connect to the backend server on the same machine as the frontend
-      const currentIp = hostname; // Use the same IP as the current page
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const remoteUrl = `${protocol}//${currentIp}:8465/ws`;
-      return remoteUrl;
-    }
+  // Debug logging
+  if (import.meta.env.DEV) {
+    console.log('[getWsBaseUrl] isDev:', isDev);
+    console.log('[getWsBaseUrl] tauriDetected:', tauriDetected);
+    console.log('[getWsBaseUrl] Current page origin:', window.location.origin);
+    console.log('[getWsBaseUrl] VITE_WS_BASE_URL from env:', import.meta.env.VITE_WS_BASE_URL);
   }
 
-  // Production configuration
+  // Development mode: ALWAYS use proxy, ignore ALL environment variables
+  // This prevents .env.tauri from interfering with web development
+  if (isDev) {
+    // Use Vite proxy for WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const devUrl = `${protocol}//${host}/ws`;
+    if (import.meta.env.DEV) {
+      console.log('[getWsBaseUrl] DEV MODE - Using proxy URL:', devUrl);
+    }
+    return devUrl;
+  }
+
+  // Production mode: use environment variables (including .env.tauri for Tauri builds)
+  if (import.meta.env.VITE_WS_BASE_URL) {
+    return import.meta.env.VITE_WS_BASE_URL
+  }
+
+  // Production configuration fallback
   if (tauriDetected) {
     // Tauri mode: connect to remote server or localhost
     const tauriUrl = 'ws://localhost:8465/ws';

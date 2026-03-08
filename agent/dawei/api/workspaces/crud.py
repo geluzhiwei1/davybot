@@ -351,13 +351,15 @@ async def _register_workspace_in_system_index(
 # ==================== 读取工作区列表 API ====================
 
 
-@router.get("/", response_model=WorkspaceListResponse)
-async def get_workspaces(
+@router.get("/list", response_model=WorkspaceListResponse)
+async def get_workspaces_list(
     include_inactive: bool = Query(False, description="是否包含已停用的工作区"),
 ):
     """获取工作区列表
 
     数据来源：~/.dawei/workspaces.json (系统级索引)
+
+    端点: GET /api/workspaces/list
     """
     system_storage = StorageProvider.get_system_storage()
 

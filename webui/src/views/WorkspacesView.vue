@@ -234,6 +234,12 @@
       </div>
     </div>
 
+    <!-- Hero Title -->
+    <div class="hero-section">
+      <h1 class="hero-title">DaweiBot</h1>
+      <p class="hero-description">AI驱动的智能工作空间平台</p>
+    </div>
+
     <!-- 全局统计卡片 -->
     <div class="stats-section" v-loading="isLoadingStats">
       <div class="stats-grid">
@@ -459,8 +465,7 @@ import SecuritySettingsTab from '@/components/user/SecuritySettingsTab.vue';
 import PreferencesTab from '@/components/user/PreferencesTab.vue';
 import ShortcutsTab from '@/components/user/ShortcutsTab.vue';
 import AboutTab from '@/components/user/AboutTab.vue';
-import { workspaceService } from '@/services/workspace';
-import { getGlobalStats, getWorkspaceStats } from '@/services/api/services/workspaces';
+import { workspacesApi, getGlobalStats, getWorkspaceStats } from '@/services/api/services/workspaces';
 import { useI18n } from 'vue-i18n';
 import type { UserSecuritySettings } from '@/services/api/types';
 import { authService, type UserInfo } from '@/services/auth';
@@ -734,15 +739,10 @@ const loadAllWorkspaceStats = async () => {
 const loadWorkspaces = async () => {
   try {
     isLoading.value = true;
-    const response = await workspaceService.getWorkspaces();
-
-    if (response.success) {
-      workspaces.value = response.workspaces || [];
-      // 加载工作区统计
-      await loadAllWorkspaceStats();
-    } else {
-      workspaces.value = [];
-    }
+    const workspacesData = await workspacesApi.getWorkspaces();
+    workspaces.value = workspacesData || [];
+    // 加载工作区统计
+    await loadAllWorkspaceStats();
   } catch (error) {
     console.error('Failed to fetch workspaces:', error);
     ElMessage.error(t('workspaces.loadFailed'));

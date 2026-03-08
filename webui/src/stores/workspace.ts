@@ -17,6 +17,7 @@ import { defineStore } from 'pinia'
 import { apiManager } from '@/services/api'
 import { logger } from '@/utils/logger'
 import { ElMessage } from 'element-plus'
+import type { Workspace, Conversation } from '@/services/api/types'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   // --- State ---
@@ -39,12 +40,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /**
    * Workspace列表
    */
-  const workspaceList = ref<unknown[]>([])
+  const workspaceList = ref<Workspace[]>([])
 
   /**
    * Conversation列表
    */
-  const conversationList = ref<unknown[]>([])
+  const conversationList = ref<Conversation[]>([])
 
   /**
    * 消息分页状态
@@ -109,7 +110,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
    */
   const createWorkspace = async (name: string): Promise<unknown> => {
     try {
-      const workspace = await apiManager.getWorkspacesApi().create({ name })
+      const workspace = await apiManager.getWorkspacesApi().createWorkspace({ name, path: name })
       workspaceList.value.push(workspace)
       await setWorkspace(workspace.id)
       return workspace
@@ -129,7 +130,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         throw new Error('No workspace selected')
       }
 
-      const conversation = await apiManager.getConversationsApi().create({
+      const conversation = await apiManager.getConversationsApi().createConversation({
         workspace_id: currentWorkspaceId.value,
         title,
       })

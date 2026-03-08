@@ -69,11 +69,12 @@ import { ElMessage } from 'element-plus'
 import { Folder, FolderOpened } from '@element-plus/icons-vue'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '@/utils/platform'
-import { workspaceService, type CreateWorkspaceRequest, type UpdateWorkspaceRequest } from '@/services/workspace'
+import { workspacesApi, type ValidatePathRequest } from '@/services/api/services/workspaces'
+import type { WorkspaceDetail } from '@/services/api/types'
 
 interface Props {
   modelValue: boolean
-  workspace?: unknown
+  workspace?: WorkspaceDetail
 }
 
 interface Emits {
@@ -161,7 +162,7 @@ const selectDirectory = async () => {
 }
 
 // 验证路径
-let validatePathTimer: unknown = null
+let validatePathTimer: ReturnType<typeof setTimeout> | null = null
 const validatePath = async () => {
   if (!formData.path || isEditMode.value) {
     pathValidation.status = ''
@@ -176,7 +177,7 @@ const validatePath = async () => {
 
   validatePathTimer = setTimeout(async () => {
     try {
-      const response = await workspaceService.validatePath({
+      const response = await workspacesApi.validatePath({
         path: formData.path
       })
 
@@ -195,7 +196,12 @@ const validatePath = async () => {
       }
     } catch (error: unknown) {
       pathValidation.status = 'error'
-      pathValidation.message = error.response?.data?.detail || '路径验证失败'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const err = error as { response?: { data?: { detail?: string } } };
+        pathValidation.message = err.response?.data?.detail || '路径验证失败'
+      } else {
+        pathValidation.message = '路径验证失败'
+      }
     }
   }, 500)
 }
@@ -266,7 +272,12 @@ const handleSubmit = async () => {
     }
   } catch (error: unknown) {
     console.error('Form submission error:', error)
-    ElMessage.error(error.response?.data?.detail || '操作失败')
+    if (error && typeof error === 'object' && 'response' in error) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      ElMessage.error(err.response?.data?.detail || '操作失败')
+    } else {
+      ElMessage.error('操作失败')
+    }
   } finally {
     submitting.value = false
   }

@@ -68,6 +68,13 @@ export interface WorkspaceInfo extends Workspace {
   size?: number;
 }
 
+export interface WorkspaceDetail extends Workspace {
+  files_list?: string[];
+  system_environments?: unknown;
+  user_ui_environments?: unknown;
+  user_ui_context?: unknown;
+}
+
 export interface FileTreeNode {
   id: string;
   name: string;
@@ -79,6 +86,7 @@ export interface FileTreeNode {
   children?: FileTreeNode[];
   isOpen?: boolean;
   language?: string;
+  is_directory?: boolean;
 }
 
 export interface OpenFile {
@@ -644,6 +652,21 @@ export interface WorkspaceSecuritySettings {
   requireConfirmationForDangerous: boolean;
   blockExecutableFiles: boolean;
   allowSymlinksOutsideWorkspace: boolean;
+}
+
+// 路径验证相关类型
+export interface ValidatePathRequest {
+  path: string;
+}
+
+export interface ValidatePathResponse {
+  success: boolean;
+  valid: boolean;
+  message: string;
+  exists: boolean;
+  writable?: boolean;
+  is_empty?: boolean;
+  is_workspace?: boolean;
 }
 
 // 安全配置响应
