@@ -477,7 +477,10 @@ class UpdateTodoListInput(BaseModel):
 
     todos: List[str] = Field(
         ...,
-        description="List of todo items with status markers: [ ] pending, [x] completed, [-] in progress.",
+        description='List of todo items as an array of strings. Each item must include a status marker and description. '
+        'Status markers: "[√]" for completed, "[-]" for in-progress, "[ ]" for pending. '
+        'Format example: ["[√] Analyzed requirements", "[-] Implementing feature", "[ ] Write tests", "[ ] Update docs"]. '
+        'IMPORTANT: This must be a valid JSON array of strings, not plain text. Each todo item should be a separate string element in the array.',
     )
 
 

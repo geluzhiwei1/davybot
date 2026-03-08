@@ -11,14 +11,14 @@
         <!-- 远程访问 -->
         <el-popover :width="400" trigger="click" placement="bottom-end" @show="handleRemotePopoverShow">
           <template #reference>
-            <el-button :loading="remoteLoading">
+            <el-button :loading="remoteLoading" :disabled="true">
               <el-icon v-if="!remoteConfig.running && !remoteLoading">
                 <Connection />
               </el-icon>
               <el-icon v-else-if="remoteConfig.running">
                 <CircleCheck />
               </el-icon>
-              远程访问
+              NAT访问
             </el-button>
           </template>
 
@@ -218,7 +218,7 @@
 
         <!-- 未登录状态 -->
         <div class="auth-section-top" v-else>
-          <el-button type="primary" @click="handleLogin" :loading="loggingIn" size="small">
+          <el-button :disabled="true" type="primary" @click="handleLogin" :loading="loggingIn" size="small">
             <el-icon>
               <User />
             </el-icon>

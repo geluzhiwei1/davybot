@@ -6,8 +6,9 @@
 <template>
   <div class="language-selector-wrapper">
     <el-dropdown trigger="click" @command="selectLanguage" @visible-change="handleDropdownVisible">
-      <el-button class="language-selector-btn" :title="`当前语言: ${currentLanguageLabel} - 点击切换`" :icon="ChatDotRound" text
-        circle />
+      <el-button class="language-selector-btn" :title="`当前语言: ${currentLanguageLabel} - 点击切换`" text circle>
+        <Icon icon="tabler:language" />
+      </el-button>
       <template #dropdown>
         <el-dropdown-menu>
           <el-dropdown-item v-for="lang in languages" :key="lang.value" :command="lang.value"
@@ -29,6 +30,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ChatDotRound, Check } from '@element-plus/icons-vue'
 import { setLocale } from '@/i18n'
+import { Icon } from "@iconify/vue"
 
 interface Language {
   value: string;
