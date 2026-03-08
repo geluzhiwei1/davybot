@@ -54,6 +54,9 @@ class LLMProviderCreate(BaseModel):
     enableReasoningEffort: bool | None = Field(True, description="启用推理强度")
     toolChoice: str | None = Field(None, description="Tool Choice 设置 (auto, required, none)")
     temperature: float | None = Field(1.0, description="Temperature 参数 (0.0-2.0)")
+    timeout: int | None = Field(600, description="HTTP 请求超时时间（秒）")
+    maxRetries: int | None = Field(3, description="最大重试次数")
+    retryDelay: float | None = Field(2.0, description="重试延迟时间（秒）")
     saveLocation: str | None = Field("user", description="保存位置: user 或 workspace")
 
 
@@ -296,6 +299,9 @@ async def create_llm_provider(
         "enableReasoningEffort": provider_data.enableReasoningEffort,
         "toolChoice": provider_data.toolChoice,
         "temperature": provider_data.temperature,
+        "timeout": provider_data.timeout,
+        "maxRetries": provider_data.maxRetries,
+        "retryDelay": provider_data.retryDelay,
     }
 
     if provider_data.openAiBaseUrl:
@@ -346,17 +352,42 @@ async def update_llm_provider(
     provider_data: LLMProviderCreate,
     workspace: UserWorkspace = Depends(get_user_workspace),
 ):
-    """更新 LLM Provider 配置"""
+    """更新 LLM Provider 配置
+
+    支持更新用户级和工作区级的 Provider 配置
+    """
     if not workspace.is_initialized():
         await workspace.initialize()
 
-    settings_file = workspace.user_config_dir / "settings.json"
+    # 确定 provider 在哪个配置文件中（先工作区，后用户）
+    workspace_settings_file = workspace.user_config_dir / "settings.json"
+    user_settings_file = get_dawei_home() / "settings.json"
 
-    if not settings_file.exists():
-        raise HTTPException(status_code=404, detail="Settings file not found")
+    # 查找 provider
+    settings_file = None
+    settings = None
 
-    with Path(settings_file).open(encoding="utf-8") as f:
-        settings = json.load(f)
+    # 先检查工作区级配置
+    if workspace_settings_file.exists():
+        with workspace_settings_file.open(encoding="utf-8") as f:
+            workspace_settings_data = json.load(f)
+        workspace_api_configs = workspace_settings_data.get("providerProfiles", {}).get("apiConfigs", {})
+        if provider_name in workspace_api_configs:
+            settings_file = workspace_settings_file
+            settings = workspace_settings_data
+
+    # 如果工作区级没找到，检查用户级配置
+    if not settings_file and user_settings_file.exists():
+        with user_settings_file.open(encoding="utf-8") as f:
+            user_settings_data = json.load(f)
+        user_api_configs = user_settings_data.get("providerProfiles", {}).get("apiConfigs", {})
+        if provider_name in user_api_configs:
+            settings_file = user_settings_file
+            settings = user_settings_data
+
+    # 如果都没找到，报错
+    if not settings_file:
+        raise HTTPException(status_code=404, detail=f"Provider '{provider_name}' not found")
 
     provider_profiles = settings.get("providerProfiles", {})
     api_configs = provider_profiles.get("apiConfigs", {})
@@ -380,6 +411,9 @@ async def update_llm_provider(
         "enableReasoningEffort": provider_data.enableReasoningEffort,
         "toolChoice": provider_data.toolChoice,
         "temperature": provider_data.temperature,
+        "timeout": provider_data.timeout,
+        "maxRetries": provider_data.maxRetries,
+        "retryDelay": provider_data.retryDelay,
     }
 
     if provider_data.openAiBaseUrl:

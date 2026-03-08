@@ -18,6 +18,9 @@ interface ProviderConfig {
   enableReasoningEffort?: boolean;
   toolChoice?: string | null;
   temperature?: number | null;
+  timeout?: number;
+  maxRetries?: number;
+  retryDelay?: number;
   source?: string;
   config?: ProviderConfig;
 }
@@ -59,6 +62,9 @@ export function useLLMProviders(workspaceId: string) {
     enableReasoningEffort: true,
     toolChoice: 'required' as string | null,
     temperature: 1.0 as number | null,
+    timeout: 600 as number,
+    maxRetries: 3 as number,
+    retryDelay: 2.0 as number,
     saveLocation: 'user' as 'user' | 'workspace'
   });
 

@@ -187,6 +187,28 @@
           <el-input-number v-model="providerForm.temperature" :min="0" :max="2" :step="0.1" :precision="1"
             style="width: 200px;" />
         </el-form-item>
+
+        <el-form-item label="HTTP超时（秒）">
+          <el-input-number v-model="providerForm.timeout" :min="30" :max="1800" :step="10" style="width: 200px;" />
+          <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+            HTTP请求超时时间，建议值：600秒（10分钟）
+          </div>
+        </el-form-item>
+
+        <el-form-item label="最大重试次数">
+          <el-input-number v-model="providerForm.maxRetries" :min="0" :max="10" :step="1" style="width: 200px;" />
+          <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+            请求失败时的最大重试次数
+          </div>
+        </el-form-item>
+
+        <el-form-item label="重试延迟（秒）">
+          <el-input-number v-model="providerForm.retryDelay" :min="0.5" :max="10" :step="0.5" :precision="1"
+            style="width: 200px;" />
+          <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px;">
+            重试之间的等待时间
+          </div>
+        </el-form-item>
       </el-form>
 
       <template #footer>
@@ -267,6 +289,18 @@
         <el-descriptions-item label="Temperature" :span="2">
           {{ viewingProvider.config.temperature || 1.0 }}
         </el-descriptions-item>
+
+        <el-descriptions-item label="HTTP超时（秒）" :span="2">
+          {{ viewingProvider.config.timeout || 180 }}
+        </el-descriptions-item>
+
+        <el-descriptions-item label="最大重试次数" :span="2">
+          {{ viewingProvider.config.maxRetries || 3 }}
+        </el-descriptions-item>
+
+        <el-descriptions-item label="重试延迟（秒）" :span="2">
+          {{ viewingProvider.config.retryDelay || 1.0 }}
+        </el-descriptions-item>
       </el-descriptions>
 
       <template #footer>
@@ -325,6 +359,9 @@ const showCreateProviderDialog = () => {
     enableReasoningEffort: true,
     toolChoice: 'required',
     temperature: 1.0,
+    timeout: 600,
+    maxRetries: 3,
+    retryDelay: 2.0,
     saveLocation: 'user' as 'user' | 'workspace'
   };
   customHeadersText.value = '';
@@ -379,6 +416,9 @@ const editProvider = (provider: LLMProvider) => {
     enableReasoningEffort: config.enableReasoningEffort ?? true,
     toolChoice: config.toolChoice ?? 'required',
     temperature: config.temperature ?? 1.0,
+    timeout: config.timeout ?? 600,
+    maxRetries: config.maxRetries ?? 3,
+    retryDelay: config.retryDelay ?? 2.0,
     saveLocation: 'user' as 'user' | 'workspace'
   };
 
