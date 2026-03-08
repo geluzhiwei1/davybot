@@ -20,7 +20,7 @@ import type {
 } from '@/types/knowledge'
 import { getApiBaseUrl } from '@/utils/platform'
 
-const API_BASE = `${getApiBaseUrl()}/api/knowledge`
+const API_BASE = `${getApiBaseUrl()}/knowledge`
 
 export const knowledgeBasesApi = {
   /**
