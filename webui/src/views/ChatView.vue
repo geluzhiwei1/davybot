@@ -25,16 +25,61 @@
         <!-- 下部按钮 -->
         <div class="bottom-buttons">
           <el-tooltip :content="t('sidePanel.memory')" placement="right">
-            <el-button :icon="Connection" @click="handleOpenMemoryDrawer" text circle />
+            <el-button @click="handleOpenMemoryDrawer" text circle>
+              <Icon icon="arcticons:breeno-memory" width="32" height="32" />
+            </el-button>
           </el-tooltip>
           <el-tooltip :content="t('knowledge.title')" placement="right">
-            <el-button :icon="Grid" @click="handleOpenKnowledgeDrawer" text circle />
+            <el-button @click="handleOpenKnowledgeDrawer" text circle>
+              <Icon icon="hugeicons:knowledge-02" width="32" height="32" />
+            </el-button>
           </el-tooltip>
+          <!-- 语言模型 -->
+          <el-tooltip :content="t('workspaceSettings.tabs.llmProvider')" placement="right">
+            <el-button @click="handleOpenLLMDrawer" text circle>
+              <Icon icon="hugeicons:ai-brain-05" width="32" height="32" />
+            </el-button>
+          </el-tooltip>
+          <!-- 技能 -->
+          <el-tooltip :content="t('workspaceSettings.tabs.skills')" placement="right">
+            <el-button @click="handleOpenSkillsDrawer" text circle>
+              <Icon icon="streamline-color:wind-flow-2" width="32" height="32" />
+            </el-button>
+          </el-tooltip>
+          <!-- 智能体 -->
+          <el-tooltip :content="t('workspaceSettings.tabs.agents')" placement="right">
+            <el-button @click="handleOpenAgentsDrawer" text circle>
+              <Icon icon="streamline-ultimate:professions-man-astronaut-bold" width="32" height="32" />
+            </el-button>
+          </el-tooltip>
+          <!-- 插件 -->
+          <el-tooltip :content="t('workspaceSettings.tabs.plugins')" placement="right">
+            <el-button @click="handleOpenPluginsDrawer" text circle>
+              <Icon icon="streamline-freehand:plugin-jigsaw-puzzle" width="32" height="32" />
+            </el-button>
+          </el-tooltip>
+          <!-- MCP -->
+          <el-tooltip :content="t('workspaceSettings.tabs.mcpServers')" placement="right">
+            <el-button @click="handleOpenMCPDrawer" text circle>
+              <Icon icon="octicon:mcp-24" width="32" height="32" />
+            </el-button>
+          </el-tooltip>
+          <!-- 定时任务 -->
+          <el-tooltip :content="t('workspaceSettings.tabs.scheduledTasks')" placement="right">
+            <el-button @click="handleOpenScheduledTasksDrawer" text circle>
+              <Icon icon="cil:calendar" width="32" height="32" />
+            </el-button>
+          </el-tooltip>
+
           <el-tooltip :content="t('workspaceSettings.title')" placement="right">
-            <el-button :icon="Setting" @click="handleOpenSettings" text circle />
+            <el-button @click="handleOpenSettings" text circle>
+              <Icon icon="streamline-flex:keyboard-option-setting-gear-solid" width="32" height="32" />
+            </el-button>
           </el-tooltip>
           <el-tooltip :content="t('sidePanel.switchWorkspace')" placement="right">
-            <el-button :icon="Switch" @click="handleSwitchWorkspace" text circle />
+            <el-button @click="handleSwitchWorkspace" text circle>
+              <Icon icon="hugeicons:new-office" width="32" height="32" />
+            </el-button>
           </el-tooltip>
         </div>
       </div>
@@ -71,10 +116,7 @@
     </el-container>
 
     <!-- 移动端底部导航 -->
-    <MobileBottomNav
-      :open-files-count="openFiles.length"
-      @navigate="handleMobileNavNavigate"
-    />
+    <MobileBottomNav :open-files-count="openFiles.length" @navigate="handleMobileNavNavigate" />
 
     <!-- 主内容区和右侧面板之间的拖动分隔条 (仅桌面端) -->
     <ResizerBar v-if="isRightPanelVisible && !isChatPanelCollapsed && !isMobile" :panel-ref="{ width: rightPanelWidth }"
@@ -88,47 +130,55 @@
     </el-aside>
 
     <!-- 移动端侧边栏抽屉 -->
-    <el-drawer
-      v-model="isMobileSidePanelOpen"
-      :with-header="false"
-      direction="ltr"
-      size="100%"
-      class="mobile-side-panel-drawer"
-    >
-      <SidePanel
-        ref="sidePanelRef"
-        @open-file="handleOpenFile"
-        :side-panel-collapsed="false"
-        :chat-panel-collapsed="false"
-        :workspace-id="chatStore.workspaceId ?? undefined"
-        :is-mobile-drawer="true"
-        @close-mobile-drawer="isMobileSidePanelOpen = false"
-      />
+    <el-drawer v-model="isMobileSidePanelOpen" :with-header="false" direction="rtl" size="100%"
+      class="mobile-side-panel-drawer">
+      <SidePanel ref="sidePanelRef" @open-file="handleOpenFile" :side-panel-collapsed="false"
+        :chat-panel-collapsed="false" :workspace-id="chatStore.workspaceId ?? undefined" :is-mobile-drawer="true"
+        @close-mobile-drawer="isMobileSidePanelOpen = false" />
     </el-drawer>
 
     <!-- 移动端右侧文件内容抽屉 -->
-    <el-drawer
-      v-model="isMobileRightPanelOpen"
-      :with-header="false"
-      direction="rtl"
-      size="100%"
-      class="mobile-right-panel-drawer"
-    >
-      <FileContentArea
-        ref="fileContentAreaRef"
-        :files="openFiles"
-        :active-file-id="currentActiveFileId"
-        :is-mobile-drawer="true"
-        @close-file="handleCloseFile"
-        @update:active-file-id="handleActiveFileChange"
-        @save-file="saveFileContent"
-        @update-file-content="updateFileContent"
-        @close-mobile-drawer="isMobileRightPanelOpen = false"
-      />
+    <el-drawer v-model="isMobileRightPanelOpen" :with-header="false" direction="rtl" size="100%"
+      class="mobile-right-panel-drawer">
+      <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId"
+        :is-mobile-drawer="true" @close-file="handleCloseFile" @update:active-file-id="handleActiveFileChange"
+        @save-file="saveFileContent" @update-file-content="updateFileContent"
+        @close-mobile-drawer="isMobileRightPanelOpen = false" />
     </el-drawer>
 
     <WorkspaceSettingsDrawer v-model="isSettingsDrawerVisible" :workspace-id="chatStore.workspaceId"
       :initial-tab="initialSettingsTab" />
+
+    <!-- 语言模型抽屉 -->
+    <el-drawer v-model="isLLMDrawerVisible" :title="t('workspaceSettings.tabs.llmProvider')" direction="rtl" size="70%">
+      <LLMProvidersDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
+    </el-drawer>
+
+    <!-- 技能抽屉 -->
+    <el-drawer v-model="isSkillsDrawerVisible" :title="t('workspaceSettings.tabs.skills')" direction="rtl" size="70%">
+      <SkillsDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
+    </el-drawer>
+
+    <!-- 智能体抽屉 -->
+    <el-drawer v-model="isAgentsDrawerVisible" :title="t('workspaceSettings.tabs.agents')" direction="rtl" size="70%">
+      <AgentsDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
+    </el-drawer>
+
+    <!-- 插件抽屉 -->
+    <el-drawer v-model="isPluginsDrawerVisible" :title="t('workspaceSettings.tabs.plugins')" direction="rtl" size="70%">
+      <PluginsDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
+    </el-drawer>
+
+    <!-- MCP抽屉 -->
+    <el-drawer v-model="isMCPDrawerVisible" :title="t('workspaceSettings.tabs.mcpServers')" direction="rtl" size="70%">
+      <MCPDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
+    </el-drawer>
+
+    <!-- 定时任务抽屉 -->
+    <el-drawer v-model="isScheduledTasksDrawerVisible" :title="t('workspaceSettings.tabs.scheduledTasks')"
+      direction="rtl" size="70%">
+      <ScheduledTasksDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
+    </el-drawer>
 
     <!-- 知识库抽屉 -->
     <KnowledgeDrawer v-model="isKnowledgeDrawerVisible" :workspace-id="chatStore.workspaceId ?? undefined" />
@@ -159,9 +209,27 @@ import { appConfig } from '@/config/app.config';
 import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
 import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
-import { Fold, Expand, Setting, Switch, Grid, Connection } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { useMobile } from '@/composables/useMobile';
+import {
+  Fold,
+  Expand,
+  Setting,
+  Switch,
+  Grid,
+  Connection,
+  ChatLineRound,
+  Tools,
+  Operation,
+  Clock,
+  Link,
+  Picture,
+  Star,
+  User,
+  FolderOpened
+} from '@element-plus/icons-vue';
+
+import { Icon } from "@iconify/vue"
 
 const { t } = useI18n();
 
@@ -183,6 +251,12 @@ import BottomBar from '@/components/layout/BottomBar.vue';
 import WorkspaceSettingsDrawer from '@/components/layout/WorkspaceSettingsDrawer.vue';
 import KnowledgeDrawer from '@/components/layout/KnowledgeDrawer.vue';
 import MemoryDrawer from '@/components/layout/MemoryDrawer.vue';
+import LLMProvidersDrawer from '@/components/drawers/LLMProvidersDrawer.vue';
+import SkillsDrawer from '@/components/drawers/SkillsDrawer.vue';
+import AgentsDrawer from '@/components/drawers/AgentsDrawer.vue';
+import PluginsDrawer from '@/components/drawers/PluginsDrawer.vue';
+import MCPDrawer from '@/components/drawers/MCPDrawer.vue';
+import ScheduledTasksDrawer from '@/components/drawers/ScheduledTasksDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
 import ImageViewer from '@/components/chat/ImageViewer.vue';
@@ -232,6 +306,12 @@ const isChatPanelCollapsed = ref(false);
 const isSettingsDrawerVisible = ref(false);
 const isKnowledgeDrawerVisible = ref(false);
 const isMemoryDrawerVisible = ref(false);
+const isLLMDrawerVisible = ref(false);
+const isSkillsDrawerVisible = ref(false);
+const isAgentsDrawerVisible = ref(false);
+const isPluginsDrawerVisible = ref(false);
+const isMCPDrawerVisible = ref(false);
+const isScheduledTasksDrawerVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
 // 移动端侧边栏抽屉状态
@@ -566,6 +646,36 @@ const handleOpenKnowledgeDrawer = () => {
 // 打开记忆抽屉
 const handleOpenMemoryDrawer = () => {
   isMemoryDrawerVisible.value = true;
+};
+
+// 打开语言模型抽屉
+const handleOpenLLMDrawer = () => {
+  isLLMDrawerVisible.value = true;
+};
+
+// 打开技能抽屉
+const handleOpenSkillsDrawer = () => {
+  isSkillsDrawerVisible.value = true;
+};
+
+// 打开智能体抽屉
+const handleOpenAgentsDrawer = () => {
+  isAgentsDrawerVisible.value = true;
+};
+
+// 打开插件抽屉
+const handleOpenPluginsDrawer = () => {
+  isPluginsDrawerVisible.value = true;
+};
+
+// 打开MCP抽屉
+const handleOpenMCPDrawer = () => {
+  isMCPDrawerVisible.value = true;
+};
+
+// 打开定时任务抽屉
+const handleOpenScheduledTasksDrawer = () => {
+  isScheduledTasksDrawerVisible.value = true;
 };
 
 const getValidWorkspaceId = async (): Promise<string | null> => {
