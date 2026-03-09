@@ -21,7 +21,7 @@
       <h3>确定要删除工作区吗？</h3>
 
       <p class="workspace-info">
-        <strong>{{ workspace?.display_name || workspace?.name }}</strong>
+        <strong>{{ workspace?.name }}</strong>
         <br />
         <span class="workspace-path">{{ workspace?.path }}</span>
       </p>
@@ -86,7 +86,7 @@ import { ElMessage } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { workspacesApi } from '@/services/api/services/workspaces'
 import { useI18n } from 'vue-i18n'
-import { type WorkspaceDetail } from '@/services/workspace'
+import type { WorkspaceDetail } from '@/services/api/types'
 
 const { t } = useI18n()
 
