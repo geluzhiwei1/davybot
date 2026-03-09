@@ -101,12 +101,19 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true,
+        rewrite: (path) => path,
         onError(err, req, res) {
           if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
             console.log('Proxy connection closed by client')
             return
           }
           console.error('Proxy error:', err)
+        },
+        // Log proxy requests for debugging
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('[Vite Proxy] Forwarding:', req.method, req.url, '→', options.target + proxyReq.path);
+          });
         }
       },
       '/ws': {
@@ -128,7 +135,13 @@ export default defineConfig({
           console.error('WebSocket proxy error:', err)
         },
         proxyTimeout: 30000,
-        timeout: 30000
+        timeout: 30000,
+        // Log proxy requests for debugging
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('[Vite Proxy WS] Forwarding:', req.url, '→', options.target + proxyReq.path);
+          });
+        }
       }
     },
     watch: {
@@ -145,7 +158,7 @@ export default defineConfig({
     outDir: 'src-tauri/resources',
     emptyOutDir: false,
     minify: 'terser',
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       external: [
         '@tauri-apps/api',
@@ -153,9 +166,11 @@ export default defineConfig({
       ],
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/vue') || id.includes('node_modules/@vue') ||
-              id.includes('node_modules/vue-router') || id.includes('node_modules/pinia')) {
-            return 'vendor';
+          if (id.includes('node_modules/vue') || id.includes('node_modules/@vue')) {
+            return 'vue-vendor';
+          }
+          if (id.includes('node_modules/vue-router') || id.includes('node_modules/pinia')) {
+            return 'vue-framework';
           }
           if (id.includes('node_modules/element-plus')) {
             return 'element-plus';
@@ -163,9 +178,48 @@ export default defineConfig({
           if (id.includes('node_modules/codemirror') || id.includes('node_modules/@codemirror')) {
             return 'editor';
           }
-          if (id.includes('node_modules/axios') || id.includes('node_modules/marked') ||
-              id.includes('node_modules/papaparse')) {
-            return 'utils';
+          if (id.includes('node_modules/@lezer')) {
+            return 'editor-parser';
+          }
+          if (id.includes('node_modules/axios')) {
+            return 'http';
+          }
+          if (id.includes('node_modules/marked') || id.includes('node_modules/markdown-it')) {
+            return 'markdown';
+          }
+          if (id.includes('node_modules/papaparse')) {
+            return 'csv';
+          }
+          if (id.includes('node_modules/echarts')) {
+            return 'charts';
+          }
+          if (id.includes('node_modules/vditor')) {
+            return 'vditor';
+          }
+          if (id.includes('node_modules/dayjs')) {
+            return 'date';
+          }
+          if (id.includes('node_modules/js-yaml')) {
+            return 'yaml';
+          }
+          if (id.includes('node_modules/zod')) {
+            return 'validation';
+          }
+          if (id.includes('node_modules/uuid')) {
+            return 'uuid';
+          }
+          if (id.includes('node_modules/@vueuse/core')) {
+            return 'vueuse';
+          }
+          if (id.includes('node_modules/vue-web-terminal')) {
+            return 'terminal';
+          }
+          if (id.includes('node_modules/@lljj/vue3-form-element')) {
+            return 'form';
+          }
+          if (id.includes('node_modules/@element-plus/icons-vue') ||
+              id.includes('node_modules/@heroicons/vue')) {
+            return 'icons';
           }
         },
       },
