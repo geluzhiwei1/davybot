@@ -375,10 +375,9 @@ jobs:
           EOF
 
           # Create ZIP
-          # Navigate to the parent directory to avoid including other build artifacts
-          ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
-          cd "$(dirname "${ZIP_DIR}")"
-          7z a -tzip "${ZIP_NAME}" "${ZIP_DIR_BASE}" -mx=9
+          cd webui/src-tauri/target/release
+          # Use relative path since we're already in the release directory
+          7z a -tzip "${ZIP_NAME}" "$(basename "${ZIP_DIR}")" -mx=9
       - name: Create portable ZIP package (Linux x86_64)
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
         shell: bash
