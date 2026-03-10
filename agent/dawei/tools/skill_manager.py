@@ -295,14 +295,14 @@ class SkillManager:
         query_lower = query.lower()
 
         # 将连字符替换为空格，再分割（例如 "frontend-design" -> "frontend design"）
-        query_cleaned = re.sub(r'[-_:]', ' ', query_lower)
+        query_cleaned = re.sub(r"[-_:]", " ", query_lower)
         query_words = set(query_cleaned.split())
 
         scored_skills = []
         for skill in all_skills:
             desc_lower = skill.description.lower()
             # 计算匹配分数：关键词重叠度
-            desc_cleaned = re.sub(r'[-_:]', ' ', desc_lower)
+            desc_cleaned = re.sub(r"[-_:]", " ", desc_lower)
             desc_words = set(desc_cleaned.split())
 
             overlap = len(query_words & desc_words)

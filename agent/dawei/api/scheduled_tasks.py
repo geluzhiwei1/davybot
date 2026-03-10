@@ -361,10 +361,7 @@ async def get_task_executions(
                 conv_data = json.load(f)
 
             # 过滤出该定时任务的执行记录
-            if (
-                conv_data.get("task_type") == "scheduled"
-                and conv_data.get("source_task_id") == task_id
-            ):
+            if conv_data.get("task_type") == "scheduled" and conv_data.get("source_task_id") == task_id:
                 execution = {
                     "conversation_id": conv_data.get("id"),
                     "title": conv_data.get("title", ""),

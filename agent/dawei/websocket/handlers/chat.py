@@ -453,11 +453,8 @@ class ChatHandler(AsyncMessageHandler):
             from dawei.conversation.conversation import Conversation
 
             user_workspace.current_conversation = Conversation()
-            logger.info(
-                f"[CHAT_HANDLER] Created new conversation with ID: {user_workspace.current_conversation.id}"
-            )
+            logger.info(f"[CHAT_HANDLER] Created new conversation with ID: {user_workspace.current_conversation.id}")
             return
-
 
         try:
             # 尝试从历史记录中加载会话
@@ -473,14 +470,9 @@ class ChatHandler(AsyncMessageHandler):
                 user_workspace.current_conversation = conversation
             else:
                 # 🔧 修复：会话找不到时，检查是否是当前内存中的会话
-                if (
-                    user_workspace.current_conversation
-                    and user_workspace.current_conversation.id == conversation_id
-                ):
+                if user_workspace.current_conversation and user_workspace.current_conversation.id == conversation_id:
                     # 如果请求的 conversation_id 正好是当前内存中的会话，直接复用
-                    logger.info(
-                        f"[CHAT_HANDLER] Conversation {conversation_id} not found on disk, but matches current in-memory conversation, reusing it"
-                    )
+                    logger.info(f"[CHAT_HANDLER] Conversation {conversation_id} not found on disk, but matches current in-memory conversation, reusing it")
                 elif user_workspace.current_conversation:
                     logger.warning(
                         f"[CHAT_HANDLER] Conversation {conversation_id} not found, reusing current conversation: {user_workspace.current_conversation.id}",
@@ -1013,6 +1005,7 @@ class ChatHandler(AsyncMessageHandler):
         self,
         user_message: UserInputMessage,
         workspace_path: str,
+        original_ws_message: WebSocketMessage = None,  # 🔧 新增：接收原始 WebSocket 消息
     ) -> UserInputMessage:
         """处理消息中的文件引用
 
@@ -1031,6 +1024,12 @@ class ChatHandler(AsyncMessageHandler):
         """
         original_message = user_message.content
 
+        # 【调试】打印 user_message 的所有属性
+        logger.info(f"[CHAT_HANDLER] user_message type: {type(user_message)}")
+        logger.info(f"[CHAT_HANDLER] user_message attributes: {dir(user_message)}")
+        if hasattr(user_message, "__dict__"):
+            logger.info(f"[CHAT_HANDLER] user_message.__dict__: {user_message.__dict__}")
+
         # 检查消息中是否包含@文件引用
         if "@" in original_message:
             from dawei.websocket.handlers.at_message_processor import AtMessageProcessor
@@ -1041,8 +1040,21 @@ class ChatHandler(AsyncMessageHandler):
             if file_refs:
                 logger.info(f"[CHAT_HANDLER] Detected {len(file_refs)} @ file references (will be processed by Agent)")
 
-        # 返回原始消息，保留@指令供Agent处理
-        return UserInputMessage(text=original_message)
+        # Extract knowledge_base_ids and pass to UserInputMessage
+        metadata = {}
+        if hasattr(user_message, "metadata") and user_message.metadata:
+            metadata = dict(user_message.metadata)
+
+        # Extract knowledge_base_ids from WebSocket message
+        knowledge_base_ids = None
+        if original_ws_message and hasattr(original_ws_message, "knowledge_base_ids"):
+            if original_ws_message.knowledge_base_ids:
+                knowledge_base_ids = original_ws_message.knowledge_base_ids
+                metadata["knowledge_base_ids"] = knowledge_base_ids
+                logger.debug(f"Knowledge base IDs extracted from WebSocket message: {knowledge_base_ids}")
+
+        # Return original message with metadata (do not modify user content)
+        return UserInputMessage(text=original_message, metadata=metadata if metadata else None)
 
     async def _handle_system_command_if_needed(
         self,
@@ -1340,10 +1352,7 @@ class ChatHandler(AsyncMessageHandler):
         if task_id in self._active_agents:
             del self._active_agents[task_id]
 
-        logger.info(
-            f"[CHAT_HANDLER] Skipping agent.cleanup() to avoid disrupting active handlers. "
-            f"Agent {task_id} will be garbage collected naturally."
-        )
+        logger.info(f"[CHAT_HANDLER] Skipping agent.cleanup() to avoid disrupting active handlers. Agent {task_id} will be garbage collected naturally.")
 
         # 🔧 修复：清理事件处理器，防止内存泄漏和重复处理
         await self._cleanup_event_handlers(task_id, agent)
@@ -1363,9 +1372,9 @@ class ChatHandler(AsyncMessageHandler):
             return
 
         # 提取 handler_ids 和 event_bus
-        handler_ids = task_info.get('handler_ids', {})
-        saved_event_bus_id = task_info.get('event_bus_id')
-        saved_event_bus = task_info.get('event_bus')
+        handler_ids = task_info.get("handler_ids", {})
+        saved_event_bus_id = task_info.get("event_bus_id")
+        saved_event_bus = task_info.get("event_bus")
 
         logger.info(
             f"[EVENT_HANDLER] 🧹 Cleaning up {len(handler_ids)} event handlers for task {task_id}",
@@ -1375,15 +1384,11 @@ class ChatHandler(AsyncMessageHandler):
         event_bus = saved_event_bus
 
         # 验证：如果保存的 event_bus 和当前 agent 的 event_bus 不同，记录警告
-        if agent and hasattr(agent, 'event_bus'):
+        if agent and hasattr(agent, "event_bus"):
             current_event_bus_id = id(agent.event_bus)
             if current_event_bus_id != saved_event_bus_id:
                 logger.error(
-                    f"[EVENT_HANDLER] ❌ CRITICAL: Event bus mismatch!\n"
-                    f"  - Saved event_bus_id: {saved_event_bus_id}\n"
-                    f"  - Current agent event_bus_id: {current_event_bus_id}\n"
-                    f"  - This means the agent was recreated or replaced!\n"
-                    f"  - Using saved event_bus reference for cleanup.",
+                    f"[EVENT_HANDLER] ❌ CRITICAL: Event bus mismatch!\n  - Saved event_bus_id: {saved_event_bus_id}\n  - Current agent event_bus_id: {current_event_bus_id}\n  - This means the agent was recreated or replaced!\n  - Using saved event_bus reference for cleanup.",
                 )
 
         if not event_bus:
@@ -1419,9 +1424,7 @@ class ChatHandler(AsyncMessageHandler):
                 )
 
         logger.info(
-            f"[EVENT_HANDLER] ✅ Cleanup complete for task {task_id}: "
-            f"removed {removed_count}, already removed {already_removed_count}/{len(handler_ids)} handlers. "
-            f"Remaining active handlers: {len(self._task_event_handler_ids)}",
+            f"[EVENT_HANDLER] ✅ Cleanup complete for task {task_id}: removed {removed_count}, already removed {already_removed_count}/{len(handler_ids)} handlers. Remaining active handlers: {len(self._task_event_handler_ids)}",
         )
 
     # ==================== 重构后的主执行方法 ====================
@@ -1470,6 +1473,7 @@ class ChatHandler(AsyncMessageHandler):
             # 🔥 3.5. 立即发送 conversation_id 给前端
             if user_workspace.current_conversation:
                 from dawei.websocket.protocol import ConversationInfoMessage
+
                 # 🔧 FIX: Convert datetime to ISO format string
                 created_at_str = None
                 if user_workspace.current_conversation.created_at:
@@ -1523,8 +1527,8 @@ class ChatHandler(AsyncMessageHandler):
             # 10. 启动任务
             await self.update_session_data(session_id, data={"current_task_id": task_id})
 
-            # 11. 处理文件引用
-            user_input = await self._process_file_references(user_message, workspace_path)
+            # 11. 处理文件引用（传递原始 WebSocket 消息以提取 knowledge_base_ids）
+            user_input = await self._process_file_references(user_message, workspace_path, user_message)
 
             # 12. 处理系统命令(如果需要)
             should_skip_agent = await self._handle_system_command_if_needed(
@@ -2101,9 +2105,9 @@ class ChatHandler(AsyncMessageHandler):
 
         # 🔴 关键修复：保存完整的任务信息（handler_ids + event_bus 引用）
         self._task_event_handler_ids[task_id] = {
-            'handler_ids': handler_ids,
-            'event_bus_id': id(event_bus),
-            'event_bus': event_bus,  # 保存引用，确保清理时使用同一个 event_bus
+            "handler_ids": handler_ids,
+            "event_bus_id": id(event_bus),
+            "event_bus": event_bus,  # 保存引用，确保清理时使用同一个 event_bus
         }
 
         logger.info(
@@ -2263,6 +2267,7 @@ class ChatHandler(AsyncMessageHandler):
                     llm_state = self._task_llm_api_state[task_id]
                     if llm_state.get("active", False):
                         import time
+
                         duration_ms = int((time.time() - llm_state["start_time"]) * 1000) if llm_state.get("start_time") else None
 
                         llm_complete_message = LLMApiCompleteMessage(
@@ -2313,6 +2318,7 @@ class ChatHandler(AsyncMessageHandler):
             # 🔧 修复：如果 LLM API 还在活跃状态，发送完成消息
             if task_id in self._task_llm_api_state and self._task_llm_api_state[task_id].get("active", False):
                 import time
+
                 llm_state = self._task_llm_api_state[task_id]
                 duration_ms = int((time.time() - llm_state["start_time"]) * 1000) if llm_state.get("start_time") else None
 
@@ -2366,6 +2372,7 @@ class ChatHandler(AsyncMessageHandler):
                     llm_state = self._task_llm_api_state[task_id]
                     if llm_state.get("active", False):
                         import time
+
                         duration_ms = int((time.time() - llm_state["start_time"]) * 1000) if llm_state.get("start_time") else None
 
                         llm_complete_message = LLMApiCompleteMessage(

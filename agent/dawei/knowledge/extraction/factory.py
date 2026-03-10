@@ -120,10 +120,7 @@ class ExtractionFactory:
         strategy_class = cls._strategies.get(strategy)
 
         if strategy_class is None:
-            raise ValueError(
-                f"Unknown strategy type: {strategy}. "
-                f"Available: {list(cls._strategies.keys())}"
-            )
+            raise ValueError(f"Unknown strategy type: {strategy}. Available: {list(cls._strategies.keys())}")
 
         # Create instance
         logger.info(f"Creating extraction strategy: {strategy.value}")
@@ -157,10 +154,7 @@ class ExtractionFactory:
             strategy_class: Strategy class (must inherit from ExtractionStrategy)
         """
         if not issubclass(strategy_class, ExtractionStrategy):
-            raise TypeError(
-                f"Strategy class must inherit from ExtractionStrategy: "
-                f"{strategy_class}"
-            )
+            raise TypeError(f"Strategy class must inherit from ExtractionStrategy: {strategy_class}")
 
         cls._strategies[strategy_type] = strategy_class
         logger.info(f"Registered custom strategy: {strategy_type.value}")
@@ -180,6 +174,7 @@ class ExtractionFactory:
         # Check if LLM is available
         try:
             from dawei.llm_api.client import LLMClient
+
             client = LLMClient.get_instance()
             if client is not None:
                 logger.info("Auto-selected: LLM strategy")
@@ -190,6 +185,7 @@ class ExtractionFactory:
         # Check if NER models are available
         try:
             import spacy
+
             logger.info("Auto-selected: NER model strategy")
             return ExtractionStrategyType.NER_MODEL
         except ImportError:
@@ -210,6 +206,7 @@ class ExtractionFactory:
 
 
 # Convenience functions
+
 
 async def extract_from_text(
     text: str,

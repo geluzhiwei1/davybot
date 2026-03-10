@@ -62,7 +62,7 @@ class SandboxConfig:
     workspace_mount_mode: str = "ro"  # ro = read-only, rw = read-write
 
     # === 容器运行时配置 ===
-    container_runtime: Literal['docker', 'podman', 'auto'] = 'auto'  # 容器运行时选择
+    container_runtime: Literal["docker", "podman", "auto"] = "auto"  # 容器运行时选择
 
     # === 细粒度安全控制 ===
     drop_all_capabilities: bool = True  # 是否移除所有capabilities
@@ -80,7 +80,7 @@ class SandboxManager:
 
     def _detect_runtime(self) -> str:
         """检测可用的容器运行时"""
-        if self.config.container_runtime != 'auto':
+        if self.config.container_runtime != "auto":
             # 用户明确指定了运行时
             runtime = self.config.container_runtime
             if self._check_runtime_available(runtime):
@@ -91,32 +91,24 @@ class SandboxManager:
                 # 继续自动检测
 
         # 自动检测：优先 Podman（更安全），其次 Docker
-        for runtime in ['podman', 'docker']:
+        for runtime in ["podman", "docker"]:
             if self._check_runtime_available(runtime):
                 logger.info(f"[SANDBOX] 自动检测到运行时: {runtime}")
                 return runtime
 
         # 都不可用，返回 docker（后续会在 _init_client 中报错）
         logger.warning("[SANDBOX] 未检测到可用的容器运行时")
-        return 'docker'
+        return "docker"
 
     def _check_runtime_available(self, runtime: str) -> bool:
         """检查运行时是否可用"""
         try:
-            if runtime == 'podman':
+            if runtime == "podman":
                 # 检查 Podman
-                result = subprocess.run(
-                    ['podman', '--version'],
-                    capture_output=True,
-                    timeout=5
-                )
+                result = subprocess.run(["podman", "--version"], capture_output=True, timeout=5)
                 if result.returncode == 0:
                     # 检查 Podman API socket
-                    socket_paths = [
-                        '/run/podman/podman.sock',
-                        '/run/user/{}/podman/podman.sock'.format(os.getuid()),
-                        '~/.local/share/containers/podman.sock'
-                    ]
+                    socket_paths = ["/run/podman/podman.sock", "/run/user/{}/podman/podman.sock".format(os.getuid()), "~/.local/share/containers/podman.sock"]
                     for sock_path in socket_paths:
                         sock_path = os.path.expanduser(sock_path)
                         if os.path.exists(sock_path):
@@ -124,13 +116,9 @@ class SandboxManager:
                             return True
                     logger.debug("[SANDBOX] Podman 已安装但未找到 socket")
                     return False
-            elif runtime == 'docker':
+            elif runtime == "docker":
                 # 检查 Docker
-                result = subprocess.run(
-                    ['docker', '--version'],
-                    capture_output=True,
-                    timeout=5
-                )
+                result = subprocess.run(["docker", "--version"], capture_output=True, timeout=5)
                 if result.returncode == 0:
                     # 检查 Docker daemon
                     client = docker.from_env()
@@ -148,30 +136,22 @@ class SandboxManager:
         """初始化容器客户端"""
         runtime = self.runtime
 
-        if runtime == 'podman':
+        if runtime == "podman":
             # 使用 Podman
             # Podman API socket 位置
-            socket_paths = [
-                '/run/podman/podman.sock',
-                '/run/user/{}/podman/podman.sock'.format(os.getuid()),
-                os.path.expanduser('~/.local/share/containers/podman.sock')
-            ]
+            socket_paths = ["/run/podman/podman.sock", "/run/user/{}/podman/podman.sock".format(os.getuid()), os.path.expanduser("~/.local/share/containers/podman.sock")]
 
             podman_socket = None
             for sock_path in socket_paths:
                 if os.path.exists(sock_path):
-                    podman_socket = f'unix://{sock_path}'
+                    podman_socket = f"unix://{sock_path}"
                     break
 
             if not podman_socket:
-                raise DockerConnectionError(
-                    "Podman socket 未找到。请确保 Podman 服务正在运行:\n"
-                    "  systemctl start --user podman.socket\n"
-                    "  或: sudo systemctl start podman.socket"
-                )
+                raise DockerConnectionError("Podman socket 未找到。请确保 Podman 服务正在运行:\n  systemctl start --user podman.socket\n  或: sudo systemctl start podman.socket")
 
             # 设置环境变量
-            os.environ['DOCKER_HOST'] = podman_socket
+            os.environ["DOCKER_HOST"] = podman_socket
             logger.info(f"[SANDBOX] 使用 Podman: {podman_socket}")
 
         try:
@@ -182,7 +162,7 @@ class SandboxManager:
             # 获取版本信息以确认运行时
             try:
                 version = client.version()
-                if runtime == 'podman' or 'podman' in version.get('Components', [{}])[0].get('Name', '').lower():
+                if runtime == "podman" or "podman" in version.get("Components", [{}])[0].get("Name", "").lower():
                     logger.info(f"[SANDBOX] Podman 连接成功 (版本: {version.get('Version', 'unknown')})")
                 else:
                     logger.info(f"[SANDBOX] Docker 连接成功 (版本: {version.get('Version', 'unknown')})")
@@ -193,10 +173,7 @@ class SandboxManager:
 
         except docker.errors.DockerException as e:
             logger.exception(f"[SANDBOX] {runtime.capitalize()} 连接失败: ")
-            raise DockerConnectionError(
-                f"{runtime.capitalize()} daemon 不可用: {e}\n"
-                f"请确保 {runtime} 已安装并正在运行。"
-            )
+            raise DockerConnectionError(f"{runtime.capitalize()} daemon 不可用: {e}\n请确保 {runtime} 已安装并正在运行。")
         except (OSError, ConnectionError) as e:
             logger.exception(f"[SANDBOX] {runtime.capitalize()} 连接错误: ")
             raise DockerConnectionError(f"无法连接到 {runtime}: {e}")
@@ -277,7 +254,7 @@ class SandboxManager:
             security_opt = ["no-new-privileges"] if self.config.no_new_privileges else []
 
             # 网络配置：sandbox_disable_network 优先级高于 network_disabled
-            network_disabled = self.config.sandbox_disable_network if hasattr(self.config, 'sandbox_disable_network') else self.config.network_disabled
+            network_disabled = self.config.sandbox_disable_network if hasattr(self.config, "sandbox_disable_network") else self.config.network_disabled
 
             # 使用run方法（自动删除容器）
             try:
@@ -469,7 +446,7 @@ class SandboxManager:
                 "timeout": self.config.timeout,
                 "drop_all_capabilities": self.config.drop_all_capabilities,
                 "no_new_privileges": self.config.no_new_privileges,
-                "sandbox_disable_network": self.config.sandbox_disable_network if hasattr(self.config, 'sandbox_disable_network') else self.config.network_disabled,
+                "sandbox_disable_network": self.config.sandbox_disable_network if hasattr(self.config, "sandbox_disable_network") else self.config.network_disabled,
             },
         }
 

@@ -21,16 +21,10 @@ def get_workspace_file_service(workspace_id: str) -> Storage:
     """
     workspace = workspace_manager.get_workspace_by_id(workspace_id)
     if not workspace:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Workspace not found: {workspace_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
 
     workspace_path = workspace.get("path")
     if not workspace_path:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Workspace {workspace_id} has no path configured"
-        )
+        raise HTTPException(status_code=400, detail=f"Workspace {workspace_id} has no path configured")
 
     return StorageProvider.get_local_filesystem_storage(root_dir=workspace_path)

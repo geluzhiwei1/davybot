@@ -19,9 +19,12 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+
 class StrEnum(str, Enum):
     """String enum for Python 3.10 compatibility"""
+
     pass
+
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 

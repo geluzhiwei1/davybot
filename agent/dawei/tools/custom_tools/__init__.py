@@ -47,6 +47,9 @@ from .smart_file_edit import SmartFileEditTool
 # Timer/Scheduler tools
 from .timer_tools import TimerTool
 
+# Knowledge base tools
+from .knowledge_tool import KnowledgeSearchTool, KnowledgeRAGTool
+
 # Import from fixed workflow tools to avoid circular import
 from .workflow_tools_fixed import (
     AskFollowupQuestionTool,
@@ -92,6 +95,9 @@ __all__ = [
     "GetTaskStatusTool",
     # Timer/Scheduler Tools
     "TimerTool",
+    # Knowledge Base Tools
+    "KnowledgeSearchTool",
+    "KnowledgeRAGTool",
     # Market Tools
     "SkillSearchTool",
     "SkillInstallTool",

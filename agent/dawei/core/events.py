@@ -333,7 +333,6 @@ class SimpleEventBus(IEventBus):
                 break
 
         if handler_to_remove is None:
-
             # 仍然清理映射表（如果存在）
             if handler_id in self._handler_id_map:
                 del self._handler_id_map[handler_id]
@@ -421,26 +420,22 @@ class SimpleEventBus(IEventBus):
 
                 # 🔍 诊断日志：追踪 CONTENT_STREAM 事件的 handler 数量
                 if event_type == TaskEventType.CONTENT_STREAM:
-                    content_preview = str(event.data)[:50] if hasattr(event, 'data') and event.data else ""
+                    content_preview = str(event.data)[:50] if hasattr(event, "data") and event.data else ""
 
                     handler_info = []
                     for h in handlers:
                         # 尝试从闭包中获取 task_id
-                        if hasattr(h, '__closure__') and h.__closure__:
+                        if hasattr(h, "__closure__") and h.__closure__:
                             closure_vars = {}
                             for i, cell in enumerate(h.__closure__):
                                 try:
-                                    closure_vars[f'var_{i}'] = cell.cell_contents
+                                    closure_vars[f"var_{i}"] = cell.cell_contents
                                 except (AttributeError, ValueError):
                                     # Cell doesn't contain expected content type or was garbage collected
                                     pass
-                            handler_info.append({
-                                'id': id(h),
-                                'closure_vars': list(closure_vars.keys())
-                            })
+                            handler_info.append({"id": id(h), "closure_vars": list(closure_vars.keys())})
                         else:
-                            handler_info.append({'id': id(h), 'no_closure': True})
-
+                            handler_info.append({"id": id(h), "no_closure": True})
 
                 for i, handler in enumerate(handlers):
                     await self._execute_handler(handler, event, event_type, i)

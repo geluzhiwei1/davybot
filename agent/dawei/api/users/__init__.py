@@ -14,4 +14,4 @@ router = APIRouter(prefix="/api/users", tags=["Users"])
 router.include_router(security_router)
 router.include_router(remote_router)
 
-__all__ = ['router']
+__all__ = ["router"]

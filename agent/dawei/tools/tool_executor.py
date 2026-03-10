@@ -11,8 +11,9 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import List, Dict, TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
+from dawei.agentic.file_snapshot_manager import SnapshotStrategy
 from dawei.async_task.task_manager import AsyncTaskManager
 from dawei.async_task.types import RetryPolicy, TaskDefinition, TaskStatus
 from dawei.core.error_handler import handle_errors
@@ -28,7 +29,6 @@ from dawei.entity.tool_event_data import ToolCallStartData
 from dawei.interfaces.tool_call_service import IToolCallService
 from dawei.logg.logging import log_performance
 from dawei.task_graph.task_node_data import TaskContext
-from dawei.agentic.file_snapshot_manager import SnapshotStrategy
 from dawei.tools.custom_base_tool import CustomBaseTool
 
 from .tool_manager import ToolManager
@@ -97,17 +97,17 @@ class ToolExecutor(IToolCallService):
         self.user_workspace = user_workspace
         self._agent = agent
         self._event_bus = event_bus
-        self.tools: Dict[str, Tool] = {}
+        self.tools: dict[str, Tool] = {}
         self.logger = logging.getLogger(__name__)
         self._load_tools()
 
         # Execution tracking
-        self._execution_history: List[Dict[str, Any]] = []
-        self._tool_timeouts: Dict[str, int] = {}
+        self._execution_history: list[dict[str, Any]] = []
+        self._tool_timeouts: dict[str, int] = {}
 
         # Task management
         self._task_manager = AsyncTaskManager()
-        self._active_tool_tasks: Dict[str, str] = {}
+        self._active_tool_tasks: dict[str, str] = {}
 
         # Note: Callbacks will be set up in async_initialize() method
         self._callbacks_initialized = False
@@ -127,29 +127,35 @@ class ToolExecutor(IToolCallService):
             self._callbacks_initialized = True
             self.logger.info("[TOOL_EXECUTOR] Task manager callbacks initialized")
 
-    def inject_knowledge_base_id(self, knowledge_base_id: str) -> None:
+    def inject_knowledge_base_id(self, knowledge_base_id: str | list[str]) -> None:
         """Inject knowledge base ID into all knowledge tools.
 
         This method is called by Agent during initialization to inject the
         knowledge base ID into all tools that require it.
 
         Args:
-            knowledge_base_id: Knowledge base ID to inject
+            knowledge_base_id: Knowledge base ID to inject (string or list of strings)
 
         """
+        # Normalize to list always
+        if isinstance(knowledge_base_id, str):
+            knowledge_base_ids = [knowledge_base_id]
+        else:
+            knowledge_base_ids = knowledge_base_id
+
         injected_count = 0
 
         for tool_name, tool_instance in self.tools.items():
-            # Check if tool has knowledge_base_id attribute
-            if hasattr(tool_instance, 'knowledge_base_id'):
-                tool_instance.knowledge_base_id = knowledge_base_id
+            # Check if tool has knowledge_base_ids attribute (list-based)
+            if hasattr(tool_instance, "knowledge_base_ids"):
+                tool_instance.knowledge_base_ids = knowledge_base_ids
+                self.logger.debug(f"Injected knowledge_base_ids into {tool_name}: {knowledge_base_ids}")
                 injected_count += 1
-                self.logger.info(f"[TOOL_EXECUTOR] Injected knowledge_base_id into {tool_name}")
 
         if injected_count > 0:
-            self.logger.info(f"[TOOL_EXECUTOR] Successfully injected knowledge_base_id into {injected_count} tools")
+            self.logger.info(f"Successfully injected knowledge_base_ids into {injected_count} tools")
         else:
-            self.logger.warning("[TOOL_EXECUTOR] No knowledge tools found to inject knowledge_base_id")
+            self.logger.debug("No knowledge tools found to inject knowledge_base_ids")
 
     def _load_tools(self):
         """Load all tools from tool manager."""
@@ -206,7 +212,7 @@ class ToolExecutor(IToolCallService):
 
         return None, None
 
-    def check_permission(self, tool_name: str, parameters: Dict[str, Any] | None = None) -> bool:
+    def check_permission(self, tool_name: str, parameters: dict[str, Any] | None = None) -> bool:
         """Check if tool is allowed in current Agent mode.
 
         Args:
@@ -248,7 +254,7 @@ class ToolExecutor(IToolCallService):
 
         return True
 
-    def _check_file_write_permission(self, parameters: Dict[str, Any]) -> bool:
+    def _check_file_write_permission(self, parameters: dict[str, Any]) -> bool:
         """Check if file write is allowed based on whitelist (Plan mode).
 
         Args:
@@ -319,7 +325,7 @@ class ToolExecutor(IToolCallService):
     @staticmethod
     def _perform_external_security_check(
         tool_name: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         user_workspace,
     ) -> str | None:
         """Perform external security checks.
@@ -367,10 +373,10 @@ class ToolExecutor(IToolCallService):
     async def execute_tool(
         self,
         tool_name: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         context: Any,
         task_id: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute tool with permission checks and snapshot creation.
 
         Args:
@@ -452,7 +458,7 @@ class ToolExecutor(IToolCallService):
             if len(self._execution_history) > 1000:
                 self._execution_history = self._execution_history[-1000:]
 
-    def list_available_tools(self) -> List[str]:
+    def list_available_tools(self) -> list[str]:
         """List all available tools.
 
         Returns:
@@ -467,7 +473,7 @@ class ToolExecutor(IToolCallService):
             self.logger.error(f"Failed to list available tools: {e}", exc_info=True)
             return []
 
-    def get_tool_schema(self, tool_name: str) -> Dict[str, Any] | None:
+    def get_tool_schema(self, tool_name: str) -> dict[str, Any] | None:
         """Get tool schema.
 
         Args:
@@ -543,8 +549,8 @@ class ToolExecutor(IToolCallService):
     def validate_tool_parameters(
         self,
         tool_name: str,
-        _parameters: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        _parameters: dict[str, Any],
+    ) -> dict[str, Any]:
         """Validate tool parameters.
 
         Args:
@@ -574,7 +580,7 @@ class ToolExecutor(IToolCallService):
             )
             return {"valid": False, "errors": [str(e)]}
 
-    def get_tool_execution_history(self, tool_name: str | None = None) -> List[Dict[str, Any]]:
+    def get_tool_execution_history(self, tool_name: str | None = None) -> list[dict[str, Any]]:
         """Get tool execution history.
 
         Args:
@@ -622,9 +628,9 @@ class ToolExecutor(IToolCallService):
     async def execute_tool_internal(
         self,
         tool_name: str,
-        tool_input: Dict[str, Any],
+        tool_input: dict[str, Any],
         context: TaskContext = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute the specified tool.
 
         Args:
@@ -645,6 +651,11 @@ class ToolExecutor(IToolCallService):
 
         # Emit tool call start event
         from dawei.core.events import TaskEventType, emit_typed_event
+
+        # 🔍 DEBUG: Log tool_input before emitting event
+        import json
+
+        self.logger.warning(f"[TOOL_INPUT_DEBUG] Before emitting TOOL_CALL_START: tool_name={tool_name}, tool_input={json.dumps(tool_input, ensure_ascii=False)}")
 
         self.logger.info(
             f"[TOOL_EXECUTOR] 🔧 Emitting TOOL_CALL_START event: tool_name={tool_name}, tool_call_id={tool_call_id}, task_id={task_id}",
@@ -722,7 +733,7 @@ class ToolExecutor(IToolCallService):
 
     async def _execute_tool_with_tracking(
         self,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         _context: Any = None,
     ) -> Any:
         """Execute tool with tracking (adapter for AsyncTaskManager executor interface).
@@ -778,6 +789,43 @@ class ToolExecutor(IToolCallService):
             if not tool_name or not tool_name.strip():
                 raise ValidationError("tool_name", tool_name, "must be non-empty string")
 
+            # Validate tool_input is not empty
+            if not tool_input or not isinstance(tool_input, dict):
+                raise ValidationError(
+                    "tool_input",
+                    tool_input,
+                    "must be a non-empty dictionary with tool parameters",
+                )
+
+            # Get tool to check required parameters before execution
+            tool = self.tools.get(tool_name)
+            if not tool:
+                raise ToolNotFoundError(tool_name)
+
+            # Check for missing required parameters if tool has args_schema
+            if isinstance(tool, CustomBaseTool) and hasattr(tool, "args_schema") and tool.args_schema:
+                schema = tool.args_schema
+                if hasattr(schema, "model_fields"):
+                    # Get required fields
+                    required_fields = [name for name, field in schema.model_fields.items() if field.is_required()]
+
+                    # Check if required fields are missing
+                    missing_fields = [f for f in required_fields if f not in tool_input]
+                    if missing_fields:
+                        # Build helpful error message for LLM
+                        field_descriptions = []
+                        for field_name in required_fields:
+                            field_info = schema.model_fields[field_name]
+                            desc = field_info.description or ""
+                            field_descriptions.append(f"  - {field_name}: {desc}")
+
+                        error_msg = f"Tool '{tool_name}' missing required parameters: {', '.join(missing_fields)}\n\nRequired parameters:\n" + "\n".join(field_descriptions) + "\n\nPlease retry the tool call with all required parameters."
+                        raise ValidationError(
+                            "tool_input",
+                            tool_input,
+                            error_msg,
+                        )
+
             # Emit validation progress event
             from dawei.core.events import TaskEventType, emit_typed_event
             from dawei.entity.tool_event_data import (
@@ -805,11 +853,7 @@ class ToolExecutor(IToolCallService):
             if self.user_workspace:
                 self._perform_external_security_check(tool_name, tool_input, self.user_workspace)
 
-            # Find tool - raise exception instead of returning error
-            tool = self.tools.get(tool_name)
-            if not tool:
-                raise ToolNotFoundError(tool_name)
-
+            # Tool was already fetched above during validation
             # Get actual executable tool instance
             executable_tool = tool
 
@@ -1087,7 +1131,7 @@ class ToolExecutor(IToolCallService):
         """
         return self._tool_timeouts.get(tool_name)
 
-    def get_all_tool_timeouts(self) -> Dict[str, int]:
+    def get_all_tool_timeouts(self) -> dict[str, int]:
         """Get all tool timeouts.
 
         Returns:
@@ -1122,7 +1166,7 @@ class ToolExecutor(IToolCallService):
             self.logger.error(f"Failed to clear execution history: {e}", exc_info=True)
             return False
 
-    def get_execution_statistics(self) -> Dict[str, Any]:
+    def get_execution_statistics(self) -> dict[str, Any]:
         """Get execution statistics.
 
         Returns:
@@ -1143,7 +1187,7 @@ class ToolExecutor(IToolCallService):
             avg_duration = sum(record["duration"] for record in completed_records) / len(completed_records) if completed_records else 0
 
             # Per-tool statistics
-            tool_stats: Dict[str, Dict[str, int]] = {}
+            tool_stats: dict[str, dict[str, int]] = {}
             for record in self._execution_history:
                 tool_name = record["tool_name"]
                 if tool_name not in tool_stats:
@@ -1172,7 +1216,7 @@ class ToolExecutor(IToolCallService):
     async def _create_snapshot_before_write(
         self,
         tool_name: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
     ) -> bool:
         """Create file snapshot before write operations.
 

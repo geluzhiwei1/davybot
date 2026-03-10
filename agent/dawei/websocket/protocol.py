@@ -14,9 +14,13 @@ from datetime import datetime, timezone
 from dawei.core.datetime_compat import UTC
 from enum import Enum
 
+
 class StrEnum(str, Enum):
     """String enum for Python 3.10 compatibility"""
+
     pass
+
+
 from typing import List, Dict, Any, ClassVar, Literal, Union
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -195,6 +199,7 @@ class UserWebSocketMessage(BaseWebSocketMessage):
     content: str = Field(..., description="用户消息内容")
     metadata: Dict[str, Any] | None = Field(None, description="消息元数据")
     user_ui_context: Dict[str, Any] | None = Field(None, description="用户UI上下文信息")
+    knowledge_base_ids: List[str] | None = Field(None, description="选中的知识库ID列表")
 
     @field_validator("content")
     @classmethod
@@ -768,10 +773,7 @@ class FollowupCancelMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.FOLLOWUP_CANCEL
     task_id: str = Field(..., description="任务ID")
     tool_call_id: str = Field(..., description="工具调用ID")
-    reason: Literal["user_cancelled", "timeout", "skipped"] = Field(
-        default="user_cancelled",
-        description="取消原因"
-    )
+    reason: Literal["user_cancelled", "timeout", "skipped"] = Field(default="user_cancelled", description="取消原因")
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""

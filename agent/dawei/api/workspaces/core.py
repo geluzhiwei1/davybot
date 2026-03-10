@@ -397,9 +397,7 @@ async def get_mode_rules(
             relative_dir = str(rules_abs_path.relative_to(workspace_path))
         except ValueError as e:
             # 规则目录不在工作区内，这是配置错误
-            logger.exception(
-                f"Rules directory {rules_abs_path} is not within workspace {workspace_path}"
-            )
+            logger.exception(f"Rules directory {rules_abs_path} is not within workspace {workspace_path}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Rules directory must be within workspace path: {e}",
@@ -542,9 +540,7 @@ async def update_mode_rules(
             relative_dir = str(Path(rules_dir).relative_to(Path(workspace.absolute_path)))
         except ValueError as e:
             # 规则目录不在工作区内，这是配置错误
-            logger.exception(
-                f"Rules directory {rules_dir} is not within workspace {workspace.absolute_path}"
-            )
+            logger.exception(f"Rules directory {rules_dir} is not within workspace {workspace.absolute_path}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Rules directory must be within workspace path: {e}",
@@ -664,7 +660,6 @@ async def update_proxy_config(
     }
 
 
-
 # ==================== 统计 API ====================
 
 
@@ -715,9 +710,7 @@ async def get_workspace_stats(workspace_id: str):
         for item in conv_files:
             if item["name"].endswith(".json") and not item["is_directory"]:
                 conversations_count += 1
-                conv_content = await workspace_storage.read_file(
-                    f"{conversations_path}/{item['name']}"
-                )
+                conv_content = await workspace_storage.read_file(f"{conversations_path}/{item['name']}")
                 conv_data = json.loads(conv_content)
                 messages_count += len(conv_data.get("messages", []))
 

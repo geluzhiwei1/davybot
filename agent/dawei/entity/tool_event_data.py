@@ -9,8 +9,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Dict, Any
 
+
 class StrEnum(str, Enum):
     """String enum for Python 3.10 compatibility"""
+
     pass
 
 

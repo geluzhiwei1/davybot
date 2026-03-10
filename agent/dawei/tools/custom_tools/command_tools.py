@@ -85,26 +85,17 @@ def _check_dangerous_command(command: str) -> str | None:
     # Check for format (exact match)
     if first_command == "format":
         reason = DANGEROUS_COMMANDS["primary_commands"]["format"]
-        return (
-            f"Command blocked for security reasons: '{first_command}' is dangerous ({reason}). "
-            f"If you're sure this is safe, use --super flag to bypass security checks."
-        )
+        return f"Command blocked for security reasons: '{first_command}' is dangerous ({reason}). If you're sure this is safe, use --super flag to bypass security checks."
 
     # Check for mkfs (can have extensions like mkfs.ext4, mkfs.xfs, etc.)
     if first_command.startswith("mkfs"):
         reason = DANGEROUS_COMMANDS["primary_commands"]["mkfs"]
-        return (
-            f"Command blocked for security reasons: '{first_command}' is dangerous ({reason}). "
-            f"If you're sure this is safe, use --super flag to bypass security checks."
-        )
+        return f"Command blocked for security reasons: '{first_command}' is dangerous ({reason}). If you're sure this is safe, use --super flag to bypass security checks."
 
     # Check dangerous patterns (can appear anywhere)
     for pattern, reason in DANGEROUS_COMMANDS["dangerous_patterns"].items():
         if pattern in command_lower:
-            return (
-                f"Command blocked for security reasons: contains '{pattern}' ({reason}). "
-                f"If you're sure this is safe, use --super flag to bypass security checks."
-            )
+            return f"Command blocked for security reasons: contains '{pattern}' ({reason}). If you're sure this is safe, use --super flag to bypass security checks."
 
     return None
 

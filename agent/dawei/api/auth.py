@@ -17,7 +17,6 @@ from dawei import get_dawei_home
 from dawei.config.settings import get_settings
 
 
-
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
@@ -38,8 +37,10 @@ SESSION_MAX_AGE = 7 * 24 * 60 * 60  # 7天 (秒)
 
 # ========== Data Models ==========
 
+
 class UserInfo(BaseModel):
     """用户信息"""
+
     id: str
     email: str
     nickname: str
@@ -51,17 +52,20 @@ class UserInfo(BaseModel):
 
 class UserResponse(BaseModel):
     """用户信息响应"""
+
     authenticated: bool
     user: Optional[UserInfo] = None
 
 
 class LogoutResponse(BaseModel):
     """登出响应"""
+
     success: bool
     message: str
 
 
 # ========== Session Management ==========
+
 
 class SessionManager:
     """会话管理器"""
@@ -90,17 +94,11 @@ class SessionManager:
         session_id = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(seconds=SESSION_MAX_AGE)
 
-        session_data = {
-            "session_id": session_id,
-            "user": user_data,
-            "tokens": tokens,
-            "created_at": datetime.utcnow().isoformat(),
-            "expires_at": expires_at.isoformat()
-        }
+        session_data = {"session_id": session_id, "user": user_data, "tokens": tokens, "created_at": datetime.utcnow().isoformat(), "expires_at": expires_at.isoformat()}
 
         # 保存到文件
         session_file = self._get_session_file(session_id)
-        with open(session_file, 'w', encoding='utf-8') as f:
+        with open(session_file, "w", encoding="utf-8") as f:
             json.dump(session_data, f, indent=2, ensure_ascii=False)
 
         return session_id
@@ -123,7 +121,7 @@ class SessionManager:
             return None
 
         try:
-            with open(session_file, 'r', encoding='utf-8') as f:
+            with open(session_file, "r", encoding="utf-8") as f:
                 session_data = json.load(f)
 
             # 检查是否过期
@@ -163,12 +161,14 @@ class SessionManager:
         for session_file in self.sessions_dir.glob("*.json"):
             try:
                 import json
-                with open(session_file, 'r', encoding='utf-8') as f:
+
+                with open(session_file, "r", encoding="utf-8") as f:
                     session_data = json.load(f)
 
                 if session_data.get("user", {}).get("id") == user_id:
                     # 检查是否过期
                     from datetime import datetime
+
                     expires_at = datetime.fromisoformat(session_data["expires_at"])
                     if datetime.utcnow() <= expires_at:
                         return session_data
@@ -183,6 +183,7 @@ session_manager = SessionManager()
 
 
 # ========== Helper Functions ==========
+
 
 async def get_current_session(request: Request) -> Optional[dict]:
     """从cookie中获取当前session
@@ -215,13 +216,7 @@ async def exchange_code_for_token(code: str) -> dict:
     """
     token_url = f"{SUPPORT_SYSTEM_URL}/support/auth/oauth/token"
 
-    payload = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "client_id": OAUTH_CLIENT_ID,
-        "client_secret": OAUTH_CLIENT_SECRET,
-        "redirect_uri": OAUTH_REDIRECT_URI
-    }
+    payload = {"grant_type": "authorization_code", "code": code, "client_id": OAUTH_CLIENT_ID, "client_secret": OAUTH_CLIENT_SECRET, "redirect_uri": OAUTH_REDIRECT_URI}
 
     async with httpx.AsyncClient() as client:
         try:
@@ -231,25 +226,16 @@ async def exchange_code_for_token(code: str) -> dict:
             return response.json()
 
         except httpx.HTTPStatusError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to exchange code for token: {e.response.text}"
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to exchange code for token: {e.response.text}")
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error exchanging code for token: {str(e)}"
-            )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error exchanging code for token: {str(e)}")
 
 
 # ========== API Endpoints ==========
 
+
 @router.get("/callback", status_code=status.HTTP_200_OK)
-async def oauth_callback(
-    request: Request,
-    code: str,
-    state: Optional[str] = None
-):
+async def oauth_callback(request: Request, code: str, state: Optional[str] = None):
     """
     OAuth2 回调端点
 
@@ -277,19 +263,10 @@ async def oauth_callback(
         refresh_token = token_response.get("refresh_token")
 
         if not user_data or not access_token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token response"
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token response")
 
         # 3. 创建session
-        session_id = await session_manager.create_session(
-            user_data=user_data,
-            tokens={
-                "access_token": access_token,
-                "refresh_token": refresh_token
-            }
-        )
+        session_id = await session_manager.create_session(user_data=user_data, tokens={"access_token": access_token, "refresh_token": refresh_token})
 
         # 4. 返回成功页面（设置cookie并通知主窗口）
         html_content = f"""
@@ -376,7 +353,7 @@ async def oauth_callback(
             value=session_id,
             max_age=SESSION_MAX_AGE,
             httponly=True,  # 防止XSS
-            samesite="lax"  # 防止CSRF
+            samesite="lax",  # 防止CSRF
         )
 
         return response
@@ -471,10 +448,7 @@ async def get_user(request: Request):
 
     user_data = session.get("user")
 
-    return UserResponse(
-        authenticated=True,
-        user=UserInfo(**user_data)
-    )
+    return UserResponse(authenticated=True, user=UserInfo(**user_data))
 
 
 @router.post("/logout", response_model=LogoutResponse)
@@ -499,10 +473,7 @@ async def logout(request: Request, response: Response):
     # 清除cookie
     response.delete_cookie(SESSION_COOKIE_NAME)
 
-    return LogoutResponse(
-        success=True,
-        message="Logged out successfully"
-    )
+    return LogoutResponse(success=True, message="Logged out successfully")
 
 
 @router.get("/login")
@@ -512,12 +483,6 @@ async def login_page():
 
     实际使用中，客户端应该直接打开OAuth授权URL
     """
-    auth_url = (
-        f"{SUPPORT_SYSTEM_URL}/support/auth/oauth/authorize"
-        f"?client_id={OAUTH_CLIENT_ID}"
-        f"&redirect_uri={OAUTH_REDIRECT_URI}"
-        f"&response_type=code"
-        f"&scope=profile"
-    )
+    auth_url = f"{SUPPORT_SYSTEM_URL}/support/auth/oauth/authorize?client_id={OAUTH_CLIENT_ID}&redirect_uri={OAUTH_REDIRECT_URI}&response_type=code&scope=profile"
 
     return RedirectResponse(url=auth_url, status_code=302)

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import click
 
+
 @click.group(name="agent", help="Agent operations (direct execution, bypass HTTP)")
 def agent_cmd():
     """Agent command group"""

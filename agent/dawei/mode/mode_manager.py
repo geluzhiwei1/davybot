@@ -161,7 +161,7 @@ class ModeConfigLoader:
         # 扫描所有团队目录
         if agents_dir.exists():
             for team_dir in agents_dir.iterdir():
-                if team_dir.is_dir() and not team_dir.name.startswith('.'):
+                if team_dir.is_dir() and not team_dir.name.startswith("."):
                     # 加载团队目录下的 modes
                     team_modes = self._load_modes_from_directory(team_dir, "workspace")
                     modes.update(team_modes)
@@ -474,10 +474,7 @@ class ModeManager:
                 if "customModes" in data and isinstance(data["customModes"], list):
                     # 过滤掉要删除的模式
                     original_count = len(data["customModes"])
-                    data["customModes"] = [
-                        mode for mode in data["customModes"]
-                        if mode.get("slug") != mode_slug
-                    ]
+                    data["customModes"] = [mode for mode in data["customModes"] if mode.get("slug") != mode_slug]
 
                     # 如果有删除，写回文件
                     if len(data["customModes"]) < original_count:
@@ -519,10 +516,7 @@ class ModeManager:
                             custom_modes = agent_data["customModes"]
                             if isinstance(custom_modes, list):
                                 original_count = len(custom_modes)
-                                agent_data["customModes"] = [
-                                    mode for mode in custom_modes
-                                    if mode.get("slug") != mode_slug
-                                ]
+                                agent_data["customModes"] = [mode for mode in custom_modes if mode.get("slug") != mode_slug]
 
                                 if len(agent_data["customModes"]) < original_count:
                                     with agent_modes_file.open("w", encoding="utf-8") as f:
@@ -552,6 +546,7 @@ class ModeManager:
                     agent_rules_dir = agent_dir / f"rules-{mode_slug}"
                     if agent_rules_dir.exists():
                         import shutil
+
                         shutil.rmtree(agent_rules_dir)
                         logger.info(f"Deleted rules directory from market agent package: {agent_rules_dir}")
                         mode_removed = True
@@ -567,12 +562,7 @@ class ModeManager:
         logger.info(f"Successfully deleted mode {mode_slug} from {level} level")
         return True
 
-    def update_mode(
-        self,
-        mode_slug: str,
-        mode_data: dict,
-        level: str = "workspace"
-    ) -> ModeConfig:
+    def update_mode(self, mode_slug: str, mode_data: dict, level: str = "workspace") -> ModeConfig:
         """更新指定级别的自定义模式
 
         Args:
@@ -654,13 +644,7 @@ class ModeManager:
         # 返回更新后的配置
         return self._merged_modes.get(mode_slug)
 
-    def update_mode_rules(
-        self,
-        mode_slug: str,
-        rules_content: str,
-        rules_filename: str = "mode",
-        level: str = "workspace"
-    ) -> bool:
+    def update_mode_rules(self, mode_slug: str, rules_content: str, rules_filename: str = "mode", level: str = "workspace") -> bool:
         """更新指定级别的模式规则文件
 
         Args:

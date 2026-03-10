@@ -107,11 +107,7 @@ class FullTextSearchTool(CustomBaseTool):
     """Tool for full-text search across source code files."""
 
     name: str = "fulltext_search"
-    description: str = (
-        "Performs full-text search across files using keyword matching and relevance scoring. "
-        "Returns ranked results with context snippets showing matched lines. "
-        "Supports multiple file extensions and provides smart relevance scoring."
-    )
+    description: str = "Performs full-text search across files using keyword matching and relevance scoring. Returns ranked results with context snippets showing matched lines. Supports multiple file extensions and provides smart relevance scoring."
     args_schema: type[BaseModel] = FullTextSearchInput
 
     @safe_tool_operation(
@@ -248,7 +244,7 @@ class FullTextSearchTool(CustomBaseTool):
                 # Add line numbers
                 for j in range(start, end):
                     prefix = ">>> " if j == i else "    "
-                    snippet_lines.append(f"{prefix}{j+1}:{lines[j]}")
+                    snippet_lines.append(f"{prefix}{j + 1}:{lines[j]}")
 
                 snippet_lines.append("...")  # Separator between snippets
                 snippets_found += 1

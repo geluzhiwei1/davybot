@@ -193,9 +193,7 @@ class SchedulerEngine:
                 # ✅ 尝试获取任务执行锁（防止重复执行）
                 acquired = await self._execution_lock.acquire(task.task_id)
                 if not acquired:
-                    logger.debug(
-                        f"[SCHEDULER] Worker {name}: Task {task.task_id} already being executed, skipping"
-                    )
+                    logger.debug(f"[SCHEDULER] Worker {name}: Task {task.task_id} already being executed, skipping")
                     self._execution_queue.task_done()
                     continue
 
@@ -228,10 +226,7 @@ class SchedulerEngine:
             task.triggered_at = datetime.now(UTC)
             await self.storage.save_task(task)
 
-            logger.info(
-                f"[SCHEDULER] Executing task: {task.description} "
-                f"(type: {task.execution_type}, schedule: {task.schedule_type.value})"
-            )
+            logger.info(f"[SCHEDULER] Executing task: {task.description} (type: {task.execution_type}, schedule: {task.schedule_type.value})")
 
             # 获取超时时间（从 metadata 中读取，默认1小时）
             timeout = 3600  # 默认1小时
@@ -261,10 +256,7 @@ class SchedulerEngine:
                         else:
                             retry_delay = min(2**attempt, 300)  # 最大5分钟
 
-                        logger.warning(
-                            f"[SCHEDULER] Task {task.task_id} execution failed (attempt {attempt + 1}/{max_retries + 1}): {exec_error}. "
-                            f"Retrying in {retry_delay} seconds..."
-                        )
+                        logger.warning(f"[SCHEDULER] Task {task.task_id} execution failed (attempt {attempt + 1}/{max_retries + 1}): {exec_error}. Retrying in {retry_delay} seconds...")
 
                         await asyncio.sleep(retry_delay)
                         continue
@@ -278,8 +270,7 @@ class SchedulerEngine:
                     task.schedule_next()
                     await self.storage.save_task(task)
                     logger.info(
-                        f"[SCHEDULER] Task {task.task_id} ({task.schedule_type.value}) "
-                        f"rescheduled for {task.trigger_time.isoformat()}",
+                        f"[SCHEDULER] Task {task.task_id} ({task.schedule_type.value}) rescheduled for {task.trigger_time.isoformat()}",
                     )
                 except ValueError as e:
                     # Cron表达式错误
@@ -318,12 +309,7 @@ class SchedulerEngine:
         llm = execution_data.get("llm")
         mode = execution_data.get("mode")
 
-        logger.info(
-            f"[SCHEDULER] Executing message task: {task.description}\n"
-            f"Message: {message[:100]}...\n"
-            f"LLM: {llm or '(workspace default)'}\n"
-            f"Mode: {mode or '(workspace default)'}"
-        )
+        logger.info(f"[SCHEDULER] Executing message task: {task.description}\nMessage: {message[:100]}...\nLLM: {llm or '(workspace default)'}\nMode: {mode or '(workspace default)'}")
 
         # 获取 workspace（使用与 WebSocket 相同的方式）
         workspace_info = workspace_manager.get_workspace_by_id(task.workspace_id)
@@ -336,6 +322,7 @@ class SchedulerEngine:
 
         # 创建 UserWorkspace 实例并确保初始化（与 WebSocket 一致）
         from dawei.workspace.user_workspace import UserWorkspace
+
         user_workspace = UserWorkspace(workspace_path)
         if not user_workspace.is_initialized():
             await user_workspace.initialize()
@@ -345,9 +332,7 @@ class SchedulerEngine:
         virtual_session_id = f"scheduled-{task.task_id}-{task.repeat_count}"
         virtual_task_id = str(uuid.uuid4())
 
-        logger.info(
-            f"[SCHEDULER] Virtual session: {virtual_session_id}, task: {virtual_task_id}"
-        )
+        logger.info(f"[SCHEDULER] Virtual session: {virtual_session_id}, task: {virtual_task_id}")
 
         try:
             # 获取 LLM 模型（从 workspace 设置）
@@ -355,13 +340,11 @@ class SchedulerEngine:
             llm_model = llm or settings.get("llm_model", "deepseek/deepseek-chat")
             agent_mode = mode or settings.get("agent_mode", "orchestrator")
 
-            logger.info(
-                f"[SCHEDULER] Config: LLM={llm_model}, Mode={agent_mode} "
-                f"{'(override)' if llm or mode else '(workspace default)'}"
-            )
+            logger.info(f"[SCHEDULER] Config: LLM={llm_model}, Mode={agent_mode} {'(override)' if llm or mode else '(workspace default)'}")
 
             # 1. 创建 Agent（使用与 WebSocket 相同的方法）
             from dawei.agentic.agent import Agent
+
             agent = await Agent.create_with_default_engine(user_workspace)
             logger.info(f"[SCHEDULER] Agent created successfully")
 
@@ -376,6 +359,7 @@ class SchedulerEngine:
 
             # 4. 创建或加载 conversation（用于定时任务）
             from dawei.conversation.conversation import Conversation
+
             conversation = Conversation(
                 id=virtual_session_id,
                 title=f"📅 {task.description} (第{task.repeat_count + 1}次)",
@@ -390,6 +374,7 @@ class SchedulerEngine:
 
             # 5. 创建用户输入消息
             from dawei.entity.user_input_message import UserInputMessage
+
             user_input = UserInputMessage(text=message)
 
             # 6. 添加用户消息到 conversation
@@ -408,10 +393,7 @@ class SchedulerEngine:
             user_workspace.current_conversation = conversation
             await user_workspace.save_current_conversation()
 
-            logger.info(
-                f"[SCHEDULER] Conversation: {virtual_session_id}, "
-                f"Message count: {conversation.message_count}"
-            )
+            logger.info(f"[SCHEDULER] Conversation: {virtual_session_id}, Message count: {conversation.message_count}")
 
             # 7. 执行 Agent（使用与 WebSocket 相同的方法）
             logger.info(f"[SCHEDULER] Running agent...")
@@ -422,11 +404,7 @@ class SchedulerEngine:
             user_workspace.current_conversation = conversation
             await user_workspace.save_current_conversation()
 
-            logger.info(
-                f"[SCHEDULER] Task {task.task_id} executed successfully.\n"
-                f"  Conversation: {virtual_session_id}\n"
-                f"  Messages: {conversation.message_count}\n"
-            )
+            logger.info(f"[SCHEDULER] Task {task.task_id} executed successfully.\n  Conversation: {virtual_session_id}\n  Messages: {conversation.message_count}\n")
 
         except Exception as e:
             logger.error(f"[SCHEDULER] Agent execution failed: {e}", exc_info=True)

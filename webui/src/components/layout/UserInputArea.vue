@@ -170,7 +170,22 @@ const canSend = computed(() => inputValue.value.trim().length > 0 || attachments
 
 const handleSend = () => {
   if (!canSend.value) return
-  chatStore.sendMessage(inputValue.value)
+
+  // 获取选中的知识库 ID 列表
+  const kbStore = chatStore.selectedKnowledgeBaseIds
+
+  let kbArray: string[] = []
+  if (Array.isArray(kbStore)) {
+    kbArray = [...kbStore]
+  } else if ('value' in kbStore && Array.isArray(kbStore.value)) {
+    kbArray = [...kbStore.value]
+  } else {
+    kbArray = Object.values(kbStore).filter(v => typeof v === 'string') as string[]
+  }
+
+  const kbIds = kbArray.length > 0 ? kbArray : undefined
+
+  chatStore.sendMessage(inputValue.value, kbIds)
   inputValue.value = ''
   attachments.value = []
   nextTick(() => {

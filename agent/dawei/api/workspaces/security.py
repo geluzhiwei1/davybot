@@ -14,6 +14,7 @@ router = APIRouter(tags=["Workspace Security"])
 
 class SecuritySettingsResponse(BaseModel):
     """安全配置响应"""
+
     success: bool
     settings: dict | None = None
     message: str | None = None
@@ -31,32 +32,22 @@ async def get_workspace_security_settings(
 
         workspace = await workspace_manager.get_workspace(workspace_id)
         if not workspace:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Workspace {workspace_id} not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workspace {workspace_id} not found")
 
         # 从 WorkspaceSettings 中获取 security 字段
         security_settings = {}
-        if workspace.workspace_settings and hasattr(workspace.workspace_settings, 'security'):
+        if workspace.workspace_settings and hasattr(workspace.workspace_settings, "security"):
             security_settings = workspace.workspace_settings.security
         elif workspace.workspace_settings:
             # 如果 security 字段不存在，返回空字典
             security_settings = {}
 
-        return SecuritySettingsResponse(
-            success=True,
-            settings=security_settings,
-            message="Workspace security settings retrieved successfully"
-        )
+        return SecuritySettingsResponse(success=True, settings=security_settings, message="Workspace security settings retrieved successfully")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to load workspace security settings: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.put("")
@@ -71,10 +62,7 @@ async def update_workspace_security_settings(
 
         workspace = await workspace_manager.get_workspace(workspace_id)
         if not workspace:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Workspace {workspace_id} not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workspace {workspace_id} not found")
 
         # 更新安全配置
         if workspace.workspace_settings:
@@ -83,19 +71,12 @@ async def update_workspace_security_settings(
             # TODO: 保存到持久化存储
             # await workspace.persistence_manager.save_workspace_settings(workspace_id, workspace.workspace_settings.to_dict())
 
-        return SecuritySettingsResponse(
-            success=True,
-            settings=settings_data,
-            message="Workspace security settings updated successfully"
-        )
+        return SecuritySettingsResponse(success=True, settings=settings_data, message="Workspace security settings updated successfully")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to update workspace security settings: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post("/reset")
@@ -108,26 +89,16 @@ async def reset_workspace_security_settings(
 
         workspace = await workspace_manager.get_workspace(workspace_id)
         if not workspace:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Workspace {workspace_id} not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workspace {workspace_id} not found")
 
         # 重置为空配置（将使用用户级配置）
         empty_settings = {}
         if workspace.workspace_settings:
             workspace.workspace_settings.security = empty_settings
 
-        return SecuritySettingsResponse(
-            success=True,
-            settings=empty_settings,
-            message="Workspace security settings reset (will use user-level settings)"
-        )
+        return SecuritySettingsResponse(success=True, settings=empty_settings, message="Workspace security settings reset (will use user-level settings)")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to reset workspace security settings: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

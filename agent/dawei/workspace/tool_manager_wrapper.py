@@ -84,7 +84,7 @@ class WorkspaceToolManager:
 
         # 记录 MCP 配置统计信息
         stats = self.mcp_tool_manager.get_statistics()
-        by_source = stats.get('by_source_level', {})
+        by_source = stats.get("by_source_level", {})
         logger.info(
             f"MCP configurations loaded: {stats['total_servers']} total, system: {by_source.get('system', 0)}, user: {by_source.get('user', 0)}, workspace: {by_source.get('workspace', 0)}",
         )
@@ -123,6 +123,7 @@ class WorkspaceToolManager:
 
         # Level 2: User 级别
         from dawei import get_dawei_home
+
         roots.append(get_dawei_home())
 
         logger.info(f"Initializing SkillManager with {len(roots)} roots: {roots}")

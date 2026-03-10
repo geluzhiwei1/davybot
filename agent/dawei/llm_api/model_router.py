@@ -15,9 +15,12 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Dict, Any
 
+
 class StrEnum(str, Enum):
     """String enum for Python 3.10 compatibility"""
+
     pass
+
 
 from dawei import get_dawei_home
 

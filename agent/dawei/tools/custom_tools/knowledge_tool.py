@@ -21,6 +21,10 @@ class KnowledgeSearchInput(BaseModel):
         ...,
         description="Search query for knowledge base",
     )
+    knowledge_base_ids: List[str] = Field(
+        default_factory=list,
+        description="List of knowledge base IDs to search. If not specified, uses the agent's default knowledge base.",
+    )
     mode: str = Field(
         default="hybrid",
         description="Retrieval mode: vector, graph, fulltext, or hybrid",
@@ -32,38 +36,45 @@ class KnowledgeSearchInput(BaseModel):
 
 
 class KnowledgeSearchTool(CustomBaseTool):
-    """Knowledge base search tool - Agent calls this tool to access RAG system
+    """User knowledge base search tool - Agent calls this tool to search user-created knowledge bases
 
-    This tool allows the Agent to search the knowledge base for relevant information
+    This tool allows the Agent to search the user's own knowledge bases for relevant information
     to enhance its responses with domain-specific knowledge and document citations.
     """
 
-    def __init__(self, knowledge_base_id: str = None):
-        """Initialize knowledge search tool
-
-        Args:
-            knowledge_base_id: Knowledge base ID to search
-        """
+    def __init__(self):
+        """Initialize user knowledge base search tool"""
         super().__init__()
-        self.name = "search_knowledge"
+        self.name = "search_user_knowledge_base"
         self.description = (
-            "Search the knowledge base for relevant information. "
-            "Use this tool when you need to find documents, "
-            "look up specific information, or get context for a task. "
-            "Returns relevant document chunks with similarity scores and citations."
+            "Search the user's knowledge base for relevant documents and information. "
+            "This tool searches through documents that the user has uploaded to their knowledge base. "
+            "Use this when you need to find specific documents, look up information from user's content, "
+            "or browse document chunks with similarity scores. "
+            "Returns a list of relevant document chunks with citations, sorted by relevance."
         )
         self.args_schema = KnowledgeSearchInput
-        self.knowledge_base_id = knowledge_base_id
+
+        # 🔧 修复：添加 knowledge_base_id 属性，支持注入
+        self.knowledge_base_id = None
+        self.knowledge_base_ids = []  # 支持多个知识库 ID
 
     @safe_tool_operation(
         "knowledge_search",
         fallback_value="Error: Knowledge search failed",
     )
-    async def _run(self, query: str, mode: str = "hybrid", top_k: int = 5) -> str:
+    async def _run(
+        self,
+        query: str,
+        knowledge_base_ids: List[str] = None,
+        mode: str = "hybrid",
+        top_k: int = 5,
+    ) -> str:
         """Execute knowledge search
 
         Args:
             query: Search query string
+            knowledge_base_ids: List of knowledge base IDs to search (optional, overrides injected IDs)
             mode: Retrieval mode (vector/graph/fulltext/hybrid)
             top_k: Number of results to return
 
@@ -74,6 +85,29 @@ class KnowledgeSearchTool(CustomBaseTool):
             from dawei.knowledge.models import RetrievalMode, RetrievalQuery
             from dawei.knowledge.init import get_knowledge_base_manager
 
+            # 🔧 修复：优先使用注入的 knowledge_base_ids，然后是参数，最后是默认值
+            # 1. 如果参数明确指定了 knowledge_base_ids，使用参数
+            # 2. 否则，如果注入了 knowledge_base_ids，使用注入的
+            # 3. 最后，使用默认知识库
+            if not knowledge_base_ids:
+                if self.knowledge_base_ids and len(self.knowledge_base_ids) > 0:
+                    knowledge_base_ids = self.knowledge_base_ids
+                    self.logger.info(f"[KnowledgeSearchTool] Using injected knowledge_base_ids: {knowledge_base_ids}")
+                elif self.knowledge_base_id:
+                    knowledge_base_ids = [self.knowledge_base_id]
+                    self.logger.info(f"[KnowledgeSearchTool] Using injected single knowledge_base_id: {knowledge_base_ids}")
+                else:
+                    # 使用默认知识库
+                    manager = get_knowledge_base_manager()
+                    default_base = manager.get_default_base()
+                    if default_base:
+                        knowledge_base_ids = [default_base.id]
+                        self.logger.info(f"[KnowledgeSearchTool] Using default knowledge_base_id: {knowledge_base_ids}")
+                    else:
+                        return "Error: No knowledge base specified and no default knowledge base found."
+
+            self.logger.info(f"[KnowledgeSearchTool] Searching knowledge bases: {knowledge_base_ids}")
+
             # Validate and convert mode string to enum
             try:
                 mode_enum = RetrievalMode(mode)
@@ -81,43 +115,60 @@ class KnowledgeSearchTool(CustomBaseTool):
                 valid_modes = [m.value for m in RetrievalMode]
                 return f"Error: Invalid retrieval mode '{mode}'. Valid modes: {', '.join(valid_modes)}"
 
-            # Check if knowledge_base_id is available
-            if self.knowledge_base_id is None:
-                return "Error: Knowledge base is not configured. Please enable knowledge base in configuration."
-
-            # Get knowledge base manager and search
+            # Get knowledge base manager
             manager = get_knowledge_base_manager()
 
-            # Get vector store and embedding manager for this knowledge base
-            from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever
+            # Search all selected knowledge bases and merge results
+            all_results = []
+            for kb_id in knowledge_base_ids:
+                try:
+                    # Get embedding manager
+                    embedding_service = manager.get_embedding_manager(kb_id, "MINILM")
 
-            # Get embedding manager
-            embedding_service = manager.get_embedding_manager(self.knowledge_base_id, "MINILM")
+                    # Get vector store
+                    base_storage_path = manager.get_base_storage_path(kb_id)
+                    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
 
-            # Get vector store
-            base_storage_path = manager.get_base_storage_path(self.knowledge_base_id)
-            from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
-            vector_store = SQLiteVecVectorStore(
-                db_path=str(base_storage_path / "vectors.db"),
-                dimension=384,
-            )
+                    vector_store = SQLiteVecVectorStore(
+                        db_path=str(base_storage_path / "vectors.db"),
+                        dimension=384,
+                    )
 
-            # Initialize retriever
-            retriever = HybridRetriever(
-                vector_store=vector_store,
-                embedding_manager=embedding_service,
-            )
+                    # Initialize retriever
+                    from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever
 
-            # Execute search
-            retrieval_query = RetrievalQuery(
-                query=query,
-                mode=mode_enum,
-                top_k=top_k,
-            )
-            results = await retriever.retrieve(retrieval_query)
+                    retriever = HybridRetriever(
+                        vector_store=vector_store,
+                        embedding_manager=embedding_service,
+                    )
+
+                    # Execute search
+                    retrieval_query = RetrievalQuery(
+                        query=query,
+                        mode=mode_enum,
+                        top_k=top_k,
+                    )
+                    results = await retriever.retrieve(retrieval_query)
+
+                    # Add knowledge base info to results
+                    for result in results.results:
+                        result.metadata["knowledge_base_id"] = kb_id
+                        result.metadata["knowledge_base_name"] = manager.get_base(kb_id).name if manager.get_base(kb_id) else kb_id
+
+                    all_results.extend(results.results)
+                except Exception as e:
+                    logger.warning(f"Failed to search knowledge base {kb_id}: {e}")
+                    continue
+
+            if not all_results:
+                return f"## Knowledge Search Results\n\nNo relevant information found in selected knowledge bases for query: '{query}'"
+
+            # Sort by score and take top_k
+            all_results.sort(key=lambda x: x.score, reverse=True)
+            all_results = all_results[:top_k]
 
             # Format and return results
-            return self._format_results(results, query)
+            return self._format_results(all_results, query)
 
         except Exception as e:
             logger.error(f"Knowledge search failed: {e}", exc_info=True)
@@ -151,10 +202,10 @@ class KnowledgeSearchTool(CustomBaseTool):
 
         for i, result in enumerate(results, 1):
             # Extract score
-            score = getattr(result, 'score', 0.0)
-            source = getattr(result, 'source', 'UNKNOWN')
-            content = getattr(result, 'content', '')
-            metadata = getattr(result, 'metadata', {})
+            score = getattr(result, "score", 0.0)
+            source = getattr(result, "source", "UNKNOWN")
+            content = getattr(result, "content", "")
+            metadata = getattr(result, "metadata", {})
 
             lines.append(f"### Result {i}")
             lines.append(f"**Score:** {score:.2%}")
@@ -191,6 +242,10 @@ class KnowledgeRAGInput(BaseModel):
         ...,
         description="Query for RAG-enhanced generation",
     )
+    knowledge_base_id: str = Field(
+        default=None,
+        description="Knowledge base ID to query. If not specified, uses the agent's default knowledge base.",
+    )
     max_context_length: int = Field(
         default=4000,
         description="Maximum context length in characters",
@@ -198,37 +253,44 @@ class KnowledgeRAGInput(BaseModel):
 
 
 class KnowledgeRAGTool(CustomBaseTool):
-    """Knowledge RAG tool - Get context-enhanced query with citations
+    """User knowledge base RAG tool - Get context-enhanced query with citations from user's knowledge bases
 
-    This tool retrieves relevant documents and builds a complete RAG context
-    for LLM prompt enhancement.
+    This tool retrieves relevant documents from the user's own knowledge bases and builds
+    a complete RAG context for LLM prompt enhancement.
     """
 
-    def __init__(self, knowledge_base_id: str = None):
-        """Initialize knowledge RAG tool
-
-        Args:
-            knowledge_base_id: Knowledge base ID to query
-        """
+    def __init__(self):
+        """Initialize user knowledge base RAG tool"""
         super().__init__()
-        self.name = "query_knowledge_rag"
+        self.name = "query_user_knowledge_base"
         self.description = (
-            "Query knowledge base with RAG (Retrieval-Augmented Generation). "
-            "Retrieves relevant documents and builds enhanced context with citations. "
-            "Use this when you need comprehensive context for answering complex questions."
+            "Query the user's knowledge base to get enhanced context with citations. "
+            "This tool retrieves relevant documents from the user's knowledge base and builds "
+            "a comprehensive context with proper citations for answering questions. "
+            "Use this when you need detailed context from user's documents to answer complex questions. "
+            "Returns integrated context with citations and retrieval metadata."
         )
         self.args_schema = KnowledgeRAGInput
-        self.knowledge_base_id = knowledge_base_id
+
+        # 🔧 修复：添加 knowledge_base_id 属性，支持注入
+        self.knowledge_base_id = None
+        self.knowledge_base_ids = []  # 支持多个知识库 ID
 
     @safe_tool_operation(
         "knowledge_rag",
         fallback_value="Error: RAG query failed",
     )
-    async def _run(self, query: str, max_context_length: int = 4000) -> str:
+    async def _run(
+        self,
+        query: str,
+        knowledge_base_id: str = None,
+        max_context_length: int = 4000,
+    ) -> str:
         """Execute RAG query
 
         Args:
             query: Query string
+            knowledge_base_id: Knowledge base ID to query (optional, overrides injected IDs)
             max_context_length: Maximum context length
 
         Returns:
@@ -238,15 +300,35 @@ class KnowledgeRAGTool(CustomBaseTool):
             from dawei.knowledge.init import get_knowledge_base_manager
             from dawei.knowledge.retrieval.rag_pipeline import RAGPipeline
 
-            if self.knowledge_base_id is None:
-                return "Error: Knowledge base is not configured."
+            # 🔧 修复：优先使用注入的 knowledge_base_ids，然后是参数，最后是默认值
+            # 1. 如果参数明确指定了 knowledge_base_id，使用参数
+            # 2. 否则，如果注入了 knowledge_base_ids，使用第一个
+            # 3. 最后，使用默认知识库
+            if not knowledge_base_id:
+                if self.knowledge_base_ids and len(self.knowledge_base_ids) > 0:
+                    knowledge_base_id = self.knowledge_base_ids[0]
+                    self.logger.info(f"[KnowledgeRAGTool] Using injected knowledge_base_id: {knowledge_base_id}")
+                elif self.knowledge_base_id:
+                    knowledge_base_id = self.knowledge_base_id
+                    self.logger.info(f"[KnowledgeRAGTool] Using injected single knowledge_base_id: {knowledge_base_id}")
+                else:
+                    # 使用默认知识库
+                    manager = get_knowledge_base_manager()
+                    default_base = manager.get_default_base()
+                    if default_base:
+                        knowledge_base_id = default_base.id
+                        self.logger.info(f"[KnowledgeRAGTool] Using default knowledge_base_id: {knowledge_base_id}")
+                    else:
+                        return "Error: No knowledge base specified and no default knowledge base found."
+
+            self.logger.info(f"[KnowledgeRAGTool] Querying knowledge base: {knowledge_base_id}")
 
             # Get knowledge base manager
             manager = get_knowledge_base_manager()
 
             # Get embedding manager and vector store
-            embedding_service = manager.get_embedding_manager(self.knowledge_base_id, "MINILM")
-            base_storage_path = manager.get_base_storage_path(self.knowledge_base_id)
+            embedding_service = manager.get_embedding_manager(knowledge_base_id, "MINILM")
+            base_storage_path = manager.get_base_storage_path(knowledge_base_id)
 
             from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
             from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever

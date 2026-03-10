@@ -402,16 +402,7 @@ class MoveFileRequest(BaseModel):
     target_path: str = Field(alias="targetPath", description="目标文件路径")
     overwrite: bool = Field(default=False, description="是否覆盖已存在的文件")
 
-    model_config = {
-        "populate_by_name": True,
-        "json_schema_extra": {
-            "example": {
-                "sourcePath": "path/to/file.txt",
-                "targetPath": "new/location/file.txt",
-                "overwrite": False
-            }
-        }
-    }
+    model_config = {"populate_by_name": True, "json_schema_extra": {"example": {"sourcePath": "path/to/file.txt", "targetPath": "new/location/file.txt", "overwrite": False}}}
 
 
 @router.post("/{workspace_id}/files/copy")
@@ -639,11 +630,7 @@ async def download_file_or_directory(
         filename = full_path.name
 
         # 返回文件响应
-        return FileResponse(
-            path=str(full_path),
-            filename=filename,
-            media_type="application/octet-stream"
-        )
+        return FileResponse(path=str(full_path), filename=filename, media_type="application/octet-stream")
 
     if full_path.is_dir():
         # 下载目录（打包成zip）
@@ -667,11 +654,5 @@ async def download_file_or_directory(
         zip_filename = f"{dir_name}.zip"
 
         # 返回zip文件
-        return StreamingResponse(
-            io.BytesIO(zip_buffer.getvalue()),
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f"attachment; filename={zip_filename}"
-            }
-        )
+        return StreamingResponse(io.BytesIO(zip_buffer.getvalue()), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename={zip_filename}"})
     raise HTTPException(status_code=400, detail=f"Invalid path type: {path}")

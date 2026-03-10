@@ -22,14 +22,7 @@ logger = logging.getLogger(__name__)
 class NATTunnelInfo:
     """NAT隧道信息"""
 
-    def __init__(
-        self,
-        name: str,
-        service_type: str,
-        local_port: int,
-        public_url: str,
-        tunnel_id: str
-    ):
+    def __init__(self, name: str, service_type: str, local_port: int, public_url: str, tunnel_id: str):
         self.name = name
         self.service_type = service_type
         self.local_port = local_port
@@ -39,14 +32,7 @@ class NATTunnelInfo:
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
-        return {
-            "name": self.name,
-            "service_type": self.service_type,
-            "local_port": self.local_port,
-            "public_url": self.public_url,
-            "tunnel_id": self.tunnel_id,
-            "created_at": self.created_at.isoformat()
-        }
+        return {"name": self.name, "service_type": self.service_type, "local_port": self.local_port, "public_url": self.public_url, "tunnel_id": self.tunnel_id, "created_at": self.created_at.isoformat()}
 
     def __repr__(self) -> str:
         return f"NATTunnelInfo(name='{self.name}', type='{self.service_type}', url='{self.public_url}')"
@@ -63,13 +49,7 @@ class NATService:
     4. 支持启动、停止和状态查询
     """
 
-    def __init__(
-        self,
-        support_system_url: Optional[str] = None,
-        oauth_client_id: Optional[str] = None,
-        oauth_client_secret: Optional[str] = None,
-        client_name: Optional[str] = None
-    ):
+    def __init__(self, support_system_url: Optional[str] = None, oauth_client_id: Optional[str] = None, oauth_client_secret: Optional[str] = None, client_name: Optional[str] = None):
         """
         初始化NAT服务
 
@@ -103,8 +83,7 @@ class NATService:
         # HTTP客户端
         self._http_client: Optional[httpx.AsyncClient] = None
 
-        logger.info(f"NATService initialized: client_name={self.client_name}, "
-                   f"support_system={self.support_system_url}")
+        logger.info(f"NATService initialized: client_name={self.client_name}, support_system={self.support_system_url}")
 
     def _get_or_create_client_name(self) -> str:
         """
@@ -117,7 +96,7 @@ class NATService:
 
         if client_name_file.exists():
             try:
-                with open(client_name_file, 'r', encoding='utf-8') as f:
+                with open(client_name_file, "r", encoding="utf-8") as f:
                     client_name = f.read().strip()
                 if client_name:
                     return client_name
@@ -127,13 +106,14 @@ class NATService:
         # 生成新的client_name
         import uuid
         import socket
+
         hostname = socket.gethostname()
         client_name = f"davybot-{hostname}-{uuid.uuid4().hex[:8]}"
 
         # 保存到文件
         try:
             client_name_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(client_name_file, 'w', encoding='utf-8') as f:
+            with open(client_name_file, "w", encoding="utf-8") as f:
                 f.write(client_name)
             logger.info(f"Generated new client_name: {client_name}")
         except Exception as e:
@@ -155,22 +135,14 @@ class NATService:
             raise RuntimeError("HTTP client not initialized")
 
         # 准备OAuth请求
-        oauth_data = {
-            "grant_type": "client_credentials",
-            "client_id": self.oauth_client_id,
-            "client_secret": self.oauth_client_secret,
-            "scope": "nat_token"
-        }
+        oauth_data = {"grant_type": "client_credentials", "client_id": self.oauth_client_id, "client_secret": self.oauth_client_secret, "scope": "nat_token"}
 
         try:
             url = f"{self.support_system_url}/api/auth/oauth/token"
             response = await self._http_client.post(url, data=oauth_data)
 
             if response.status_code != 200:
-                raise RuntimeError(
-                    f"Failed to get OAuth token: {response.status_code}, "
-                    f"Response: {response.text}"
-                )
+                raise RuntimeError(f"Failed to get OAuth token: {response.status_code}, Response: {response.text}")
 
             token_data = response.json()
             access_token = token_data.get("access_token")
@@ -206,23 +178,17 @@ class NATService:
         token_request = {
             "client_name": self.client_name,
             "allowed_tunnels": ["web", "ssh", "tcp"],
-            "expires_in_hours": 720  # 30天
+            "expires_in_hours": 720,  # 30天
         }
 
         try:
             url = f"{self.support_system_url}/support/api/nat/tokens/create"
-            headers = {
-                "Authorization": f"Bearer {self._access_token}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
 
             response = await self._http_client.post(url, json=token_request, headers=headers)
 
             if response.status_code != 201:
-                raise RuntimeError(
-                    f"Failed to create NAT token: {response.status_code}, "
-                    f"Response: {response.text}"
-                )
+                raise RuntimeError(f"Failed to create NAT token: {response.status_code}, Response: {response.text}")
 
             token_data = response.json()
             logger.info(f"NAT token created successfully: client_id={token_data.get('client_id')}")
@@ -253,28 +219,17 @@ class NATService:
             from nat_client_py import Client
 
             # 创建客户端
-            client = Client(
-                server_addr=server_addr,
-                token=token,
-                client_id=self.client_name
-            )
+            client = Client(server_addr=server_addr, token=token, client_id=self.client_name)
 
             logger.info(f"NAT client created: server={server_addr}, client_id={self.client_name}")
             return client
 
         except ImportError as e:
-            raise RuntimeError(
-                f"Failed to import nat_client_py: {e}. "
-                "Please install nat-client-py: pip install nat-client-py"
-            )
+            raise RuntimeError(f"Failed to import nat_client_py: {e}. Please install nat-client-py: pip install nat-client-py")
         except Exception as e:
             raise RuntimeError(f"Failed to create NAT client: {e}")
 
-    async def start(
-        self,
-        nat_server_addr: str = "localhost:8888",
-        services: Optional[List[Dict[str, Any]]] = None
-    ) -> List[NATTunnelInfo]:
+    async def start(self, nat_server_addr: str = "localhost:8888", services: Optional[List[Dict[str, Any]]] = None) -> List[NATTunnelInfo]:
         """
         启动NAT服务
 
@@ -351,28 +306,20 @@ class NATService:
 
         try:
             # 异步连接（如果支持）
-            if hasattr(self._nat_client, 'connect_async'):
+            if hasattr(self._nat_client, "connect_async"):
                 native_tunnels = await self._nat_client.connect_async()
             else:
                 # 同步连接（在线程池中运行）
                 import concurrent.futures
+
                 loop = asyncio.get_event_loop()
                 with concurrent.futures.ThreadPoolExecutor() as pool:
-                    native_tunnels = await loop.run_in_executor(
-                        pool,
-                        self._nat_client.connect_sync
-                    )
+                    native_tunnels = await loop.run_in_executor(pool, self._nat_client.connect_sync)
 
             # 转换为NATTunnelInfo
             self._tunnels = []
             for tunnel in native_tunnels:
-                tunnel_info = NATTunnelInfo(
-                    name=tunnel.name,
-                    service_type=tunnel.service_type,
-                    local_port=tunnel.local_port,
-                    public_url=tunnel.public_url,
-                    tunnel_id=tunnel.tunnel_id
-                )
+                tunnel_info = NATTunnelInfo(name=tunnel.name, service_type=tunnel.service_type, local_port=tunnel.local_port, public_url=tunnel.public_url, tunnel_id=tunnel.tunnel_id)
                 self._tunnels.append(tunnel_info)
                 logger.info(f"Tunnel created: {tunnel_info}")
 
@@ -391,7 +338,7 @@ class NATService:
         # 断开NAT客户端
         if self._nat_client:
             try:
-                if hasattr(self._nat_client, 'disconnect'):
+                if hasattr(self._nat_client, "disconnect"):
                     self._nat_client.disconnect()
                 logger.info("NAT client disconnected")
             except Exception as e:
@@ -414,13 +361,7 @@ class NATService:
 
         logger.info("NATService stopped")
 
-    async def add_service(
-        self,
-        name: str,
-        service_type: str,
-        local_port: int,
-        domain: Optional[str] = None
-    ) -> None:
+    async def add_service(self, name: str, service_type: str, local_port: int, domain: Optional[str] = None) -> None:
         """
         添加服务到NAT客户端
 
@@ -489,10 +430,7 @@ def get_nat_service() -> NATService:
     return _nat_service
 
 
-async def start_nat_service(
-    nat_server_addr: str = "localhost:8888",
-    services: Optional[List[Dict[str, Any]]] = None
-) -> List[NATTunnelInfo]:
+async def start_nat_service(nat_server_addr: str = "localhost:8888", services: Optional[List[Dict[str, Any]]] = None) -> List[NATTunnelInfo]:
     """
     启动全局NAT服务
 

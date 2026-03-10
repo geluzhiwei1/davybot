@@ -64,18 +64,10 @@ class SQLiteGraphStore(GraphStore):
             )
 
             # Create indexes for efficient graph traversal
-            await db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type)"
-            )
-            await db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_entity)"
-            )
-            await db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_entity)"
-            )
-            await db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(relation_type)"
-            )
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_entity)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_entity)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(relation_type)")
 
             await db.commit()
 
@@ -92,8 +84,7 @@ class SQLiteGraphStore(GraphStore):
                 """INSERT OR REPLACE INTO entities
                 (id, type, name, description, properties, base_id)
                 VALUES (?, ?, ?, ?, ?, ?)""",
-                (entity.id, entity.type, entity.name, entity.description,
-                 properties_json, entity.base_id)
+                (entity.id, entity.type, entity.name, entity.description, properties_json, entity.base_id),
             )
             await db.commit()
 
@@ -110,8 +101,7 @@ class SQLiteGraphStore(GraphStore):
                 """INSERT OR REPLACE INTO relations
                 (id, from_entity, to_entity, relation_type, properties, weight, base_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (relation.id, relation.from_entity, relation.to_entity,
-                 relation.relation_type, properties_json, relation.weight, relation.base_id)
+                (relation.id, relation.from_entity, relation.to_entity, relation.relation_type, properties_json, relation.weight, relation.base_id),
             )
             await db.commit()
 
@@ -128,7 +118,7 @@ class SQLiteGraphStore(GraphStore):
             cursor = await db.execute(
                 """SELECT id, type, name, description, properties, base_id
                 FROM entities WHERE id = ?""",
-                (entity_id,)
+                (entity_id,),
             )
             row = await cursor.fetchone()
 
@@ -160,7 +150,7 @@ class SQLiteGraphStore(GraphStore):
             cursor = await db.execute(
                 """SELECT id, from_entity, to_entity, relation_type, properties, weight, base_id
                 FROM relations WHERE id = ?""",
-                (relation_id,)
+                (relation_id,),
             )
             row = await cursor.fetchone()
 
@@ -222,15 +212,17 @@ class SQLiteGraphStore(GraphStore):
                 relation_id, from_entity, to_entity, relation_type, properties_json, weight, base_id = row
                 properties = json.loads(properties_json) if properties_json else {}
 
-                relations.append(GraphRelation(
-                    id=relation_id,
-                    from_entity=from_entity,
-                    to_entity=to_entity,
-                    relation_type=relation_type,
-                    properties=properties,
-                    weight=weight,
-                    base_id=base_id,
-                ))
+                relations.append(
+                    GraphRelation(
+                        id=relation_id,
+                        from_entity=from_entity,
+                        to_entity=to_entity,
+                        relation_type=relation_type,
+                        properties=properties,
+                        weight=weight,
+                        base_id=base_id,
+                    )
+                )
 
             return relations
 
@@ -335,10 +327,7 @@ class SQLiteGraphStore(GraphStore):
         """
         async with aiosqlite.connect(self.db_path) as db:
             # Delete relations first
-            cursor = await db.execute(
-                "DELETE FROM relations WHERE from_entity = ? OR to_entity = ?",
-                (entity_id, entity_id)
-            )
+            cursor = await db.execute("DELETE FROM relations WHERE from_entity = ? OR to_entity = ?", (entity_id, entity_id))
             relations_deleted = cursor.rowcount
 
             # Delete entity
@@ -393,18 +382,10 @@ class SQLiteGraphStore(GraphStore):
             List of relations
         """
         # Map direction names
-        direction_map = {
-            "incoming": "in",
-            "outgoing": "out",
-            "both": "both"
-        }
+        direction_map = {"incoming": "in", "outgoing": "out", "both": "both"}
         mapped_direction = direction_map.get(direction, direction)
 
-        return await self.get_entity_relations(
-            entity_id=entity_id,
-            relation_type=relation_type,
-            direction=mapped_direction
-        )
+        return await self.get_entity_relations(entity_id=entity_id, relation_type=relation_type, direction=mapped_direction)
 
     async def find_neighbors(
         self,

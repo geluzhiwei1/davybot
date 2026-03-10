@@ -16,6 +16,7 @@ from pydantic_settings import BaseSettings
 from dawei.config.logging_config import LoggingConfig
 from dawei import get_dawei_home
 
+
 class DatabaseConfig(BaseSettings):
     """数据库配置 - 使用 SQLite"""
 
@@ -37,7 +38,7 @@ class DatabaseConfig(BaseSettings):
     pool_size: int = Field(default=1)  # SQLite 单连接
     max_overflow: int = Field(default=0)
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def set_default_paths(self):
         """设置默认路径，使用 get_dawei_home()"""
         dawei_home = get_dawei_home()
@@ -642,6 +643,7 @@ class StorageConfig(BaseSettings):
 # Logging Configuration
 # 导入自 dawei.config.logging_config.LoggingConfig
 # ============================================================================
+
 
 class AppConfig(BaseSettings):
     """应用主配置"""

@@ -34,7 +34,7 @@ class PingService:
         self,
         support_system_url: Optional[str] = None,
         ping_interval: int = 300,  # 5分钟 = 300秒
-        agent_id: Optional[str] = None
+        agent_id: Optional[str] = None,
     ):
         """
         初始化Ping服务
@@ -44,10 +44,7 @@ class PingService:
             ping_interval: Ping间隔（秒），默认5分钟
             agent_id: 智能体ID（自动生成）
         """
-        self.support_system_url = support_system_url or os.getenv(
-            "SUPPORT_SYSTEM_URL",
-            "http://localhost:8766"
-        )
+        self.support_system_url = support_system_url or os.getenv("SUPPORT_SYSTEM_URL", "http://localhost:8766")
         self.ping_interval = ping_interval
         self.agent_id = agent_id or self._get_or_create_agent_id()
 
@@ -55,9 +52,7 @@ class PingService:
         self._ping_task: Optional[asyncio.Task] = None
         self._client: Optional[httpx.AsyncClient] = None
 
-        logger.info(f"PingService initialized: agent_id={self.agent_id}, "
-                   f"support_system={self.support_system_url}, "
-                   f"interval={ping_interval}s")
+        logger.info(f"PingService initialized: agent_id={self.agent_id}, support_system={self.support_system_url}, interval={ping_interval}s")
 
     def _get_or_create_agent_id(self) -> str:
         """
@@ -72,7 +67,7 @@ class PingService:
 
         if agent_id_file.exists():
             try:
-                with open(agent_id_file, 'r', encoding='utf-8') as f:
+                with open(agent_id_file, "r", encoding="utf-8") as f:
                     agent_id = f.read().strip()
                 if agent_id:
                     return agent_id
@@ -81,12 +76,13 @@ class PingService:
 
         # 生成新的agent_id
         import uuid
+
         agent_id = f"davybot-{uuid.uuid4().hex[:16]}"
 
         # 保存到文件
         try:
             agent_id_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(agent_id_file, 'w', encoding='utf-8') as f:
+            with open(agent_id_file, "w", encoding="utf-8") as f:
                 f.write(agent_id)
             logger.info(f"Generated new agent_id: {agent_id}")
         except Exception as e:
@@ -109,7 +105,7 @@ class PingService:
 
         self._client = httpx.AsyncClient(
             timeout=30.0,
-            verify=verify_ssl  # False 表示禁用 SSL 验证（用于自签名证书）
+            verify=verify_ssl,  # False 表示禁用 SSL 验证（用于自签名证书）
         )
 
         # 启动ping任务
@@ -184,12 +180,10 @@ class PingService:
             "timestamp": datetime.utcnow().isoformat(),
             "status": "online",
             "version": self._get_version(),
-
             # 详细的系统信息
             "system_info": self._get_system_info(),
-
             # 环境信息
-            "environment_info": self._get_environment_info()
+            "environment_info": self._get_environment_info(),
         }
 
         try:
@@ -198,14 +192,9 @@ class PingService:
             response = await self._client.post(url, json=ping_data)
 
             if response.status_code == 200:
-                logger.debug(f"Ping successful: URL={url}, "
-                           f"Agent={ping_data['agent_id']}, "
-                           f"OS: {ping_data['system_info']['os_name']} "
-                           f"({ping_data['system_info']['os_version']})")
+                logger.debug(f"Ping successful: URL={url}, Agent={ping_data['agent_id']}, OS: {ping_data['system_info']['os_name']} ({ping_data['system_info']['os_version']})")
             else:
-                logger.warning(f"Ping failed with status {response.status_code}: "
-                            f"URL={url}, "
-                            f"Response={response.text}")
+                logger.warning(f"Ping failed with status {response.status_code}: URL={url}, Response={response.text}")
 
         except httpx.ConnectError as e:
             logger.warning(f"Failed to connect to Support System: URL={url}, Error={e}")
@@ -217,6 +206,7 @@ class PingService:
     def _get_hostname(self) -> str:
         """获取主机名"""
         import socket
+
         try:
             return socket.gethostname()
         except:
@@ -226,6 +216,7 @@ class PingService:
         """获取DavyBot版本"""
         try:
             from dawei import __version__
+
             return __version__
         except:
             return "0.0.0"
@@ -242,21 +233,18 @@ class PingService:
 
         system_info = {
             # 操作系统信息
-            "os_name": platform.system(),          # Linux, Windows, Darwin
-            "os_version": platform.release(),      # 版本号
+            "os_name": platform.system(),  # Linux, Windows, Darwin
+            "os_version": platform.release(),  # 版本号
             "os_version_full": platform.version(),  # 完整版本信息
-
             # 系统架构
-            "machine": platform.machine(),        # x86_64, ARM64, etc.
-            "processor": platform.processor(),    # 处理器信息
-
+            "machine": platform.machine(),  # x86_64, ARM64, etc.
+            "processor": platform.processor(),  # 处理器信息
             # Python信息
             "python_version": platform.python_version(),
             "python_implementation": platform.python_implementation(),
             "python_compiler": platform.python_compiler(),
-
             # 平台详细信息
-            "platform": platform.platform(),      # 综合平台信息
+            "platform": platform.platform(),  # 综合平台信息
         }
 
         # 添加Linux发行版信息（如果是Linux）
@@ -265,6 +253,7 @@ class PingService:
                 # 尝试读取 /etc/os-release
                 if os.path.exists("/etc/os-release"):
                     import configparser
+
                     config = configparser.ConfigParser()
                     # 读取文件前需要添加section header
                     with open("/etc/os-release", "r") as f:
@@ -280,9 +269,9 @@ class PingService:
         elif system_info["os_name"] == "Windows":
             try:
                 import winreg
+
                 # 读取Windows版本号
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                                   r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
                 system_info["windows_display_version"] = winreg.QueryValueEx(key, "DisplayVersion")[0]
                 system_info["windows_build_number"] = winreg.QueryValueEx(key, "CurrentBuild")[0]
                 winreg.CloseKey(key)
@@ -294,8 +283,8 @@ class PingService:
             try:
                 # 使用sw_vers命令获取macOS版本
                 import subprocess
-                result = subprocess.run(["sw_vers", "-productVersion"],
-                                        capture_output=True, text=True)
+
+                result = subprocess.run(["sw_vers", "-productVersion"], capture_output=True, text=True)
                 if result.returncode == 0:
                     system_info["macos_version"] = result.stdout.strip()
             except Exception as e:
@@ -314,26 +303,18 @@ class PingService:
             # Python环境
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "python_executable": sys.executable,
-
             # 工作目录
             "working_directory": os.getcwd(),
-
             # 用户信息
             "user": os.getenv("USER") or os.getenv("USERNAME") or os.getenv("LOGNAME"),
-
             # Shell信息
             "shell": os.getenv("SHELL"),
-
             # 语言环境
             "language": os.getenv("LANG") or os.getenv("LC_ALL"),
-
             # 终端信息
             "terminal": os.getenv("TERM") or os.getenv("TERM_PROGRAM"),
-
             # 虚拟环境信息
-            "is_venv": hasattr(sys, "real_prefix") or (
-                hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
-            ),
+            "is_venv": hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix),
         }
 
         # 添加虚拟环境路径（如果存在）

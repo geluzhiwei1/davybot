@@ -107,10 +107,9 @@ class Agent:
         self.logger = get_logger(__name__)
 
         from dawei.core.events import SimpleEventBus
+
         self.event_bus = SimpleEventBus()
-        self.logger.info(
-            f"[AGENT] Agent created own event_bus (id={id(self.event_bus)})"
-        )
+        self.logger.info(f"[AGENT] Agent created own event_bus (id={id(self.event_bus)})")
 
         # 【关键】设置execution_engine的agent引用，用于暂停检查
         if hasattr(execution_engine, "_agent"):
@@ -232,9 +231,7 @@ class Agent:
 
                 if default_base:
                     self.knowledge_base_id = default_base.id
-                    self.logger.info(
-                        f"Knowledge system enabled, using default knowledge base: {default_base.id} ({default_base.name})"
-                    )
+                    self.logger.info(f"Knowledge system enabled, using default knowledge base: {default_base.id} ({default_base.name})")
                 else:
                     # Create default knowledge base if it doesn't exist
                     from dawei.knowledge.base_models import KnowledgeBaseCreate
@@ -248,9 +245,7 @@ class Agent:
                         )
                     )
                     self.knowledge_base_id = default_base.id
-                    self.logger.info(
-                        f"Created default knowledge base for Agent: {default_base.id}"
-                    )
+                    self.logger.info(f"Created default knowledge base for Agent: {default_base.id}")
 
             except Exception as e:
                 # Fast Fail: Knowledge system is explicitly enabled but failed to initialize
@@ -340,6 +335,26 @@ class Agent:
                     tool_call_service.tools[skill_tool.name] = skill_tool
                     logger.info(f"[AGENT_CREATE] Loaded skill tool: {skill_tool.name}")
 
+            # Load knowledge tools
+            try:
+                from dawei.tools.custom_tools.knowledge_tool import KnowledgeSearchTool, KnowledgeRAGTool
+
+                knowledge_tools = [
+                    KnowledgeSearchTool(),
+                    KnowledgeRAGTool(),
+                ]
+
+                for tool in knowledge_tools:
+                    tool_call_service.tools[tool.name] = tool
+                    logger.info(f"[AGENT_CREATE] Loaded knowledge tool: {tool.name}")
+
+                logger.info(f"[AGENT_CREATE] Loaded {len(knowledge_tools)} knowledge tools")
+
+            except ImportError as e:
+                logger.warning(f"[AGENT_CREATE] Knowledge tools not available: {e}")
+            except Exception as e:
+                logger.error(f"[AGENT_CREATE] Failed to load knowledge tools: {e}", exc_info=True)
+
             # Initialize task manager callbacks (must be done before setting user workspace)
             await tool_call_service.async_initialize()
 
@@ -353,10 +368,11 @@ class Agent:
             logger.info("[AGENT_CREATE] Creating TaskGraph for workspace...")
             # 🔧 修复：创建 TaskGraph 并使用 Agent 的 event_bus
             from dawei.task_graph.task_graph import TaskGraph
+
             task_id = user_workspace.workspace_info.id if user_workspace.workspace_info else "default-task"
             user_workspace.task_graph = TaskGraph(
                 task_id=task_id,
-                event_bus=agent.event_bus  # 使用 Agent 的 event_bus
+                event_bus=agent.event_bus,  # 使用 Agent 的 event_bus
             )
 
             logger.info("[AGENT_CREATE] Creating execution engine...")
@@ -436,6 +452,20 @@ class Agent:
         # 获取消息内容
         prompt = message.content if hasattr(message, "content") else str(message)
 
+        # Process user-selected knowledge bases
+        knowledge_base_ids = None
+        if hasattr(message, "metadata") and message.metadata:
+            knowledge_base_ids = message.metadata.get("knowledge_base_ids")
+            if knowledge_base_ids and isinstance(knowledge_base_ids, list) and len(knowledge_base_ids) > 0:
+                # Inject knowledge base IDs to tools
+                try:
+                    self.execution_engine.tool_call_service.inject_knowledge_base_id(knowledge_base_ids)
+                    self.logger.debug(f"User-selected knowledge base IDs injected: {knowledge_base_ids}")
+                except AttributeError:
+                    self.logger.warning("Tool call service does not support knowledge base injection")
+                except Exception as e:
+                    self.logger.warning(f"Failed to inject knowledge base IDs: {e}", exc_info=True)
+
         # 【新增】文件引用解析（
         parsed_refs = self.file_reference_parser.parse(prompt)
         if parsed_refs.references:
@@ -452,7 +482,7 @@ class Agent:
                 from pathlib import Path
 
                 from dawei.tools.skill_manager import SkillManager
-                from dawei import get_dawei_home 
+                from dawei import get_dawei_home
 
                 # 构建技能管理器，包含工作区和用户技能目录
                 skills_roots = [Path(self.user_workspace.absolute_path), get_dawei_home]
@@ -654,6 +684,7 @@ class Agent:
 
             # Convert dict format to LLMMessage format
             from dawei.entity.lm_messages import UserMessage
+
             llm_messages = [UserMessage(role="user", content=extraction_prompt)]
 
             response = await llm_service.process_message(

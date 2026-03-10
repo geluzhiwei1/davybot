@@ -833,7 +833,12 @@
         "allowNetworkOverride": "允许工作区覆盖网络安全设置",
         "allowNetworkOverrideHelp": "如果禁用，所有工作区必须使用您的网络安全配置",
         "allowResourceOverride": "允许工作区覆盖资源限制设置",
-        "allowResourceOverrideHelp": "如果禁用，所有工作区必须使用您的资源限制配置"
+        "allowResourceOverrideHelp": "如果禁用，所有工作区必须使用您的资源限制配置",
+        "allowOverridePathHelp": "如果禁用，所有工作区必须使用您的路径安全配置",
+        "allowOverrideCommandHelp": "如果禁用，所有工作区必须使用您的命令执行安全配置",
+        "allowOverrideToolsHelp": "如果禁用，所有工作区必须使用您的工具权限配置",
+        "allowOverrideNetworkHelp": "如果禁用，所有工作区必须使用您的网络安全配置",
+        "allowOverrideResourcesHelp": "如果禁用，所有工作区必须使用您的资源限制配置"
       },
       "pathSecurity": {
         "title": "路径安全配置"
@@ -990,14 +995,18 @@
         "resetError": "安全设置重置失败",
         "pathSecurity": {
           "title": "路径安全配置",
+          "enableProtection": "启用路径安全保护",
+          "enableProtectionHelp": "启用保护以限制文件访问在工作区边界内",
           "enableTraversalProtection": "启用路径遍历保护",
           "enableTraversalProtectionHelp": "防止使用 ../ 访问父目录",
           "allowAbsolutePaths": "允许绝对路径",
           "allowAbsolutePathsHelp": "允许命令使用以 / 开头的绝对路径",
           "allowedExtensions": "允许的文件扩展名",
           "allowedExtensionsHelp": "Agent允许访问的文件扩展名",
+          "allowedExtensionsPlaceholder": "例如：.txt,.md,.py,.js",
           "deniedExtensions": "拒绝的文件扩展名",
           "deniedExtensionsHelp": "Agent绝不允许访问的文件扩展名",
+          "deniedExtensionsPlaceholder": "例如：.exe,.sh,.bat",
           "maxFileSize": "最大文件大小（MB）",
           "maxFileSizeHelp": "可读取或写入的文件的最大大小",
           "pathAccessMode": "路径访问模式",
@@ -1233,6 +1242,14 @@
     "saveSettingsFailed": "保存设置失败",
     "refresh": "刷新",
     "lastIndexed": "最后索引",
-    "reindexConfirm": "确定要重新索引文档 \"{name}\" 吗?"
+    "reindexConfirm": "确定要重新索引文档 \"{name}\" 吗?",
+    "selector": {
+      "placeholder": "选择知识库 (可多选)",
+      "noSelection": "不使用知识库",
+      "manageBases": "管理知识库",
+      "refresh": "刷新",
+      "default": "默认",
+      "documentCount": "{count} 文档"
+    }
   }
 }

@@ -82,16 +82,16 @@ class Logger {
     try {
       switch (level) {
         case 'debug':
-          console.log('[DEBUG]', ...args)
+          console.log(...args)
           break
         case 'info':
-          console.log('[INFO]', ...args)
+          console.info(...args)
           break
         case 'warn':
-          console.warn('[WARN]', ...args)
+          console.warn(...args)
           break
         case 'error':
-          console.error('[ERROR]', ...args)
+          console.error(...args)
           break
       }
     } catch {
@@ -155,11 +155,11 @@ class Logger {
    */
   success(...args: unknown[]): void {
     if (this.shouldLog('info')) {
-      this.addLog('info', `[SUCCESS] ${args.join(' ')}`, args)
+      this.addLog('info', args.join(' '), args)
 
       if (appConfig.logging.includeConsole) {
         try {
-          console.log('%c[SUCCESS]', 'color: green; font-weight: bold', ...args)
+          console.log('%c✓', 'color: green; font-weight: bold', ...args)
         } catch {
           // console 可能不可用
         }
@@ -189,10 +189,17 @@ class Logger {
   }
 
   /**
+   * 获取开发环境状态
+   */
+  private get isDev(): boolean {
+    return appConfig.logging.level === 'debug'
+  }
+
+  /**
    * 分组日志
    */
   group(label: string): void {
-    if (this.isDev) {
+    if (this.isDev && appConfig.logging.includeConsole) {
       console.group(label)
     }
   }
@@ -201,7 +208,7 @@ class Logger {
    * 分组结束
    */
   groupEnd(): void {
-    if (this.isDev) {
+    if (this.isDev && appConfig.logging.includeConsole) {
       console.groupEnd()
     }
   }
@@ -210,7 +217,7 @@ class Logger {
    * 表格形式显示日志
    */
   table(data: unknown): void {
-    if (this.isDev) {
+    if (this.isDev && appConfig.logging.includeConsole) {
       console.table(data)
     }
   }
@@ -219,7 +226,7 @@ class Logger {
    * 性能测量开始
    */
   time(label: string): void {
-    if (this.isDev) {
+    if (this.isDev && appConfig.logging.includeConsole) {
       console.time(label)
     }
   }
@@ -228,7 +235,7 @@ class Logger {
    * 性能测量结束
    */
   timeEnd(label: string): void {
-    if (this.isDev) {
+    if (this.isDev && appConfig.logging.includeConsole) {
       console.timeEnd(label)
     }
   }

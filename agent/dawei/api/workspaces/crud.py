@@ -376,10 +376,7 @@ async def get_workspaces_list(
     if not include_inactive:
         workspaces = [w for w in workspaces if w.get("is_active", True)]
 
-    sanitized_workspaces = [
-        sanitize_workspace_response(ws, remove_path=False, keep_full_path=True)
-        for ws in workspaces
-    ]
+    sanitized_workspaces = [sanitize_workspace_response(ws, remove_path=False, keep_full_path=True) for ws in workspaces]
 
     return WorkspaceListResponse(
         success=True,

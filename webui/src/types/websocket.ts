@@ -126,6 +126,8 @@ export interface UserMessage extends BaseMessage {
     current_mode?: string;
     current_llm_id?: string;
   };
+  // 选中的知识库ID列表
+  knowledge_base_ids?: string[];
 }
 
 // 助手消息

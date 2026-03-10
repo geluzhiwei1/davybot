@@ -40,10 +40,7 @@ class KnowledgeBaseSettings(BaseModel):
     fulltext_weight: float = Field(default=0.2, ge=0.0, le=1.0)
 
     # Knowledge extraction settings
-    extraction_strategy: str = Field(
-        default="rule_based",
-        description="Entity/relation extraction strategy: rule_based, llm, ner_model, auto"
-    )
+    extraction_strategy: str = Field(default="rule_based", description="Entity/relation extraction strategy: rule_based, llm, ner_model, auto")
 
     # Advanced settings
     enable_graph: bool = True
@@ -90,9 +87,7 @@ class KnowledgeBase(BaseModel):
     storage_path: str  # e.g., "bases/kb_001/"
 
     class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class KnowledgeBaseCreate(BaseModel):

@@ -205,8 +205,7 @@ class TimerTool(CustomBaseTool):
                     return json.dumps(
                         {
                             "status": "error",
-                            "message": f"Invalid cron expression '{cron_expression}': {e!s}\n"
-                            "Expected format: 'minute hour day month weekday' (e.g., '0 9 * * *')",
+                            "message": f"Invalid cron expression '{cron_expression}': {e!s}\nExpected format: 'minute hour day month weekday' (e.g., '0 9 * * *')",
                         },
                         indent=2,
                     )

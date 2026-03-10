@@ -31,6 +31,7 @@ __version__ = "1.0.0"
 __author__ = "Dawei Team"
 __description__ = "AI agent API with dawei as top-level package"
 
+
 def get_dawei_home() -> Path:
     """从环境变量获取DAWEI_HOME，默认值为 ~/.dawei
     Returns:
@@ -38,6 +39,7 @@ def get_dawei_home() -> Path:
     """
     dawei_home = os.environ.get("DAWEI_HOME", "~/.dawei")
     return Path(dawei_home).expanduser().resolve()
+
 
 # 核心模块导入
 from . import (

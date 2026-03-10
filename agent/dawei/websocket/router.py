@@ -177,14 +177,7 @@ class MessageRouter:
 
         # 如果处理器返回响应消息，则发送
         if response:
-            if not is_heartbeat:
-                print(f"[DEBUG ROUTER] Sending response: {response.type}, session_id: {session_id}")
             result = await self.websocket_manager.send_message(session_id, response)
-            if not is_heartbeat:
-                if result:
-                    print(f"[DEBUG ROUTER] Response sent SUCCESSFULLY: session_id={session_id}")
-                else:
-                    print(f"[DEBUG ROUTER] Response send FAILED: session_id={session_id}")
 
     async def register_handler(self, handler: MessageHandler):
         """注册消息处理器

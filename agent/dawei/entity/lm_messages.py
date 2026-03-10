@@ -9,7 +9,10 @@ from enum import Enum
 
 class StrEnum(str, Enum):
     """String enum for Python 3.10 compatibility"""
+
     pass
+
+
 from typing import List, Dict, Any, Union
 
 from pydantic import BaseModel, Field

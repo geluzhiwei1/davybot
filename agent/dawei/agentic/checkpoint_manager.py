@@ -459,10 +459,7 @@ class IntelligentCheckpointManager:
         """
         # API 层调用时没有 state 数据，无法创建有效的检查点
         # 记录警告并返回 None
-        self.logger.warning(
-            f"create_checkpoint_compat called for task {task_id} without state data. "
-            "Checkpoint creation skipped. Use create_checkpoint(task_id, state, ...) instead."
-        )
+        self.logger.warning(f"create_checkpoint_compat called for task {task_id} without state data. Checkpoint creation skipped. Use create_checkpoint(task_id, state, ...) instead.")
         return None
 
     async def get_checkpoints(self, task_id: str) -> List[Dict[str, Any]]:
@@ -481,16 +478,18 @@ class IntelligentCheckpointManager:
         # 从内存中获取
         for cp_id, cp in self._checkpoints.items():
             if cp.metadata.task_id == task_id:
-                checkpoint_list.append({
-                    "checkpoint_id": cp.metadata.checkpoint_id,
-                    "task_id": cp.metadata.task_id,
-                    "checkpoint_type": cp.metadata.checkpoint_type.value,
-                    "created_at": cp.metadata.created_at.isoformat(),
-                    "size_bytes": cp.metadata.size_bytes,
-                    "checksum": cp.metadata.checksum,
-                    "tags": cp.metadata.tags,
-                    "parent_checkpoint_id": cp.metadata.parent_checkpoint_id,
-                })
+                checkpoint_list.append(
+                    {
+                        "checkpoint_id": cp.metadata.checkpoint_id,
+                        "task_id": cp.metadata.task_id,
+                        "checkpoint_type": cp.metadata.checkpoint_type.value,
+                        "created_at": cp.metadata.created_at.isoformat(),
+                        "size_bytes": cp.metadata.size_bytes,
+                        "checksum": cp.metadata.checksum,
+                        "tags": cp.metadata.tags,
+                        "parent_checkpoint_id": cp.metadata.parent_checkpoint_id,
+                    }
+                )
 
         # 如果内存中没有，从磁盘加载所有检查点
         if not checkpoint_list:
@@ -498,16 +497,18 @@ class IntelligentCheckpointManager:
             for cp_dict in all_checkpoints:
                 if cp_dict.get("metadata", {}).get("task_id") == task_id:
                     metadata = cp_dict["metadata"]
-                    checkpoint_list.append({
-                        "checkpoint_id": metadata["checkpoint_id"],
-                        "task_id": metadata["task_id"],
-                        "checkpoint_type": metadata["checkpoint_type"],
-                        "created_at": metadata["created_at"],
-                        "size_bytes": metadata["size_bytes"],
-                        "checksum": metadata["checksum"],
-                        "tags": metadata["tags"],
-                        "parent_checkpoint_id": metadata.get("parent_checkpoint_id"),
-                    })
+                    checkpoint_list.append(
+                        {
+                            "checkpoint_id": metadata["checkpoint_id"],
+                            "task_id": metadata["task_id"],
+                            "checkpoint_type": metadata["checkpoint_type"],
+                            "created_at": metadata["created_at"],
+                            "size_bytes": metadata["size_bytes"],
+                            "checksum": metadata["checksum"],
+                            "tags": metadata["tags"],
+                            "parent_checkpoint_id": metadata.get("parent_checkpoint_id"),
+                        }
+                    )
 
         # 按时间倒序排序
         checkpoint_list.sort(key=lambda x: x["created_at"], reverse=True)

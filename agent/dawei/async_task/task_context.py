@@ -493,6 +493,7 @@ class SimpleCheckpointService(ICheckpointService):
         # 使用默认全局路径
         if not storage_path:
             from dawei import get_dawei_home
+
             storage_path = str(get_dawei_home()) + "/checkpoints"
 
         self.storage_path = Path(storage_path)

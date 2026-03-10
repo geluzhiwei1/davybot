@@ -387,11 +387,7 @@ def sanitize_api_path(absolute_path: str, workspace_name: str | None = None) -> 
     return path_obj.name
 
 
-def sanitize_workspace_response(
-    data: dict,
-    remove_path: bool = True,
-    keep_full_path: bool = False
-) -> dict:
+def sanitize_workspace_response(data: dict, remove_path: bool = True, keep_full_path: bool = False) -> dict:
     """Sanitize workspace API response to remove absolute filesystem paths.
 
     This function recursively processes a dictionary and removes or sanitizes
@@ -438,11 +434,7 @@ def sanitize_workspace_response(
                     sanitized[key] = value
             else:
                 # Recursively sanitize nested values
-                sanitized[key] = sanitize_workspace_response(
-                    value,
-                    remove_path=remove_path,
-                    keep_full_path=keep_full_path
-                )
+                sanitized[key] = sanitize_workspace_response(value, remove_path=remove_path, keep_full_path=keep_full_path)
         return sanitized
 
     if isinstance(data, list):

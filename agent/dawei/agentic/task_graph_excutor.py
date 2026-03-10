@@ -74,7 +74,7 @@ class TaskGraphExecutionEngine:
         # WebSocket handler 订阅的是 Agent 的 event_bus，所以所有事件都必须发送到那里
         if not agent:
             raise ConfigurationError("agent must be provided for event_bus")
-        if not hasattr(agent, 'event_bus'):
+        if not hasattr(agent, "event_bus"):
             raise ConfigurationError("agent must have event_bus attribute")
         self._event_bus = agent.event_bus
         self._config = config
@@ -107,6 +107,11 @@ class TaskGraphExecutionEngine:
         self.logger.info(
             f"TaskGraphExecutionEngine initialized with max_parallel_tasks={self._max_parallel_tasks}",
         )
+
+    @property
+    def tool_call_service(self):
+        """Expose tool_call_service for knowledge base ID injection"""
+        return self._tool_call_service
 
     async def execute_task_graph(self) -> TaskStatus:
         """执行任务图

@@ -61,7 +61,7 @@ def _ensure_default_base(manager: KnowledgeBaseManager):
                 description="系统默认知识库,用于存储通用文档",
                 is_default=True,
                 # Provide empty settings dict instead of KnowledgeBaseSettings object
-                settings={}
+                settings={},
             )
 
             default_base = manager.create_base(create_data)

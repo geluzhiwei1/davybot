@@ -72,11 +72,7 @@ class ExtractionStrategy(ABC):
         """
         pass
 
-    async def extract_batch(
-        self,
-        texts: List[str],
-        **kwargs
-    ) -> List[ExtractionResult]:
+    async def extract_batch(self, texts: List[str], **kwargs) -> List[ExtractionResult]:
         """Extract from multiple texts (default implementation)
 
         Args:
@@ -112,9 +108,7 @@ class ExtractionStrategy(ABC):
                     existing = all_entities[entity.name]
                     existing.mention_count += entity.mention_count
                     # Average confidence
-                    existing.confidence = (
-                        existing.confidence + entity.confidence
-                    ) / 2
+                    existing.confidence = (existing.confidence + entity.confidence) / 2
                     # Merge properties
                     existing.properties.update(entity.properties)
                 else:
@@ -122,18 +116,12 @@ class ExtractionStrategy(ABC):
 
             # Merge relations (deduplicate by from_entity+to_entity+relation_type)
             for relation in result.relations:
-                key = (
-                    f"{relation.from_entity}|"
-                    f"{relation.to_entity}|"
-                    f"{relation.relation_type}"
-                )
+                key = f"{relation.from_entity}|{relation.to_entity}|{relation.relation_type}"
                 if key in all_relations:
                     # Update existing relation
                     existing = all_relations[key]
                     existing.mention_count += relation.mention_count
-                    existing.confidence = (
-                        existing.confidence + relation.confidence
-                    ) / 2
+                    existing.confidence = (existing.confidence + relation.confidence) / 2
                     existing.properties.update(relation.properties)
                 else:
                     all_relations[key] = relation

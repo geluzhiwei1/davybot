@@ -1,5 +1,5 @@
 # Copyright (c) 2025 格律至微
-from typing import List, Dict
+from typing import List, Dict, Any
 # SPDX-License-Identifier: AGPL-3.0-only
 
 """Skills工具 - 将skills能力暴露给agent
@@ -14,6 +14,8 @@ from typing import List, Dict
 import logging
 import os
 from pathlib import Path
+
+from pydantic import BaseModel, Field
 
 from dawei import get_dawei_home
 from dawei.tools.custom_base_tool import CustomBaseTool
@@ -38,9 +40,15 @@ Use this tool when you need to:
 
 Returns a formatted list of all skills with their descriptions."""
 
+    class Args(BaseModel):
+        """Arguments for listing skills (no parameters required)."""
+
+        pass
+
     def __init__(self, skill_manager: SkillManager):
         super().__init__()
         self.skill_manager = skill_manager
+        self.args_schema = self.Args
 
     def _run(self, **_kwargs) -> str:
         """列出所有可用的skills"""
@@ -61,14 +69,17 @@ Use this tool when you need to:
 - Discover specialized capabilities for a task
 - Match user intent to available skills
 
-Args:
-    query (str): The task description or query to match against skill descriptions
-
 Returns a ranked list of matching skills with their relevance scores."""
+
+    class Args(BaseModel):
+        """Arguments for searching skills."""
+
+        query: str = Field(..., description="The task description or query to match against skill descriptions")
 
     def __init__(self, skill_manager: SkillManager):
         super().__init__()
         self.skill_manager = skill_manager
+        self.args_schema = self.Args
 
     def _run(self, query: str, **_kwargs) -> str:
         """搜索匹配的skills"""
@@ -113,14 +124,17 @@ Use this tool when you:
 - Need to understand how to perform a specialized task
 - Want to follow a skill's workflow or best practices
 
-Args:
-    skill_name (str): The name of the skill to load (e.g., 'pdf', 'docx', 'xlsx')
-
 Returns the complete SKILL.md content with all instructions, examples, and workflows."""
+
+    class Args(BaseModel):
+        """Arguments for getting a skill."""
+
+        skill_name: str = Field(..., description="The name of the skill to load (e.g., 'pdf', 'docx', 'xlsx')")
 
     def __init__(self, skill_manager: SkillManager):
         super().__init__()
         self.skill_manager = skill_manager
+        self.args_schema = self.Args
 
     def _run(self, skill_name: str, **_kwargs) -> str:
         """获取skill的完整内容"""
@@ -154,14 +168,17 @@ Use this tool when you:
 - Want to access reference materials, templates, or examples
 - Are looking for supplementary documentation
 
-Args:
-    skill_name (str): The name of the skill
-
 Returns a list of available resource files with their descriptions."""
+
+    class Args(BaseModel):
+        """Arguments for listing skill resources."""
+
+        skill_name: str = Field(..., description="The name of the skill")
 
     def __init__(self, skill_manager: SkillManager):
         super().__init__()
         self.skill_manager = skill_manager
+        self.args_schema = self.Args
 
     def _run(self, skill_name: str, **_kwargs) -> str:
         """列出skill的资源文件"""
@@ -204,15 +221,18 @@ Use this tool when you:
 - Want to see examples or templates provided by the skill
 - Are accessing supplementary documentation
 
-Args:
-    skill_name (str): The name of the skill
-    resource_name (str): The name of the resource file (without extension)
-
 Returns the complete content of the resource file."""
+
+    class Args(BaseModel):
+        """Arguments for reading a skill resource."""
+
+        skill_name: str = Field(..., description="The name of the skill")
+        resource_name: str = Field(..., description="The name of the resource file (without extension)")
 
     def __init__(self, skill_manager: SkillManager):
         super().__init__()
         self.skill_manager = skill_manager
+        self.args_schema = self.Args
 
     def _run(self, skill_name: str, resource_name: str, **_kwargs) -> str:
         """读取skill的资源文件内容"""

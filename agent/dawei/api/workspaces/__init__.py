@@ -51,10 +51,7 @@ router.include_router(memory_api.router)
 
 # 注册安全配置路由器
 # Note: Security router has prefix with workspace_id: /api/workspaces/{workspace_id}/security-settings
-router.include_router(
-    security_api.router,
-    prefix="/{workspace_id}/security-settings"
-)
+router.include_router(security_api.router, prefix="/{workspace_id}/security-settings")
 
 # 导出
 __all__ = ["router"]

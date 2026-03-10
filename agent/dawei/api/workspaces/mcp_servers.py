@@ -112,20 +112,14 @@ def load_mode_settings(workspace: UserWorkspace) -> Dict[str, Any]:
     settings_file = get_mode_settings_file(workspace)
 
     if not settings_file.exists():
-        return {
-            "customModes": [],
-            "mcpServers": {}
-        }
+        return {"customModes": [], "mcpServers": {}}
 
     try:
         with settings_file.open("r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load mode settings: {e}")
-        return {
-            "customModes": [],
-            "mcpServers": {}
-        }
+        return {"customModes": [], "mcpServers": {}}
 
 
 def save_mode_settings(workspace: UserWorkspace, settings: Dict[str, Any]) -> None:
@@ -142,15 +136,7 @@ def save_mode_settings(workspace: UserWorkspace, settings: Dict[str, Any]) -> No
 
 def mcp_config_to_api(config: Dict[str, Any]) -> MCPServerConfig:
     """将后端MCP配置转换为API格式"""
-    return MCPServerConfig(
-        name=config.get("name", ""),
-        command=config.get("command", ""),
-        args=config.get("args", []),
-        cwd=config.get("cwd"),
-        always_allow=config.get("always_allow", config.get("alwaysAllow", [])),
-        timeout=config.get("timeout", 300),
-        disabled=config.get("disabled", False)
-    )
+    return MCPServerConfig(name=config.get("name", ""), command=config.get("command", ""), args=config.get("args", []), cwd=config.get("cwd"), always_allow=config.get("always_allow", config.get("alwaysAllow", [])), timeout=config.get("timeout", 300), disabled=config.get("disabled", False))
 
 
 def api_config_to_mcp(config: MCPServerConfig | MCPServerCreate | MCPServerUpdate) -> Dict[str, Any]:
@@ -208,10 +194,7 @@ async def create_mcp_server(workspace_id: str, request: MCPServerCreate):
     # 检查服务器名称是否已存在
     mcp_servers = mode_settings.get("mcpServers", {})
     if request.name in mcp_servers:
-        raise HTTPException(
-            status_code=400,
-            detail=f"MCP server '{request.name}' already exists"
-        )
+        raise HTTPException(status_code=400, detail=f"MCP server '{request.name}' already exists")
 
     # 添加新服务器
     server_data = api_config_to_mcp(request)
@@ -227,11 +210,7 @@ async def create_mcp_server(workspace_id: str, request: MCPServerCreate):
     server_config = mcp_config_to_api(server_data)
     server_config.name = request.name
 
-    return MCPServerOperationResponse(
-        success=True,
-        message=f"MCP server '{request.name}' created successfully",
-        server=server_config
-    )
+    return MCPServerOperationResponse(success=True, message=f"MCP server '{request.name}' created successfully", server=server_config)
 
 
 @router.put("/{server_name}", response_model=MCPServerOperationResponse)
@@ -255,10 +234,7 @@ async def update_mcp_server(workspace_id: str, server_name: str, request: MCPSer
     # 获取现有服务器配置
     mcp_servers = mode_settings.get("mcpServers", {})
     if server_name not in mcp_servers:
-        raise HTTPException(
-            status_code=404,
-            detail=f"MCP server '{server_name}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"MCP server '{server_name}' not found")
 
     # 更新服务器配置
     existing_config = mcp_servers[server_name]
@@ -280,11 +256,7 @@ async def update_mcp_server(workspace_id: str, server_name: str, request: MCPSer
     server_config = mcp_config_to_api(existing_config)
     server_config.name = server_name
 
-    return MCPServerOperationResponse(
-        success=True,
-        message=f"MCP server '{server_name}' updated successfully",
-        server=server_config
-    )
+    return MCPServerOperationResponse(success=True, message=f"MCP server '{server_name}' updated successfully", server=server_config)
 
 
 @router.delete("/{server_name}", response_model=MCPServerOperationResponse)
@@ -307,10 +279,7 @@ async def delete_mcp_server(workspace_id: str, server_name: str):
     # 获取现有服务器配置
     mcp_servers = mode_settings.get("mcpServers", {})
     if server_name not in mcp_servers:
-        raise HTTPException(
-            status_code=404,
-            detail=f"MCP server '{server_name}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"MCP server '{server_name}' not found")
 
     # 删除服务器
     del mcp_servers[server_name]
@@ -321,11 +290,7 @@ async def delete_mcp_server(workspace_id: str, server_name: str):
 
     logger.info(f"Deleted MCP server '{server_name}' from workspace {workspace_id}")
 
-    return MCPServerOperationResponse(
-        success=True,
-        message=f"MCP server '{server_name}' deleted successfully",
-        server=None
-    )
+    return MCPServerOperationResponse(success=True, message=f"MCP server '{server_name}' deleted successfully", server=None)
 
 
 @router.post("/{server_name}/test", response_model=MCPServerTestResponse)
@@ -348,10 +313,7 @@ async def test_mcp_server(workspace_id: str, server_name: str):
     # 检查服务器是否存在
     mcp_servers = mode_settings.get("mcpServers", {})
     if server_name not in mcp_servers:
-        raise HTTPException(
-            status_code=404,
-            detail=f"MCP server '{server_name}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"MCP server '{server_name}' not found")
 
     server_config = mcp_servers[server_name]
 
@@ -361,7 +323,4 @@ async def test_mcp_server(workspace_id: str, server_name: str):
 
     logger.info(f"Testing MCP server '{server_name}' in workspace {workspace_id}")
 
-    return MCPServerTestResponse(
-        success=True,
-        message=f"MCP server '{server_name}' connection test passed"
-    )
+    return MCPServerTestResponse(success=True, message=f"MCP server '{server_name}' connection test passed")

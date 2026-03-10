@@ -92,6 +92,10 @@ class CreateA2UISurfaceTool(CustomBaseTool):
             description="Layout direction: 'vertical', 'horizontal', or 'grid'",
         )
 
+    def __init__(self):
+        super().__init__()
+        self.args_schema = self.Args
+
     def _run(self, **kwargs) -> str:
         """Execute the tool to create an A2UI surface."""
         try:
@@ -197,6 +201,10 @@ class UpdateA2UIDataTool(CustomBaseTool):
             description="JSON Pointer path to update (e.g., '/users/0/name', '/form/username')",
         )
         value: Any = Field(..., description="New value to set at the specified path")
+
+    def __init__(self):
+        super().__init__()
+        self.args_schema = self.Args
 
     def _run(self, **kwargs) -> str:
         """Execute the tool to update A2UI data model."""

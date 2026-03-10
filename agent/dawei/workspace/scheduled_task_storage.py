@@ -69,16 +69,10 @@ class ScheduledTaskStorage:
 
         # ✅ Fast fail: 如果有任务加载失败，抛出异常
         if fail_on_error and failed_tasks:
-            raise RuntimeError(
-                f"Failed to load {len(failed_tasks)} scheduled tasks: {failed_tasks}. "
-                f"Please check task data integrity in {self.workspace_path}"
-            )
+            raise RuntimeError(f"Failed to load {len(failed_tasks)} scheduled tasks: {failed_tasks}. Please check task data integrity in {self.workspace_path}")
 
         self._loaded = True
-        logger.info(
-            f"[SCHEDULER_STORAGE] Loaded {loaded_count} scheduled tasks "
-            f"(total files: {len(tasks_data)}, failed: {len(failed_tasks)})"
-        )
+        logger.info(f"[SCHEDULER_STORAGE] Loaded {loaded_count} scheduled tasks (total files: {len(tasks_data)}, failed: {len(failed_tasks)})")
 
     async def save_task(self, task: ScheduledTask) -> bool:
         """保存任务

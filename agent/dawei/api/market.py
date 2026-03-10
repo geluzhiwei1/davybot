@@ -335,7 +335,7 @@ async def get_featured_resources(
     sorted_results = sorted(all_results, key=get_popularity, reverse=True)
 
     # Apply pagination
-    paginated_results = sorted_results[skip:skip + limit]
+    paginated_results = sorted_results[skip : skip + limit]
     total_count = len(sorted_results)
 
     return {

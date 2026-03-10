@@ -12,7 +12,7 @@
  * - 协调各store之间的交互
  */
 
-import { watch, computed } from 'vue'
+import { watch, computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { v4 as uuidv4 } from 'uuid'
 import { ElMessage } from 'element-plus'
@@ -216,7 +216,7 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 发送用户消息
    */
-  const sendMessage = (text: string) => {
+  const sendMessage = (text: string, knowledgeBaseIds?: string[]) => {
     if (!isConnected.value) {
       logger.error('WebSocket is not connected.')
       return
@@ -235,7 +235,7 @@ export const useChatStore = defineStore('chat', () => {
     messageStore.clearStreamingContent()
 
     // 构建metadata
-    const metadata: unknown = {}
+    const metadata: Record<string, unknown> = {}
     if (currentWorkspaceId.value) {
       metadata.workspaceId = currentWorkspaceId.value
     }
@@ -244,7 +244,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     // 构建用户UI上下文
-    const userUIContext: unknown = {}
+    const userUIContext: Record<string, unknown> = {}
     if (uiContext.value.openFiles.length > 0) {
       userUIContext.open_files = uiContext.value.openFiles
     }
@@ -261,9 +261,17 @@ export const useChatStore = defineStore('chat', () => {
       userUIContext.user_preferences = uiContext.value.userPreferences
     }
 
+    // 【调试】记录即将发送给 WebSocket 的 knowledgeBaseIds
+    console.log('[CHAT_STORE.sendMessage] Sending to WebSocket with knowledgeBaseIds:', knowledgeBaseIds);
+
     // 发送消息（使用当前workspace的客户端）
     const workspaceId = workspaceStore.currentWorkspaceId || 'default'
-    connectionStore.getClient(workspaceId).sendUserMessage(text, metadata, userUIContext).catch(err => {
+    connectionStore.getClient(workspaceId).sendUserMessage(
+      text,
+      metadata,
+      userUIContext,
+      knowledgeBaseIds
+    ).catch(err => {
       logger.error('Failed to send message:', err)
       messageStore.addMessage({
         id: uuidv4(),
@@ -1767,6 +1775,9 @@ export const useChatStore = defineStore('chat', () => {
 
   // --- 返回store接口 ---
 
+  // 知识库选择状态 (本地状态,不持久化)
+  const selectedKnowledgeBaseIds = ref<string[]>([])
+
   return {
     // State (代理到专门stores)
     messages,
@@ -1781,6 +1792,7 @@ export const useChatStore = defineStore('chat', () => {
     uiContext,
     llmApiStatus,
     agentStatus,
+    selectedKnowledgeBaseIds,
 
     // Actions
     initializeConnection,

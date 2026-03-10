@@ -57,10 +57,7 @@ class UseMCPTool(CustomBaseTool):
     """Tool for using tools provided by MCP servers."""
 
     name: str = "use_mcp_tool"
-    description: str = (
-        "Uses a tool provided by a connected MCP server with specified parameters. "
-        "Requires MCP server to be configured and connected."
-    )
+    description: str = "Uses a tool provided by a connected MCP server with specified parameters. Requires MCP server to be configured and connected."
     args_schema: type[BaseModel] = UseMCPToolInput
 
     def __init__(self, workspace_path: str | None = None):
@@ -75,9 +72,7 @@ class UseMCPTool(CustomBaseTool):
         """Use MCP tool (real implementation using MCP SDK)."""
         try:
             # Execute tool call asynchronously
-            result = _run_async(
-                self.mcp_manager.call_tool(server_name, tool_name, arguments)
-            )
+            result = _run_async(self.mcp_manager.call_tool(server_name, tool_name, arguments))
             return json.dumps(result, indent=2, ensure_ascii=False)
 
         except Exception as e:
@@ -105,10 +100,7 @@ class AccessMCPResource(CustomBaseTool):
     """Tool for accessing resources provided by MCP servers."""
 
     name: str = "access_mcp_resource"
-    description: str = (
-        "Accesses a resource provided by a connected MCP server using its URI. "
-        "Requires MCP server to be configured and connected."
-    )
+    description: str = "Accesses a resource provided by a connected MCP server using its URI. Requires MCP server to be configured and connected."
     args_schema: type[BaseModel] = AccessMCPResourceInput
 
     def __init__(self, workspace_path: str | None = None):

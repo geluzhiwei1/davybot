@@ -17,6 +17,7 @@ class UserInputText:
     text: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     task_node_id: str | None = None
+    metadata: dict | None = None  # 用于存储额外的元数据，如 knowledge_base_ids
 
 
 UserInputMessage = Union[UserInputText]

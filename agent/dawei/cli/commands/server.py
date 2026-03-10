@@ -84,8 +84,7 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill,
         if sys.platform == "win32":
             click.echo(
                 click.style(
-                    "❌ Daemon mode is not supported on Windows.\n"
-                    "   Use a service manager like NSSM or run with screen/tmux.",
+                    "❌ Daemon mode is not supported on Windows.\n   Use a service manager like NSSM or run with screen/tmux.",
                     fg="red",
                 ),
                 err=True,
@@ -95,8 +94,7 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill,
         if reload:
             click.echo(
                 click.style(
-                    "❌ Cannot use --reload with --daemon.\n"
-                    "   Daemon mode requires a stable process.",
+                    "❌ Cannot use --reload with --daemon.\n   Daemon mode requires a stable process.",
                     fg="red",
                 ),
                 err=True,

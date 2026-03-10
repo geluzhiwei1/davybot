@@ -134,7 +134,7 @@ class EmbeddingManager:
                 except RuntimeError as e:
                     if "client has been closed" in str(e) and attempt < max_retries - 1:
                         logger.warning(f"HTTP client closed on attempt {attempt + 1}, retrying...")
-                        time.sleep(2 ** attempt)  # Exponential backoff
+                        time.sleep(2**attempt)  # Exponential backoff
                         continue
                     else:
                         raise

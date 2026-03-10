@@ -136,10 +136,7 @@ class WorkspaceContext:
             # ✅ 修复：使用 ResourceType 枚举而不是字符串
             from dawei.workspace.persistence_manager import ResourceType
 
-            settings_data = await self.persistence_manager.load_resource(
-                ResourceType.WORKSPACE_SETTINGS,
-                "settings"
-            )
+            settings_data = await self.persistence_manager.load_resource(ResourceType.WORKSPACE_SETTINGS, "settings")
             if settings_data:
                 return WorkspaceSettings.from_dict(settings_data)
         except Exception as e:

@@ -110,9 +110,9 @@ class TaskGraph:
         self._event_bus = value
 
         # 更新 managers 的 event_bus
-        if hasattr(self, '_todo_manager') and self._todo_manager is not None:
+        if hasattr(self, "_todo_manager") and self._todo_manager is not None:
             self._todo_manager.event_bus = value
-        if hasattr(self, '_state_manager') and self._state_manager is not None:
+        if hasattr(self, "_state_manager") and self._state_manager is not None:
             self._state_manager.event_bus = value
 
     def _setup_event_listeners(self):

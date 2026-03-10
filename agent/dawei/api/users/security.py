@@ -19,6 +19,7 @@ router = APIRouter(prefix="/me/security", tags=["User Security"])
 
 class SecuritySettingsResponse(BaseModel):
     """安全配置响应"""
+
     success: bool
     settings: dict | None = None
     message: str | None = None
@@ -48,7 +49,7 @@ async def load_user_security_settings(user_id: str) -> UserSecuritySettings:
 
     if config_file.exists():
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
+            with open(config_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return UserSecuritySettings.from_dict(data)
         except Exception as e:
@@ -60,10 +61,7 @@ async def load_user_security_settings(user_id: str) -> UserSecuritySettings:
     return UserSecuritySettings()
 
 
-async def save_user_security_settings(
-    user_id: str,
-    settings: UserSecuritySettings
-) -> None:
+async def save_user_security_settings(user_id: str, settings: UserSecuritySettings) -> None:
     """保存用户安全配置到存储
 
     Args:
@@ -76,35 +74,23 @@ async def save_user_security_settings(
 
     config_file = config_dir / "security_settings.json"
 
-    with open(config_file, 'w', encoding='utf-8') as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         json.dump(settings.to_dict(), f, indent=2, ensure_ascii=False)
 
 
 @router.get("", response_model=SecuritySettingsResponse)
-async def get_user_security_settings(
-    current_user: str = Depends(get_current_user_id)
-) -> SecuritySettingsResponse:
+async def get_user_security_settings(current_user: str = Depends(get_current_user_id)) -> SecuritySettingsResponse:
     """获取用户安全配置"""
     try:
         settings = await load_user_security_settings(current_user)
-        return SecuritySettingsResponse(
-            success=True,
-            settings=settings.to_dict(),
-            message="User security settings retrieved successfully"
-        )
+        return SecuritySettingsResponse(success=True, settings=settings.to_dict(), message="User security settings retrieved successfully")
     except Exception as e:
         logger.error(f"Failed to load user security settings: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.put("", response_model=SecuritySettingsResponse)
-async def update_user_security_settings(
-    settings_data: dict,
-    current_user: str = Depends(get_current_user_id)
-) -> SecuritySettingsResponse:
+async def update_user_security_settings(settings_data: dict, current_user: str = Depends(get_current_user_id)) -> SecuritySettingsResponse:
     """更新用户安全配置"""
     try:
         # 创建配置对象（使用 from_dict 进行验证）
@@ -113,23 +99,14 @@ async def update_user_security_settings(
         # 保存到用户配置存储
         await save_user_security_settings(current_user, settings)
 
-        return SecuritySettingsResponse(
-            success=True,
-            settings=settings.to_dict(),
-            message="User security settings updated successfully"
-        )
+        return SecuritySettingsResponse(success=True, settings=settings.to_dict(), message="User security settings updated successfully")
     except Exception as e:
         logger.error(f"Failed to update user security settings: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post("/reset", response_model=SecuritySettingsResponse)
-async def reset_user_security_settings(
-    current_user: str = Depends(get_current_user_id)
-) -> SecuritySettingsResponse:
+async def reset_user_security_settings(current_user: str = Depends(get_current_user_id)) -> SecuritySettingsResponse:
     """重置用户安全配置为默认值"""
     # 创建默认配置
     default_settings = UserSecuritySettings()
@@ -137,9 +114,4 @@ async def reset_user_security_settings(
     # 保存默认配置
     await save_user_security_settings(current_user, default_settings)
 
-    return SecuritySettingsResponse(
-        success=True,
-        settings=default_settings.to_dict(),
-        message="User security settings reset to defaults"
-    )
-
+    return SecuritySettingsResponse(success=True, settings=default_settings.to_dict(), message="User security settings reset to defaults")

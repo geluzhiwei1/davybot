@@ -112,6 +112,4 @@ async def get_privacy_settings() -> PrivacyConfigResponse:
 async def update_privacy_settings(config: PrivacyConfig) -> PrivacyConfigResponse:
     """更新隐私配置"""
     save_privacy_config(config)
-    return PrivacyConfigResponse(
-        success=True, config=config, message="Privacy configuration updated successfully"
-    )
+    return PrivacyConfigResponse(success=True, config=config, message="Privacy configuration updated successfully")

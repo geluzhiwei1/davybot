@@ -15,9 +15,13 @@ from datetime import datetime, timedelta, timezone
 from dawei.core.datetime_compat import UTC
 from enum import Enum
 
+
 class StrEnum(str, Enum):
     """String enum for Python 3.10 compatibility"""
+
     pass
+
+
 from typing import List, Dict, Any
 
 from dawei.websocket.protocol import (

@@ -88,12 +88,8 @@ TOOL_GROUPS = {
     },
     "knowledge": {
         "custom_tools": [
-            "search_knowledge",
-            "query_knowledge_rag",
-            "upload_document",
-            "delete_document",
-            "list_documents",
-            "reindex_document",
+            "search_user_knowledge_base",
+            "query_user_knowledge_base",
         ],
     },
 }
@@ -293,59 +289,6 @@ def _load_workspace_tools(workspace_path: str) -> Dict[str, ToolConfig]:
     return tools
 
 
-def _load_knowledge_tools(workspace_path: str | None = None) -> Dict[str, ToolConfig]:
-    """加载知识库工具
-
-    Args:
-        workspace_path: 工作区路径（可选）
-
-    Returns:
-        工具配置字典
-
-    """
-    tools = {}
-    logger.info("Loading knowledge tools...")
-
-    try:
-        from dawei.tools.custom_tools.knowledge_tool import KnowledgeSearchTool, KnowledgeRAGTool
-        from dawei.tools.custom_tools.knowledge_management_tool import (
-            UploadDocumentTool,
-            DeleteDocumentTool,
-            ListDocumentsTool,
-            ReindexDocumentTool,
-        )
-
-        # 创建知识库工具实例（不传入service，稍后在Agent中注入）
-        knowledge_tools = [
-            KnowledgeSearchTool(),
-            KnowledgeRAGTool(),
-            UploadDocumentTool(),
-            DeleteDocumentTool(),
-            ListDocumentsTool(),
-            ReindexDocumentTool(),
-        ]
-
-        # 转换为ToolConfig
-        for tool in knowledge_tools:
-            tools[tool.name] = ToolConfig(
-                name=tool.name,
-                description=tool.description,
-                category="knowledge",
-                callable=tool.run if hasattr(tool, 'run') else tool._run,
-                enabled=True,
-                source_level="default",
-            )
-
-        logger.info(f"Loaded {len(knowledge_tools)} knowledge tools")
-
-    except ImportError as e:
-        logger.warning(f"Knowledge tools not available: {e}")
-    except Exception as e:
-        logger.error(f"Failed to load knowledge tools: {e}", exc_info=True)
-
-    return tools
-
-
 class ToolManager:
     """简化的工具管理器 (KISS Principle)
 
@@ -390,11 +333,11 @@ class ToolManager:
         """
         tools = {}
 
-        # 1. 加载默认工具（builtin + user + knowledge）
+        # 1. 加载默认工具（builtin + user）
+        # Note: knowledge tools are already included in _load_builtin_tools via CustomToolProvider
         try:
             tools.update(_load_builtin_tools(self.workspace_path))
             tools.update(_load_user_tools())
-            tools.update(_load_knowledge_tools(self.workspace_path))  # 添加知识库工具
             logger.info(f"Loaded {len(tools)} default tools")
         except Exception as e:
             # Fast Fail: 默认工具加载失败应立即抛出

@@ -81,12 +81,7 @@ class AgentExecutionService:
             LLMError: LLM 调用失败
             AgentInitializationError: Agent 初始化失败
         """
-        logger.info(
-            f"[AGENT_EXECUTION] Starting task: {task_id}\n"
-            f"  Type: {task_type}\n"
-            f"  Session: {session_id}\n"
-            f"  Message: {message[:100]}..."
-        )
+        logger.info(f"[AGENT_EXECUTION] Starting task: {task_id}\n  Type: {task_type}\n  Session: {session_id}\n  Message: {message[:100]}...")
 
         agent = None
         conversation = None
@@ -97,10 +92,7 @@ class AgentExecutionService:
             llm_model = llm or settings.get("llm_model", "deepseek/deepseek-chat")
             agent_mode = mode or settings.get("agent_mode", "orchestrator")
 
-            logger.info(
-                f"[AGENT_EXECUTION] Config: LLM={llm_model}, Mode={agent_mode} "
-                f"{'(override)' if llm or mode else '(workspace default)'}"
-            )
+            logger.info(f"[AGENT_EXECUTION] Config: LLM={llm_model}, Mode={agent_mode} {'(override)' if llm or mode else '(workspace default)'}")
 
             # 2. 创建 Agent 实例（使用正确的 API）
             config = {
@@ -162,10 +154,7 @@ class AgentExecutionService:
             workspace.current_conversation = conversation
             await workspace.save_current_conversation()
 
-            logger.info(
-                f"[AGENT_EXECUTION] Conversation: {session_id}, "
-                f"Message count: {conversation.message_count}"
-            )
+            logger.info(f"[AGENT_EXECUTION] Conversation: {session_id}, Message count: {conversation.message_count}")
 
             # 7. 执行 Agent（核心逻辑）
             logger.info(f"[AGENT_EXECUTION] Running agent: {task_id}")
@@ -193,11 +182,7 @@ class AgentExecutionService:
                 workspace.current_conversation = conversation
                 await workspace.save_current_conversation()
 
-            logger.info(
-                f"[AGENT_EXECUTION] Task {task_id} completed successfully\n"
-                f"  Messages: {conversation.message_count}\n"
-                f"  Conversation: {session_id}"
-            )
+            logger.info(f"[AGENT_EXECUTION] Task {task_id} completed successfully\n  Messages: {conversation.message_count}\n  Conversation: {session_id}")
 
             return {
                 "success": True,

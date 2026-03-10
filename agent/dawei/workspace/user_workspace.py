@@ -23,6 +23,7 @@ from typing import List, Dict, TYPE_CHECKING, Any
 
 from dawei import get_dawei_home
 from dawei.conversation.conversation import Conversation, create_conversation
+
 # from dawei.core.events import CORE_EVENT_BUS  # REMOVED: CORE_EVENT_BUS deleted
 from dawei.entity.llm_config import LLMConfig
 from dawei.task_graph.task_node_data import TaskContext
@@ -159,7 +160,7 @@ class UserWorkspace:
 
         """
         # 优先从 workspace_info 获取
-        if self.workspace_info and hasattr(self.workspace_info, 'id'):
+        if self.workspace_info and hasattr(self.workspace_info, "id"):
             return self.workspace_info.id
 
         # 否则返回 uuid（向后兼容）
@@ -688,10 +689,7 @@ class UserWorkspace:
             logger.info(f"Workspace settings incremental update: {only_fields}")
         else:
             # 全量模式：保存所有字段（向后兼容）
-            settings_dict = {
-                json_field: getattr(self.workspace_settings, py_field)
-                for py_field, json_field in field_mapping.items()
-            }
+            settings_dict = {json_field: getattr(self.workspace_settings, py_field) for py_field, json_field in field_mapping.items()}
             existing_data["globalSettings"] = settings_dict
             logger.info("Workspace settings full update")
 
@@ -727,7 +725,7 @@ class UserWorkspace:
             settings_dict = self.workspace_settings.to_dict()
 
             # 添加 LLM 模型配置（从 llm_manager 获取默认模型）
-            if self.llm_manager and hasattr(self.llm_manager, 'get_default_model'):
+            if self.llm_manager and hasattr(self.llm_manager, "get_default_model"):
                 try:
                     settings["llm_model"] = self.llm_manager.get_default_model()
                 except Exception:
@@ -874,7 +872,7 @@ class UserWorkspace:
             # ===== Level 2: Global User级别 =====
             # 2.1 {DAWEI_HOME}/skills/
             dawei_home = get_dawei_home()
-            global_dawei_configs = dawei_home 
+            global_dawei_configs = dawei_home
             global_skills_dir = global_dawei_configs / "skills"
             if global_skills_dir.exists() and any(global_skills_dir.iterdir()):
                 logger.info("[Level 2: Global User] Found .dawei/skills in DAWEI_HOME")

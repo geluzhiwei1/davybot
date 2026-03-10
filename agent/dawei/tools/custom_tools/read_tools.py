@@ -215,7 +215,9 @@ class ListFilesTool(CustomBaseTool):
                 result.append(f"{indent}{root.name}/")
                 subindent = " " * 2 * (level + 1)
                 for file in files:
-                    result.append(f"{subindent}{file.name}")
+                    # Ensure file is a Path object
+                    file_path = file if isinstance(file, Path) else Path(file)
+                    result.append(f"{subindent}{file_path.name}")
         else:
             items = sorted(Path(full_path).iterdir())
             for item in items:

@@ -232,7 +232,7 @@ class TextChunker:
                 if self.config.chunk_overlap > 0 and chunks:
                     prev_content = chunks[-1].content
                     words = prev_content.split()
-                    overlap_words = words[-self.config.chunk_overlap:] if len(words) > self.config.chunk_overlap else words
+                    overlap_words = words[-self.config.chunk_overlap :] if len(words) > self.config.chunk_overlap else words
                     current_chunk = " ".join(overlap_words) + " " + sentence
                 else:
                     current_chunk = sentence

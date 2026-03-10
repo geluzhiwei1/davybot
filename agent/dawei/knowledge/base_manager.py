@@ -59,10 +59,10 @@ class KnowledgeBaseManager:
             return
 
         try:
-            with open(self.metadata_file, 'r', encoding='utf-8') as f:
+            with open(self.metadata_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            for base_data in data.get('bases', []):
+            for base_data in data.get("bases", []):
                 try:
                     kb = KnowledgeBase(**base_data)
                     self._bases_cache[kb.id] = kb
@@ -79,13 +79,9 @@ class KnowledgeBaseManager:
     def _save_metadata(self):
         """Save knowledge bases metadata to disk"""
         try:
-            data = {
-                'version': '1.0',
-                'updated_at': datetime.now().isoformat(),
-                'bases': [kb.model_dump(mode='json') for kb in self._bases_cache.values()]
-            }
+            data = {"version": "1.0", "updated_at": datetime.now().isoformat(), "bases": [kb.model_dump(mode="json") for kb in self._bases_cache.values()]}
 
-            with open(self.metadata_file, 'w', encoding='utf-8') as f:
+            with open(self.metadata_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             logger.debug("Saved knowledge bases metadata")
@@ -409,12 +405,14 @@ class KnowledgeBaseManager:
         # Initialize if not exists
         if not fulltext_db_path.exists():
             import asyncio
+
             try:
                 loop = asyncio.get_event_loop()
                 loop.run_until_complete(fulltext_store.initialize())
             except RuntimeError:
                 # No event loop, run in new thread
                 import asyncio
+
                 asyncio.run(fulltext_store.initialize())
 
         return fulltext_store
@@ -437,9 +435,7 @@ class KnowledgeBaseManager:
 
         return graph_store
 
-    def list_base_documents(
-        self, base_id: str, skip: int = 0, limit: int = 10
-    ) -> Dict[str, Any]:
+    def list_base_documents(self, base_id: str, skip: int = 0, limit: int = 10) -> Dict[str, Any]:
         """List documents in a knowledge base
 
         Args:
@@ -532,9 +528,9 @@ class KnowledgeBaseManager:
         for cache_key, service in self._embedding_managers.items():
             try:
                 # Clean up the underlying manager
-                if hasattr(service, 'manager'):
+                if hasattr(service, "manager"):
                     manager = service.manager
-                    if hasattr(manager, '_model') and manager._model is not None:
+                    if hasattr(manager, "_model") and manager._model is not None:
                         del manager._model
                         logger.debug(f"Cleaned up embedding manager: {cache_key}")
             except Exception as e:

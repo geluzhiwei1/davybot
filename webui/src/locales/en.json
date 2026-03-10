@@ -828,7 +828,12 @@
         "allowNetworkOverride": "Allow workspaces to override network security settings",
         "allowNetworkOverrideHelp": "If disabled, all workspaces must use your network security configuration",
         "allowResourceOverride": "Allow workspaces to override resource limit settings",
-        "allowResourceOverrideHelp": "If disabled, all workspaces must use your resource limit configuration"
+        "allowResourceOverrideHelp": "If disabled, all workspaces must use your resource limit configuration",
+        "allowOverridePathHelp": "If disabled, all workspaces must use your path security configuration",
+        "allowOverrideCommandHelp": "If disabled, all workspaces must use your command execution security configuration",
+        "allowOverrideToolsHelp": "If disabled, all workspaces must use your tool permission configuration",
+        "allowOverrideNetworkHelp": "If disabled, all workspaces must use your network security configuration",
+        "allowOverrideResourcesHelp": "If disabled, all workspaces must use your resource limit configuration"
       },
       "sandbox": {
         "title": "Sandbox Configuration",
@@ -955,14 +960,18 @@
         "resetError": "Failed to reset security settings",
         "pathSecurity": {
           "title": "Path Security Configuration",
+          "enableProtection": "Enable Path Security Protection",
+          "enableProtectionHelp": "Enable protection to restrict file access within workspace boundaries",
           "enableTraversalProtection": "Enable Path Traversal Protection",
           "enableTraversalProtectionHelp": "Prevents access to parent directories using ../",
           "allowAbsolutePaths": "Allow Absolute Paths",
           "allowAbsolutePathsHelp": "Allows commands to use absolute paths starting with /",
           "allowedExtensions": "Allowed File Extensions",
           "allowedExtensionsHelp": "File extensions that agents are allowed to access",
+          "allowedExtensionsPlaceholder": "e.g., .txt,.md,.py,.js",
           "deniedExtensions": "Denied File Extensions",
           "deniedExtensionsHelp": "File extensions that agents are never allowed to access",
+          "deniedExtensionsPlaceholder": "e.g., .exe,.sh,.bat",
           "maxFileSize": "Maximum File Size (MB)",
           "maxFileSizeHelp": "Maximum size of files that can be read or written",
           "pathAccessMode": "Path Access Mode",
@@ -1164,6 +1173,14 @@
     "zoomOut": "Zoom Out",
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Exit Fullscreen",
-    "selectBaseFirst": "Please select a knowledge base first"
+    "selectBaseFirst": "Please select a knowledge base first",
+    "selector": {
+      "placeholder": "Select Knowledge Bases (Multiple)",
+      "noSelection": "No Knowledge Base",
+      "manageBases": "Manage Knowledge Bases",
+      "refresh": "Refresh",
+      "default": "Default",
+      "documentCount": "{count} documents"
+    }
   }
 }

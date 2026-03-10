@@ -542,7 +542,6 @@ class OpenaiCompatibleClient(BaseClient):
             },
         )
 
-
         endpoint = "chat/completions"
 
         # 创建原始流数据生成器
@@ -666,7 +665,6 @@ class OpenAICompatibleParser(StreamChunkParser):
             return messages
 
         delta = chunk["choices"][0].get("delta", {})
-
 
         # 处理流式推理过程输出
         if delta.get("reasoning_content"):

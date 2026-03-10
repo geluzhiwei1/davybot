@@ -13,6 +13,7 @@ from typing import List, Dict, Any
 
 from dawei.agentic.agent import Agent
 from dawei.core import local_context
+
 # from dawei.core.events import CORE_EVENT_BUS  # REMOVED: CORE_EVENT_BUS deleted
 from dawei.core.events import TaskEventType
 from dawei.logg.logging import get_logger
@@ -453,14 +454,34 @@ class EventForwardingHandler:
 
     async def _handle_tool_call_start(self, event_data, session_id: str, task_id: str):
         """处理工具调用开始事件"""
-        logger.info(f"[EVENT_FORWARDING] 🔧 Handling TOOL_CALL_START event: tool_name={event_data.tool_name if hasattr(event_data, 'tool_name') else 'unknown'}, session_id={session_id}, task_id={task_id}")
+        import json
+
+        # 🔧 修复：event_data 可能是字典或 ToolCallStartData 对象
+        if isinstance(event_data, dict):
+            # 字典格式（来自 tool_message_handler.py）
+            tool_name = event_data.get("tool_name", "")
+            tool_input = event_data.get("tool_input", {})
+            tool_call_id = event_data.get("tool_call_id")
+        else:
+            # ToolCallStartData 对象格式
+            tool_name = getattr(event_data, "tool_name", "")
+            tool_input = getattr(event_data, "tool_input", {})
+            tool_call_id = getattr(event_data, "tool_call_id", None)
+
+        # 🔍 DEBUG: Log event_data
+        logger.warning(f"[TOOL_INPUT_DEBUG] Received TOOL_CALL_START: type={type(event_data).__name__}, tool_name={tool_name}, tool_input={json.dumps(tool_input, ensure_ascii=False)}")
+
+        logger.info(f"[EVENT_FORWARDING] 🔧 Handling TOOL_CALL_START event: tool_name={tool_name}, session_id={session_id}, task_id={task_id}")
+
+        # 🔍 DEBUG: Log what will be sent to frontend
+        logger.warning(f"[TOOL_INPUT_DEBUG] Sending to frontend: tool_name={tool_name}, tool_input={json.dumps(tool_input, ensure_ascii=False)}")
 
         return ToolCallStartMessage(
             session_id=session_id,
             task_id=task_id,
-            tool_name=event_data.tool_name if hasattr(event_data, "tool_name") else "",
-            tool_input=(event_data.tool_input if hasattr(event_data, "tool_input") else {}),
-            tool_call_id=getattr(event_data, "tool_call_id", None),
+            tool_name=tool_name,
+            tool_input=tool_input,
+            tool_call_id=tool_call_id,
         )
 
     async def _handle_tool_call_progress(self, event_data, session_id: str, task_id: str):
@@ -555,6 +576,7 @@ class EventForwardingHandler:
 
         # 🔍 详细日志：记录从事件中提取的数据
         from dawei.logg.logging import get_logger
+
         logger = get_logger(__name__)
 
         question = event_data.get("question", "")
@@ -562,10 +584,7 @@ class EventForwardingHandler:
         tool_call_id = event_data.get("tool_call_id", "")
 
         if not suggestions:
-            logger.error(
-                f"[FOLLOWUP_DEBUG] ❌ CRITICAL in event forwarding: suggestions is empty! "
-                f"event_data keys: {list(event_data.keys())}, full event_data: {event_data}"
-            )
+            logger.error(f"[FOLLOWUP_DEBUG] ❌ CRITICAL in event forwarding: suggestions is empty! event_data keys: {list(event_data.keys())}, full event_data: {event_data}")
 
         return FollowupQuestionMessage(
             session_id=event_session_id,

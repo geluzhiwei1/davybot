@@ -335,7 +335,7 @@ async def upload_document_to_base(
         metadata_copy = dict(chunk.metadata)
         # Convert datetime objects to ISO strings
         for key, value in metadata_copy.items():
-            if hasattr(value, 'isoformat'):
+            if hasattr(value, "isoformat"):
                 metadata_copy[key] = value.isoformat()
 
         vector_doc = VectorDocument(
@@ -503,10 +503,7 @@ async def upload_document_to_base(
                 logger.warning(f"Failed to extract knowledge from chunk {i}: {e}")
                 # Non-fatal, continue with next chunk
 
-        logger.info(
-            f"Graph indexing complete: {total_entities} entities, "
-            f"{total_relations} relations (strategy: {extraction_strategy})"
-        )
+        logger.info(f"Graph indexing complete: {total_entities} entities, {total_relations} relations (strategy: {extraction_strategy})")
     except Exception as e:
         logger.warning(f"Failed to index graph: {e}")
         # Non-fatal, continue
@@ -665,11 +662,7 @@ async def get_document_from_base(base_id: str, document_id: str):
                 list_query = f"SELECT DISTINCT json_extract(metadata, '$.document_id') as doc_id, json_extract(metadata, '$.file_name') as file_name FROM {vector_store.table_name}"
                 list_cursor = await db.execute(list_query)
                 list_rows = await list_cursor.fetchall()
-                available_docs = [
-                    {"document_id": row[0], "file_name": row[1]}
-                    for row in list_rows
-                    if row[0] and row[1]
-                ]
+                available_docs = [{"document_id": row[0], "file_name": row[1]} for row in list_rows if row[0] and row[1]]
             except Exception:
                 pass
 
@@ -863,7 +856,7 @@ async def reindex_knowledge_base(base_id: str):
             for chunk, embedding in zip(chunks, embeddings, strict=True):
                 metadata_copy = dict(chunk.metadata)
                 for key, value in metadata_copy.items():
-                    if hasattr(value, 'isoformat'):
+                    if hasattr(value, "isoformat"):
                         metadata_copy[key] = value.isoformat()
 
                 vector_doc = VectorDocument(
@@ -1022,11 +1015,7 @@ async def reindex_knowledge_base(base_id: str):
     kb.stats.last_updated_at = None  # Will be set by default factory
     manager._save_metadata()
 
-    logger.info(
-        f"Re-indexing complete: {total_documents} documents, "
-        f"{total_chunks} chunks, {total_entities} entities, "
-        f"{total_relations} relations"
-    )
+    logger.info(f"Re-indexing complete: {total_documents} documents, {total_chunks} chunks, {total_entities} entities, {total_relations} relations")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -1256,10 +1245,7 @@ async def get_graph_entities(
     manager = get_base_manager()
     kb = manager.get_base(base_id)
     if not kb:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge base not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
 
     try:
         # Simple implementation: query from database
@@ -1277,7 +1263,7 @@ async def get_graph_entities(
                     "success": True,
                     "entities": [],
                     "total": 0,
-                }
+                },
             )
 
         # Try to initialize graph store (creates tables if needed)
@@ -1294,7 +1280,7 @@ async def get_graph_entities(
                     "entities": [],
                     "total": 0,
                     "error": f"Graph store initialization failed: {str(init_error)}",
-                }
+                },
             )
 
         # Get all entities (filter by type if specified)
@@ -1319,15 +1305,17 @@ async def get_graph_entities(
             rows = await cursor.fetchall()
 
             for row in rows:
-                entities.append({
-                    "id": row["id"],
-                    "type": row["type"],
-                    "name": row["name"],
-                    "description": row["description"],
-                    "properties": json.loads(row["properties"]) if row["properties"] else {},
-                    "base_id": row["base_id"],
-                    "created_at": row["created_at"],
-                })
+                entities.append(
+                    {
+                        "id": row["id"],
+                        "type": row["type"],
+                        "name": row["name"],
+                        "description": row["description"],
+                        "properties": json.loads(row["properties"]) if row["properties"] else {},
+                        "base_id": row["base_id"],
+                        "created_at": row["created_at"],
+                    }
+                )
                 entity_ids.add(row["id"])
 
         # Get total count
@@ -1346,15 +1334,12 @@ async def get_graph_entities(
                 "success": True,
                 "entities": entities,
                 "total": total,
-            }
+            },
         )
 
     except Exception as e:
         logger.error(f"Failed to get graph entities: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get graph entities: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get graph entities: {str(e)}")
 
 
 @router.get("/{base_id}/graph/relations")
@@ -1378,10 +1363,7 @@ async def get_graph_relations(
     manager = get_base_manager()
     kb = manager.get_base(base_id)
     if not kb:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge base not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
 
     try:
         # Get relations from database
@@ -1399,7 +1381,7 @@ async def get_graph_relations(
                     "success": True,
                     "relations": [],
                     "total": 0,
-                }
+                },
             )
 
         # Try to initialize graph store (creates tables if needed)
@@ -1416,7 +1398,7 @@ async def get_graph_relations(
                     "relations": [],
                     "total": 0,
                     "error": f"Graph store initialization failed: {str(init_error)}",
-                }
+                },
             )
 
         async with aiosqlite.connect(graph_db_path) as db:
@@ -1438,16 +1420,18 @@ async def get_graph_relations(
 
             relations = []
             for row in rows:
-                relations.append({
-                    "id": row["id"],
-                    "from_entity": row["from_entity"],
-                    "to_entity": row["to_entity"],
-                    "relation_type": row["relation_type"],
-                    "properties": json.loads(row["properties"]) if row["properties"] else {},
-                    "weight": row["weight"],
-                    "base_id": row["base_id"],
-                    "created_at": row["created_at"],
-                })
+                relations.append(
+                    {
+                        "id": row["id"],
+                        "from_entity": row["from_entity"],
+                        "to_entity": row["to_entity"],
+                        "relation_type": row["relation_type"],
+                        "properties": json.loads(row["properties"]) if row["properties"] else {},
+                        "weight": row["weight"],
+                        "base_id": row["base_id"],
+                        "created_at": row["created_at"],
+                    }
+                )
 
         # Get total count
         async with aiosqlite.connect(graph_db_path) as db:
@@ -1465,12 +1449,9 @@ async def get_graph_relations(
                 "success": True,
                 "relations": relations,
                 "total": total,
-            }
+            },
         )
 
     except Exception as e:
         logger.error(f"Failed to get graph relations: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get graph relations: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get graph relations: {str(e)}")

@@ -51,6 +51,7 @@ class PluginManager:
 
         # Tier 2: User plugins
         from dawei import get_dawei_home
+
         home = get_dawei_home()
         # User plugins: ~/.dawei/plugins/
         user_plugin_dir = home / ".dawei" / "plugins"

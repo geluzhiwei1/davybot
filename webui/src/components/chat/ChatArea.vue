@@ -80,13 +80,34 @@ const newMessage = ref('');
 const scrollbarRef = ref<InstanceType<typeof ElScrollbarType>>();
 const innerRef = ref<HTMLDivElement>();
 
+// 知识库选择 - 直接从 chatStore 获取
+const selectedKnowledgeBases = computed(() => chatStore.selectedKnowledgeBaseIds.value);
+
 const isLoading = computed(() => {
   return chatStore.isThinking;
 });
 
 const handleSendMessage = () => {
   if (newMessage.value.trim() && !isLoading.value && chatStore.isConnected) {
-    chatStore.sendMessage(newMessage.value);
+    // 【调试】打印知识库 ID
+    console.log('[CHAT_AREA] ========================================');
+    console.log('[CHAT_AREA] Sending message with knowledge base IDs:', selectedKnowledgeBases.value);
+    console.log('[CHAT_AREA] chatStore.selectedKnowledgeBaseIds:', chatStore.selectedKnowledgeBaseIds);
+    console.log('[CHAT_AREA] Type:', typeof selectedKnowledgeBases.value);
+    console.log('[CHAT_AREA] Length:', selectedKnowledgeBases.value?.length);
+    console.log('[CHAT_AREA] Is Array:', Array.isArray(selectedKnowledgeBases.value));
+    console.log('[CHAT_AREA] ========================================');
+
+    // 发送消息时，将选中的知识库 ID 列表传递给后端
+    const kbIds = selectedKnowledgeBases.value && selectedKnowledgeBases.value.length > 0
+      ? selectedKnowledgeBases.value
+      : undefined;
+    console.log('[CHAT_AREA] Final kbIds being sent:', kbIds);
+
+    chatStore.sendMessage(
+      newMessage.value,
+      kbIds
+    );
     newMessage.value = '';
   }
 };
@@ -205,6 +226,15 @@ watch([() => chatStore.messages, isLoading], scrollToBottom, { deep: true, immed
   background-color: var(--color-surface-1);
   height: auto;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.kb-selector-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .message-input-footer::before {

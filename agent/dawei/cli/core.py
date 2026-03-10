@@ -94,6 +94,14 @@ def cli(ctx, verbose, config, super):
             handlers=[logging.StreamHandler(sys.stderr)],
         )
 
+        # Suppress verbose websockets library logs even in verbose mode
+        logging.getLogger("websockets").setLevel(logging.WARNING)
+        logging.getLogger("websockets.server").setLevel(logging.WARNING)
+        logging.getLogger("websockets.client").setLevel(logging.WARNING)
+        logging.getLogger("websockets.legacy").setLevel(logging.WARNING)
+        logging.getLogger("websockets.asyncio.connection").setLevel(logging.WARNING)
+        logging.getLogger("websockets.sync.connection").setLevel(logging.WARNING)
+
 
 # Register command groups with the CLI
 cli.add_command(server_cmd)

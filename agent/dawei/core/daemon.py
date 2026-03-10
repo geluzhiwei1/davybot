@@ -99,9 +99,7 @@ def is_process_running(pid: int) -> bool:
         PROCESS_QUERY_INFORMATION = 0x0400
 
         try:
-            handle = ctypes.windll.kernel32.OpenProcess(
-                SYNCHRONIZE | PROCESS_QUERY_INFORMATION, False, pid
-            )
+            handle = ctypes.windll.kernel32.OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION, False, pid)
             if handle == 0:
                 return False
             ctypes.windll.kernel32.CloseHandle(handle)
@@ -158,10 +156,7 @@ def daemonize(
         it will raise NotImplementedError.
     """
     if sys.platform == "win32":
-        raise NotImplementedError(
-            "Daemon mode is not supported on Windows. "
-            "Use a service manager like NSSM or run as a background service."
-        )
+        raise NotImplementedError("Daemon mode is not supported on Windows. Use a service manager like NSSM or run as a background service.")
 
     # First fork
     try:

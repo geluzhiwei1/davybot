@@ -205,11 +205,7 @@ class HybridRetriever:
                     continue
 
                 # Get content from entity (try multiple fields)
-                content = (
-                    entity.properties.get("content") or
-                    entity.description or
-                    entity.name
-                )
+                content = entity.properties.get("content") or entity.description or entity.name
 
                 # Always add entity as a result
                 score = self._calculate_graph_relevance(entity, query.query)
@@ -219,12 +215,7 @@ class HybridRetriever:
                         content=content,
                         score=score,
                         source="graph",
-                        metadata={
-                            "entity_id": entity.id,
-                            "entity_type": entity.type,
-                            "entity_name": entity.name,
-                            **entity.properties
-                        },
+                        metadata={"entity_id": entity.id, "entity_type": entity.type, "entity_name": entity.name, **entity.properties},
                     )
                 )
 
@@ -236,11 +227,7 @@ class HybridRetriever:
 
                 for neighbor in neighbors:
                     # Skip if neighbor doesn't have any meaningful content
-                    neighbor_content = (
-                        neighbor.properties.get("content") or
-                        neighbor.description or
-                        neighbor.name
-                    )
+                    neighbor_content = neighbor.properties.get("content") or neighbor.description or neighbor.name
 
                     if not neighbor_content or neighbor_content == neighbor.name:
                         continue
@@ -254,12 +241,7 @@ class HybridRetriever:
                             content=neighbor_content,
                             score=score,
                             source="graph",
-                            metadata={
-                                "entity_id": neighbor.id,
-                                "entity_type": neighbor.type,
-                                "entity_name": neighbor.name,
-                                **neighbor.properties
-                            },
+                            metadata={"entity_id": neighbor.id, "entity_type": neighbor.type, "entity_name": neighbor.name, **neighbor.properties},
                         )
                     )
 

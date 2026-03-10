@@ -82,6 +82,7 @@ customModes:
       - "browser"
       - "command"
       - "mcp"
+      - "knowledge"
       - "task_graph"
       - "workflow"
     customInstructions: |
@@ -168,6 +169,7 @@ customModes:
       - "read"
       - "browser"
       - "mcp"
+      - "knowledge"
       - "task_graph"
       - "workflow"
     customInstructions: |
@@ -255,6 +257,7 @@ customModes:
       - "browser"
       - "command"
       - "mcp"
+      - "knowledge"
       - "workflow"
     customInstructions: |
       ## Do Mode 通用工作流程
@@ -340,6 +343,7 @@ customModes:
       - "command"
       - "browser"
       - "mcp"
+      - "knowledge"
     customInstructions: |
       ## Check Mode 通用工作流程
 
@@ -428,6 +432,7 @@ customModes:
       - "edit"
       - "browser"
       - "mcp"
+      - "knowledge"
       - "workflow"
     customInstructions: |
       ## Act Mode 通用工作流程

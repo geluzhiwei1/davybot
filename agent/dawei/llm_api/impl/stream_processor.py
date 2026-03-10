@@ -228,11 +228,7 @@ class StreamProcessor:
                 if chunk.strip():  # 只处理非空白内容
                     # ⚠️ Fallback: 纯文本chunk没有metadata，无法获取message_id
                     # 这通常意味着上游代码没有正确处理LLM响应
-                    logger.warning(
-                        f"[STREAM_PROCESSOR] Received raw string chunk (no metadata). "
-                        f"This indicates the chunk was not parsed from OpenAI format. "
-                        f"Content preview: {chunk[:100]!r}"
-                    )
+                    logger.warning(f"[STREAM_PROCESSOR] Received raw string chunk (no metadata). This indicates the chunk was not parsed from OpenAI format. Content preview: {chunk[:100]!r}")
                     result.append(ContentMessage(content=chunk))
                 return result
 

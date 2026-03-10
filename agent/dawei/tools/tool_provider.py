@@ -98,6 +98,8 @@ class CustomToolProvider(ToolProvider):
                 diff_applier,
                 document_parser,
                 edit_tools,
+                knowledge_management_tool,
+                knowledge_tool,
                 mcp_tools,
                 read_tools,
                 search_tools,
@@ -115,6 +117,8 @@ class CustomToolProvider(ToolProvider):
                 diff_applier,
                 timer_tools,
                 a2ui_tools,
+                knowledge_tool,
+                knowledge_management_tool,
             ]
 
             # Also check the top-level custom_tools __init__ for any directly defined/imported tools
@@ -165,13 +169,19 @@ class CustomToolProvider(ToolProvider):
                         except Exception as e:
                             # FAST FAIL: Log complete exception with stack trace
                             # Use WARNING level for optional dependencies (e.g., davy-market CLI)
-                            from dawei.market.cli_wrapper import CliNotFoundError
 
-                            # Check if this is an optional dependency error
-                            is_optional = isinstance(e, (CliNotFoundError, ImportError))
-                            # Also check for MarketNotAvailableError from market_tools
-                            if not is_optional and type(e).__name__ == "MarketNotAvailableError":
-                                is_optional = True
+                            # Try to import CliNotFoundError, but handle import failure gracefully
+                            is_optional = isinstance(e, ImportError) or type(e).__name__ in ("MarketNotAvailableError", "CliNotFoundError")
+
+                            # If we can import CliNotFoundError, do additional checks
+                            try:
+                                from dawei.market.cli_wrapper import CliNotFoundError
+
+                                if isinstance(e, CliNotFoundError):
+                                    is_optional = True
+                            except ImportError:
+                                # cli_wrapper import failed, rely on default checks
+                                pass
 
                             log_level = logging.WARNING if is_optional else logging.ERROR
                             logger.log(
@@ -223,10 +233,16 @@ class CustomToolProvider(ToolProvider):
                 # Create skills tools (always available)
                 skills_tools = create_skills_tools(skills_roots)
                 for skill_tool in skills_tools:
+                    # Extract args_schema from skills tools
+                    tool_args_schema = getattr(skill_tool, "args_schema", None)
+                    parameters = {}
+                    if tool_args_schema and inspect.isclass(tool_args_schema) and issubclass(tool_args_schema, BaseModel):
+                        parameters = self._pydantic_to_json_schema(tool_args_schema)
+
                     tool_dict = {
                         "name": skill_tool.name,
                         "description": skill_tool.description,
-                        "parameters": {},  # Skills tools use their own parameter parsing
+                        "parameters": parameters,
                         "callable": skill_tool,
                         "original_tool": skill_tool,
                     }
@@ -238,11 +254,17 @@ class CustomToolProvider(ToolProvider):
             except Exception:
                 logger.exception("Error loading skills tools: ")
 
-        except ImportError:
-            logger.exception("Failed to import custom tools package: ")
-            # 继续执行,不中断整个加载过程
-        except Exception:
-            logger.exception("Unexpected error loading custom tools: ")
+        except ImportError as e:
+            # Import errors should not fail the entire loading process
+            # Return already loaded tools
+            logger.warning(f"Import error during tool loading: {e}")
+            logger.info(f"Returning {len(tools)} successfully loaded tools despite import error")
+            return tools
+        except Exception as e:
+            # Unexpected errors - return what we have
+            logger.error(f"Unexpected error loading custom tools: {e}", exc_info=True)
+            logger.info(f"Returning {len(tools)} successfully loaded tools despite error")
+            return tools
 
         logger.info(f"Loaded {len(tools)} tools from CustomToolProvider")
         return tools

@@ -25,13 +25,14 @@ class MarkdownParser(BaseParser):
 
         # Extract metadata from frontmatter if present
         import re
+
         title = None
 
         frontmatter_match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
         if frontmatter_match:
             frontmatter = frontmatter_match.group(1)
             # Extract title from frontmatter
-            title_match = re.search(r'^title:\s*(.+)$', frontmatter, re.MULTILINE)
+            title_match = re.search(r"^title:\s*(.+)$", frontmatter, re.MULTILINE)
             if title_match:
                 title = title_match.group(1).strip().strip('"').strip("'")
 

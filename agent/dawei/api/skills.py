@@ -592,6 +592,7 @@ async def create_skill(
     skill_name = request.name.strip()
     # 替换不允许的字符
     import re
+
     skill_dir_name = re.sub(r'[<>:"/\\|?*]', "_", skill_name)
 
     # 确定创建路径

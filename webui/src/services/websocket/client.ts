@@ -206,9 +206,14 @@ export class WebSocketClient {
   /**
    * 发送用户消息
    */
-  async sendUserMessage(content: string, metadata?: unknown, userUIContext?: unknown): Promise<void> {
-    // 创建符合后端 UserWebSocketMessage 结构的消息
-    const message = {
+  async sendUserMessage(
+    content: string,
+    metadata?: unknown,
+    userUIContext?: unknown,
+    knowledgeBaseIds?: string[]
+  ): Promise<void> {
+    // Create user message with knowledge base IDs
+    const message: Record<string, unknown> = {
        id: this.generateId(),
        timestamp: new Date().toISOString(),
        type: 'user_message',
@@ -217,8 +222,13 @@ export class WebSocketClient {
        metadata,
        user_ui_context: userUIContext
     };
-    
-    // 直接发送消息对象，不使用 payload 包装
+
+    // Add knowledge base IDs if provided
+    if (knowledgeBaseIds && knowledgeBaseIds.length > 0) {
+      message.knowledge_base_ids = knowledgeBaseIds;
+    }
+
+    // Send message directly
     await this.sendMessage(message);
   }
 

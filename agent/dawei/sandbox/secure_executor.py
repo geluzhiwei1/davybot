@@ -136,9 +136,7 @@ class SecureCommandExecutor:
         # 当 DAWEI_SUPER_MODE=1 时，跳过所有安全检查，直接在本机执行
         if is_super_mode_enabled():
             log_security_bypass("command_execution", f"command={command}, workspace={workspace_path}")
-            logger.warning(
-                f"[SUPER MODE] 直接在本机执行命令（跳过沙箱和白名单）: {command[:50]}..."
-            )
+            logger.warning(f"[SUPER MODE] 直接在本机执行命令（跳过沙箱和白名单）: {command[:50]}...")
             # 直接使用 subprocess 执行，无任何限制
             return self._execute_with_subprocess_unsafe(command, workspace_path)
 
@@ -341,9 +339,7 @@ class SecureCommandExecutor:
             # 直接解析命令，不做任何验证
             args = shlex.split(command)
 
-            logger.warning(
-                f"[SUPER MODE] 执行不安全命令: args={args}, cwd={workspace_path}"
-            )
+            logger.warning(f"[SUPER MODE] 执行不安全命令: args={args}, cwd={workspace_path}")
 
             # 准备环境变量 - 继承系统完整环境（不只是PATH）
             env = os.environ.copy()
@@ -360,9 +356,7 @@ class SecureCommandExecutor:
 
             execution_time = int((time.time() - start_time) * 1000)
 
-            logger.warning(
-                f"[SUPER MODE] 命令执行完成: exit_code={result.returncode}, time={execution_time}ms"
-            )
+            logger.warning(f"[SUPER MODE] 命令执行完成: exit_code={result.returncode}, time={execution_time}ms")
 
             return {
                 "success": True,

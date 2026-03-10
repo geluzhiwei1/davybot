@@ -23,6 +23,7 @@ from dawei.core.decorators import safe_system_operation
 try:
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
+
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False
@@ -448,10 +449,7 @@ class MCPToolManager:
                 logger.warning(f"Failed to list resources for {server_name}: {e}")
                 server_info.resources = []
 
-            logger.info(
-                f"Successfully connected to MCP server: {server_name} "
-                f"({len(server_info.tools)} tools, {len(server_info.resources)} resources)"
-            )
+            logger.info(f"Successfully connected to MCP server: {server_name} ({len(server_info.tools)} tools, {len(server_info.resources)} resources)")
             return True
 
         except Exception as e:
@@ -562,9 +560,7 @@ class MCPToolManager:
             },
         }
 
-    async def call_tool(
-        self, server_name: str, tool_name: str, arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def call_tool(self, server_name: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """调用MCP工具
 
         Args:

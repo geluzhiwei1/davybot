@@ -73,6 +73,7 @@ class LLMExtractor(ExtractionStrategy):
         if self._llm_service is None:
             try:
                 from dawei.llm_api.llm_provider import LLMProviderManager
+
                 self._llm_service = LLMProviderManager()
                 logger.info("LLM service loaded successfully")
             except ImportError as e:
@@ -92,7 +93,7 @@ class LLMExtractor(ExtractionStrategy):
         """
         # Truncate text if too long
         if len(text) > self.max_text_length:
-            text = text[:self.max_text_length] + "..."
+            text = text[: self.max_text_length] + "..."
             logger.warning(f"Text truncated to {self.max_text_length} chars for LLM extraction")
 
         # Prepare prompt
@@ -110,10 +111,10 @@ class LLMExtractor(ExtractionStrategy):
             response = await self.llm_service.create_message(messages)
 
             # Extract response content
-            if hasattr(response, 'content'):
+            if hasattr(response, "content"):
                 content = response.content
             elif isinstance(response, dict):
-                content = response.get('content', '')
+                content = response.get("content", "")
             else:
                 content = str(response)
 
@@ -123,11 +124,13 @@ class LLMExtractor(ExtractionStrategy):
             result = self._parse_llm_response(content)
 
             # Add metadata
-            result.metadata.update({
-                "strategy": self.strategy_name,
-                "text_length": len(text),
-                "chunk_id": kwargs.get("chunk_id"),
-            })
+            result.metadata.update(
+                {
+                    "strategy": self.strategy_name,
+                    "text_length": len(text),
+                    "chunk_id": kwargs.get("chunk_id"),
+                }
+            )
 
             logger.info(f"LLM extraction completed: {len(result.entities)} entities, {len(result.relations)} relations")
             return result
@@ -135,11 +138,7 @@ class LLMExtractor(ExtractionStrategy):
         except Exception as e:
             logger.error(f"LLM extraction failed: {e}", exc_info=True)
             # Return empty result on failure
-            return ExtractionResult(
-                entities=[],
-                relations=[],
-                metadata={"error": str(e), "strategy": self.strategy_name}
-            )
+            return ExtractionResult(entities=[], relations=[], metadata={"error": str(e), "strategy": self.strategy_name})
 
     def _parse_llm_response(self, response: str) -> ExtractionResult:
         """Parse LLM response into ExtractionResult
@@ -175,25 +174,29 @@ class LLMExtractor(ExtractionStrategy):
             # Parse entities
             entities = []
             for entity_data in data.get("entities", []):
-                entities.append(ExtractedEntity(
-                    name=entity_data.get("name", ""),
-                    type=entity_data.get("type", "OTHER"),
-                    properties=entity_data.get("properties", {}),
-                    confidence=0.85,
-                    mention_count=1,
-                ))
+                entities.append(
+                    ExtractedEntity(
+                        name=entity_data.get("name", ""),
+                        type=entity_data.get("type", "OTHER"),
+                        properties=entity_data.get("properties", {}),
+                        confidence=0.85,
+                        mention_count=1,
+                    )
+                )
 
             # Parse relations
             relations = []
             for rel_data in data.get("relations", []):
-                relations.append(ExtractedRelation(
-                    from_entity=rel_data.get("from_entity", ""),
-                    to_entity=rel_data.get("to_entity", ""),
-                    relation_type=rel_data.get("relation_type", "OTHER"),
-                    properties=rel_data.get("properties", {}),
-                    confidence=0.80,
-                    mention_count=1,
-                ))
+                relations.append(
+                    ExtractedRelation(
+                        from_entity=rel_data.get("from_entity", ""),
+                        to_entity=rel_data.get("to_entity", ""),
+                        relation_type=rel_data.get("relation_type", "OTHER"),
+                        properties=rel_data.get("properties", {}),
+                        confidence=0.80,
+                        mention_count=1,
+                    )
+                )
 
             return ExtractionResult(
                 entities=entities,
@@ -208,11 +211,7 @@ class LLMExtractor(ExtractionStrategy):
             logger.error(f"Error parsing LLM response: {e}")
             return ExtractionResult(entities=[], relations=[])
 
-    async def extract_batch(
-        self,
-        texts: List[str],
-        **kwargs
-    ) -> List[ExtractionResult]:
+    async def extract_batch(self, texts: List[str], **kwargs) -> List[ExtractionResult]:
         """Extract from multiple texts sequentially
 
         Args:
@@ -224,7 +223,7 @@ class LLMExtractor(ExtractionStrategy):
         """
         results = []
         for i, text in enumerate(texts):
-            logger.info(f"Processing text {i+1}/{len(texts)}")
+            logger.info(f"Processing text {i + 1}/{len(texts)}")
             result = await self.extract(text, **kwargs)
             results.append(result)
         return results

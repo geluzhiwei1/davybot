@@ -43,9 +43,7 @@ class SQLiteFTSStore(FullTextStore):
         """
         async with aiosqlite.connect(self.db_path) as db:
             # Check if FTS table already exists
-            cursor = await db.execute(
-                f"SELECT name FROM sqlite_master WHERE type='table' AND name='{self.table_name}'"
-            )
+            cursor = await db.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{self.table_name}'")
             existing_tables = await cursor.fetchall()
 
             if existing_tables:
@@ -84,7 +82,7 @@ class SQLiteFTSStore(FullTextStore):
                 try:
                     # Convert metadata to JSON string
                     # Use model_dump() instead of dict() for Pydantic models
-                    if hasattr(chunk.metadata, 'model_dump'):
+                    if hasattr(chunk.metadata, "model_dump"):
                         metadata_dict = chunk.metadata.model_dump()
                     else:
                         metadata_dict = dict(chunk.metadata)
@@ -92,17 +90,17 @@ class SQLiteFTSStore(FullTextStore):
                     metadata_json = json.dumps(metadata_dict, default=str)
 
                     # Extract file name from metadata
-                    file_name = metadata_dict.get('file_name', metadata_dict.get('file_path', ''))
+                    file_name = metadata_dict.get("file_name", metadata_dict.get("file_path", ""))
 
                     # Use document_id from metadata if available, otherwise from chunk
-                    document_id = metadata_dict.get('document_id', chunk.document_id)
+                    document_id = metadata_dict.get("document_id", chunk.document_id)
 
                     # Insert into FTS table
                     await db.execute(
                         f"""INSERT INTO {self.table_name}
                         (chunk_id, document_id, content, file_name, metadata)
                         VALUES (?, ?, ?, ?, ?)""",
-                        (chunk.id, document_id, chunk.content, file_name, metadata_json)
+                        (chunk.id, document_id, chunk.content, file_name, metadata_json),
                     )
 
                     success_count += 1
@@ -215,10 +213,7 @@ class SQLiteFTSStore(FullTextStore):
         """
         async with aiosqlite.connect(self.db_path) as db:
             # Delete from FTS index
-            await db.execute(
-                f"DELETE FROM {self.table_name} WHERE document_id = ?",
-                (document_id,)
-            )
+            await db.execute(f"DELETE FROM {self.table_name} WHERE document_id = ?", (document_id,))
 
             # Delete from content table (FTS table only)
             # FTS5 doesn't need separate delete, it's already done above
@@ -241,10 +236,7 @@ class SQLiteFTSStore(FullTextStore):
 
         async with aiosqlite.connect(self.db_path) as db:
             # Query from FTS table (we only have FTS table now, no separate content table)
-            cursor = await db.execute(
-                f"SELECT chunk_id, document_id, content, file_name, metadata FROM {self.table_name} WHERE chunk_id = ?",
-                (chunk_id,)
-            )
+            cursor = await db.execute(f"SELECT chunk_id, document_id, content, file_name, metadata FROM {self.table_name} WHERE chunk_id = ?", (chunk_id,))
             row = await cursor.fetchone()
 
             if not row:
@@ -256,7 +248,7 @@ class SQLiteFTSStore(FullTextStore):
             return DocumentChunk(
                 id=chunk_id,
                 document_id=document_id,
-                chunk_index=metadata.get('chunk_index', 0),
+                chunk_index=metadata.get("chunk_index", 0),
                 content=content,
                 metadata=metadata,
             )
@@ -281,7 +273,7 @@ class SQLiteFTSStore(FullTextStore):
                 f"""UPDATE {self.table_name}
                 SET content = ?, metadata = ?
                 WHERE chunk_id = ?""",
-                (chunk.content, metadata_json, chunk_id)
+                (chunk.content, metadata_json, chunk_id),
             )
 
             await db.commit()

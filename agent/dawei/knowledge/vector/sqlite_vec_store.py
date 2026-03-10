@@ -92,9 +92,7 @@ class SQLiteVecVectorStore(VectorStore):
                 )
             except sqlite3.OperationalError:
                 # Fallback: create regular index on metadata
-                await db.execute(
-                    f"CREATE INDEX IF NOT EXISTS idx_metadata ON {self.table_name}(metadata)"
-                )
+                await db.execute(f"CREATE INDEX IF NOT EXISTS idx_metadata ON {self.table_name}(metadata)")
 
             await db.commit()
 

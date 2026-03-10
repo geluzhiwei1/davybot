@@ -114,10 +114,7 @@ class MarketInstaller:
             search_results = search_result.get("results", [])
 
             if not search_results:
-                raise InstallationError(
-                    f"Search returned no results for '{resource_name}'. "
-                    f"Please check the resource name and try again."
-                )
+                raise InstallationError(f"Search returned no results for '{resource_name}'. Please check the resource name and try again.")
 
             # Find exact match by name or id
             for result in search_results:
@@ -135,13 +132,9 @@ class MarketInstaller:
                 return f"{resource_type.value}://{first_id}"
 
         except CliExecutionError as e:
-            raise InstallationError(
-                f"Failed to search for '{resource_name}': {e.message}"
-            ) from e
+            raise InstallationError(f"Failed to search for '{resource_name}': {e.message}") from e
         except Exception as e:
-            raise InstallationError(
-                f"Failed to search for '{resource_name}': {e}"
-            ) from e
+            raise InstallationError(f"Failed to search for '{resource_name}': {e}") from e
 
     def _get_resource_dir(self, resource_type: ResourceType) -> Path:
         """Get installation directory for resource type."""
@@ -239,10 +232,7 @@ class MarketInstaller:
                         )
                     else:
                         # Settings say installed, but files don't exist - need to reinstall
-                        logger.warning(
-                            f"{resource_type} '{resource_name}' marked as installed but files missing. "
-                            f"Reinstalling..."
-                        )
+                        logger.warning(f"{resource_type} '{resource_name}' marked as installed but files missing. Reinstalling...")
                         # Remove from settings to allow reinstallation
                         self.settings.remove_installed(resource_type, resource_name)
                         self._save_settings()
@@ -263,10 +253,7 @@ class MarketInstaller:
                         )
                     else:
                         # Settings say installed, but files don't exist - need to reinstall
-                        logger.warning(
-                            f"{resource_type} '{resource_name}' marked as installed but files missing. "
-                            f"Reinstalling..."
-                        )
+                        logger.warning(f"{resource_type} '{resource_name}' marked as installed but files missing. Reinstalling...")
                         # Remove from settings to allow reinstallation
                         self.settings.remove_installed(resource_type, resource_name)
                         self._save_settings()
@@ -602,12 +589,7 @@ class MarketInstaller:
         # Convert to plugin dictionaries
         plugins = []
         for plugin_name in installed_plugins:
-            plugins.append({
-                "name": plugin_name,
-                "type": "plugin",
-                "install_path": f"{self.workspace}/.dawei/plugins/{plugin_name}",
-                "scope": "workspace"
-            })
+            plugins.append({"name": plugin_name, "type": "plugin", "install_path": f"{self.workspace}/.dawei/plugins/{plugin_name}", "scope": "workspace"})
 
         return plugins
 

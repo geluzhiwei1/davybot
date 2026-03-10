@@ -92,10 +92,8 @@ class NERModelExtractor(ExtractionStrategy):
                     # Model not installed, try to download
                     logger.warning(f"spaCy model '{model}' not found, attempting download...")
                     import subprocess
-                    subprocess.run(
-                        ["python", "-m", "spacy", "download", model],
-                        check=True
-                    )
+
+                    subprocess.run(["python", "-m", "spacy", "download", model], check=True)
                     self._nlp = spacy.load(model)
                     logger.info(f"Downloaded and loaded spaCy model: {model}")
 
@@ -140,10 +138,7 @@ class NERModelExtractor(ExtractionStrategy):
                     continue
 
                 # Map entity type
-                entity_type = self.SPACY_ENTITY_MAP.get(
-                    ent.label_,
-                    "OTHER"
-                )
+                entity_type = self.SPACY_ENTITY_MAP.get(ent.label_, "OTHER")
 
                 # Deduplicate
                 if entity_name not in seen_entities:
@@ -154,20 +149,22 @@ class NERModelExtractor(ExtractionStrategy):
                             "label": ent.label_,
                             "start": ent.start_char,
                             "end": ent.end_char,
-                        }
+                        },
                     }
                 else:
                     seen_entities[entity_name]["count"] += 1
 
             # Create ExtractedEntity objects
             for name, data in seen_entities.items():
-                entities.append(ExtractedEntity(
-                    name=name,
-                    type=data["type"],
-                    properties=data["properties"],
-                    confidence=0.9,  # High confidence for professional models
-                    mention_count=data["count"],
-                ))
+                entities.append(
+                    ExtractedEntity(
+                        name=name,
+                        type=data["type"],
+                        properties=data["properties"],
+                        confidence=0.9,  # High confidence for professional models
+                        mention_count=data["count"],
+                    )
+                )
 
             # Extract relations (dependency-based)
             if self.extract_relations:
@@ -182,7 +179,7 @@ class NERModelExtractor(ExtractionStrategy):
                     "library": self.library,
                     "entity_count": len(entities),
                     "relation_count": len(relations),
-                }
+                },
             )
 
             logger.debug(f"NER extraction: {len(entities)} entities, {len(relations)} relations")
@@ -190,17 +187,9 @@ class NERModelExtractor(ExtractionStrategy):
 
         except Exception as e:
             logger.error(f"NER extraction failed: {e}", exc_info=True)
-            return ExtractionResult(
-                entities=[],
-                relations=[],
-                metadata={"error": str(e)}
-            )
+            return ExtractionResult(entities=[], relations=[], metadata={"error": str(e)})
 
-    def _extract_dependency_relations(
-        self,
-        doc,
-        entities: List[ExtractedEntity]
-    ) -> List[ExtractedRelation]:
+    def _extract_dependency_relations(self, doc, entities: List[ExtractedEntity]) -> List[ExtractedRelation]:
         """Extract relations based on dependency parsing
 
         Args:
@@ -225,17 +214,19 @@ class NERModelExtractor(ExtractionStrategy):
                     # Determine relation type based on dependency
                     rel_type = self._map_dependency_to_relation(token.dep_)
 
-                    relations.append(ExtractedRelation(
-                        from_entity=token.text,
-                        to_entity=head.text,
-                        relation_type=rel_type,
-                        properties={
-                            "dependency": token.dep_,
-                            "source": "dependency_parsing",
-                        },
-                        confidence=0.75,
-                        mention_count=1,
-                    ))
+                    relations.append(
+                        ExtractedRelation(
+                            from_entity=token.text,
+                            to_entity=head.text,
+                            relation_type=rel_type,
+                            properties={
+                                "dependency": token.dep_,
+                                "source": "dependency_parsing",
+                            },
+                            confidence=0.75,
+                            mention_count=1,
+                        )
+                    )
 
         return relations
 
@@ -259,11 +250,7 @@ class NERModelExtractor(ExtractionStrategy):
         }
         return mapping.get(dep, "related_to")
 
-    async def extract_batch(
-        self,
-        texts: List[str],
-        **kwargs
-    ) -> List[ExtractionResult]:
+    async def extract_batch(self, texts: List[str], **kwargs) -> List[ExtractionResult]:
         """Extract from multiple texts efficiently
 
         spaCy supports batch processing for better performance.
@@ -296,32 +283,26 @@ class NERModelExtractor(ExtractionStrategy):
                 entity_type = self.SPACY_ENTITY_MAP.get(ent.label_, "OTHER")
 
                 if entity_name not in seen_entities:
-                    seen_entities[entity_name] = {
-                        "type": entity_type,
-                        "count": 1,
-                        "properties": {"label": ent.label_}
-                    }
+                    seen_entities[entity_name] = {"type": entity_type, "count": 1, "properties": {"label": ent.label_}}
                 else:
                     seen_entities[entity_name]["count"] += 1
 
             for name, data in seen_entities.items():
-                entities.append(ExtractedEntity(
-                    name=name,
-                    type=data["type"],
-                    properties=data["properties"],
-                    confidence=0.9,
-                    mention_count=data["count"],
-                ))
+                entities.append(
+                    ExtractedEntity(
+                        name=name,
+                        type=data["type"],
+                        properties=data["properties"],
+                        confidence=0.9,
+                        mention_count=data["count"],
+                    )
+                )
 
             # Extract relations if enabled
             relations = []
             if self.extract_relations:
                 relations = self._extract_dependency_relations(doc, entities)
 
-            results.append(ExtractionResult(
-                entities=entities,
-                relations=relations,
-                metadata={"strategy": self.strategy_name}
-            ))
+            results.append(ExtractionResult(entities=entities, relations=relations, metadata={"strategy": self.strategy_name}))
 
         return results

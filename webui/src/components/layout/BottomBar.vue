@@ -49,6 +49,49 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+
+      <!-- 知识库选择器 -->
+      <el-dropdown @command="toggleKnowledgeBase" :disabled="loadingKnowledgeBases">
+        <el-button>
+          <el-icon>
+            <Reading />
+          </el-icon>
+          {{ getKnowledgeBaseDisplayText() }}
+          <el-icon class="el-icon--right"><arrow-down /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item v-for="base in knowledgeBases" :key="base.id" :command="base">
+              <div class="kb-dropdown-item">
+                <el-checkbox
+                  :model-value="selectedKnowledgeBases.includes(base.id)"
+                  @change="() => toggleKnowledgeBase(base)"
+                  @click.stop
+                >
+                  {{ base.name }}
+                </el-checkbox>
+                <div class="kb-meta">
+                  <el-tag v-if="base.is_default" type="success" size="small">默认</el-tag>
+                  <el-tag size="small" type="info">{{ base.stats.total_documents }}</el-tag>
+                </div>
+              </div>
+            </el-dropdown-item>
+            <el-dropdown-item divided :disabled="true">
+              <div class="kb-footer">
+                <el-button text @click="handleOpenKnowledgeDrawer" size="small">
+                  <el-icon><Setting /></el-icon>
+                  管理
+                </el-button>
+                <el-button text @click="loadKnowledgeBases" size="small" :loading="loadingKnowledgeBases">
+                  <el-icon><Refresh /></el-icon>
+                  刷新
+                </el-button>
+              </div>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+
       <el-button @click="refreshConfig" :loading="refreshing" :icon="Refresh" circle title="重新加载Agent和LLM配置" />
     </div>
 
@@ -62,10 +105,12 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useChatStore } from '@/stores/chat';
-import { ElFooter, ElDropdown, ElDropdownMenu, ElDropdownItem, ElButton, ElIcon, ElMessage } from 'element-plus';
-import { ArrowDown, Cpu, Refresh } from '@element-plus/icons-vue';
+import { ElFooter, ElDropdown, ElDropdownMenu, ElDropdownItem, ElButton, ElIcon, ElMessage, ElCheckbox, ElTag, ElSwitch, ElTooltip } from 'element-plus';
+import { ArrowDown, Cpu, Reading, Refresh, Setting } from '@element-plus/icons-vue';
 import { workspacesApi } from '@/services/api';
+import { knowledgeBasesApi } from '@/services/api/knowledge';
 import { httpClient } from '@/services/api/http';
+import type { KnowledgeBase } from '@/types/knowledge';
 
 interface Mode {
   slug: string;
@@ -83,6 +128,11 @@ interface LLM {
 
 const currentMode = ref<Mode | null>(null);
 const modes = ref<Mode[]>([]);
+
+// 知识库选择
+const selectedKnowledgeBases = ref<string[]>([]);
+const knowledgeBases = ref<KnowledgeBase[]>([]);
+const loadingKnowledgeBases = ref(false);
 
 // 从mode name中提取emoji和display name
 const getModeIcon = (mode: Mode): string => {
@@ -189,7 +239,7 @@ const fetchLLMs = async (forceReload = false) => {
 };
 
 onMounted(async () => {
-  await Promise.all([fetchModes(), fetchLLMs()]);
+  await Promise.all([fetchModes(), fetchLLMs(), loadKnowledgeBases()]);
 });
 
 const selectMode = async (mode: Mode) => {
@@ -213,7 +263,6 @@ const selectLLM = async (llm: LLM) => {
 
     if (!workspaceId) {
       ElMessage.error('工作区ID不存在');
-      console.error('Workspace ID is missing:', route.params);
       return;
     }
 
@@ -224,11 +273,72 @@ const selectLLM = async (llm: LLM) => {
     currentLLM.value = llm;
     // 更新 chatStore 中的 uiContext
     chatStore.uiContext.currentLlmId = llm.llm_id;
-    ElMessage.success('LLM 已更新');
   } catch (error) {
-    console.error('Error updating LLM:', error);
-    ElMessage.error('更新LLM时发生网络错误');
+    ElMessage.error('切换 LLM 失败');
+    console.error('Error switching LLM:', error);
   }
+};
+
+// 加载知识库列表
+const loadKnowledgeBases = async () => {
+  loadingKnowledgeBases.value = true;
+  try {
+    const response = await knowledgeBasesApi.listBases();
+    knowledgeBases.value = response.items;
+  } catch (error) {
+    console.error('Failed to load knowledge bases:', error);
+  } finally {
+    loadingKnowledgeBases.value = false;
+  }
+};
+
+// 处理知识库选择变化
+const handleKnowledgeBasesChange = (baseIds: string[]) => {
+  console.log('[BOTTOM_BAR] Selected knowledge bases:', baseIds);
+  // 更新 chat store
+  chatStore.selectedKnowledgeBaseIds = baseIds;
+};
+
+// 获取知识库显示文本
+const getKnowledgeBaseDisplayText = (): string => {
+  if (selectedKnowledgeBases.value.length === 0) {
+    return '知识库';
+  } else if (selectedKnowledgeBases.value.length === 1) {
+    const base = knowledgeBases.value.find(b => b.id === selectedKnowledgeBases.value[0]);
+    return base ? base.name : '知识库';
+  } else {
+    return `知识库 (${selectedKnowledgeBases.value.length})`;
+  }
+};
+
+// 切换知识库选择状态
+const toggleKnowledgeBase = (base: KnowledgeBase) => {
+  console.log('[BOTTOM_BAR] toggleKnowledgeBase called with:', {
+    'base.id': base.id,
+    'base.id type': typeof base.id,
+    'base.id length': base.id.length,
+    'base.name': base.name
+  });
+
+  const index = selectedKnowledgeBases.value.indexOf(base.id);
+  if (index > -1) {
+    // 已选中，移除
+    selectedKnowledgeBases.value.splice(index, 1);
+  } else {
+    // 未选中，添加
+    selectedKnowledgeBases.value.push(base.id);
+    console.log('[BOTTOM_BAR] Added base.id to selectedKnowledgeBases:', base.id);
+  }
+  // 【修复】更新 chat store，确保 ChatArea 能读取到选择的知识库
+  chatStore.selectedKnowledgeBaseIds = [...selectedKnowledgeBases.value];
+  console.log('[BOTTOM_BAR] Updated chatStore.selectedKnowledgeBaseIds:', chatStore.selectedKnowledgeBaseIds);
+  console.log('[BOTTOM_BAR] Verification - First ID length:', chatStore.selectedKnowledgeBaseIds[0]?.length);
+};
+
+// 打开知识库管理抽屉
+const handleOpenKnowledgeDrawer = () => {
+  // 触发打开知识库管理面板的事件
+  window.dispatchEvent(new CustomEvent('open-knowledge-drawer'));
 };
 
 const refreshConfig = async () => {
@@ -239,6 +349,7 @@ const refreshConfig = async () => {
     const workspaceId = route.params.workspaceId as string;
     if (!workspaceId) {
       ElMessage.error('工作区ID不存在');
+      console.error('Workspace ID is missing:', route.params);
       return;
     }
 
@@ -259,68 +370,60 @@ const refreshConfig = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 44px;
-  padding: 0 16px;
-  background-color: var(--el-bg-color-overlay);
-  border-top: 1px solid var(--el-border-color-light);
+  padding: 8px 16px;
+  background-color: var(--el-bg-color-page);
+  border-top: 1px solid var(--el-border-color-lighter);
+  height: 60px;
+  box-sizing: border-box;
 }
 
-.left-controls,
+.left-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  overflow-x: auto;
+}
+
 .right-controls {
   display: flex;
   align-items: center;
-  gap: 16px;
-}
-
-/* 下拉菜单项样式优化 */
-:deep(.el-dropdown-menu__item) {
-  padding: 8px 12px;
-  line-height: 1.5;
-  min-height: 56px;
-}
-
-:deep(.el-dropdown-menu__item:hover) {
-  background-color: var(--el-fill-color-light);
+  gap: 12px;
 }
 
 .mode-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.mode-item:hover {
+  background-color: var(--el-bg-color);
 }
 
 .mode-icon {
-  font-size: 20px;
-  line-height: 1;
+  font-size: 24px;
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .mode-info {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .mode-name-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .mode-name {
-  font-size: 14px;
   font-weight: 500;
   color: var(--el-text-color-primary);
-  line-height: 1.4;
 }
 
 .mode-description {
@@ -329,51 +432,117 @@ const refreshConfig = async () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.3;
 }
 
-/* Source 标签样式 */
-:deep(.el-tag.source-tag-system) {
-  background-color: var(--el-color-info-light-9);
-  border-color: var(--el-color-info-light-7);
-  color: var(--el-color-info);
-  font-size: 11px;
-  height: 18px;
-  line-height: 18px;
-  padding: 0 6px;
-  font-weight: 500;
+.source-tag-system {
+  background-color: #e7f5ff;
+  color: #0050b3;
+  border-color: #91caff;
 }
 
-:deep(.el-tag.source-tag-user) {
-  background-color: var(--el-color-success-light-9);
-  border-color: var(--el-color-success-light-7);
-  color: var(--el-color-success);
-  font-size: 11px;
-  height: 18px;
-  line-height: 18px;
-  padding: 0 6px;
-  font-weight: 500;
+.source-tag-user {
+  background-color: #f6ffed;
+  color: #389e0d;
+  border-color: #b7eb8f;
 }
 
-:deep(.el-tag.source-tag-workspace) {
-  background-color: var(--el-color-warning-light-9);
-  border-color: var(--el-color-warning-light-7);
-  color: var(--el-color-warning);
-  font-size: 11px;
-  height: 18px;
-  line-height: 18px;
-  padding: 0 6px;
-  font-weight: 500;
-}
-
-/* 默认标签优化 */
-:deep(.el-dropdown-menu__item .el-tag) {
-  flex-shrink: 0;
+.source-tag-workspace {
+  background-color: #fff7e6;
+  color: #d46b08;
+  border-color: #ffd591;
 }
 
 .llm-model-id {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   margin-left: 8px;
+}
+
+/* 知识库选择器样式 */
+.kb-selector-label {
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+  white-space: nowrap;
+}
+
+.kb-selector-inline {
+  width: 300px;
+  max-width: 300px;
+}
+
+.kb-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.kb-name {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.kb-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.kb-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.kb-dropdown-item .el-checkbox {
+  width: 100%;
+  margin: 0;
+}
+
+/* 标签折叠优化 */
+.kb-selector-inline :deep(.el-select__tags) {
+  max-width: calc(100% - 32px);
+}
+
+.kb-selector-inline :deep(.el-tag) {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .bottom-bar {
+    padding: 8px;
+  }
+
+  .left-controls {
+    gap: 8px;
+  }
+
+  .kb-selector-inline {
+    width: 200px;
+    max-width: 200px;
+  }
+
+  .kb-selector-label {
+    display: none; /* 移动端隐藏标签 */
+  }
 }
 </style>
