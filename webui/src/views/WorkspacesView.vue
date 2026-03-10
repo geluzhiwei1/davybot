@@ -237,7 +237,7 @@
     <!-- Hero Title -->
     <div class="hero-section">
       <h1 class="hero-title">DaweiBot</h1>
-      <p class="hero-description">AI驱动的智能工作空间平台</p>
+      <p class="hero-description">AI驱动的智能工作平台</p>
     </div>
 
     <!-- 全局统计卡片 -->

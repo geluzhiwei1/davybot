@@ -234,41 +234,33 @@ const handleSubmit = async () => {
 
     if (isEditMode.value) {
       // 编辑模式
-      const updateData: UpdateWorkspaceRequest = {
+      const updateData = {
         display_name: formData.display_name,
         description: formData.description
       }
 
-      const response = await workspaceService.updateWorkspace(
+      const response = await workspacesApi.updateWorkspace(
         props.workspace.id,
         updateData
       )
 
-      if (response.success) {
-        ElMessage.success('工作区更新成功')
-        emit('updated', response.workspace)
-        handleClose()
-      } else {
-        ElMessage.error(response.error || '更新失败')
-      }
+      ElMessage.success('工作区更新成功')
+      emit('updated', response)
+      handleClose()
     } else {
       // 创建模式
-      const createData: CreateWorkspaceRequest = {
+      const createData = {
         path: formData.path,
         name: formData.name || undefined,
         display_name: formData.display_name,
         description: formData.description || undefined
       }
 
-      const response = await workspaceService.createWorkspace(createData)
+      const response = await workspacesApi.createWorkspace(createData)
 
-      if (response.success) {
-        ElMessage.success('工作区创建成功')
-        emit('created', response.workspace)
-        handleClose()
-      } else {
-        ElMessage.error(response.error || '创建失败')
-      }
+      ElMessage.success('工作区创建成功')
+      emit('created', response)
+      handleClose()
     }
   } catch (error: unknown) {
     console.error('Form submission error:', error)
