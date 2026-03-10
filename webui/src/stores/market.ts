@@ -226,7 +226,16 @@ export const useMarketStore = defineStore('market', () => {
           const workspacesApi = apiManager.getWorkspacesApi();
 
           // 根据资源类型重新加载对应配置
-          const configType = type === 'plugin' ? 'tools' : type;
+          // 映射: 'skill' -> 'skills', 'plugin' -> 'tools', 'agent' -> 'all'
+          let configType: 'all' | 'skills' | 'modes' | 'tools';
+          if (type === 'plugin') {
+            configType = 'tools';
+          } else if (type === 'skill') {
+            configType = 'skills';
+          } else {
+            // 对于 'agent' 或其他未知类型，重新加载所有配置
+            configType = 'all';
+          }
           const result = await workspacesApi.reloadWorkspaceConfig(
             currentWorkspaceId.value,
             configType,

@@ -255,6 +255,7 @@ const {
   viewingMode,
   editingModeRules,
   modeForm,
+  modeYamlContent,
   savingMode,
   modeRulesContent,
   modeRuleFiles,

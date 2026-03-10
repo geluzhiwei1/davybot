@@ -91,6 +91,16 @@ class CliWrapper:
         elif isinstance(error, ValidationError):
             raise CliExecutionError(context, 422, error_msg)
         elif isinstance(error, APIError):
+            # Check if error message contains 502 (Bad Gateway) or 503 (Service Unavailable)
+            if "502" in error_msg or "503" in error_msg:
+                # These are temporary server errors, provide more helpful message
+                raise CliExecutionError(
+                    context,
+                    503,
+                    f"Market API is temporarily unavailable (502/503). "
+                    f"The server may be overloaded or down for maintenance. "
+                    f"Please try again later. Original error: {error_msg}"
+                )
             raise CliExecutionError(context, 500, error_msg)
         else:
             raise CliExecutionError(context, 500, error_msg)
@@ -187,8 +197,16 @@ class CliWrapper:
                     )
         except NotFoundError:
             # Resource type not found in market, return empty result
+            logger.info(f"Resource type '{resource_type}' not found in market, returning empty list")
             return {"resources": [], "total": 0, "success": True}
+        except APIError as e:
+            # Log the API error for debugging
+            error_msg = str(e)
+            logger.error(f"Market API error when listing {resource_type}: {error_msg}")
+            # Re-raise with better context
+            self._handle_error(e, f"list {resource_type}")
         except Exception as e:
+            logger.error(f"Unexpected error listing {resource_type}: {e}")
             self._handle_error(e, f"list {resource_type}")
 
     def list_skills(self, limit: int = 50, skip: int = 0) -> Dict[str, Any]:

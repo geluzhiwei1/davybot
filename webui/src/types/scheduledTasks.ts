@@ -1,13 +1,7 @@
-export interface ScheduledTask {
-  id: string;
-  name: string;
-  description?: string;
-  cron: string;
-  enabled: boolean;
-  status: 'idle' | 'running' | 'success' | 'error';
-  last_run?: string;
-  next_run?: string;
-  command: string;
-  args?: string[];
-  working_dir?: string;
-}
+// Re-export from API types to maintain backward compatibility
+export type {
+  ScheduledTask,
+  ScheduledTaskExecution,
+  ScheduledTasksListResponse,
+  ScheduledTaskExecutionsResponse
+} from '@/services/api/types';

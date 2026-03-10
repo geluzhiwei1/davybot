@@ -483,6 +483,7 @@ export interface ScheduledTask {
     mode?: string;
   };
   status: 'pending' | 'paused' | 'triggered' | 'completed' | 'failed' | 'cancelled';
+  enabled?: boolean;
   created_at: string;
   updated_at?: string;
   paused_at?: string;
