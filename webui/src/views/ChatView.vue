@@ -150,33 +150,33 @@
       :initial-tab="initialSettingsTab" />
 
     <!-- 语言模型抽屉 -->
-    <el-drawer v-model="isLLMDrawerVisible" :title="t('workspaceSettings.tabs.llmProvider')" direction="rtl" size="70%">
+    <el-drawer v-model="isLLMDrawerVisible" :title="t('workspaceSettings.tabs.llmProvider')" direction="rtl" size="90%">
       <LLMProvidersDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
     <!-- 技能抽屉 -->
-    <el-drawer v-model="isSkillsDrawerVisible" :title="t('workspaceSettings.tabs.skills')" direction="rtl" size="70%">
+    <el-drawer v-model="isSkillsDrawerVisible" :title="t('workspaceSettings.tabs.skills')" direction="rtl" size="90%">
       <SkillsDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
     <!-- 智能体抽屉 -->
-    <el-drawer v-model="isAgentsDrawerVisible" :title="t('workspaceSettings.tabs.agents')" direction="rtl" size="70%">
+    <el-drawer v-model="isAgentsDrawerVisible" :title="t('workspaceSettings.tabs.agents')" direction="rtl" size="90%">
       <AgentsDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
     <!-- 插件抽屉 -->
-    <el-drawer v-model="isPluginsDrawerVisible" :title="t('workspaceSettings.tabs.plugins')" direction="rtl" size="70%">
+    <el-drawer v-model="isPluginsDrawerVisible" :title="t('workspaceSettings.tabs.plugins')" direction="rtl" size="90%">
       <PluginsDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
     <!-- MCP抽屉 -->
-    <el-drawer v-model="isMCPDrawerVisible" :title="t('workspaceSettings.tabs.mcpServers')" direction="rtl" size="70%">
+    <el-drawer v-model="isMCPDrawerVisible" :title="t('workspaceSettings.tabs.mcpServers')" direction="rtl" size="90%">
       <MCPDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
     <!-- 定时任务抽屉 -->
     <el-drawer v-model="isScheduledTasksDrawerVisible" :title="t('workspaceSettings.tabs.scheduledTasks')"
-      direction="rtl" size="70%">
+      direction="rtl" size="90%">
       <ScheduledTasksDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
@@ -208,7 +208,7 @@ import { httpClient } from '@/services/api/http';
 import { appConfig } from '@/config/app.config';
 import { MessageType } from '@/types/websocket';
 import type { FollowupQuestionMessage } from '@/types/websocket';
-import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip } from 'element-plus';
+import { ElContainer, ElAside, ElHeader, ElMain, ElFooter, ElButton, ElTooltip, ElMessage } from 'element-plus';
 import { useI18n } from 'vue-i18n';
 import { useMobile } from '@/composables/useMobile';
 import {
@@ -443,7 +443,7 @@ if (appConfig.debug.exposeGlobal) {
 
 const isRightPanelVisible = computed(() => openFiles.value.length > 0);
 
-// 检查 LLM 配置，如果为空则自动打开设置
+// 检查 LLM 配置，如果为空则自动打开 LLM Providers 抽屉
 const checkLLMConfiguration = async () => {
   if (!chatStore.workspaceId) {
     return;
@@ -459,11 +459,9 @@ const checkLLMConfiguration = async () => {
     const hasConfigs = userConfigs.length > 0 || workspaceConfigs.length > 0;
 
     if (!hasConfigs) {
-      console.warn('[ChatView] No LLM providers configured, opening settings drawer');
-      // 设置初始 tab 为 'llm-providers'
-      initialSettingsTab.value = 'llm-providers';
-      // 打开设置抽屉
-      isSettingsDrawerVisible.value = true;
+      console.warn('[ChatView] No LLM providers configured, opening LLM Providers drawer');
+      // 打开 LLM Providers 抽屉
+      isLLMDrawerVisible.value = true;
 
       // 显示提示消息
       setTimeout(() => {

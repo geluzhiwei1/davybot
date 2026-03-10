@@ -177,7 +177,7 @@
       "compression": "压缩与记忆",
       "features": "功能开关",
       "monitoring": "日志监控",
-      "llmProvider": "语言模型",
+      "llmProvider": "大模型",
       "skills": "技能",
       "agents": "智能体",
       "plugins": "插件",
