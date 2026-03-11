@@ -223,18 +223,84 @@ async fn start_backend(app: tauri::AppHandle) -> Result<String, String> {
         logs.push(format!("✓ [start_backend] Detected standalone mode"));
 
         let venv_path = exe_dir.join("resources/python-env");
-        let full_command = format!("{} run dawei server start", uv_path.display());
-        let env_vars = format!("VIRTUAL_ENV={}", venv_path.display());
 
-        logs.push(format!("📁 [start_backend] Working directory: {:?}", exe_dir));
-        logs.push(format!("🔧 [start_backend] Environment: {}", env_vars));
-        logs.push(format!("⏳ [start_backend] Full command: {}", full_command));
+        // Determine the Python executable path based on platform
+        #[cfg(windows)]
+        let python_executable = venv_path.join("Scripts/python.exe");
+        #[cfg(unix)]
+        let python_executable = venv_path.join("bin/python");
 
-        Command::new(&uv_path)
-            .args(["run", "dawei", "server", "start"])
-            .env("VIRTUAL_ENV", &venv_path)
-            .current_dir(exe_dir)
-            .spawn()
+        #[cfg(windows)]
+        let dawei_exe = venv_path.join("Scripts/dawei.exe");
+        #[cfg(unix)]
+        let dawei_exe = venv_path.join("bin/dawei");
+
+        // Try multiple methods in order of preference
+        // Method 1: Direct dawei.exe execution (most reliable if exe exists)
+        // Method 2: Python module invocation (fallback, always works)
+
+        let mut spawn_result = None;
+
+        // Method 1: Try direct dawei.exe execution
+        if dawei_exe.exists() {
+            logs.push(format!("🎯 [start_backend] Method 1: Trying direct dawei.exe execution"));
+            let full_command = format!("{:?} server start", dawei_exe);
+            logs.push(format!("⏳ [start_backend] Full command: {}", full_command));
+
+            spawn_result = Some(Command::new(&dawei_exe)
+                .args(["server", "start"])
+                .env("VIRTUAL_ENV", &venv_path)
+                .current_dir(exe_dir)
+                .spawn());
+
+            match &spawn_result {
+                Some(Ok(_)) => {
+                    logs.push(format!("✅ [start_backend] Method 1 (direct exe) succeeded"));
+                }
+                Some(Err(e)) => {
+                    logs.push(format!("⚠️  [start_backend] Method 1 (direct exe) failed: {}", e));
+                }
+                None => {}
+            }
+        } else {
+            logs.push(format!("⚠️  [start_backend] dawei.exe not found, skipping Method 1"));
+        }
+
+        // Method 2: Python module invocation (fallback)
+        if spawn_result.is_none() || spawn_result.as_ref().unwrap().is_err() {
+            logs.push(format!("🎯 [start_backend] Method 2: Trying Python module invocation"));
+            let full_command = format!("{:?} -m dawei.cli.dawei server start", python_executable);
+
+            logs.push(format!("📁 [start_backend] Working directory: {:?}", exe_dir));
+            logs.push(format!("🐍 [start_backend] Python executable: {:?}", python_executable));
+            logs.push(format!("⏳ [start_backend] Full command: {}", full_command));
+
+            spawn_result = Some(Command::new(&python_executable)
+                .args(["-m", "dawei.cli.dawei", "server", "start"])
+                .env("VIRTUAL_ENV", &venv_path)
+                .current_dir(exe_dir)
+                .spawn());
+
+            match &spawn_result {
+                Some(Ok(_)) => {
+                    logs.push(format!("✅ [start_backend] Method 2 (Python module) succeeded"));
+                }
+                Some(Err(e)) => {
+                    logs.push(format!("❌ [start_backend] Method 2 (Python module) failed: {}", e));
+                }
+                None => {}
+            }
+        }
+
+        // Return the result
+        match spawn_result {
+            Some(Ok(child)) => Ok(child),
+            Some(Err(e)) => Err(e),
+            None => Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "No spawn method was attempted"
+            ))
+        }
     };
 
     match result {

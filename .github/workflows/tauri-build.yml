@@ -146,24 +146,64 @@ jobs:
             # Create venv with UV
             uv venv --python 3.12 .venv
 
-            # Install UV in the venv (needed for standalone)
-            # On Windows, use uv directly now
+            # Install project dependencies (includes CLI entry points)
+            # On Windows, use standard pip to ensure proper exe generation
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              uv pip install uv --target .venv
+              echo "Windows detected: using pip for installation to ensure exe generation"
+              .venv/Scripts/python.exe -m pip install -e .
             else
-              uv pip install uv --target .venv
+              echo "Unix detected: using uv for installation"
+              uv pip install -e .
             fi
 
-            # Install project dependencies
-            uv pip install -e .
+            # Verify dawei command is available
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              # On Windows, check for dawei.exe in Scripts
+              if [ -f ".venv/Scripts/dawei.exe" ]; then
+                echo "✓ dawei.exe found in Scripts directory"
+                .venv/Scripts/dawei.exe --version || echo "Version check failed"
+              else
+                echo "❌ ERROR: dawei.exe not found in Scripts directory"
+                echo "Contents of Scripts directory:"
+                ls -la .venv/Scripts/ | head -20
+                exit 1
+              fi
+            else
+              # On Unix, check for dawei in bin
+              if [ -f ".venv/bin/dawei" ]; then
+                echo "✓ dawei found in bin directory"
+                .venv/bin/dawei --version || echo "Version check failed"
+              else
+                echo "❌ ERROR: dawei not found in bin directory"
+                echo "Contents of bin directory:"
+                ls -la .venv/bin/ | head -20
+                exit 1
+              fi
+            fi
           else
             # Sync existing dependencies
-            uv pip install -e . 2>/dev/null || true
-            # Ensure uv is available
+            echo "Found existing .venv, syncing dependencies"
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              uv pip install uv 2>/dev/null || true
+              .venv/Scripts/python.exe -m pip install -e . 2>/dev/null || true
             else
-              uv pip install uv --target .venv 2>/dev/null || true
+              uv pip install -e . 2>/dev/null || true
+            fi
+
+            # Verify dawei command is available
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              if [ -f ".venv/Scripts/dawei.exe" ]; then
+                echo "✓ dawei.exe found in Scripts directory"
+              else
+                echo "❌ ERROR: dawei.exe not found after sync"
+                exit 1
+              fi
+            else
+              if [ -f ".venv/bin/dawei" ]; then
+                echo "✓ dawei found in bin directory"
+              else
+                echo "❌ ERROR: dawei not found after sync"
+                exit 1
+              fi
             fi
           fi
         shell: bash
@@ -177,6 +217,30 @@ jobs:
           # Clean up Python cache to reduce size
           find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
+
+          # Verify dawei command exists in copied environment
+          echo "=== Verifying dawei command in resources/python-env ==="
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            if [ -f "webui/src-tauri/resources/python-env/Scripts/dawei.exe" ]; then
+              echo "✓ dawei.exe found in resources/python-env/Scripts/"
+              webui/src-tauri/resources/python-env/Scripts/dawei.exe --version || echo "Version check failed"
+            else
+              echo "❌ ERROR: dawei.exe not found in resources/python-env/Scripts/"
+              echo "Contents of Scripts directory:"
+              ls -la webui/src-tauri/resources/python-env/Scripts/ | head -20
+              exit 1
+            fi
+          else
+            if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
+              echo "✓ dawei found in resources/python-env/bin/"
+              webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
+            else
+              echo "❌ ERROR: dawei not found in resources/python-env/bin/"
+              echo "Contents of bin directory:"
+              ls -la webui/src-tauri/resources/python-env/bin/ | head -20
+              exit 1
+            fi
+          fi
         shell: bash
 
       # ========== Prepare drawio resources ==========
