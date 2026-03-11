@@ -696,7 +696,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "davybot"
+name = "dawei-gui"
 version = "0.1.0"
 dependencies = [
  "chrono",
