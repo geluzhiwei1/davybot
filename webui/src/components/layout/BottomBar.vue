@@ -1,13 +1,13 @@
 /**
- * Copyright (c) 2025 格律至微
- * SPDX-License-Identifier: AGPL-3.0
- */
+* Copyright (c) 2025 格律至微
+* SPDX-License-Identifier: AGPL-3.0
+*/
 
 <template>
   <el-footer class="bottom-bar">
     <div class="left-controls">
       Agent：
-      <el-dropdown @command="selectMode">
+      <el-dropdown @command="selectMode" placement="top">
         <el-button>
           <span v-if="currentMode">{{ getModeIcon(currentMode) }} {{ getModeDisplayName(currentMode) }}</span>
           <el-icon class="el-icon--right"><arrow-down /></el-icon>
@@ -33,7 +33,7 @@
         </template>
       </el-dropdown>
       LLM:
-      <el-dropdown @command="selectLLM">
+      <el-dropdown @command="selectLLM" placement="top">
         <el-button>
           <el-icon>
             <Cpu />
@@ -51,7 +51,7 @@
       </el-dropdown>
 
       <!-- 知识库选择器 -->
-      <el-dropdown @command="toggleKnowledgeBase" :disabled="loadingKnowledgeBases">
+      <el-dropdown @command="toggleKnowledgeBase" :disabled="loadingKnowledgeBases" placement="top">
         <el-button>
           <el-icon>
             <Reading />
@@ -63,11 +63,8 @@
           <el-dropdown-menu>
             <el-dropdown-item v-for="base in knowledgeBases" :key="base.id" :command="base">
               <div class="kb-dropdown-item">
-                <el-checkbox
-                  :model-value="selectedKnowledgeBases.includes(base.id)"
-                  @change="() => toggleKnowledgeBase(base)"
-                  @click.stop
-                >
+                <el-checkbox :model-value="selectedKnowledgeBases.includes(base.id)"
+                  @change="() => toggleKnowledgeBase(base)" @click.stop>
                   {{ base.name }}
                 </el-checkbox>
                 <div class="kb-meta">
@@ -79,11 +76,15 @@
             <el-dropdown-item divided :disabled="true">
               <div class="kb-footer">
                 <el-button text @click="handleOpenKnowledgeDrawer" size="small">
-                  <el-icon><Setting /></el-icon>
+                  <el-icon>
+                    <Setting />
+                  </el-icon>
                   管理
                 </el-button>
                 <el-button text @click="loadKnowledgeBases" size="small" :loading="loadingKnowledgeBases">
-                  <el-icon><Refresh /></el-icon>
+                  <el-icon>
+                    <Refresh />
+                  </el-icon>
                   刷新
                 </el-button>
               </div>
@@ -542,7 +543,8 @@ const refreshConfig = async () => {
   }
 
   .kb-selector-label {
-    display: none; /* 移动端隐藏标签 */
+    display: none;
+    /* 移动端隐藏标签 */
   }
 }
 </style>
