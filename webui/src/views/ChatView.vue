@@ -91,11 +91,41 @@
         :chat-panel-collapsed="isChatPanelCollapsed" :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-aside>
 
-    <!-- 左侧面板拖动分隔条 (仅桌面端) -->
-    <ResizerBar v-if="!isSidePanelCollapsed && !isMobile" :panel-ref="{ width: sidePanelWidth }" :min-width="100"
-      storage-key="dawei-sidepanel-width" @resize="sidePanelWidth = $event" />
+    <!-- 主内容区 - 桌面端使用固定宽度50% -->
+    <el-aside v-show="!isChatPanelCollapsed && !isMobile" class="main-content" :width="mainContentWidth + 'px'">
+      <el-container style="height: 100%; display: flex; flex-direction: column;">
+        <el-header height="auto">
+          <TopBar @open-settings="handleOpenSettings" />
+        </el-header>
+        <el-main>
+          <!-- Agents 下拉监控面板 -->
+          <MinimalMonitoringPanel v-if="isMonitoringPanelVisible" />
 
-    <el-container v-show="!isChatPanelCollapsed" class="main-content">
+          <div class="main-scroll-area">
+            <MessageArea ref="messageAreaRef" />
+            <UserOperationArea ref="userOperationAreaRef" />
+          </div>
+          <UserInputArea />
+        </el-main>
+        <el-footer height="auto" :class="{ 'mobile-footer': isMobile }">
+          <BottomBar />
+          <ServerStatusIndicator />
+        </el-footer>
+      </el-container>
+    </el-aside>
+
+    <!-- 移动端底部导航 -->
+    <MobileBottomNav :open-files-count="openFiles.length" @navigate="handleMobileNavNavigate" />
+
+    <!-- 右侧文件内容区 - 桌面端固定,移动端隐藏 -->
+    <el-aside v-if="isRightPanelVisible && !isMobile" class="right-panel" :width="rightPanelWidth + 'px'">
+      <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId"
+        @close-file="handleCloseFile" @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
+        @update-file-content="updateFileContent" />
+    </el-aside>
+
+    <!-- 移动端主内容区 - 使用原来的 el-container 结构 -->
+    <el-container v-show="!isChatPanelCollapsed && isMobile" class="main-content">
       <el-header height="auto">
         <TopBar @open-settings="handleOpenSettings" />
       </el-header>
@@ -114,20 +144,6 @@
         <ServerStatusIndicator />
       </el-footer>
     </el-container>
-
-    <!-- 移动端底部导航 -->
-    <MobileBottomNav :open-files-count="openFiles.length" @navigate="handleMobileNavNavigate" />
-
-    <!-- 主内容区和右侧面板之间的拖动分隔条 (仅桌面端) -->
-    <ResizerBar v-if="isRightPanelVisible && !isChatPanelCollapsed && !isMobile" :panel-ref="{ width: rightPanelWidth }"
-      :min-width="100" storage-key="dawei-rightpanel-width" position="right" @resize="rightPanelWidth = $event" />
-
-    <!-- 右侧文件内容区 - 桌面端固定,移动端隐藏 -->
-    <el-aside v-if="isRightPanelVisible && !isMobile" class="right-panel" :width="rightPanelWidth + 'px'">
-      <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId"
-        @close-file="handleCloseFile" @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
-        @update-file-content="updateFileContent" />
-    </el-aside>
 
     <!-- 移动端侧边栏抽屉 -->
     <el-drawer v-model="isMobileSidePanelOpen" :with-header="false" direction="rtl" size="100%"
@@ -240,7 +256,6 @@ const { isMobile, isTablet, isDesktop, isTouchDevice } = useMobile();
 import '@/styles/chat-ultra-minimal.css';
 
 import SidePanel from '@/components/layout/SidePanel.vue';
-import ResizerBar from '@/components/layout/ResizerBar.vue';
 import FileContentArea from '@/components/layout/FileContentArea.vue';
 import TopBar from '@/components/layout/TopBar.vue';
 import MessageArea from '@/components/layout/MessageArea.vue';
@@ -325,13 +340,26 @@ const sidePanelWidth = computed({
     if (isMobile.value) return window.innerWidth;
     // 平板设备使用较小宽度
     if (isTablet.value) return 320;
-    // 桌面端使用保存的宽度或默认400px
-    return savedSidePanelWidth.value;
+    // 桌面端：固定宽度
+    return 400;
   },
   set: (val) => {
-    if (!isMobile.value) {
-      savedSidePanelWidth.value = val;
-    }
+    // 不再保存宽度
+  }
+});
+
+const mainContentWidth = computed({
+  get: () => {
+    // 移动端不使用此计算
+    if (isMobile.value) return window.innerWidth;
+    // 平板设备使用较小宽度
+    if (isTablet.value) return 400;
+    // 桌面端：计算剩余空间的50%
+    const availableWidth = window.innerWidth - 60 - sidePanelWidth.value; // 减去activity-bar和sidePanel
+    return Math.floor(availableWidth * 0.5);
+  },
+  set: (val) => {
+    // 不再保存宽度
   }
 });
 
@@ -341,18 +369,14 @@ const rightPanelWidth = computed({
     if (isMobile.value) return window.innerWidth;
     // 平板设备使用较小宽度
     if (isTablet.value) return 400;
-    // 桌面端使用保存的宽度或默认500px
-    return savedRightPanelWidth.value;
+    // 桌面端：计算剩余空间的50%
+    const availableWidth = window.innerWidth - 60 - sidePanelWidth.value; // 减去activity-bar和sidePanel
+    return Math.floor(availableWidth * 0.5);
   },
   set: (val) => {
-    if (!isMobile.value) {
-      savedRightPanelWidth.value = val;
-    }
+    // 不再保存宽度
   }
 });
-
-const savedSidePanelWidth = ref(400); // 桌面端折叠前保存宽度
-const savedRightPanelWidth = ref(500); // 桌面端右侧面板宽度
 
 // 移动端自动折叠侧边栏
 watch(isMobile, (mobile) => {
@@ -481,36 +505,10 @@ const checkLLMConfiguration = async () => {
 
 // 在组件挂载时立即打印API配置
 onMounted(async () => {
-  // 恢复面板宽度
-  try {
-    const savedSideWidth = localStorage.getItem('dawei-sidepanel-width');
-    if (savedSideWidth) {
-      const width = parseInt(savedSideWidth, 10);
-      if (!isNaN(width) && width >= 100) {
-        sidePanelWidth.value = width;
-      }
-    }
-
-    const savedRightWidth = localStorage.getItem('dawei-rightpanel-width');
-    if (savedRightWidth) {
-      const width = parseInt(savedRightWidth, 10);
-      if (!isNaN(width) && width >= 100) {
-        rightPanelWidth.value = width;
-      }
-    }
-  } catch (error) {
-    console.warn('[ChatView] Failed to restore panel widths:', error);
-  }
+  // 面板宽度不再持久化，使用默认值
 });
 
 const toggleSidePanel = () => {
-  if (!isSidePanelCollapsed.value) {
-    // 折叠前保存当前宽度
-    savedSidePanelWidth.value = sidePanelWidth.value;
-  } else {
-    // 展开时恢复之前的宽度
-    sidePanelWidth.value = savedSidePanelWidth.value;
-  }
   isSidePanelCollapsed.value = !isSidePanelCollapsed.value;
 };
 
