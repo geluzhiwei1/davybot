@@ -165,13 +165,13 @@ jobs:
           echo "Building for aarch64-unknown-linux-gnu..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target aarch64-unknown-linux-gnu --features standalone
           echo "Build completed successfully"
-          ls -la src-tauri/target/aarch64-unknown-linux-gnu/release/davybot
+          ls -la src-tauri/target/aarch64-unknown-linux-gnu/release/dawei-gui
 
       # ========== Create portable ZIP package (Linux ARM64) ==========
       - name: Create portable ZIP package (Linux ARM64)
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          APP_NAME="davybot"
+          APP_NAME="dawei-gui"
           ARCH="aarch64"
           ZIP_DIR="webui/src-tauri/target/aarch64-unknown-linux-gnu/release/${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}"
           ZIP_NAME="${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}.zip"
@@ -246,7 +246,8 @@ jobs:
       - name: Upload artifacts (Linux ARM64)
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-linux-aarch64-v${{ env.VERSION }}
+          name: dawei-gui-standalone-linux-aarch64-v${{ steps.version.outputs.version }}
           path: |
+            webui/src-tauri/target/aarch64-unknown-linux-gnu/release/dawei-gui
             webui/src-tauri/target/aarch64-unknown-linux-gnu/release/*.zip
           if-no-files-found: warn

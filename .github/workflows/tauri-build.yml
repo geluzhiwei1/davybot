@@ -263,13 +263,13 @@ jobs:
           echo "Building for ${{ matrix.target }}..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
           echo "Build completed successfully"
-          ls -la src-tauri/target/${{ matrix.target }}/release/davybot
+          ls -la src-tauri/target/${{ matrix.target }}/release/dawei-gui
 
       - name: Copy macOS binaries to simple path
         if: startsWith(matrix.platform, 'macos')
         run: |
           mkdir -p macos-binaries
-          cp webui/src-tauri/target/${{ matrix.target }}/release/davybot macos-binaries/davybot-${{ matrix.arch }}
+          cp webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui macos-binaries/dawei-gui-${{ matrix.arch }}
           ls -la macos-binaries/
 
       - name: Create portable ZIP package (macOS)
@@ -277,7 +277,7 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          APP_NAME="davybot"
+          APP_NAME="dawei-gui"
           ARCH="${{ matrix.arch }}"
           ZIP_DIR="webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}-standalone-darwin-${ARCH}-portable-v${VERSION}"
           ZIP_NAME="${APP_NAME}-standalone-darwin-${ARCH}-portable-v${VERSION}.zip"
@@ -285,7 +285,7 @@ jobs:
           # Create package directory
           mkdir -p "${ZIP_DIR}/resources"
 
-          # Copy main executable from the correct target directory
+          # Copy main executable
           cp webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME} "${ZIP_DIR}/"
 
           # Copy Python environment
@@ -360,7 +360,7 @@ jobs:
           echo "Building for ${{ matrix.target }}..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
           echo "Build completed successfully"
-          ls -la src-tauri/target/${{ matrix.target }}/release/davybot || ls -la src-tauri/target/release/davybot
+          ls -la src-tauri/target/${{ matrix.target }}/release/dawei-gui || ls -la src-tauri/target/release/dawei-gui
 
       - name: Build Tauri app (Windows)
         if: startsWith(matrix.platform, 'windows')
@@ -373,7 +373,7 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          APP_NAME="davybot"
+          APP_NAME="dawei-gui"
           ZIP_DIR="webui/src-tauri/target/release/${APP_NAME}-standalone-win-portable-v${VERSION}"
           ZIP_NAME="${APP_NAME}-standalone-win-portable-v${VERSION}.zip"
 
@@ -447,7 +447,7 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          APP_NAME="davybot"
+          APP_NAME="dawei-gui"
           ARCH="${{ matrix.arch }}"
           ZIP_DIR="webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}"
           ZIP_NAME="${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}.zip"
@@ -528,9 +528,9 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-macos-${{ matrix.arch }}-v${{ steps.version.outputs.version }}
+          name: dawei-gui-standalone-macos-${{ matrix.arch }}-v${{ steps.version.outputs.version }}
           path: |
-            macos-binaries/davybot-${{ matrix.arch }}
+            macos-binaries/dawei-gui-${{ matrix.arch }}
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: error
 
@@ -538,9 +538,9 @@ jobs:
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-linux-x86_64-v${{ steps.version.outputs.version }}
+          name: dawei-gui-standalone-linux-x86_64-v${{ steps.version.outputs.version }}
           path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/davybot
+            webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui
             webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: warn
 
@@ -548,7 +548,7 @@ jobs:
         if: startsWith(matrix.platform, 'windows')
         uses: actions/upload-artifact@v4
         with:
-          name: davybot-standalone-windows-x86_64-v${{ steps.version.outputs.version }}
+          name: dawei-gui-standalone-windows-x86_64-v${{ steps.version.outputs.version }}
           path: |
             webui/src-tauri/target/release/*.zip
           if-no-files-found: warn
