@@ -170,7 +170,7 @@ jobs:
       # ========== Create portable ZIP package (Linux ARM64) ==========
       - name: Create portable ZIP package (Linux ARM64)
         run: |
-          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          VERSION="${{ steps.version.outputs.version }}"
           APP_NAME="davybot"
           ARCH="aarch64"
           ZIP_DIR="webui/src-tauri/target/aarch64-unknown-linux-gnu/release/${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}"

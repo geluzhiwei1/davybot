@@ -276,7 +276,7 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         shell: bash
         run: |
-          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          VERSION="${{ steps.version.outputs.version }}"
           APP_NAME="davybot"
           ARCH="${{ matrix.arch }}"
           ZIP_DIR="webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}-standalone-darwin-${ARCH}-portable-v${VERSION}"
@@ -372,7 +372,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          VERSION="${{ steps.version.outputs.version }}"
           APP_NAME="davybot"
           ZIP_DIR="webui/src-tauri/target/release/${APP_NAME}-standalone-win-portable-v${VERSION}"
           ZIP_NAME="${APP_NAME}-standalone-win-portable-v${VERSION}.zip"
@@ -446,7 +446,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
         shell: bash
         run: |
-          VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          VERSION="${{ steps.version.outputs.version }}"
           APP_NAME="davybot"
           ARCH="${{ matrix.arch }}"
           ZIP_DIR="webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}-standalone-linux-${ARCH}-portable-v${VERSION}"
