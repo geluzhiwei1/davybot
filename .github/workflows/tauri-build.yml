@@ -139,21 +139,25 @@ jobs:
           # Install UV using pip (works on all platforms)
           pip3 install uv --quiet
 
-      - name: Create Python venv with UV if cache miss
+      - name: Create Python venv if cache miss
         run: |
           cd agent
           if [ ! -d ".venv" ]; then
-            # Create venv with UV
-            uv venv --python 3.12 .venv
+            # Create venv using Python's standard venv module (more reliable for standalone)
+            # UV's venv creates trampolines that break in standalone environments
+            echo "Creating venv with python3 -m venv (more portable than uv venv)"
+            python3 -m venv .venv
 
             # Install project dependencies (includes CLI entry points)
-            # On Windows, use standard pip to ensure proper exe generation
+            # On all platforms, use the venv's pip to ensure proper entry point generation
             if [[ "$RUNNER_OS" == "Windows" ]]; then
-              echo "Windows detected: using pip for installation to ensure exe generation"
+              echo "Windows detected: using pip for installation"
+              .venv/Scripts/python.exe -m pip install --upgrade pip
               .venv/Scripts/python.exe -m pip install -e .
             else
-              echo "Unix detected: using uv for installation"
-              uv pip install -e .
+              echo "Unix detected: using pip for installation"
+              .venv/bin/python -m pip install --upgrade pip
+              .venv/bin/python -m pip install -e .
             fi
 
             # Verify dawei command is available
@@ -186,7 +190,7 @@ jobs:
             if [[ "$RUNNER_OS" == "Windows" ]]; then
               .venv/Scripts/python.exe -m pip install -e . 2>/dev/null || true
             else
-              uv pip install -e . 2>/dev/null || true
+              .venv/bin/python -m pip install -e . 2>/dev/null || true
             fi
 
             # Verify dawei command is available

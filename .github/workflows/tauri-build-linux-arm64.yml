@@ -118,26 +118,23 @@ jobs:
           # Install UV using pip (works on all platforms)
           pip3 install uv --quiet
 
-      - name: Create Python venv with UV if cache miss
+      - name: Create Python venv if cache miss
         run: |
           cd agent
           if [ ! -d ".venv" ]; then
-            # Create venv with UV
-            uv venv --python 3.12 .venv
-
-            # Install UV in venv (needed for standalone)
-            uv pip install uv --target .venv
-
-            # Install pip in venv (for compatibility)
-            uv pip install pip --target .venv
+            # Create venv using Python's standard venv module (more reliable for standalone)
+            # UV's venv creates trampolines that break in standalone environments
+            echo "Creating venv with python3 -m venv (more portable than uv venv)"
+            python3 -m venv .venv
 
             # Install project dependencies
-            uv pip install -e .
+            echo "Installing dependencies with pip"
+            .venv/bin/python -m pip install --upgrade pip
+            .venv/bin/python -m pip install -e .
           else
             # Sync existing dependencies
-            uv pip install -e . 2>/dev/null || true
-            # Ensure uv and pip are available
-            uv pip install pip --target .venv 2>/dev/null || true
+            echo "Found existing .venv, syncing dependencies"
+            .venv/bin/python -m pip install -e . 2>/dev/null || true
           fi
         shell: bash
 
