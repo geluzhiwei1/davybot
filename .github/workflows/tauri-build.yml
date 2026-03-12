@@ -247,6 +247,16 @@ jobs:
           fi
         shell: bash
 
+      - name: Fix Python dynamic library linking (macOS only)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          echo "=== Fixing Python for portable macOS build ==="
+          bash scripts/fix-macos-python-venv.sh webui/src-tauri/resources/python-env
+
+          echo "=== Verifying Python binary after fix ==="
+          webui/src-tauri/resources/python-env/bin/python --version
+        shell: bash
+
       # ========== Prepare drawio resources ==========
       - name: Prepare drawio resources
         working-directory: ./webui
