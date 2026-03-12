@@ -45,10 +45,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useParallelTasksStore } from '@/stores/parallelTasks'
 import { Loading, CircleCheck } from '@element-plus/icons-vue'
 import { ElTag, ElProgress, ElIcon } from 'element-plus'
 
 const chatStore = useChatStore()
+const parallelTasksStore = useParallelTasksStore()
 const llmApiStatus = computed(() => chatStore.llmApiStatus)
 const agentStatus = computed(() => chatStore.agentStatus)
 
@@ -62,8 +64,13 @@ interface ActiveTask {
 
 const currentTask = ref<ActiveTask | null>(null)
 
-// 是否有活跃任务
-const hasActiveTask = computed(() => !!currentTask.value)
+// 是否有活跃任务（综合判断 LLM、工具执行和 Agent 状态）
+const hasActiveTask = computed(() => {
+  return !!currentTask.value ||
+         llmApiStatus.value.isActive ||
+         agentStatus.value.isActive ||
+         parallelTasksStore.hasActiveTasks
+})
 
 // 状态图标
 const statusIcon = computed(() => {
@@ -92,6 +99,11 @@ const activeTaskTag = computed((): {
   if (type === 'task') return { type: 'info', label: '任务处理' }
   if (type === 'agent') return { type: 'success', label: 'Agent 执行' }
   if (type === 'error') return { type: 'danger', label: '错误' }
+
+  // 如果没有 currentTask 但有活跃任务，检查其他状态
+  if (llmApiStatus.value.isActive) return { type: 'primary', label: 'AI 调用' }
+  if (parallelTasksStore.hasActiveTasks) return { type: 'warning', label: '工具执行' }
+  if (agentStatus.value.isActive) return { type: 'success', label: 'Agent 执行' }
 
   return { type: 'info', label: '处理中' }
 })
@@ -170,10 +182,33 @@ watch(() => agentStatus.value.thinking, (thinking) => {
   }
 })
 
+// 监听并行任务状态变化（工具执行）
+watch(() => parallelTasksStore.hasActiveTasks, (hasActive, prevHasActive) => {
+  // 从无任务变为有任务
+  if (hasActive && !prevHasActive) {
+    const activeTasks = parallelTasksStore.activeTasks
+    if (activeTasks.length > 0) {
+      const task = activeTasks[0]
+      currentTask.value = {
+        type: 'tool',
+        message: `工具执行中: ${task.description || task.nodeType || '未知工具'}`,
+        timestamp: Date.now()
+      }
+    }
+  }
+  // 从有任务变为无任务
+  else if (!hasActive && prevHasActive) {
+    if (currentTask.value?.type === 'tool') {
+      currentTask.value = null
+    }
+  }
+})
+
 // 处理任务节点进度
-const handleTaskNodeProgress = (event: unknown) => {
-  const detail = event.detail
-  if (currentTask.value?.type === 'task') {
+const handleTaskNodeProgress = (event: Event) => {
+  const customEvent = event as CustomEvent<{progress: number}>
+  const detail = customEvent.detail
+  if (currentTask.value?.type === 'task' && detail) {
     currentTask.value.message = `任务进度: ${detail.progress}%`
     currentTask.value.progress = detail.progress
   }

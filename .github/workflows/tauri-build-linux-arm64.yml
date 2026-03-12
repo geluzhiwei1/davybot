@@ -29,6 +29,8 @@ jobs:
         run: |
           if [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
+            # Remove leading 'v' if present to avoid double 'v' prefix
+            VERSION=${VERSION#v}
           elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
@@ -73,6 +75,8 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/ubuntu-security.sources
           sudo apt-get update
           sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            pkg-config \
             libgtk-3-dev:arm64 \
             libwebkit2gtk-4.1-dev:arm64 \
             libappindicator3-dev:arm64 \
@@ -81,25 +85,12 @@ jobs:
             p7zip-full
 
       # ========== Cache dependencies ==========
-      - name: Cache Rust registry
-        uses: actions/cache@v4
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
-
-      - name: Cache Rust index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
-
-      - name: Cache Rust build
-        uses: actions/cache@v4
-        with:
-          path: |
-            webui/src-tauri/target
-            ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
+          workspaces: webui/src-tauri
+          key: aarch64-unknown-linux-gnu-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
+          cache-on-failure: true
 
       - name: Cache Python venv
         uses: actions/cache@v4
@@ -131,10 +122,29 @@ jobs:
             echo "Installing dependencies with pip"
             .venv/bin/python -m pip install --upgrade pip
             .venv/bin/python -m pip install -e .
+
+            # Verify dawei command is available
+            if [ -f ".venv/bin/dawei" ]; then
+              echo "✓ dawei found in bin directory"
+              .venv/bin/dawei --version || echo "Version check failed"
+            else
+              echo "❌ ERROR: dawei not found in bin directory"
+              echo "Contents of bin directory:"
+              ls -la .venv/bin/ | head -20
+              exit 1
+            fi
           else
             # Sync existing dependencies
             echo "Found existing .venv, syncing dependencies"
             .venv/bin/python -m pip install -e . 2>/dev/null || true
+
+            # Verify dawei command is available
+            if [ -f ".venv/bin/dawei" ]; then
+              echo "✓ dawei found in bin directory"
+            else
+              echo "❌ ERROR: dawei not found after sync"
+              exit 1
+            fi
           fi
         shell: bash
 
@@ -147,7 +157,24 @@ jobs:
           # Clean up Python cache to reduce size
           find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
+
+          # Verify dawei command exists in copied environment
+          echo "=== Verifying dawei command in resources/python-env ==="
+          if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
+            echo "✓ dawei found in resources/python-env/bin/"
+            webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
+          else
+            echo "❌ ERROR: dawei not found in resources/python-env/bin/"
+            echo "Contents of bin directory:"
+            ls -la webui/src-tauri/resources/python-env/bin/ | head -20
+            exit 1
+          fi
         shell: bash
+
+      # ========== Prepare drawio resources ==========
+      - name: Prepare drawio resources
+        working-directory: ./webui
+        run: bash scripts/prepare-drawio.sh
 
       # ========== Build frontend ==========
       - name: Build frontend
@@ -157,6 +184,13 @@ jobs:
       # ========== Build Tauri app (Linux ARM64) ==========
       - name: Build Tauri app (Linux ARM64)
         working-directory: ./webui
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+          PKG_CONFIG_ALLOW_CROSS: "1"
+          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
         run: |
           # For Linux ARM64, build for specific architecture
           echo "Building for aarch64-unknown-linux-gnu..."
@@ -181,6 +215,9 @@ jobs:
 
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
+
+          # Copy drawio (diagram editor)
+          cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
 
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"

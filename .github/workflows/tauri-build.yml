@@ -573,7 +573,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: davybot-standalone-*
+          pattern: dawei-gui-standalone-*
           merge-multiple: true
           path: ./bundles
 
