@@ -86,10 +86,8 @@
     "@vueuse/core": "^10.7.2",
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",
-    "docx-preview": "^0.3.7",
     "echarts": "^6.0.0",
     "element-plus": "^2.11.9",
-    "exceljs": "^4.4.0",
     "js-yaml": "^4.1.1",
     "less": "^4.2.0",
     "lodash": "^4.17.21",
@@ -97,7 +95,6 @@
     "marked": "^17.0.1",
     "papaparse": "^5.5.3",
     "pinia": "^3.0.3",
-    "pptx-preview": "^1.0.7",
     "tinycolor2": "^1.6.0",
     "uuid": "^13.0.0",
     "vditor": "^3.11.2",
@@ -106,9 +103,6 @@
     "vue-echarts": "^8.0.1",
     "vue-i18n": "^11.0.0",
     "vue-router": "^4.6.3",
-    "vue-web-terminal": "^3.4.1",
-    "x-data-spreadsheet": "^1.1.9",
-    "xlsx": "^0.18.5",
     "zod": "^3.22.4"
   },
   "devDependencies": {
