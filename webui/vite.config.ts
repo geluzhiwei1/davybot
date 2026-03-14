@@ -6,6 +6,7 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import fs from 'fs'
+import http from 'http'
 import path from 'path'
 
 // https://vite.dev/config/
@@ -121,7 +122,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true,
-        agent: new (require('http')).Agent({
+        agent: new http.Agent({
           keepAlive: true,
           keepAliveMsecs: 1000,
           maxSockets: 256,
