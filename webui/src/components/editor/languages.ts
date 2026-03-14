@@ -74,6 +74,11 @@ export const LANGUAGE_MAP: Readonly<Record<string, LanguageInfo>> = {
     extensions: ['.yaml', '.yml'],
     mimetypes: ['text/x-yaml', 'application/x-yaml'],
   },
+  rust: {
+    name: 'Rust',
+    extensions: ['.rs'],
+    mimetypes: ['text/x-rust'],
+  },
   sql: {
     name: 'SQL',
     extensions: ['.sql'],
@@ -81,12 +86,22 @@ export const LANGUAGE_MAP: Readonly<Record<string, LanguageInfo>> = {
   },
   shell: {
     name: 'Shell',
-    extensions: ['.sh', '.bash', '.zsh'],
+    extensions: ['.sh', '.bash', '.zsh', '.fish'],
     mimetypes: ['text/x-shellscript', 'application/x-sh'],
+  },
+  toml: {
+    name: 'TOML',
+    extensions: ['.toml'],
+    mimetypes: ['text/x-toml'],
+  },
+  jinja: {
+    name: 'Jinja',
+    extensions: ['.jinja2', '.j2', '.jinja'],
+    mimetypes: ['text/x-jinja2'],
   },
   plaintext: {
     name: 'Plain Text',
-    extensions: ['.txt', '.text'],
+    extensions: ['.txt', '.text', '.conf', '.config', '.ini', '.cfg'],
     mimetypes: ['text/plain'],
   },
 } as const

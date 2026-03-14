@@ -262,6 +262,19 @@ jobs:
         working-directory: ./webui
         run: bash scripts/prepare-drawio.sh
 
+      # ========== Prepare OnlyOffice resources ==========
+      - name: Cache OnlyOffice build
+        uses: actions/cache@v4
+        with:
+          path: deps/onlyoffice-web-local/html
+          key: onlyoffice-html-${{ hashFiles('deps/onlyoffice-web-local/package.json', 'deps/onlyoffice-web-local/pnpm-lock.yaml') }}
+          restore-keys: |
+            onlyoffice-html-
+
+      - name: Prepare OnlyOffice resources
+        working-directory: ./webui
+        run: bash scripts/prepare-onlyoffice.sh
+
       # ========== Build frontend ==========
       - name: Build frontend
         working-directory: ./webui
@@ -308,6 +321,9 @@ jobs:
           # Copy drawio (diagram editor)
           cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
 
+          # Copy onlyoffice (office editor)
+          cp -r webui/src-tauri/resources/onlyoffice "${ZIP_DIR}/resources/"
+
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -331,6 +347,7 @@ jobs:
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
+            - onlyoffice/            : OnlyOffice document editor
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/uv               : UV package manager
@@ -403,6 +420,9 @@ jobs:
           # Copy drawio (diagram editor)
           cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
 
+          # Copy onlyoffice (office editor)
+          cp -r webui/src-tauri/resources/onlyoffice "${ZIP_DIR}/resources/"
+
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -425,6 +445,7 @@ jobs:
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
+            - onlyoffice/            : OnlyOffice document editor
             - python-env/            : Python runtime environment (Windows venv)
               - Scripts/python.exe   : Python interpreter
               - Scripts/uv.exe       : UV package manager
@@ -478,6 +499,9 @@ jobs:
           # Copy drawio (diagram editor)
           cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
 
+          # Copy onlyoffice (office editor)
+          cp -r webui/src-tauri/resources/onlyoffice "${ZIP_DIR}/resources/"
+
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -501,6 +525,7 @@ jobs:
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
+            - onlyoffice/            : OnlyOffice document editor
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/uv               : UV package manager
@@ -668,6 +693,7 @@ jobs:
           - Portable ZIP versions require no installation
           - Multi-architecture support (Intel and Apple Silicon for macOS)
           - **Draw.io diagram editor included** (148 MB) - Create and edit diagrams visually
+          - **OnlyOffice document editor included** - Edit Word, Excel, and PowerPoint files
 
           ### Quick Start (Portable)
 

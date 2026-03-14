@@ -17,6 +17,8 @@ import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
 import { json } from '@codemirror/lang-json'
 import { vue } from '@codemirror/lang-vue'
+import { yaml } from '@codemirror/lang-yaml'
+import { rust } from '@codemirror/lang-rust'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap, lineNumbers as cmLineNumbers, highlightSpecialChars, drawSelection, dropCursor } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -91,6 +93,8 @@ const LANGUAGE_EXTENSIONS: Record<string, () => Extension | Extension[]> = {
   css: () => css(),
   json: () => json(),
   vue: () => vue(),
+  yaml: () => yaml(),
+  rust: () => rust(),
 }
 
 const detectedLanguage = computed(() => {

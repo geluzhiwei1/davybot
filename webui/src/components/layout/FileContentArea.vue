@@ -14,7 +14,7 @@
     <div class="file-content-area" :class="{ 'has-mobile-close': isMobileDrawer }">
       <el-tabs v-if="hasFiles" :model-value="activeFileId || ''" type="card" class="file-tabs" closable
         @tab-remove="closeFile" @tab-change="handleTabChange">
-        <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
+        <el-tab-pane v-for="file in files" :key="`pane-${file.id}`" :label="file.name" :name="file.id">
           <template #label>
             <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)"
               @dblclick="handleTabDoubleClick(file)">
@@ -150,6 +150,11 @@
             @change="handleContentChange" />
           <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content" :filename="activeFile.name"
             class="pdf-viewer-wrapper" />
+
+          <!-- Office 文件（Excel、Word、PPT）编辑 -->
+          <OnlyOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
+            :filename="activeFile.name" :editable="true" :workspace-id="getCurrentWorkspaceId()"
+            @save="handleOfficeSave" @error="handleOfficeError" class="office-viewer-wrapper" />
           <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
             class="drawio-editor-tabs">
             <el-tab-pane name="drawio">
@@ -171,7 +176,7 @@
           <!-- <el-input v-show="isTextFile(activeFile)" v-model="editableContent" type="textarea" class="text-editor"
             :autosize="{ minRows: 10 }" @input="handleContentChange" /> -->
           <pre
-            v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isDrawioFile(activeFile) && !isTextFile(activeFile)"
+            v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isDrawioFile(activeFile) && !isOfficeFile(activeFile) && !isTextFile(activeFile)"
             class="readonly-content"><code>{{ activeFile.content }}</code></pre>
         </div>
         <el-empty v-else description="没有打开的文件" />
@@ -192,7 +197,7 @@
           <!-- 完全复制 tabs 结构 -->
           <el-tabs v-if="hasFiles" :model-value="activeFileId || ''" type="card" class="file-tabs" closable
             @tab-remove="closeFile" @tab-change="handleTabChange">
-            <el-tab-pane v-for="file in files" :key="file.id" :label="file.name" :name="file.id">
+            <el-tab-pane v-for="file in files" :key="`pane-fullscreen-${file.id}`" :label="file.name" :name="file.id">
               <template #label>
                 <span class="tab-label" @contextmenu.prevent="handleTabContextMenu($event, file)"
                   @dblclick="handleTabDoubleClick(file)">
@@ -278,13 +283,14 @@
                 :file-path="activeFile.name" :theme="editorTheme" :line-numbers="true" :bracket-matching="true"
                 :close-brackets="true" :search="true" class="code-editor-wrapper" @change="handleContentChange" />
 
-              <!-- CSV 编辑器 -->
-              <CSVEditor v-show="isCSVFile(activeFile)" v-model="editableContent" class="csv-editor-wrapper"
-                @change="handleContentChange" />
-
               <!-- PDF 查看器 -->
               <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content"
                 :filename="activeFile.name" class="pdf-viewer-wrapper" />
+
+              <!-- Office 文件（Excel、Word、PPT）编辑 -->
+              <OnlyOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
+                :filename="activeFile.name" :editable="true" :workspace-id="getCurrentWorkspaceId()"
+                @save="handleOfficeSave" @error="handleOfficeError" class="office-viewer-wrapper" />
 
               <!-- Drawio 编辑器 -->
               <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
@@ -320,7 +326,7 @@
 
               <!-- 只读内容 -->
               <pre
-                v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isDrawioFile(activeFile) && !isTextFile(activeFile)"
+                v-show="!isMarkdownFile(activeFile) && !isCodeFile(activeFile) && !isImageFile(activeFile) && !isVideoFile(activeFile) && !isAudioFile(activeFile) && !isCSVFile(activeFile) && !isPDFFile(activeFile) && !isHTMLFile(activeFile) && !isDrawioFile(activeFile) && !isOfficeFile(activeFile) && !isTextFile(activeFile)"
                 class="readonly-content"><code>{{ activeFile.content }}</code></pre>
             </div>
             <el-empty v-else description="没有打开的文件" />
@@ -336,7 +342,7 @@ import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { useThemeStore } from '@/stores/theme'
-import { ElTabs, ElTabPane, ElCard, ElButton, ElIcon, ElImage, ElInput, ElEmpty } from 'element-plus'
+import { ElTabs, ElTabPane, ElCard, ElButton, ElIcon, ElImage, ElInput, ElEmpty, ElMessage } from 'element-plus'
 // ElTabs 和 ElTabPane 已经在上面导入了
 import { Document, VideoPlay, Headset, Picture, ZoomIn, FullScreen, Close, CloseBold, Monitor } from '@element-plus/icons-vue'
 // View 和 Edit 图标用于 Markdown 文件的编辑器切换
@@ -346,7 +352,10 @@ import ImageViewer from '@/components/chat/ImageViewer.vue'
 import PDFViewer from '@/components/editor/PDFViewer.vue'
 import HTMLViewer from '@/components/editor/HTMLViewer.vue'
 import DrawioEditor from '@/components/editor/DrawioEditor.vue'
+import VueOfficeViewer from '@/components/editor/VueOfficeViewer.vue'
+import OnlyOfficeEditor from '@/components/editor/OnlyOfficeEditor.vue'
 import { isTauri } from '@/utils/platform'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 interface File {
   id: string
@@ -376,7 +385,13 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 const themeStore = useThemeStore()
+const workspaceStore = useWorkspaceStore()
 const htmlActiveTab = ref('preview')
+
+// 获取当前 workspaceId 的辅助函数
+const getCurrentWorkspaceId = () => {
+  return workspaceStore.currentWorkspaceId || undefined
+}
 const drawioActiveTab = ref('xml')
 const isSaving = ref(false)
 const isLoading = ref(false)
@@ -448,11 +463,59 @@ const imageFiles = computed(() => allImageFiles.value)
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico']
 const VIDEO_EXTENSIONS = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'flv']
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg']
-const CODE_EXTENSIONS = ['js', 'ts', 'jsx', 'tsx', 'py', 'vue', 'html', 'css', 'json', 'yaml', 'yml', 'sql', 'sh', 'xml']
-const TEXT_EXTENSIONS = ['txt', 'text']
+const CODE_EXTENSIONS = [
+  // JavaScript/TypeScript
+  'js', 'ts', 'jsx', 'tsx',
+  // Python
+  'py',
+  // Vue
+  'vue',
+  // Web
+  'html', 'css',
+  // Config
+  'json', 'yaml', 'yml', 'toml',
+  // Templates
+  'jinja2', 'j2', 'jinja',
+  // Shell
+  'sh', 'bash', 'zsh', 'fish',
+  // Database
+  'sql',
+  // Markup
+  'xml',
+  // Other
+  'conf', 'config', 'ini', 'cfg'
+]
+const TEXT_EXTENSIONS = ['text']  // 移除 'txt'，因为 txt 现在由 OnlyOfficeEditor 处理
+
+// Office 文件扩展名（扩展版）
+const OFFICE_EXTENSIONS = [
+  // Word
+  'docx', 'doc', 'odt', 'rtf', 'txt',
+  // Excel
+  'xlsx', 'xls', 'ods',
+  // PowerPoint
+  'pptx', 'ppt', 'odp'
+]
 
 function isMarkdownFile(file: File): boolean {
   return file.type === 'markdown' || file.name.endsWith('.md')
+}
+
+function isOfficeFile(file: File): boolean {
+  return file.type === 'office' || OFFICE_EXTENSIONS.some(ext => file.name.endsWith(`.${ext}`))
+}
+
+function isExcelFile(file: File): boolean {
+  const excelExtensions = ['xlsx', 'xls', 'ods', 'csv']
+  return file.name.endsWith('.xlsx') ||
+         file.name.endsWith('.xls') ||
+         file.name.endsWith('.ods') ||
+         file.name.endsWith('.csv') ||
+         file.type === 'excel' ||
+         file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+         file.type === 'application/vnd.ms-excel' ||
+         file.type === 'application/vnd.oasis.opendocument.spreadsheet' ||
+         file.type === 'text/csv'
 }
 
 function isImageFile(file: File): boolean {
@@ -501,7 +564,16 @@ function isDrawioFile(file: File): boolean {
 }
 
 function isGenericFile(file: File): boolean {
-  return !isMarkdownFile(file) && !isCodeFile(file) && !isImageFile(file) && !isVideoFile(file) && !isAudioFile(file) && !isCSVFile(file) && !isPDFFile(file) && !isHTMLFile(file) && !isDrawioFile(file)
+  return !isMarkdownFile(file) &&
+    !isCodeFile(file) &&
+    !isImageFile(file) &&
+    !isVideoFile(file) &&
+    !isAudioFile(file) &&
+    !isCSVFile(file) &&
+    !isPDFFile(file) &&
+    !isHTMLFile(file) &&
+    !isDrawioFile(file) &&
+    !isOfficeFile(file)
 }
 
 // Event handlers
@@ -576,7 +648,7 @@ const handleFullscreen = () => {
 }
 
 // 监听全屏状态变化
-const handleFullscreenChange = () => {
+const handleFullscreenChange = (_event: Event) => {
   isBrowserFullscreen.value = !!document.fullscreenElement
 }
 
@@ -642,6 +714,52 @@ const handleSave = async () => {
   }
 }
 
+/**
+ * 处理 Office 编辑器保存事件
+ */
+const handleOfficeSave = async (blob: Blob, filename: string) => {
+  if (!activeFile.value) return
+
+  isSaving.value = true
+  try {
+    // 将 Blob 转换为 base64
+    const base64 = await blobToBase64(blob)
+
+    // 通知父组件保存
+    emit('save-file', activeFile.value.id, base64)
+
+    // 重置 dirty 状态
+    isDirty.value = false
+
+    ElMessage.success(`${filename} 保存成功`)
+  } catch (error) {
+    console.error('[FileContentArea] Office 保存失败:', error)
+    ElMessage.error(`保存失败: ${(error as Error).message}`)
+  } finally {
+    isSaving.value = false
+  }
+}
+
+/**
+ * 处理 Office 编辑器错误事件
+ */
+const handleOfficeError = (error: Error) => {
+  console.error('[FileContentArea] Office 编辑器错误:', error)
+  ElMessage.error(`文档加载失败: ${error.message}`)
+}
+
+/**
+ * 将 Blob 转换为 Base64
+ */
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
 const handleKeyDown = (event: KeyboardEvent) => {
   // 检查是否按下了 Ctrl+S 或 Cmd+S (Mac)
   if ((event.ctrlKey || event.metaKey) && event.key === 's') {
@@ -661,14 +779,6 @@ onMounted(() => {
   }
 })
 
-onUnmounted(() => {
-  document.removeEventListener('click', handleGlobalClick)
-  document.removeEventListener('keydown', handleKeyDown)
-  if (!isTauri()) {
-    document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }
-})
-
 const handleGlobalClick = (event: Event) => {
   if (tabContextMenuVisible.value) {
     const target = event.target as HTMLElement
@@ -677,6 +787,123 @@ const handleGlobalClick = (event: Event) => {
       closeTabContextMenu()
     }
   }
+}
+
+// 处理预览中的图片链接
+const processImagesInPreview = (element: HTMLElement) => {
+  console.log('[processImagesInPreview] 开始处理图片')
+
+  // 检查 workspaceId - 使用 currentWorkspaceId 而不是 workspaceId
+  const workspaceId = workspaceStore.currentWorkspaceId
+  if (!workspaceId) {
+    console.error('[processImagesInPreview] 未找到 workspaceId,跳过图片处理')
+    console.error('[processImagesInPreview] workspaceStore.currentWorkspaceId:', workspaceStore.currentWorkspaceId)
+    return
+  }
+
+  console.log('[processImagesInPreview] workspaceId:', workspaceId)
+
+  const imgElements = element.querySelectorAll('img')
+  console.log('[processImagesInPreview] 找到图片数量:', imgElements.length)
+
+  imgElements.forEach((img) => {
+    const originalSrc = img.getAttribute('src')
+    console.log('[processImagesInPreview] 处理图片:', originalSrc)
+
+    // 跳过已经处理过的图片(data: URL 或 http URL)
+    if (!originalSrc ||
+        originalSrc.startsWith('data:') ||
+        originalSrc.startsWith('http://') ||
+        originalSrc.startsWith('https://')) {
+      console.log('[processImagesInPreview] 跳过已处理的图片')
+      return
+    }
+
+    // 处理相对路径 ./xxx.png, ../xxx.png, ../../xxx.png 和绝对路径 /xxx.png
+    if (originalSrc.startsWith('/') || originalSrc.startsWith('./') || originalSrc.startsWith('../')) {
+      // 获取 API base URL
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+
+      console.log('[processImagesInPreview] 转换前:', originalSrc)
+
+      // 解析相对路径
+      let resolvedPath = originalSrc
+
+      if (!originalSrc.startsWith('/')) {
+        // 这是相对路径,需要基于当前文件路径解析
+        if (activeFile.value && activeFile.value.id) {
+          // 使用 activeFile.value.id 而不是 name,因为 id 包含完整路径
+          // 例如: id = "results-for-paper/统计分析报告.md"
+          //       name = "统计分析报告.md"
+          const currentFilePath = activeFile.value.id
+          const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'))
+
+          console.log('[processImagesInPreview] 当前文件完整路径 (id):', currentFilePath)
+          console.log('[processImagesInPreview] 当前目录:', currentDir)
+          console.log('[processImagesInPreview] activeFile.value.id:', activeFile.value.id)
+          console.log('[processImagesInPreview] activeFile.value.name:', activeFile.value.name)
+
+          // 使用 path 模块解析相对路径
+          // 例如: currentDir = results-for-paper
+          //       ../image.png -> image.png
+          //       ./image.png -> results-for-paper/image.png
+          //       ../../image.png -> image.png
+
+          const pathSegments = currentDir ? currentDir.split('/').filter(p => p) : []
+
+          // 处理 ../ 前缀
+          let relativePath = originalSrc
+          while (relativePath.startsWith('../')) {
+            relativePath = relativePath.substring(3) // 移除 ../
+            if (pathSegments.length > 0) {
+              pathSegments.pop() // 回退一级目录
+            }
+          }
+
+          // 处理 ./ 前缀
+          if (relativePath.startsWith('./')) {
+            relativePath = relativePath.substring(2) // 移除 ./
+          }
+
+          // 组合路径 - 注意:不添加前导 /,路径应该从工作区根目录开始
+          resolvedPath = pathSegments.length > 0
+            ? [...pathSegments, relativePath].join('/')
+            : relativePath
+
+          console.log('[processImagesInPreview] pathSegments:', pathSegments)
+          console.log('[processImagesInPreview] relativePath:', relativePath)
+        } else {
+          // 没有当前文件信息,直接使用原始路径(移除 ./ 前缀)
+          resolvedPath = originalSrc.startsWith('./') ? originalSrc.substring(2) : originalSrc
+          console.log('[processImagesInPreview] 没有当前文件信息,使用原始路径:', resolvedPath)
+        }
+      } else {
+        // 绝对路径,移除前导 /
+        resolvedPath = originalSrc.startsWith('/') ? originalSrc.substring(1) : originalSrc
+      }
+
+      const encodedPath = encodeURIComponent(resolvedPath)
+      // 使用正确的 API 路径: /files?path=xxx
+      const fileApiUrl = `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodedPath}`
+
+      console.log('[processImagesInPreview] 解析路径:', resolvedPath)
+      console.log('[processImagesInPreview] 转换后:', fileApiUrl)
+
+      img.setAttribute('src', fileApiUrl)
+
+      // 添加点击预览功能
+      img.style.cursor = 'pointer'
+      img.onclick = () => {
+        openImageViewer()
+      }
+
+      // 添加错误处理
+      img.onerror = () => {
+        console.error('[Vditor] 加载图片失败:', fileApiUrl)
+        img.setAttribute('alt', `图片加载失败: ${originalSrc}`)
+      }
+    }
+  })
 }
 
 // Vditor initialization
@@ -712,7 +939,10 @@ const initVditor = () => {
     mode: 'wysiwyg',
     height: '100%',
     value: editableContent.value,
-    cache: { enable: false },
+    cache: {
+      enable: false,
+      id: `markdown-file-${activeFile.value.id}`
+    },
     placeholder: '请输入 Markdown 内容...',
     toolbar: [
       // 标题和基础格式
@@ -767,6 +997,127 @@ const initVditor = () => {
       'info',
       'help',
     ],
+    upload: {
+      handler: async (files: File[]) => {
+        try {
+          if (!files || files.length === 0) {
+            return ''
+          }
+
+          const file = files[0]
+          const workspaceId = workspaceStore.currentWorkspaceId
+
+          if (!workspaceId) {
+            ElMessage.error('未找到工作区信息')
+            return ''
+          }
+
+          // 使用项目的文件上传 API
+          const { filesApi } = await import('@/services/api')
+          const result = await filesApi.uploadFile(workspaceId, {
+            file,
+            path: 'assets/images',  // 上传到工作区的 assets/images 目录
+            overwrite: false
+          })
+
+          // 返回相对路径用于 Markdown 引用
+          const relativePath = result.path.startsWith('/')
+            ? result.path.substring(1)
+            : result.path
+
+          ElMessage.success(`图片上传成功: ${result.name}`)
+
+          return `/${relativePath}`
+        } catch (error) {
+          console.error('[Vditor] 上传失败:', error)
+          ElMessage.error(`上传失败: ${error.message || '未知错误'}`)
+          return ''
+        }
+      },
+      filename: (file: File) => {
+        // 保留原始文件名
+        return file.name
+      },
+      linkToImgUrl: '', // 不使用自动转图服务
+      max: 10 * 1024 * 1024, // 10MB
+      allow: (file: File) => {
+        // 只允许图片文件
+        if (!file.type.startsWith('image/')) {
+          ElMessage.warning('只能上传图片文件')
+          return false
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          ElMessage.warning('图片大小不能超过 10MB')
+          return false
+        }
+        return true
+      }
+    },
+    preview: {
+      parse: (element: HTMLElement) => {
+        console.log('[Vditor preview.parse] 被调用')
+        // 处理预览中的图片链接
+        processImagesInPreview(element)
+
+        // 处理代码块的复制按钮
+        const codeBlocks = element.querySelectorAll('pre code')
+        codeBlocks.forEach((block) => {
+          const pre = block.parentElement
+          if (pre && !pre.querySelector('.copy-button')) {
+            const copyBtn = document.createElement('button')
+            copyBtn.className = 'copy-button'
+            copyBtn.textContent = '复制'
+            copyBtn.style.cssText = `
+              position: absolute;
+              top: 8px;
+              right: 8px;
+              padding: 4px 12px;
+              background: rgba(0, 0, 0, 0.6);
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 12px;
+              transition: background 0.2s;
+              z-index: 10;
+            `
+            copyBtn.onmouseover = () => {
+              copyBtn.style.background = 'rgba(0, 0, 0, 0.8)'
+            }
+            copyBtn.onmouseout = () => {
+              copyBtn.style.background = 'rgba(0, 0, 0, 0.6)'
+            }
+            copyBtn.onclick = async () => {
+              try {
+                await navigator.clipboard.writeText(block.textContent || '')
+                copyBtn.textContent = '已复制!'
+                setTimeout(() => {
+                  copyBtn.textContent = '复制'
+                }, 2000)
+              } catch (err) {
+                console.error('复制失败:', err)
+              }
+            }
+            pre.style.position = 'relative'
+            pre.appendChild(copyBtn)
+          }
+        })
+      },
+      hljs: {
+        enable: true,
+        style: themeStore.theme === 'dark' ? 'github-dark' : 'github'
+      },
+      math: {
+        inlineDigit: true,
+        macros: {}
+      },
+      markdown: {
+        autoSpace: true,
+        gfmAutoLink: true,
+        toc: true,
+        mark: true
+      }
+    },
     input: (value: string) => {
       editableContent.value = value
       handleContentChange()
@@ -775,6 +1126,69 @@ const initVditor = () => {
       vditorInitialized.value = true
       // 记录初始化时的全屏状态
       vditorInitFullscreen.value = isPageFullscreen.value
+
+      // 保存对 ref 的引用,因为 targetRef 在闭包中可能不可用
+      const currentRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
+
+      console.log('[Vditor after] Vditor 初始化完成')
+      console.log('[Vditor after] currentRef:', currentRef)
+      console.log('[Vditor after] isPageFullscreen:', isPageFullscreen.value)
+      console.log('[Vditor after] vditorRef.value:', vditorRef.value)
+      console.log('[Vditor after] vditorRefFullscreen.value:', vditorRefFullscreen.value)
+
+      // 定义图片处理函数
+      const processImages = () => {
+        if (!currentRef) {
+          console.error('[Vditor after] currentRef 为空,无法处理图片')
+          return
+        }
+
+        // 尝试多个可能的选择器
+        const selectors = [
+          '.vditor-wysiwyg .vditor-reset',
+          '.vditor-wysiwyg__area .vditor-reset',
+          '.vditor-content .vditor-reset',
+          '.vditor-reset'
+        ]
+
+        for (const selector of selectors) {
+          const previewElement = currentRef.querySelector(selector)
+          if (previewElement) {
+            const images = previewElement.querySelectorAll('img')
+            console.log(`[Vditor after] 使用选择器 "${selector}" 找到 ${images.length} 个图片`)
+
+            if (images.length > 0) {
+              console.log('[Vditor after] 准备处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
+              processImagesInPreview(previewElement as HTMLElement)
+              return
+            }
+          }
+        }
+
+        console.warn('[Vditor after] 未找到任何图片元素')
+      }
+
+      // 立即检查并尝试处理
+      setTimeout(() => {
+        console.log('[Vditor after] 第一次尝试处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
+
+        if (workspaceStore.currentWorkspaceId) {
+          console.log('[Vditor after] workspaceId 已准备好,立即处理')
+          processImages()
+        } else {
+          console.warn('[Vditor after] workspaceId 未准备好,等待后重试')
+          // 等待 workspaceId 准备好
+          setTimeout(() => {
+            console.log('[Vditor after] 第二次尝试处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
+            if (workspaceStore.currentWorkspaceId) {
+              console.log('[Vditor after] workspaceId 已准备好,开始处理')
+              processImages()
+            } else {
+              console.error('[Vditor after] workspaceId 仍然未准备好,跳过图片处理')
+            }
+          }, 500)
+        }
+      }, 200)
     },
   })
 }
@@ -801,6 +1215,11 @@ watch(activeFile, (newFile, oldFile) => {
     htmlActiveTab.value = 'preview'
   }
 
+  // 如果是Excel文件，重置tab状态
+  // if (isExcelFile(newFile)) {
+  //   excelActiveTab.value = 'preview'
+  // }
+
   // 只在切换到Markdown文件时初始化/更新Vditor
   if (isMarkdownFile(newFile)) {
     // 检查是否需要重新初始化：
@@ -818,6 +1237,28 @@ watch(activeFile, (newFile, oldFile) => {
       nextTick(() => {
         if (vditor.value) {
           vditor.value.setValue(newFile.content)
+
+          // 在 wysiwyg 模式下， setValue 后需要重新处理图片
+          setTimeout(() => {
+            const targetRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
+            const previewElement = targetRef?.querySelector('.vditor-wysiwyg .vditor-reset')
+            if (previewElement) {
+              console.log('[watch activeFile] 重新处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
+
+              // 检查 workspaceId 是否存在
+              if (!workspaceStore.currentWorkspaceId) {
+                console.warn('[watch activeFile] workspaceId 还未准备好,稍后重试')
+                setTimeout(() => {
+                  if (workspaceStore.currentWorkspaceId && previewElement) {
+                    console.log('[watch activeFile] 重试处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
+                    processImagesInPreview(previewElement as HTMLElement)
+                  }
+                }, 300)
+              } else {
+                processImagesInPreview(previewElement as HTMLElement)
+              }
+            }
+          }, 200)
         }
       })
     }
@@ -853,7 +1294,23 @@ watch(isPageFullscreen, (newVal, oldVal) => {
 })
 
 onUnmounted(() => {
-  vditor.value?.destroy()
+  // Clean up event listeners
+  document.removeEventListener('click', handleGlobalClick)
+  document.removeEventListener('keydown', handleKeyDown)
+  if (!isTauri()) {
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+
+  // Clean up Vditor instance to prevent memory leaks
+  if (vditor.value) {
+    try {
+      vditor.value.destroy()
+      vditor.value = null
+    } catch (error) {
+      console.warn('[FileContentArea] Error destroying Vditor:', error)
+    }
+  }
+  vditorInitialized.value = false
 })
 </script>
 
@@ -1072,7 +1529,8 @@ onUnmounted(() => {
 .code-editor-wrapper,
 .csv-editor-wrapper,
 .pdf-viewer-wrapper,
-.html-viewer-wrapper {
+.html-viewer-wrapper,
+.office-viewer-wrapper {
   flex-grow: 1;
   overflow: auto;
   min-height: 0;
@@ -1257,6 +1715,37 @@ onUnmounted(() => {
 .drawio-preview-wrapper {
   height: 100%;
   position: relative;
+}
+
+.excel-editor-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.excel-editor-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+
+.excel-editor-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.excel-edit-wrapper {
+  height: 100%;
+  position: relative;
+}
+
+.excel-preview-wrapper {
+  height: 100%;
+  position: relative;
+}
+
+.luckysheet-wrapper {
+  height: 100%;
+  min-height: 600px;
 }
 
 .floating-save-button {
