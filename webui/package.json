@@ -24,7 +24,11 @@
       "@lezer/css": "^1.1.7",
       "@lezer/json": "^1.0.0",
       "@lezer/vue": "^1.0.0"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@vue-office/docx",
+      "@vue-office/excel"
+    ]
   },
   "scripts": {
     "dev": "bash scripts/prepare-drawio.sh && vite --host",
