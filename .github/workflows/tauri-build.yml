@@ -145,8 +145,20 @@ jobs:
           if [ ! -d ".venv" ]; then
             # Create venv using Python's standard venv module (more reliable for standalone)
             # UV's venv creates trampolines that break in standalone environments
-            echo "Creating venv with python3 -m venv (more portable than uv venv)"
-            python3 -m venv .venv
+
+            # On macOS, use the toolcache Python (self-contained) instead of system Python
+            # System Python on macOS uses frameworks that can't be bundled in standalone apps
+            if [[ "$RUNNER_OS" == "macOS" ]]; then
+              echo "macOS detected: using toolcache Python for portable venv"
+              # Use Python from the hosted toolcache (self-contained, can be bundled)
+              $Python_ROOT_DIR/bin/python3 -m venv .venv
+            elif [[ "$RUNNER_OS" == "Windows" ]]; then
+              echo "Windows detected: using python3 for venv"
+              python3 -m venv .venv
+            else
+              echo "Linux detected: using python3 for venv"
+              python3 -m venv .venv
+            fi
 
             # Install project dependencies (includes CLI entry points)
             # On all platforms, use the venv's pip to ensure proper entry point generation

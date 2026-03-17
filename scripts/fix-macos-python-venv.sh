@@ -72,16 +72,82 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
     echo "   This means the venv is tied to the system Python installation"
     echo ""
 
-    # Find the libpython in the venv
+    # Find or copy the libpython dylib
     LIBPYTHON=$(find "$PYTHON_ENV_DIR" -name "libpython*.dylib" -type f | head -1)
 
     if [ -z "$LIBPYTHON" ]; then
-        echo "❌ Error: Cannot find libpython in the venv"
-        echo "   The venv may not be properly self-contained"
-        exit 1
-    fi
+        echo "⚠️  No libpython found in venv, attempting to copy from system Python..."
 
-    echo "✓ Found libpython in venv: $LIBPYTHON"
+        # Get the Python version from the binary
+        PYTHON_VERSION=$("$PYTHON_BIN" --version 2>&1 | awk '{print $2}')
+        PYTHON_MAJOR_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f1,2)
+
+        # Try to find libpython in various locations
+        SYSTEM_LIBPYTHON=""
+
+        # 1. Check GitHub Actions Python installation (toolcache) - PRIORITY for CI
+        if [ -n "$Python_ROOT_DIR" ]; then
+            echo "Checking GitHub Actions toolcache Python at: $Python_ROOT_DIR"
+            # Toolcache Python has libpython in lib/ directory
+            SYSTEM_LIBPYTHON="$Python_ROOT_DIR/lib/libpython${PYTHON_MAJOR_MINOR}.dylib"
+            if [ -f "$SYSTEM_LIBPYTHON" ]; then
+                echo "✓ Found toolcache libpython: $SYSTEM_LIBPYTHON"
+            else
+                SYSTEM_LIBPYTHON=""
+            fi
+        fi
+
+        # 2. Check standard Python.org framework installation
+        if [ -z "$SYSTEM_LIBPYTHON" ]; then
+            SYSTEM_LIBPYTHON="/Library/Frameworks/Python.framework/Versions/${PYTHON_MAJOR_MINOR}/Python"
+        fi
+
+        # 3. Try to find in Python.framework (any version)
+        if [ -z "$SYSTEM_LIBPYTHON" ] || [ ! -f "$SYSTEM_LIBPYTHON" ]; then
+            SYSTEM_LIBPYTHON=$(find /Library/Frameworks/Python.framework -name "Python" -type f 2>/dev/null | grep "Versions/${PYTHON_MAJOR_MINOR}" | head -1)
+        fi
+
+        # 4. Try using 'locate libpython' or find from the framework reference
+        if [ -z "$SYSTEM_LIBPYTHON" ] || [ ! -f "$SYSTEM_LIBPYTHON" ]; then
+            # The framework path should point to the actual dylib
+            FRAMEWORK_DIR=$(dirname "$PYTHON_FRAMEWORK_PATH")
+            if [ -d "$FRAMEWORK_DIR" ]; then
+                SYSTEM_LIBPYTHON=$(find "$FRAMEWORK_DIR" -name "libpython*.dylib" -o -name "Python" | grep -v ".framework" | head -1)
+            fi
+        fi
+
+        if [ -z "$SYSTEM_LIBPYTHON" ] || [ ! -f "$SYSTEM_LIBPYTHON" ]; then
+            echo "❌ Error: Cannot find libpython in system Python installation"
+            echo "   Searched for libpython${PYTHON_MAJOR_MINOR} in:"
+            echo "   - Python_ROOT_DIR: ${Python_ROOT_DIR:-not set}"
+            echo "   - /Library/Frameworks/Python.framework/Versions/${PYTHON_MAJOR_MINOR}/"
+            echo "   - Framework path: $PYTHON_FRAMEWORK_PATH"
+            echo ""
+            echo "💡 TIP: If running on GitHub Actions macOS, ensure:"
+            echo "   - Python is setup with 'actions/setup-python@v5'"
+            echo "   - The venv is created using: \$Python_ROOT_DIR/bin/python3 -m venv .venv"
+            echo "   - This uses the self-contained toolcache Python instead of system Python"
+            exit 1
+        fi
+
+        # Create lib directory in venv
+        LIB_DIR="$PYTHON_ENV_DIR/lib"
+        mkdir -p "$LIB_DIR"
+
+        # Copy libpython dylib to venv
+        LIBPYTHON_NAME="libpython${PYTHON_MAJOR_MINOR}.dylib"
+        LIBPYTHON="$LIB_DIR/$LIBPYTHON_NAME"
+        echo "Copying $SYSTEM_LIBPYTHON to $LIBPYTHON"
+        cp "$SYSTEM_LIBPYTHON" "$LIBPYTHON"
+
+        if [ ! -f "$LIBPYTHON" ]; then
+            echo "❌ Error: Failed to copy libpython to venv"
+            exit 1
+        fi
+        echo "✓ Copied libpython to venv: $LIBPYTHON"
+    else
+        echo "✓ Found libpython in venv: $LIBPYTHON"
+    fi
     echo ""
 
     # Calculate relative path from bin to lib
