@@ -303,7 +303,7 @@ jobs:
           mkdir -p "${ZIP_DIR}/resources"
 
           # Copy main executable
-          cp webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME} "${ZIP_DIR}/"
+          cp "webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}" "${ZIP_DIR}/"
 
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
@@ -324,13 +324,13 @@ jobs:
           ## Usage
 
           1. Extract this ZIP file to any directory
-          2. Run ./davybot to launch the application
+          2. Run ./dawei-gui to launch the application
 
           The application will automatically start the backend service on first launch.
 
           ## Directory Structure
 
-          - davybot                  : Main application (${ARCH} binary)
+          - dawei-gui                : Main application (${ARCH} binary)
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
@@ -349,7 +349,7 @@ jobs:
           ## Notes
 
           - First launch may take a few seconds to initialize
-          - Make the script executable: chmod +x davybot
+          - Make the script executable: chmod +x dawei-gui
           - Do not move or delete the resources directory
           - If you encounter issues, check the application logs
 
@@ -361,7 +361,7 @@ jobs:
           EOF
 
           # Create ZIP
-          cd webui/src-tauri/target/${{ matrix.target }}/release
+          cd "webui/src-tauri/target/${{ matrix.target }}/release"
           # Use relative path since we're already in the release directory
           ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
           zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
@@ -438,7 +438,6 @@ jobs:
             exit 1
           fi
 
-
       # ========== Create portable ZIP packages ==========
       - name: Create portable ZIP package (Windows)
         if: matrix.platform == 'windows-latest'
@@ -446,14 +445,15 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           APP_NAME="dawei-gui"
-          ZIP_DIR="webui/src-tauri/target/release/${APP_NAME}-standalone-win-portable-v${VERSION}"
+          TARGET="${{ matrix.target }}"
+          ZIP_DIR="webui/src-tauri/target/${TARGET}/release/${APP_NAME}-standalone-win-portable-v${VERSION}"
           ZIP_NAME="${APP_NAME}-standalone-win-portable-v${VERSION}.zip"
 
           # Create package directory
           mkdir -p "${ZIP_DIR}/resources"
 
           # Copy main executable
-          cp webui/src-tauri/target/release/${APP_NAME}.exe "${ZIP_DIR}/"
+          cp "webui/src-tauri/target/${TARGET}/release/${APP_NAME}.exe" "${ZIP_DIR}/"
 
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
@@ -465,25 +465,24 @@ jobs:
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
           # Create README
-          cat > "${ZIP_DIR}/README.txt" << 'EOF'
+          cat > "${ZIP_DIR}/README.txt" << EOF
           # Dawei AI Assistant - Standalone Portable Version
 
-          Version: ${VERSION}
+          Version: \${VERSION}
 
           ## Usage
 
           1. Extract this ZIP file to any directory
-          2. Double-click davybot.exe to launch the application
+          2. Double-click dawei-gui.exe to launch the application
 
           The application will automatically start the backend service on first launch.
 
           ## Directory Structure
 
-          - davybot.exe              : Main application
+          - dawei-gui.exe            : Main application
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
-            - onlyoffice/            : OnlyOffice document editor
             - python-env/            : Python runtime environment (Windows venv)
               - Scripts/python.exe   : Python interpreter
               - Scripts/uv.exe       : UV package manager
@@ -512,9 +511,13 @@ jobs:
           EOF
 
           # Create ZIP
-          cd webui/src-tauri/target/release
+          cd "webui/src-tauri/target/${TARGET}/release"
           # Use relative path since we're already in the release directory
           7z a -tzip "${ZIP_NAME}" "$(basename "${ZIP_DIR}")" -mx=9
+
+          echo "Created ZIP: ${ZIP_NAME}"
+          ls -la "${ZIP_NAME}"
+
       - name: Create portable ZIP package (Linux x86_64)
         if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
         shell: bash
@@ -529,7 +532,7 @@ jobs:
           mkdir -p "${ZIP_DIR}/resources"
 
           # Copy main executable from the correct target directory
-          cp webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME} "${ZIP_DIR}/"
+          cp "webui/src-tauri/target/${{ matrix.target }}/release/${APP_NAME}" "${ZIP_DIR}/"
 
           # Copy Python environment
           cp -r webui/src-tauri/resources/python-env "${ZIP_DIR}/resources/"
@@ -550,13 +553,13 @@ jobs:
           ## Usage
 
           1. Extract this ZIP file to any directory
-          2. Run ./davybot to launch the application
+          2. Run ./dawei-gui to launch the application
 
           The application will automatically start the backend service on first launch.
 
           ## Directory Structure
 
-          - davybot                  : Main application (${ARCH} binary)
+          - dawei-gui                : Main application (${ARCH} binary)
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
@@ -575,7 +578,7 @@ jobs:
           ## Notes
 
           - First launch may take a few seconds to initialize
-          - Make the script executable: chmod +x davybot
+          - Make the script executable: chmod +x dawei-gui
           - Do not move or delete the resources directory
           - If you encounter issues, check the application logs
 
@@ -587,7 +590,7 @@ jobs:
           EOF
 
           # Create ZIP
-          cd webui/src-tauri/target/${{ matrix.target }}/release
+          cd "webui/src-tauri/target/${{ matrix.target }}/release"
           # Use relative path since we're already in the release directory
           ZIP_DIR_BASE=$(basename "${ZIP_DIR}")
           zip -qr "${ZIP_NAME}" "${ZIP_DIR_BASE}"
@@ -623,7 +626,7 @@ jobs:
         with:
           name: dawei-gui-standalone-windows-x86_64-v${{ steps.version.outputs.version }}
           path: |
-            webui/src-tauri/target/release/*.zip
+            webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: warn
 
   # ========== Release to GitHub ==========
@@ -631,7 +634,7 @@ jobs:
     needs: build
     if: |
       always() && (
-        startswith(github.ref, 'refs/tags/') ||
+        startsWith(github.ref, 'refs/tags/') ||
         (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
       ) && (needs.build.result == 'success')
     runs-on: ubuntu-latest
@@ -652,27 +655,20 @@ jobs:
 
       - name: Extract artifact zips and reorganize
         run: |
-          # GitHub Actions artifacts are already extracted by download-artifact@v4
-          # The portable ZIP files are in bundles/<artifact-name>/webui/src-tauri/target/.../release/
-
           echo "=== Finding portable ZIP files from extracted artifacts ==="
           mkdir -p ./release-zips
 
-          # Find all portable and universal ZIP files directly in the bundles directory
-          # These are the final products we created in the build step
-          find ./bundles -type f \( -name "*portable*.zip" -o -name "*universal*.zip" \) | while read zip_file; do
+          # Find all portable ZIP files and copy to release-zips
+          find ./bundles -type f -name "*portable*.zip" | while read zip_file; do
             echo "Found portable ZIP: $zip_file"
-
-            # Get the basename and copy to release-zips
-            basename_zip=$(basename "$zip_file")
-            cp "$zip_file" "./release-zips/$basename_zip"
+            cp "$zip_file" "./release-zips/$(basename "$zip_file")"
           done
 
           echo "=== Final release zips ==="
           ls -lh ./release-zips/
 
           # Verify we found the expected files
-          if [ -z "$(ls -A ./release-zips/)" ]; then
+          if [ -z "$(find ./release-zips -name '*.zip' -type f)" ]; then
             echo "ERROR: No portable ZIP files found!"
             echo "Bundles structure:"
             find ./bundles -type f -name "*.zip" || echo "No ZIP files found at all"
@@ -715,11 +711,10 @@ jobs:
           ### Installation
 
           #### Portable ZIP Packages (Standalone)
-          - **macOS Intel**: \`davybot-standalone-darwin-x86_64-portable-v${TAG#v}.zip\` - For Intel Macs (2019 and earlier)
-          - **macOS Apple Silicon**: \`davybot-standalone-darwin-aarch64-portable-v${TAG#v}.zip\` - For M1/M2/M3/M4 Macs
-          - **Windows**: \`davybot-standalone-win-portable-v${TAG#v}.zip\` - No installation required
-          - **Linux x86_64**: \`davybot-standalone-linux-x86_64-portable-v${TAG#v}.zip\` - For Intel/AMD 64-bit systems
-          - **Linux ARM64**: \`davybot-standalone-linux-aarch64-portable-v${TAG#v}.zip\` - For ARM 64-bit systems (Raspberry Pi 4/5, ARM servers, etc.)
+          - **macOS Intel**: \`dawei-gui-standalone-darwin-x86_64-portable-v${TAG#v}.zip\` - For Intel Macs (2019 and earlier)
+          - **macOS Apple Silicon**: \`dawei-gui-standalone-darwin-aarch64-portable-v${TAG#v}.zip\` - For M1/M2/M3/M4 Macs
+          - **Windows**: \`dawei-gui-standalone-win-portable-v${TAG#v}.zip\` - No installation required
+          - **Linux x86_64**: \`dawei-gui-standalone-linux-x86_64-portable-v${TAG#v}.zip\` - For Intel/AMD 64-bit systems
 
           ### Features
 
@@ -727,7 +722,7 @@ jobs:
           - No external Python installation required
           - Standalone operation - works offline
           - Portable ZIP versions require no installation
-          - Multi-architecture support (Intel and Apple Silicon for macOS, x86_64 and ARM64 for Linux)
+          - Multi-architecture support (Intel and Apple Silicon for macOS, x86_64 for Linux)
           - **Draw.io diagram editor included** (148 MB) - Create and edit diagrams visually
 
           ### Quick Start (Portable)
@@ -735,8 +730,8 @@ jobs:
           1. Download the appropriate ZIP file for your platform and architecture
           2. Extract to any folder
           3. Run the application:
-             - Windows: Double-click \`davybot.exe\`
-             - Linux/macOS: Run \`./davybot\`
+             - Windows: Double-click \`dawei-gui.exe\`
+             - Linux/macOS: Run \`./dawei-gui\`
 
           **Note for macOS users**: Check your architecture with \`uname -m\`:
           - \`x86_64\`: Download the x86_64 version (Intel Macs)
@@ -744,7 +739,6 @@ jobs:
 
           **Note for Linux users**: Check your architecture with \`uname -m\`:
           - \`x86_64\`: Download the x86_64 version (Intel/AMD PCs)
-          - \`aarch64\`: Download the aarch64 version (ARM devices like Raspberry Pi 4/5)
 
           **Why no Universal Binary?** Due to technical limitations with Python C extensions on different architectures, we provide separate builds for Intel and Apple Silicon Macs. This ensures optimal performance and compatibility for both platforms.
           " \
