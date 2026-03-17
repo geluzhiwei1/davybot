@@ -212,50 +212,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Copy Python environment to Tauri resources
-        run: |
-          mkdir -p webui/src-tauri/resources
-          rm -rf webui/src-tauri/resources/python-env
-          cp -r agent/.venv webui/src-tauri/resources/python-env
-
-          # Clean up Python cache to reduce size
-          find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
-
-          # Verify dawei command exists in copied environment
-          echo "=== Verifying dawei command in resources/python-env ==="
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            if [ -f "webui/src-tauri/resources/python-env/Scripts/dawei.exe" ]; then
-              echo "✓ dawei.exe found in resources/python-env/Scripts/"
-              webui/src-tauri/resources/python-env/Scripts/dawei.exe --version || echo "Version check failed"
-            else
-              echo "❌ ERROR: dawei.exe not found in resources/python-env/Scripts/"
-              echo "Contents of Scripts directory:"
-              ls -la webui/src-tauri/resources/python-env/Scripts/ | head -20
-              exit 1
-            fi
-          else
-            if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
-              echo "✓ dawei found in resources/python-env/bin/"
-              webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
-            else
-              echo "❌ ERROR: dawei not found in resources/python-env/bin/"
-              echo "Contents of bin directory:"
-              ls -la webui/src-tauri/resources/python-env/bin/ | head -20
-              exit 1
-            fi
-          fi
-        shell: bash
-
-      - name: Fix Python dynamic library linking (macOS only)
-        if: startsWith(matrix.platform, 'macos')
-        run: |
-          echo "=== Fixing Python for portable macOS build ==="
-          bash scripts/fix-macos-python-venv.sh webui/src-tauri/resources/python-env
-
-          echo "=== Verifying Python binary after fix ==="
-          webui/src-tauri/resources/python-env/bin/python --version
-        shell: bash
+      # NOTE: Python environment will be copied AFTER Tauri build to avoid symlink validation errors
 
       # ========== Prepare drawio resources ==========
       - name: Prepare drawio resources
@@ -278,6 +235,40 @@ jobs:
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
           echo "Build completed successfully"
           ls -la src-tauri/target/${{ matrix.target }}/release/dawei-gui
+
+      - name: Copy Python environment to Tauri resources (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          mkdir -p webui/src-tauri/resources
+          rm -rf webui/src-tauri/resources/python-env
+          cp -r agent/.venv webui/src-tauri/resources/python-env
+
+          # Clean up Python cache to reduce size
+          find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
+
+          # Verify dawei command exists in copied environment
+          echo "=== Verifying dawei command in resources/python-env ==="
+          if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
+            echo "✓ dawei found in resources/python-env/bin/"
+            webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
+          else
+            echo "❌ ERROR: dawei not found in resources/python-env/bin/"
+            echo "Contents of bin directory:"
+            ls -la webui/src-tauri/resources/python-env/bin/ | head -20
+            exit 1
+          fi
+        shell: bash
+
+      - name: Fix Python dynamic library linking (macOS only)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          echo "=== Fixing Python for portable macOS build ==="
+          bash scripts/fix-macos-python-venv.sh webui/src-tauri/resources/python-env
+
+          echo "=== Verifying Python binary after fix ==="
+          webui/src-tauri/resources/python-env/bin/python --version
+        shell: bash
 
       - name: Copy macOS binaries to simple path
         if: startsWith(matrix.platform, 'macos')
@@ -376,15 +367,65 @@ jobs:
           echo "Build completed successfully"
           ls -la src-tauri/target/${{ matrix.target }}/release/dawei-gui || ls -la src-tauri/target/release/dawei-gui
 
+      - name: Copy Python environment to Tauri resources (Linux)
+        if: matrix.platform == 'ubuntu-latest' && matrix.arch == 'x86_64'
+        run: |
+          mkdir -p webui/src-tauri/resources
+          rm -rf webui/src-tauri/resources/python-env
+          cp -r agent/.venv webui/src-tauri/resources/python-env
+
+          # Clean up Python cache to reduce size
+          find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
+
+          # Verify dawei command exists in copied environment
+          echo "=== Verifying dawei command in resources/python-env ==="
+          if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
+            echo "✓ dawei found in resources/python-env/bin/"
+            webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
+          else
+            echo "❌ ERROR: dawei not found in resources/python-env/bin/"
+            echo "Contents of bin directory:"
+            ls -la webui/src-tauri/resources/python-env/bin/ | head -20
+            exit 1
+          fi
+        shell: bash
+
       - name: Build Tauri app (Windows)
         if: startsWith(matrix.platform, 'windows')
         working-directory: ./webui
+        shell: bash
         run: |
           # For Windows, build for the specific architecture
           echo "Building for ${{ matrix.target }}..."
           pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
           echo "Build completed successfully"
-          ls -la src-tauri/target/${{ matrix.target }}/release/dawei-gui.exe || ls -la src-tauri/target/release/dawei-gui.exe
+          ls -la src-tauri/target/${{ matrix.target }}/release/dawei-gui.exe || ls -la src-tauri/target/release/dawei-gui.exe || true
+
+      - name: Copy Python environment to Tauri resources (Windows)
+        if: startsWith(matrix.platform, 'windows')
+        shell: bash
+        run: |
+          mkdir -p webui/src-tauri/resources
+          rm -rf webui/src-tauri/resources/python-env
+          cp -r agent/.venv webui/src-tauri/resources/python-env
+
+          # Clean up Python cache to reduce size
+          find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
+
+          # Verify dawei command exists in copied environment
+          echo "=== Verifying dawei command in resources/python-env ==="
+          if [ -f "webui/src-tauri/resources/python-env/Scripts/dawei.exe" ]; then
+            echo "✓ dawei.exe found in resources/python-env/Scripts/"
+            webui/src-tauri/resources/python-env/Scripts/dawei.exe --version || echo "Version check failed"
+          else
+            echo "❌ ERROR: dawei.exe not found in resources/python-env/Scripts/"
+            echo "Contents of Scripts directory:"
+            ls -la webui/src-tauri/resources/python-env/Scripts/ | head -20
+            exit 1
+          fi
+
 
       # ========== Create portable ZIP packages ==========
       - name: Create portable ZIP package (Windows)
