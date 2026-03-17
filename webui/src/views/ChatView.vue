@@ -526,15 +526,23 @@ const fetchFileContent = async (node: { path: string; name: string; is_directory
     const audioExtensions = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'];
     // PDF文件扩展名
     const pdfExtensions = ['pdf'];
+    // Office 文件扩展名（交给 VueOfficeEditor 自行通过 workspace API 拉取内容）
+    const officeExtensions = ['docx', 'xlsx', 'xls'];
 
     let fileType = 'text';
     if (imageExtensions.includes(extension)) fileType = 'image';
     else if (videoExtensions.includes(extension)) fileType = 'video';
     else if (audioExtensions.includes(extension)) fileType = 'audio';
     else if (pdfExtensions.includes(extension)) fileType = 'pdf';
+    else if (officeExtensions.includes(extension)) fileType = 'office';
     else if (['md', 'markdown'].includes(extension)) fileType = 'markdown';
     else if (['json', 'js', 'ts', 'jsx', 'tsx', 'vue', 'html', 'css', 'py', 'sql', 'yaml', 'yml', 'xml', 'sh'].includes(extension)) fileType = 'code';
     else if (extension === 'csv') fileType = 'csv';
+
+    // Office 文件：不要走文本读取，避免在 Tauri 中把二进制塞进响应式状态导致页面重载
+    if (fileType === 'office') {
+      return { content: '', type: fileType };
+    }
 
     // 处理媒体文件（图像、视频、音频、PDF）
     if (fileType === 'image' || fileType === 'video' || fileType === 'audio' || fileType === 'pdf') {
@@ -598,13 +606,44 @@ const handleOpenFile = async (fileInfo: { path: string; name: string; is_directo
 };
 
 
+const isBase64DataUrl = (value: string): boolean => /^data:[^;]+;base64,/.test(value);
+
+const dataUrlToFile = (dataUrl: string, fileName: string): File => {
+  const [header, base64] = dataUrl.split(',', 2);
+  const mimeType = header.match(/^data:(.*?);base64$/)?.[1] || 'application/octet-stream';
+  const binary = atob(base64 || '');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new File([bytes], fileName, { type: mimeType });
+};
+
 const saveFileContent = async (fileId: string, content: string) => {
   try {
     const workspaceId = chatStore.workspaceId || 'default';
     const file = openFiles.value.find(f => (f as { id: string }).id === fileId);
     if (!file) throw new Error('文件未找到');
-    await apiManager.getFilesApi().saveFileContent(workspaceId, { path: (file as { id: string }).id, content });
-    (file as { content: string; isDirty: boolean }).content = content;
+
+    const targetPath = (file as { id: string }).id;
+
+    if (isBase64DataUrl(content)) {
+      const lastSlashIndex = targetPath.lastIndexOf('/');
+      const parentPath = lastSlashIndex >= 0 ? targetPath.slice(0, lastSlashIndex) : '';
+      const fileName = lastSlashIndex >= 0 ? targetPath.slice(lastSlashIndex + 1) : targetPath;
+      const binaryFile = dataUrlToFile(content, fileName);
+
+      await apiManager.getFilesApi().uploadFile(workspaceId, {
+        file: binaryFile,
+        path: parentPath,
+      });
+
+      (file as { content: string; isDirty: boolean }).content = '';
+    } else {
+      await apiManager.getFilesApi().saveFileContent(workspaceId, { path: targetPath, content });
+      (file as { content: string; isDirty: boolean }).content = content;
+    }
+
     (file as { isDirty: boolean }).isDirty = false;
   } catch (error) {
     console.error('保存文件失败:', error);

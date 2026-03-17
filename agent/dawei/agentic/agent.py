@@ -197,10 +197,36 @@ class Agent:
             self.conversation_memory_integration = ConversationMemoryIntegration(
                 memory_graph=self.memory_graph,
                 virtual_context=self.virtual_context,
-                auto_extract=True,
+                auto_extract=False,  # 改为False，禁用自动提取
                 auto_store=True,
             )
-            self.logger.info("Conversation-memory integration initialized")
+            self.logger.info("Conversation-memory integration initialized (auto-extract disabled)")
+
+        # 【新增】记忆提取调度器（定时+手动）
+        self.memory_scheduler = None
+        if is_memory_enabled(self.user_workspace) and self.memory_graph is not None:
+            try:
+                from dawei.memory.scheduler import MemoryExtractionScheduler
+
+                llm_service = None
+                if hasattr(self, "execution_engine") and hasattr(self.execution_engine, "llm_service"):
+                    llm_service = self.execution_engine.llm_service
+
+                self.memory_scheduler = MemoryExtractionScheduler(
+                    workspace_path=str(self.user_workspace.absolute_path),
+                    memory_graph=self.memory_graph,
+                    llm_service=llm_service,
+                    extraction_hour=0,  # 凌晨0点执行
+                    extraction_minute=0,
+                )
+
+                # 自动启动调度器
+                import asyncio
+                asyncio.create_task(self.memory_scheduler.start())
+
+                self.logger.info("Memory extraction scheduler initialized and started")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize memory scheduler: {e}", exc_info=True)
 
         # 【新增】Plan Mode 工作流执行器
         self.plan_workflow = None
@@ -614,18 +640,8 @@ class Agent:
         await self.execution_engine.process_message(message)
         await self.execution_engine.execute_task_graph()
 
-        # 【新增】执行完成后自动提取记忆
-        # Fast fail: only catch expected errors, let unknown errors propagate
-        if self.memory_graph is not None and not self.memory_degraded:
-            try:
-                await self._extract_memories_after_execution()
-            except (ConnectionError, TimeoutError, OSError) as e:
-                # Expected errors: network issues, timeouts, etc.
-                self.logger.warning(f"Memory extraction failed due to connectivity issue: {e}")
-            except Exception as e:
-                # Unexpected errors should fail fast - log as error
-                self.logger.error(f"Memory extraction failed unexpectedly: {e}", exc_info=True)
-                raise
+        # 注意：自动记忆提取已移除，改为定时（每天0点）或手动（UI按钮）触发
+        # 记忆提取由 MemoryExtractionScheduler 负责管理
 
         return
 

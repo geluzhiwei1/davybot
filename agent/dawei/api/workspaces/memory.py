@@ -8,6 +8,7 @@ REST API for memory system operations
 import csv
 import io
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from dawei.core.datetime_compat import UTC
@@ -16,7 +17,9 @@ from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from dawei import get_dawei_home
 from dawei.memory.memory_graph import MemoryEntry, MemoryGraph, MemoryType
@@ -695,10 +698,6 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
             temperature=0.3,
         )
 
-        # 调试日志
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.info(f"LLM response raw type: {type(response)}, value: {response}")
 
         response_text = ""
@@ -757,10 +756,7 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
             extraction_result["details"].append("No extractable information found")
 
     except Exception as e:
-        # Non-critical LLM extraction: log warning but don't fail the request
-        import logging
-
-        logging.getLogger(__name__).warning(f"LLM extraction failed: {e}", exc_info=True)
+        logger.warning(f"LLM extraction failed: {e}", exc_info=True)
         extraction_result["details"].append(f"LLM error: {str(e)}")
 
     return {
@@ -771,4 +767,131 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
         "details": extraction_result["details"][:10],
         "message": f"成功提取 {extraction_result['extracted']} 条记忆",
         "requires_input": False,
+    }
+
+
+# ============================================================================
+# Batch Memory Extraction Endpoints (New)
+# ============================================================================
+
+
+class BatchExtractRequest(BaseModel):
+    """批量提取记忆请求"""
+
+    date: str | None = Field(
+        None,
+        description="目标日期 (格式: YYYY-MM-DD)，为空则提取今天",
+        examples=["2026-02-18"],
+    )
+    extract_all: bool = Field(
+        False,
+        description="是否提取所有会话（False=仅提取未提取过的）",
+    )
+
+
+class BatchExtractResponse(BaseModel):
+    """批量提取响应"""
+
+    success: bool
+    date: str | None = None
+    total_conversations: int = 0
+    processed_conversations: int = 0
+    extracted_memories: int = 0
+    skipped: int = 0
+    processed_files: list[str] = []
+    error: str | None = None
+
+
+@router.post("/{workspace_id}/memory/extract/batch", response_model=BatchExtractResponse)
+async def batch_extract_memories(
+    workspace_id: str,
+    request: BatchExtractRequest,
+):
+    """批量提取记忆（从会话文件）
+
+    从指定日期的会话文件中批量提取记忆，支持：
+    1. 指定日期提取
+    2. 提取今天的所有会话
+
+    Args:
+        workspace_id: 工作空间ID
+        request: 批量提取请求
+
+    Returns:
+        提取结果
+    """
+    try:
+        # 获取工作空间路径
+        workspace_path = _get_workspace_path(workspace_id)
+        if not workspace_path or not workspace_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workspace not found: {workspace_id}",
+            )
+
+        # 获取数据库路径
+        db_path = _get_memory_db_path(workspace_id)
+        if not db_path:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to get memory database path",
+            )
+
+        # 初始化MemoryGraph
+        graph = MemoryGraph(db_path)
+
+        # 导入批量提取器
+        from dawei.memory.batch_extractor import BatchMemoryExtractor
+
+        # 创建批量提取器（不传LLM服务，使用规则提取）
+        extractor = BatchMemoryExtractor(
+            workspace_path=str(workspace_path),
+            memory_graph=graph,
+            llm_service=None,  # 使用规则提取，避免依赖LLM
+        )
+
+        # 确定提取日期
+        target_date = request.date
+        if not target_date:
+            target_date = datetime.now(UTC).strftime("%Y-%m-%d")
+
+        # 执行提取
+        result = await extractor.extract_from_date(
+            target_date=target_date,
+            extract_all=request.extract_all,
+        )
+
+        logger.info(
+            f"Batch memory extraction completed: "
+            f"{result['extracted_memories']} memories from "
+            f"{result['total_conversations']} conversations"
+        )
+
+        return BatchExtractResponse(**result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch memory extraction failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Batch extraction failed: {str(e)}",
+        )
+
+
+@router.get("/{workspace_id}/memory/extract/scheduler/status")
+async def get_extraction_scheduler_status(workspace_id: str):
+    """获取记忆提取调度器状态
+
+    Returns:
+        调度器状态信息
+    """
+    # TODO: 实现调度器状态查询
+    # 需要通过WebSocketManager获取活跃Agent实例
+    return {
+        "running": False,
+        "scheduled_time": "00:00",
+        "next_run": None,
+        "workspace_id": workspace_id,
+        "message": "Scheduler status not implemented yet",
     }

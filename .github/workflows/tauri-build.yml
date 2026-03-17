@@ -74,7 +74,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -262,19 +262,6 @@ jobs:
         working-directory: ./webui
         run: bash scripts/prepare-drawio.sh
 
-      # ========== Prepare OnlyOffice resources ==========
-      - name: Cache OnlyOffice build
-        uses: actions/cache@v4
-        with:
-          path: deps/onlyoffice-web-local/html
-          key: onlyoffice-html-${{ hashFiles('deps/onlyoffice-web-local/package.json', 'deps/onlyoffice-web-local/pnpm-lock.yaml') }}
-          restore-keys: |
-            onlyoffice-html-
-
-      - name: Prepare OnlyOffice resources
-        working-directory: ./webui
-        run: bash scripts/prepare-onlyoffice.sh
-
       # ========== Build frontend ==========
       - name: Build frontend
         working-directory: ./webui
@@ -321,9 +308,6 @@ jobs:
           # Copy drawio (diagram editor)
           cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
 
-          # Copy onlyoffice (office editor)
-          cp -r webui/src-tauri/resources/onlyoffice "${ZIP_DIR}/resources/"
-
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -347,7 +331,6 @@ jobs:
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
-            - onlyoffice/            : OnlyOffice document editor
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/uv               : UV package manager
@@ -396,7 +379,12 @@ jobs:
       - name: Build Tauri app (Windows)
         if: startsWith(matrix.platform, 'windows')
         working-directory: ./webui
-        run: pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --features standalone
+        run: |
+          # For Windows, build for the specific architecture
+          echo "Building for ${{ matrix.target }}..."
+          pnpm tauri build --config src-tauri/tauri.conf.standalone.json --no-bundle --target ${{ matrix.target }} --features standalone
+          echo "Build completed successfully"
+          ls -la src-tauri/target/${{ matrix.target }}/release/dawei-gui.exe || ls -la src-tauri/target/release/dawei-gui.exe
 
       # ========== Create portable ZIP packages ==========
       - name: Create portable ZIP package (Windows)
@@ -419,9 +407,6 @@ jobs:
 
           # Copy drawio (diagram editor)
           cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
-
-          # Copy onlyoffice (office editor)
-          cp -r webui/src-tauri/resources/onlyoffice "${ZIP_DIR}/resources/"
 
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
@@ -499,9 +484,6 @@ jobs:
           # Copy drawio (diagram editor)
           cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
 
-          # Copy onlyoffice (office editor)
-          cp -r webui/src-tauri/resources/onlyoffice "${ZIP_DIR}/resources/"
-
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -525,7 +507,6 @@ jobs:
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
-            - onlyoffice/            : OnlyOffice document editor
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/uv               : UV package manager
@@ -601,6 +582,7 @@ jobs:
         (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
       ) && (needs.build.result == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -684,6 +666,7 @@ jobs:
           - **macOS Apple Silicon**: \`davybot-standalone-darwin-aarch64-portable-v${TAG#v}.zip\` - For M1/M2/M3/M4 Macs
           - **Windows**: \`davybot-standalone-win-portable-v${TAG#v}.zip\` - No installation required
           - **Linux x86_64**: \`davybot-standalone-linux-x86_64-portable-v${TAG#v}.zip\` - For Intel/AMD 64-bit systems
+          - **Linux ARM64**: \`davybot-standalone-linux-aarch64-portable-v${TAG#v}.zip\` - For ARM 64-bit systems (Raspberry Pi 4/5, ARM servers, etc.)
 
           ### Features
 
@@ -691,9 +674,8 @@ jobs:
           - No external Python installation required
           - Standalone operation - works offline
           - Portable ZIP versions require no installation
-          - Multi-architecture support (Intel and Apple Silicon for macOS)
+          - Multi-architecture support (Intel and Apple Silicon for macOS, x86_64 and ARM64 for Linux)
           - **Draw.io diagram editor included** (148 MB) - Create and edit diagrams visually
-          - **OnlyOffice document editor included** - Edit Word, Excel, and PowerPoint files
 
           ### Quick Start (Portable)
 
@@ -706,6 +688,10 @@ jobs:
           **Note for macOS users**: Check your architecture with \`uname -m\`:
           - \`x86_64\`: Download the x86_64 version (Intel Macs)
           - \`arm64\` or \`aarch64\`: Download the aarch64 version (Apple Silicon Macs)
+
+          **Note for Linux users**: Check your architecture with \`uname -m\`:
+          - \`x86_64\`: Download the x86_64 version (Intel/AMD PCs)
+          - \`aarch64\`: Download the aarch64 version (ARM devices like Raspberry Pi 4/5)
 
           **Why no Universal Binary?** Due to technical limitations with Python C extensions on different architectures, we provide separate builds for Intel and Apple Silicon Macs. This ensures optimal performance and compatibility for both platforms.
           " \

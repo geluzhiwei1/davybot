@@ -10,6 +10,12 @@ on:
         description: 'Build version (optional)'
         required: false
         type: string
+  workflow_run:
+    workflows: ["Build Tauri Standalone"]
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -45,7 +51,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -66,6 +72,68 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      # ========== Build ARM64 Python environment using Docker ==========
+      - name: Build ARM64 Python environment
+        run: |
+          echo "=== Building ARM64 Python environment using Docker ==="
+
+          # Create a Dockerfile for ARM64 Python
+          cat > Dockerfile.python-arm64 << 'EOF'
+          FROM --platform=linux/arm64 python:3.12-slim
+
+          RUN apt-get update && apt-get install -y \
+              gcc \
+              g++ \
+              && rm -rf /var/lib/apt/lists/*
+
+          # Install UV
+          RUN pip install --no-cache-dir uv
+
+          # Copy project files
+          WORKDIR /workspace
+          COPY agent/ ./agent/
+
+          # Create venv and install dependencies
+          RUN cd /workspace/agent && \
+              python3 -m venv /opt/python-env && \
+              /opt/python-env/bin/pip install --upgrade pip && \
+              /opt/python-env/bin/pip install -e .
+
+          # Verify installation
+          RUN /opt/python-env/bin/dawei --version || true
+
+          # Pack the environment
+          WORKDIR /opt
+          RUN tar czf /python-env-arm64.tar.gz python-env
+
+          EOF
+
+          # Build Docker image for ARM64 using buildx
+          docker buildx create --use --name multiarch 2>/dev/null || true
+          docker buildx build \
+            --platform linux/arm64 \
+            -f Dockerfile.python-arm64 \
+            --output type=local,path=. .
+
+          # Extract the Python environment
+          if [ -f "python-env-arm64.tar.gz" ]; then
+            mkdir -p agent/.venv-arm64
+            tar xzf python-env-arm64.tar.gz -C agent/
+            mv agent/python-env agent/.venv-arm64
+            echo "=== ARM64 Python environment built successfully ==="
+            ls -la agent/.venv-arm64/bin/ | head -10
+            # Verify dawei exists
+            if [ -f "agent/.venv-arm64/bin/dawei" ]; then
+              echo "✓ dawei found in ARM64 Python environment"
+            else
+              echo "❌ ERROR: dawei not found in ARM64 Python environment"
+              exit 1
+            fi
+          else
+            echo "❌ ERROR: Failed to build ARM64 Python environment"
+            exit 1
+          fi
 
       # ========== Install ARM64 system libraries for cross-compilation ==========
       - name: Install ARM64 system libraries for cross-compilation
@@ -92,11 +160,11 @@ jobs:
           key: aarch64-unknown-linux-gnu-${{ hashFiles('webui/src-tauri/Cargo.lock') }}
           cache-on-failure: true
 
-      - name: Cache Python venv
+      - name: Cache ARM64 Python venv
         uses: actions/cache@v4
         with:
-          path: agent/.venv
-          key: ${{ runner.os }}-python-venv-${{ hashFiles('agent/pyproject.toml') }}
+          path: agent/.venv-arm64
+          key: ${{ runner.os }}-python-venv-arm64-${{ hashFiles('agent/pyproject.toml') }}
 
       # ========== Install frontend dependencies ==========
       - name: Install pnpm dependencies
@@ -104,67 +172,31 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # ========== Prepare Python environment ==========
-      - name: Install UV package manager
+      - name: Install UV package manager (host)
         run: |
           # Install UV using pip (works on all platforms)
           pip3 install uv --quiet
 
-      - name: Create Python venv if cache miss
-        run: |
-          cd agent
-          if [ ! -d ".venv" ]; then
-            # Create venv using Python's standard venv module (more reliable for standalone)
-            # UV's venv creates trampolines that break in standalone environments
-            echo "Creating venv with python3 -m venv (more portable than uv venv)"
-            python3 -m venv .venv
+      # Skip the old venv creation step since we use Docker-built ARM64 environment
 
-            # Install project dependencies
-            echo "Installing dependencies with pip"
-            .venv/bin/python -m pip install --upgrade pip
-            .venv/bin/python -m pip install -e .
-
-            # Verify dawei command is available
-            if [ -f ".venv/bin/dawei" ]; then
-              echo "✓ dawei found in bin directory"
-              .venv/bin/dawei --version || echo "Version check failed"
-            else
-              echo "❌ ERROR: dawei not found in bin directory"
-              echo "Contents of bin directory:"
-              ls -la .venv/bin/ | head -20
-              exit 1
-            fi
-          else
-            # Sync existing dependencies
-            echo "Found existing .venv, syncing dependencies"
-            .venv/bin/python -m pip install -e . 2>/dev/null || true
-
-            # Verify dawei command is available
-            if [ -f ".venv/bin/dawei" ]; then
-              echo "✓ dawei found in bin directory"
-            else
-              echo "❌ ERROR: dawei not found after sync"
-              exit 1
-            fi
-          fi
-        shell: bash
-
-      - name: Copy Python environment to Tauri resources
+      - name: Copy ARM64 Python environment to Tauri resources
         run: |
           mkdir -p webui/src-tauri/resources
           rm -rf webui/src-tauri/resources/python-env
-          cp -r agent/.venv webui/src-tauri/resources/python-env
+          cp -r agent/.venv-arm64 webui/src-tauri/resources/python-env
 
           # Clean up Python cache to reduce size
           find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
 
           # Verify dawei command exists in copied environment
-          echo "=== Verifying dawei command in resources/python-env ==="
+          echo "=== Verifying ARM64 dawei command in resources/python-env ==="
           if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
-            echo "✓ dawei found in resources/python-env/bin/"
+            echo "✓ ARM64 dawei found in resources/python-env/bin/"
+            file webui/src-tauri/resources/python-env/bin/dawei
             webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
           else
-            echo "❌ ERROR: dawei not found in resources/python-env/bin/"
+            echo "❌ ERROR: ARM64 dawei not found in resources/python-env/bin/"
             echo "Contents of bin directory:"
             ls -la webui/src-tauri/resources/python-env/bin/ | head -20
             exit 1
@@ -175,19 +207,6 @@ jobs:
       - name: Prepare drawio resources
         working-directory: ./webui
         run: bash scripts/prepare-drawio.sh
-
-      # ========== Prepare OnlyOffice resources ==========
-      - name: Cache OnlyOffice build
-        uses: actions/cache@v4
-        with:
-          path: deps/onlyoffice-web-local/html
-          key: onlyoffice-html-${{ hashFiles('deps/onlyoffice-web-local/package.json', 'deps/onlyoffice-web-local/pnpm-lock.yaml') }}
-          restore-keys: |
-            onlyoffice-html-
-
-      - name: Prepare OnlyOffice resources
-        working-directory: ./webui
-        run: bash scripts/prepare-onlyoffice.sh
 
       # ========== Build frontend ==========
       - name: Build frontend
@@ -232,9 +251,6 @@ jobs:
           # Copy drawio (diagram editor)
           cp -r webui/src-tauri/resources/drawio "${ZIP_DIR}/resources/"
 
-          # Copy onlyoffice (office editor)
-          cp -r webui/src-tauri/resources/onlyoffice "${ZIP_DIR}/resources/"
-
           # Copy welcome.html
           cp webui/src-tauri/resources/welcome.html "${ZIP_DIR}/resources/"
 
@@ -258,7 +274,6 @@ jobs:
           - resources/               : Resource files directory
             - welcome.html           : Welcome page (standalone HTML)
             - drawio/                : Draw.io diagram editor (148 MB)
-            - onlyoffice/            : OnlyOffice document editor
             - python-env/            : Python runtime environment
               - bin/python           : Python interpreter
               - bin/uv               : UV package manager
@@ -294,8 +309,94 @@ jobs:
           echo "Created ZIP: ${ZIP_NAME}"
           ls -la "${ZIP_NAME}"
 
-      # ========== Upload artifacts ==========
-      - name: Upload artifacts (Linux ARM64)
+  # ========== Add ARM64 artifacts to GitHub Release ==========
+  release-arm64:
+    needs: build-linux-arm64
+    if: |
+      always() && (
+        startswith(github.ref, 'refs/tags/') ||
+        (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+      ) && (needs.build-linux-arm64.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dawei-gui-standalone-linux-aarch64-*
+          merge-multiple: true
+          path: ./arm64-bundles
+
+      - name: Display structure of downloaded files
+        run: ls -R ./arm64-bundles
+
+      - name: Extract ARM64 ZIP files
+        run: |
+          echo "=== Finding ARM64 portable ZIP files ==="
+          mkdir -p ./arm64-release-zips
+
+          # Find ARM64 portable ZIP files
+          find ./arm64-bundles -type f -name "*portable*.zip" | while read zip_file; do
+            echo "Found ARM64 portable ZIP: $zip_file"
+            basename_zip=$(basename "$zip_file")
+            cp "$zip_file" "./arm64-release-zips/$basename_zip"
+          done
+
+          echo "=== ARM64 release zips ==="
+          ls -lh ./arm64-release-zips/
+
+          # Verify we found the expected files
+          if [ -z "$(ls -A ./arm64-release-zips/)" ]; then
+            echo "ERROR: No ARM64 portable ZIP files found!"
+            exit 1
+          fi
+
+      - name: Get version for release
+        id: release_version
+        run: |
+          # Determine version: use input version, tag ref, or Cargo.toml
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            VERSION=${VERSION#v}  # Remove leading 'v' if present
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep '^version' webui/src-tauri/Cargo.toml | head -1 | awk -F '"' '{print $2}')
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Adding ARM64 artifacts to release for version: ${VERSION}"
+
+      - name: Add ARM64 artifacts to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.release_version.outputs.version }}"
+          TAG="v${VERSION}"
+
+          echo "=== Checking if release exists ==="
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release $TAG exists, adding ARM64 artifacts..."
+
+            # Upload ARM64 artifacts to existing release
+            for zip_file in ./arm64-release-zips/*.zip; do
+              if [ -f "$zip_file" ]; then
+                echo "Uploading: $(basename "$zip_file")"
+                gh release upload "$TAG" "$zip_file" --repo "${{ github.repository }}"
+              fi
+            done
+
+            echo "✅ ARM64 artifacts added to release $TAG"
+          else
+            echo "⚠️  Release $TAG does not exist yet. ARM64 artifacts will be added when release is created."
+            echo "Please ensure the main workflow runs first to create the release."
+          fi
+
+      # ========== Upload artifacts (deprecated, kept for compatibility) ==========
+      - name: Upload artifacts (Linux ARM64) - DEPRECATED
         uses: actions/upload-artifact@v4
         with:
           name: dawei-gui-standalone-linux-aarch64-v${{ steps.version.outputs.version }}
@@ -303,3 +404,4 @@ jobs:
             webui/src-tauri/target/aarch64-unknown-linux-gnu/release/dawei-gui
             webui/src-tauri/target/aarch64-unknown-linux-gnu/release/*.zip
           if-no-files-found: warn
+        continue-on-error: true

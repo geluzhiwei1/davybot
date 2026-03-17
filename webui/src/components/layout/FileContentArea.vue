@@ -151,10 +151,10 @@
           <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content" :filename="activeFile.name"
             class="pdf-viewer-wrapper" />
 
-          <!-- Office 文件（Excel、Word、PPT）编辑 -->
-          <OnlyOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
-            :filename="activeFile.name" :editable="true" :workspace-id="getCurrentWorkspaceId()"
-            @save="handleOfficeSave" @error="handleOfficeError" class="office-viewer-wrapper" />
+          <!-- Office 文件预览（DOCX、Excel）- 使用 vue-office -->
+          <VueOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
+            :filename="activeFile.name" :editable="false" :workspace-id="getCurrentWorkspaceId()"
+            @error="handleOfficeError" class="office-viewer-wrapper" />
           <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
             class="drawio-editor-tabs">
             <el-tab-pane name="drawio">
@@ -287,10 +287,10 @@
               <PDFViewer v-if="activeFile && isPDFFile(activeFile)" v-model="activeFile.content"
                 :filename="activeFile.name" class="pdf-viewer-wrapper" />
 
-              <!-- Office 文件（Excel、Word、PPT）编辑 -->
-              <OnlyOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
-                :filename="activeFile.name" :editable="true" :workspace-id="getCurrentWorkspaceId()"
-                @save="handleOfficeSave" @error="handleOfficeError" class="office-viewer-wrapper" />
+              <!-- Office 文件预览（DOCX、Excel）- 使用 vue-office -->
+              <VueOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
+                :filename="activeFile.name" :editable="false" :workspace-id="getCurrentWorkspaceId()"
+                @error="handleOfficeError" class="office-viewer-wrapper" />
 
               <!-- Drawio 编辑器 -->
               <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
@@ -352,7 +352,7 @@ import ImageViewer from '@/components/chat/ImageViewer.vue'
 import PDFViewer from '@/components/editor/PDFViewer.vue'
 import HTMLViewer from '@/components/editor/HTMLViewer.vue'
 import DrawioEditor from '@/components/editor/DrawioEditor.vue'
-import OnlyOfficeEditor from '@/components/editor/OnlyOfficeEditor.vue'
+import VueOfficeEditor from '@/components/editor/VueOfficeEditor.vue'
 import { isTauri } from '@/utils/platform'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -484,16 +484,14 @@ const CODE_EXTENSIONS = [
   // Other
   'conf', 'config', 'ini', 'cfg'
 ]
-const TEXT_EXTENSIONS = ['text']  // 移除 'txt'，因为 txt 现在由 OnlyOfficeEditor 处理
+const TEXT_EXTENSIONS = ['text', 'txt']  // txt 文件作为文本处理
 
-// Office 文件扩展名（扩展版）
+// Office 文件扩展名（仅支持 DOCX 和 Excel，使用 vue-office 预览）
 const OFFICE_EXTENSIONS = [
   // Word
-  'docx', 'doc', 'odt', 'rtf', 'txt',
+  'docx',
   // Excel
-  'xlsx', 'xls', 'ods',
-  // PowerPoint
-  'pptx', 'ppt', 'odp'
+  'xlsx', 'xls'
 ]
 
 function isMarkdownFile(file: File): boolean {
@@ -501,7 +499,14 @@ function isMarkdownFile(file: File): boolean {
 }
 
 function isOfficeFile(file: File): boolean {
-  return file.type === 'office' || OFFICE_EXTENSIONS.some(ext => file.name.endsWith(`.${ext}`))
+  const result = file.type === 'office' || OFFICE_EXTENSIONS.some(ext => file.name.endsWith(`.${ext}`))
+  console.log('[FileContentArea] 🔍 isOfficeFile 检查:', {
+    fileName: file.name,
+    fileType: file.type,
+    isOffice: result,
+    extensions: OFFICE_EXTENSIONS.filter(ext => file.name.endsWith(`.${ext}`))
+  })
+  return result
 }
 
 function isExcelFile(file: File): boolean {
@@ -1199,7 +1204,18 @@ watch(() => themeStore.theme, (newTheme) => {
 
 
 watch(activeFile, (newFile, oldFile) => {
-  if (!newFile) return
+  console.log('[FileContentArea] 🔍 activeFile 变化:')
+  console.log('[FileContentArea] 🔍 新文件:', newFile?.name, newFile?.type)
+  console.log('[FileContentArea] 🔍 旧文件:', oldFile?.name, oldFile?.type)
+
+  if (!newFile) {
+    console.log('[FileContentArea] ⚠️  新文件为空，返回')
+    return
+  }
+
+  // 检查是否是 Office 文件
+  const isOffice = isOfficeFile(newFile)
+  console.log('[FileContentArea] 🔍 是否为 Office 文件:', isOffice)
 
   // 更新编辑内容
   editableContent.value = newFile.content
