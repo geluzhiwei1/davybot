@@ -49,15 +49,21 @@ jobs:
         working-directory: ./webui
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
+      - name: Prepare drawio resources
         working-directory: ./webui
         run: |
-          # For CI, skip drawio preparation if resources don't exist
-          if [ ! -d "public/drawio" ]; then
-            echo "Drawio resources not found, creating empty directory for CI build"
-            mkdir -p public/drawio
+          # Prepare deps directory and clone drawio
+          mkdir -p ../deps
+          if [ ! -d "../deps/drawio" ]; then
+            echo "Cloning drawio repository..."
+            git clone https://github.com/geluzhiwei1/drawio.git ../deps/drawio
           fi
-          pnpm build
+          # Run prepare-drawio.sh to copy resources
+          bash scripts/prepare-drawio.sh
+
+      - name: Build frontend
+        working-directory: ./webui
+        run: pnpm build
 
       # ========== Backend Build ==========
       - name: Copy frontend to agent
