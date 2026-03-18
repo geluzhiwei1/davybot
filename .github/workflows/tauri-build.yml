@@ -220,9 +220,17 @@ jobs:
                 echo "✓ Python is standalone build (good for portability)"
               fi
 
-              # Create venv with --symlinks=false to copy binary
+              # Create venv with --copies to copy binary (Python 3.12+) or --symlinks=false (Python 3.11-)
               # Homebrew Python doesn't have Python.app, so no need to remove it
-              "$PYTHON_EXE" -m venv --symlinks=false .venv
+              # Python 3.12+ changed from --symlinks=false to --copies
+              PYTHON_VERSION=$("$PYTHON_EXE" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+              if [[ "$(echo "$PYTHON_VERSION 3.12" | awk '{print ($1 < $2)}')" == "1" ]]; then
+                # Python < 3.12: use --symlinks=false
+                "$PYTHON_EXE" -m venv --symlinks=false .venv
+              else
+                # Python >= 3.12: use --copies
+                "$PYTHON_EXE" -m venv --copies .venv
+              fi
               echo "✓ Created venv with Homebrew Python"
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               echo "Windows detected: using python3 for venv"
@@ -289,7 +297,15 @@ jobs:
                 exit 1
               fi
 
-              "$PYTHON_EXE" -m venv --symlinks=false .venv
+              # Python 3.12+ changed from --symlinks=false to --copies
+              PYTHON_VERSION=$("$PYTHON_EXE" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+              if [[ "$(echo "$PYTHON_VERSION 3.12" | awk '{print ($1 < $2)}')" == "1" ]]; then
+                # Python < 3.12: use --symlinks=false
+                "$PYTHON_EXE" -m venv --symlinks=false .venv
+              else
+                # Python >= 3.12: use --copies
+                "$PYTHON_EXE" -m venv --copies .venv
+              fi
               echo "✓ Recreated venv with Homebrew Python"
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               python3 -m venv .venv
