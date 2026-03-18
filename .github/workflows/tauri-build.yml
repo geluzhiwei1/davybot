@@ -172,11 +172,14 @@ jobs:
           # On Linux/Windows, we use the system Python from actions/setup-python
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             # Use Homebrew Python's pip3
-            "$(brew --prefix)/bin/pip3" install uv --quiet
+            # Homebrew Python uses PEP 668 (externally-managed-environment)
+            # We need to use --break-system-packages since we're in CI
+            "$(brew --prefix)/bin/pip3" install uv --quiet --break-system-packages
           else
             # Use system pip3
             pip3 install uv --quiet
           fi
+        shell: bash
 
       - name: Create Python venv if cache miss
         run: |
