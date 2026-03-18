@@ -145,8 +145,19 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
             exit 1
         fi
         echo "✓ Copied libpython to venv: $LIBPYTHON"
+
+        # Remove and re-sign the copied libpython (required for portability)
+        echo "Re-signing libpython with ad-hoc signature..."
+        codesign --remove-signature "$LIBPYTHON" 2>/dev/null || true
+        codesign -s - "$LIBPYTHON"
+        echo "✓ Re-signed libpython"
     else
         echo "✓ Found libpython in venv: $LIBPYTHON"
+        # Re-sign existing libpython to ensure valid signature
+        echo "Re-signing existing libpython with ad-hoc signature..."
+        codesign --remove-signature "$LIBPYTHON" 2>/dev/null || true
+        codesign -s - "$LIBPYTHON"
+        echo "✓ Re-signed libpython"
     fi
     echo ""
 
@@ -168,6 +179,12 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
 
     # Also add rpath if needed
     install_name_tool -add_rpath "@executable_path/../lib" "$PYTHON_BIN" 2>/dev/null || true
+
+    # Re-sign the binary after modification (install_name_tool invalidates the signature)
+    echo "Re-signing Python binary with ad-hoc signature..."
+    codesign --remove-signature "$PYTHON_BIN" 2>/dev/null || true
+    codesign -s - "$PYTHON_BIN"
+    echo "✓ Re-signed Python binary"
 
     echo "✓ Fixed Python binary"
     echo ""

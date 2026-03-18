@@ -135,11 +135,16 @@ jobs:
 
       - name: Build frontend
         run: |
+          # For CI, skip drawio preparation if resources don't exist
+          if [ ! -d "public/drawio" ]; then
+            echo "Drawio resources not found, creating empty directory for CI build"
+            mkdir -p public/drawio
+          fi
           pnpm build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: webui/dist/
+          path: webui/src-tauri/resources/
           retention-days: 7

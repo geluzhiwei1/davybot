@@ -251,7 +251,7 @@ jobs:
       # ========== Build frontend ==========
       - name: Build frontend
         working-directory: ./webui
-        run: pnpm build-only
+        run: pnpm build
 
       # ========== Build Tauri app (no bundle) ==========
       - name: Build Tauri app (macOS)

@@ -51,14 +51,20 @@ jobs:
 
       - name: Build frontend
         working-directory: ./webui
-        run: pnpm build-only
+        run: |
+          # For CI, skip drawio preparation if resources don't exist
+          if [ ! -d "public/drawio" ]; then
+            echo "Drawio resources not found, creating empty directory for CI build"
+            mkdir -p public/drawio
+          fi
+          pnpm build
 
       # ========== Backend Build ==========
       - name: Copy frontend to agent
         run: |
           mkdir -p agent/dawei/frontend
           rm -rf agent/dawei/frontend/*
-          cp -r webui/dist/* agent/dawei/frontend/
+          cp -r webui/src-tauri/resources/* agent/dawei/frontend/
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -112,11 +118,9 @@ jobs:
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: agent/dist/
           skip-existing: true
-          trusted-publishing: none
 
       # ========== Create GitHub Release ==========
       - name: Create GitHub Release
