@@ -114,7 +114,7 @@ jobs:
           docker buildx build \
             --platform linux/arm64 \
             -f Dockerfile.python-arm64 \
-            --output type=local,path=. .
+            --output type=local,dest=. .
 
           # Extract the Python environment
           if [ -f "python-env-arm64.tar.gz" ]; then
