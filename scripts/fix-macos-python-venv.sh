@@ -4,6 +4,16 @@
 
 set -e
 
+echo "========================================"
+echo "  Python Portable Build Fix for macOS"
+echo "========================================"
+echo ""
+echo "This script fixes:"
+echo "  1. Hardcoded Python.framework references"
+echo "  2. Python.app bundle references (if present)"
+echo "  3. Code signature issues"
+echo ""
+
 PYTHON_ENV_DIR="$1"
 
 if [ -z "$PYTHON_ENV_DIR" ]; then
@@ -24,6 +34,27 @@ echo "  Fixing Python for Portable macOS"
 echo "========================================"
 echo ""
 echo "Target: $PYTHON_ENV_DIR"
+echo ""
+
+# Step 0: Remove Python.app if it exists (causes posix_spawn errors)
+# Python.app is part of framework Python builds and contains hardcoded paths
+echo "Step 0: Checking for Python.app bundle..."
+PYTHON_APP_DIRS=$(find "$PYTHON_ENV_DIR" -path "*/lib/Resources/Python.app" -type d 2>/dev/null || true)
+if [ -n "$PYTHON_APP_DIRS" ]; then
+    echo "⚠️  Found Python.app directories that will cause issues:"
+    echo "$PYTHON_APP_DIRS"
+    echo ""
+    echo "Removing Python.app bundles..."
+    while read -r app_dir; do
+        if [ -d "$app_dir" ]; then
+            echo "  Removing: $app_dir"
+            rm -rf "$app_dir"
+        fi
+    done <<< "$PYTHON_APP_DIRS"
+    echo "✓ Removed Python.app bundles"
+else
+    echo "✓ No Python.app bundles found (good!)"
+fi
 echo ""
 
 # Python binary location
@@ -209,6 +240,17 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
         echo ""
         echo "Checking for other hardcoded paths..."
         otool -L "$PYTHON_BIN" | grep -E "^/[^@]" || echo "  (no other absolute paths found)"
+
+        # Check if Python.app is still referenced
+        PYTHON_APP_CHECK=$(strings "$PYTHON_BIN" 2>/dev/null | grep -i "Python.app" || true)
+        if [ -n "$PYTHON_APP_CHECK" ]; then
+            echo ""
+            echo "⚠️  Binary still contains Python.app references:"
+            echo "$PYTHON_APP_CHECK"
+            echo ""
+            echo "This binary may have been built from a framework Python installation."
+            echo "Consider rebuilding the venv with: python3 -m venv --symlinks=false .venv"
+        fi
     fi
 else
     echo "❌ Error: Referenced Python framework does not exist on this system"

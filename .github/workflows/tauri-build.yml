@@ -35,7 +35,7 @@ jobs:
             target: 'aarch64-apple-darwin'
             arch: 'aarch64'
             timeout: 120
-          - platform: 'ubuntu-latest'
+          - platform: 'ubuntu-22.04'
             args: '--config src-tauri/tauri.conf.standalone.json'
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
@@ -154,7 +154,13 @@ jobs:
             if [[ "$RUNNER_OS" == "macOS" ]]; then
               echo "macOS detected: using toolcache Python for portable venv"
               # Use Python from the hosted toolcache (self-contained, can be bundled)
-              $Python_ROOT_DIR/bin/python3 -m venv .venv
+              # IMPORTANT: Use --symlinks=false to copy the actual Python binary instead of symlinking
+              # This ensures the binary is truly portable and doesn't reference CI paths
+              $Python_ROOT_DIR/bin/python3 -m venv --symlinks=false .venv
+
+              # Remove any Python.app bundle that might have been copied
+              # Python.app contains hardcoded paths that break in portable builds
+              find .venv -path "*/Python.app" -type d -exec rm -rf {} + 2>/dev/null || true
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               echo "Windows detected: using python3 for venv"
               python3 -m venv .venv
@@ -207,7 +213,9 @@ jobs:
             echo "Cache hit: recreating venv to ensure portability"
             rm -rf .venv
             if [[ "$RUNNER_OS" == "macOS" ]]; then
-              $Python_ROOT_DIR/bin/python3 -m venv .venv
+              $Python_ROOT_DIR/bin/python3 -m venv --symlinks=false .venv
+              # Remove Python.app bundle if present
+              find .venv -path "*/Python.app" -type d -exec rm -rf {} + 2>/dev/null || true
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               python3 -m venv .venv
             else
@@ -638,7 +646,10 @@ jobs:
           ## System Requirements
 
           - Linux x86_64 (Intel/AMD 64-bit)
+          - GLIBC 2.35 or higher (Ubuntu 22.04+, Debian 12+, RHEL 9+, or equivalent)
           - About 500 MB free disk space
+
+          **Note**: This build requires GLIBC 2.35+. If you're on an older system (Ubuntu 20.04 or earlier), please upgrade your OS or use our source distribution.
 
           ## Notes
 
