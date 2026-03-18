@@ -228,12 +228,27 @@ async fn start_backend(app: tauri::AppHandle) -> Result<String, String> {
         #[cfg(windows)]
         let python_executable = venv_path.join("Scripts/python.exe");
         #[cfg(unix)]
-        let python_executable = venv_path.join("bin/python");
+        let python_executable = {
+            // Try bin/python first, fall back to bin/python3
+            let p = venv_path.join("bin/python");
+            if p.exists() { p } else { venv_path.join("bin/python3") }
+        };
 
         #[cfg(windows)]
         let dawei_exe = venv_path.join("Scripts/dawei.exe");
         #[cfg(unix)]
         let dawei_exe = venv_path.join("bin/dawei");
+
+        // Prepend venv bin/ to PATH so that entry-point scripts with
+        // `#!/usr/bin/env python3` shebang resolve to the bundled python3.
+        #[cfg(unix)]
+        let venv_bin_dir = venv_path.join("bin");
+        #[cfg(windows)]
+        let venv_bin_dir = venv_path.join("Scripts");
+        let path_with_venv = {
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            format!("{}:{}", venv_bin_dir.to_string_lossy(), current_path)
+        };
 
         // Try multiple methods in order of preference
         // Method 1: Direct dawei.exe execution (most reliable if exe exists)
@@ -250,6 +265,7 @@ async fn start_backend(app: tauri::AppHandle) -> Result<String, String> {
             spawn_result = Some(Command::new(&dawei_exe)
                 .args(["server", "start"])
                 .env("VIRTUAL_ENV", &venv_path)
+                .env("PATH", &path_with_venv)
                 .current_dir(exe_dir)
                 .spawn());
 
@@ -278,6 +294,7 @@ async fn start_backend(app: tauri::AppHandle) -> Result<String, String> {
             spawn_result = Some(Command::new(&python_executable)
                 .args(["-m", "dawei.cli.dawei", "server", "start"])
                 .env("VIRTUAL_ENV", &venv_path)
+                .env("PATH", &path_with_venv)
                 .current_dir(exe_dir)
                 .spawn());
 

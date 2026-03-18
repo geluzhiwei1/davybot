@@ -145,6 +145,9 @@ jobs:
           if [ ! -d ".venv" ]; then
             # Create venv using Python's standard venv module (more reliable for standalone)
             # UV's venv creates trampolines that break in standalone environments
+            # IMPORTANT: Always use `python -m venv`, never `uv venv`:
+            #   - `uv venv` does NOT copy the python binary (only symlinks), which break when copied
+            #   - `python -m venv` copies the real python binary, making it truly portable
 
             # On macOS, use the toolcache Python (self-contained) instead of system Python
             # System Python on macOS uses frameworks that can't be bundled in standalone apps
@@ -160,16 +163,18 @@ jobs:
               python3 -m venv .venv
             fi
 
-            # Install project dependencies (includes CLI entry points)
-            # On all platforms, use the venv's pip to ensure proper entry point generation
+            # Install project dependencies (non-editable install is required for portable packaging)
+            # IMPORTANT: Use `pip install .` (NOT `-e .`):
+            #   - `-e .` (editable) embeds the CI source path in .pth files, breaking on user machines
+            #   - `.` (regular) copies the package into site-packages, making it truly portable
             if [[ "$RUNNER_OS" == "Windows" ]]; then
               echo "Windows detected: using pip for installation"
               .venv/Scripts/python.exe -m pip install --upgrade pip
-              .venv/Scripts/python.exe -m pip install -e .
+              .venv/Scripts/python.exe -m pip install .
             else
               echo "Unix detected: using pip for installation"
               .venv/bin/python -m pip install --upgrade pip
-              .venv/bin/python -m pip install -e .
+              .venv/bin/python -m pip install .
             fi
 
             # Verify dawei command is available
@@ -197,12 +202,24 @@ jobs:
               fi
             fi
           else
-            # Sync existing dependencies
-            echo "Found existing .venv, syncing dependencies"
-            if [[ "$RUNNER_OS" == "Windows" ]]; then
-              .venv/Scripts/python.exe -m pip install -e . 2>/dev/null || true
+            # Cache hit: recreate venv to ensure clean state
+            # (cached venv may have been created by `uv venv` with symlinked python, not portable)
+            echo "Cache hit: recreating venv to ensure portability"
+            rm -rf .venv
+            if [[ "$RUNNER_OS" == "macOS" ]]; then
+              $Python_ROOT_DIR/bin/python3 -m venv .venv
+            elif [[ "$RUNNER_OS" == "Windows" ]]; then
+              python3 -m venv .venv
             else
-              .venv/bin/python -m pip install -e . 2>/dev/null || true
+              python3 -m venv .venv
+            fi
+
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              .venv/Scripts/python.exe -m pip install --upgrade pip
+              .venv/Scripts/python.exe -m pip install .
+            else
+              .venv/bin/python -m pip install --upgrade pip
+              .venv/bin/python -m pip install .
             fi
 
             # Verify dawei command is available
@@ -210,14 +227,14 @@ jobs:
               if [ -f ".venv/Scripts/dawei.exe" ]; then
                 echo "✓ dawei.exe found in Scripts directory"
               else
-                echo "❌ ERROR: dawei.exe not found after sync"
+                echo "❌ ERROR: dawei.exe not found after recreate"
                 exit 1
               fi
             else
               if [ -f ".venv/bin/dawei" ]; then
                 echo "✓ dawei found in bin directory"
               else
-                echo "❌ ERROR: dawei not found after sync"
+                echo "❌ ERROR: dawei not found after recreate"
                 exit 1
               fi
             fi
@@ -259,15 +276,33 @@ jobs:
           find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
 
+          # Fix shebangs: rewrite hardcoded CI paths to use /usr/bin/env python3
+          # Entry-point scripts have shebangs like #!/home/runner/.../bin/python3 which
+          # don't exist on user machines. Rewrite to /usr/bin/env python3.
+          # The Rust startup code prepends venv bin/ to PATH, so env resolves to bundled python3.
+          echo "=== Fixing shebangs in python-env/bin/ ==="
+          PYENV="webui/src-tauri/resources/python-env"
+          find "$PYENV/bin" -maxdepth 1 -type f | while read script; do
+            if head -1 "$script" 2>/dev/null | grep -q "^#!.*python"; then
+              sed -i '' "1s|^#!.*|#!/usr/bin/env python3|" "$script"
+              echo "  Fixed shebang: $(basename "$script")"
+            fi
+          done
+
+          # Ensure python -> python3 symlink exists (Rust code uses bin/python)
+          if [ ! -e "$PYENV/bin/python" ]; then
+            echo "Creating python -> python3 symlink"
+            ln -s python3 "$PYENV/bin/python"
+          fi
+
           # Verify dawei command exists in copied environment
           echo "=== Verifying dawei command in resources/python-env ==="
-          if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
+          if [ -f "$PYENV/bin/dawei" ]; then
             echo "✓ dawei found in resources/python-env/bin/"
-            webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
+            "$PYENV/bin/python3" -c "from dawei.cli.dawei import main; print('dawei import OK')"
           else
             echo "❌ ERROR: dawei not found in resources/python-env/bin/"
-            echo "Contents of bin directory:"
-            ls -la webui/src-tauri/resources/python-env/bin/ | head -20
+            ls -la "$PYENV/bin/" | head -20
             exit 1
           fi
         shell: bash
@@ -390,15 +425,45 @@ jobs:
           find webui/src-tauri/resources/python-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find webui/src-tauri/resources/python-env -name "*.pyc" -delete 2>/dev/null || true
 
+          # Verify python binary exists (real file, not broken symlink from uv venv)
+          echo "=== Verifying python binary in resources/python-env ==="
+          PYENV="webui/src-tauri/resources/python-env"
+          if [ -f "$PYENV/bin/python3" ]; then
+            echo "✓ python3 found (real binary)"
+            "$PYENV/bin/python3" --version
+          else
+            echo "❌ ERROR: python3 not found in $PYENV/bin/ - venv may have been created by 'uv venv' (no python binary)"
+            echo "Contents of bin directory:"
+            ls -la "$PYENV/bin/" | head -20
+            exit 1
+          fi
+
+          # Ensure python -> python3 symlink exists (Rust code uses bin/python)
+          if [ ! -e "$PYENV/bin/python" ]; then
+            echo "Creating python -> python3 symlink"
+            ln -s python3 "$PYENV/bin/python"
+          fi
+
+          # Fix shebangs: rewrite hardcoded CI paths to use /usr/bin/env python3
+          # Entry-point scripts have shebangs like #!/home/runner/.../bin/python3 which
+          # don't exist on user machines. Rewrite to /usr/bin/env python3.
+          # The Rust startup code prepends venv bin/ to PATH, so env resolves to bundled python3.
+          echo "=== Fixing shebangs in python-env/bin/ ==="
+          find "$PYENV/bin" -maxdepth 1 -type f -executable | while read script; do
+            if head -1 "$script" 2>/dev/null | grep -q "^#!.*python"; then
+              sed -i "1s|^#!.*|#!/usr/bin/env python3|" "$script"
+              echo "  Fixed shebang: $(basename "$script")"
+            fi
+          done
+
           # Verify dawei command exists in copied environment
           echo "=== Verifying dawei command in resources/python-env ==="
-          if [ -f "webui/src-tauri/resources/python-env/bin/dawei" ]; then
+          if [ -f "$PYENV/bin/dawei" ]; then
             echo "✓ dawei found in resources/python-env/bin/"
-            webui/src-tauri/resources/python-env/bin/dawei --version || echo "Version check failed"
+            "$PYENV/bin/python3" -c "from dawei.cli.dawei import main; print('dawei import OK')"
           else
             echo "❌ ERROR: dawei not found in resources/python-env/bin/"
-            echo "Contents of bin directory:"
-            ls -la webui/src-tauri/resources/python-env/bin/ | head -20
+            ls -la "$PYENV/bin/" | head -20
             exit 1
           fi
         shell: bash
@@ -605,9 +670,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dawei-gui-standalone-macos-${{ matrix.arch }}-v${{ steps.version.outputs.version }}
-          path: |
-            macos-binaries/dawei-gui-${{ matrix.arch }}
-            webui/src-tauri/target/${{ matrix.target }}/release/*.zip
+          path: webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: error
 
       - name: Upload artifacts (Linux x86_64)
@@ -615,9 +678,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dawei-gui-standalone-linux-x86_64-v${{ steps.version.outputs.version }}
-          path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui
-            webui/src-tauri/target/${{ matrix.target }}/release/*.zip
+          path: webui/src-tauri/target/${{ matrix.target }}/release/*.zip
           if-no-files-found: warn
 
       - name: Upload artifacts (Windows)
