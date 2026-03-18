@@ -92,7 +92,14 @@ jobs:
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
       # ========== Setup Python (for standalone) ==========
-      - name: Setup Python
+      # NOTE: For macOS, we use Homebrew Python instead of actions/setup-python
+      # because:
+      #   - actions/setup-python installs framework Python with Python.app
+      #   - Python.app contains hardcoded paths that break in portable builds
+      #   - Homebrew Python is a standalone binary without Python.app
+      # For Linux/Windows, actions/setup-python works fine
+      - name: Setup Python (Linux/Windows)
+        if: startsWith(matrix.platform, 'ubuntu') || startsWith(matrix.platform, 'windows')
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -107,6 +114,30 @@ jobs:
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
+          # Install Homebrew Python (standalone, no Python.app)
+          # This is CRITICAL for portable builds
+          echo "Installing Homebrew Python 3.12..."
+          brew install python@3.12
+
+          # Verify it's a standalone build
+          PYTHON_BIN="$(brew --prefix)/bin/python3"
+          echo "Python binary: $PYTHON_BIN"
+          file "$PYTHON_BIN"
+
+          # Check it's not a framework build
+          if "$PYTHON_BIN" -c "import sys; print('Framework:', getattr(sys, 'framework', 'None'))" | grep -q "Framework: None"; then
+            echo "✓ Homebrew Python is standalone (not framework)"
+          else
+            echo "⚠️  Warning: Python might be a framework build"
+          fi
+
+          # Add to PATH for subsequent steps
+          echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+
+          # Set Python_ROOT_DIR for our venv creation script
+          echo "PYTHON_ROOT_DIR=$(brew --prefix)" >> $GITHUB_ENV
+          echo "PYTHON_BIN=$(brew --prefix)/bin/python3" >> $GITHUB_ENV
+
           brew install openssl@3
 
       # ========== Cache dependencies ==========
@@ -149,18 +180,39 @@ jobs:
             #   - `uv venv` does NOT copy the python binary (only symlinks), which break when copied
             #   - `python -m venv` copies the real python binary, making it truly portable
 
-            # On macOS, use the toolcache Python (self-contained) instead of system Python
-            # System Python on macOS uses frameworks that can't be bundled in standalone apps
+            # On macOS, use Homebrew Python (standalone, no Python.app)
+            # Homebrew Python is installed in the "Install dependencies (macOS only)" step
+            # System Python and actions/setup-python use frameworks with Python.app
             if [[ "$RUNNER_OS" == "macOS" ]]; then
-              echo "macOS detected: using toolcache Python for portable venv"
-              # Use Python from the hosted toolcache (self-contained, can be bundled)
-              # IMPORTANT: Use --symlinks=false to copy the actual Python binary instead of symlinking
-              # This ensures the binary is truly portable and doesn't reference CI paths
-              $Python_ROOT_DIR/bin/python3 -m venv --symlinks=false .venv
+              echo "macOS detected: using Homebrew Python for portable venv"
 
-              # Remove any Python.app bundle that might have been copied
-              # Python.app contains hardcoded paths that break in portable builds
-              find .venv -path "*/Python.app" -type d -exec rm -rf {} + 2>/dev/null || true
+              # Check if Homebrew Python is available
+              if [[ -n "$PYTHON_BIN" ]] && [[ -f "$PYTHON_BIN" ]]; then
+                echo "Using Homebrew Python: $PYTHON_BIN"
+                PYTHON_EXE="$PYTHON_BIN"
+              elif command -v brew &> /dev/null; then
+                PYTHON_EXE="$(brew --prefix)/bin/python3"
+                echo "Using Homebrew Python from brew prefix: $PYTHON_EXE"
+              else
+                echo "❌ ERROR: Homebrew Python not found"
+                echo "Please ensure 'brew install python@3.12' was run"
+                exit 1
+              fi
+
+              # Verify it's a standalone build (not framework)
+              PYTHON_TYPE=$("$PYTHON_EXE" -c "import sys; print('framework' if hasattr(sys, 'framework') and sys.framework else 'standalone')")
+              echo "Python build type: $PYTHON_TYPE"
+
+              if [[ "$PYTHON_TYPE" == "framework" ]]; then
+                echo "⚠️  Warning: Python is a framework build, may not be fully portable"
+              else
+                echo "✓ Python is standalone build (good for portability)"
+              fi
+
+              # Create venv with --symlinks=false to copy binary
+              # Homebrew Python doesn't have Python.app, so no need to remove it
+              "$PYTHON_EXE" -m venv --symlinks=false .venv
+              echo "✓ Created venv with Homebrew Python"
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               echo "Windows detected: using python3 for venv"
               python3 -m venv .venv
@@ -212,10 +264,22 @@ jobs:
             # (cached venv may have been created by `uv venv` with symlinked python, not portable)
             echo "Cache hit: recreating venv to ensure portability"
             rm -rf .venv
+
             if [[ "$RUNNER_OS" == "macOS" ]]; then
-              $Python_ROOT_DIR/bin/python3 -m venv --symlinks=false .venv
-              # Remove Python.app bundle if present
-              find .venv -path "*/Python.app" -type d -exec rm -rf {} + 2>/dev/null || true
+              echo "macOS detected: using Homebrew Python"
+
+              # Same logic as above for cache miss
+              if [[ -n "$PYTHON_BIN" ]] && [[ -f "$PYTHON_BIN" ]]; then
+                PYTHON_EXE="$PYTHON_BIN"
+              elif command -v brew &> /dev/null; then
+                PYTHON_EXE="$(brew --prefix)/bin/python3"
+              else
+                echo "❌ ERROR: Homebrew Python not found"
+                exit 1
+              fi
+
+              "$PYTHON_EXE" -m venv --symlinks=false .venv
+              echo "✓ Recreated venv with Homebrew Python"
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               python3 -m venv .venv
             else
@@ -318,11 +382,24 @@ jobs:
       - name: Fix Python dynamic library linking (macOS only)
         if: startsWith(matrix.platform, 'macos')
         run: |
-          echo "=== Fixing Python for portable macOS build ==="
-          bash scripts/fix-macos-python-venv.sh webui/src-tauri/resources/python-env
+          echo "=== Checking if Python needs dynamic library fixing ==="
+          PYENV="webui/src-tauri/resources/python-env"
 
-          echo "=== Verifying Python binary after fix ==="
-          webui/src-tauri/resources/python-env/bin/python --version
+          # Check if Python binary references any framework or has hardcoded paths
+          PYTHON_DEPS=$(otool -L "$PYENV/bin/python" | grep -v "/usr/lib" | grep -v "/System/Library" || true)
+
+          if [ -n "$PYTHON_DEPS" ]; then
+            echo "Python has non-system dependencies, running fix script..."
+            echo "Dependencies:"
+            echo "$PYTHON_DEPS"
+            bash scripts/fix-macos-python-venv.sh "$PYENV"
+          else
+            echo "✓ Python binary appears to be standalone (no framework dependencies)"
+            echo "Skipping fix script - Homebrew Python is already portable"
+          fi
+
+          echo "=== Verifying Python binary after fix/check ==="
+          "$PYENV/bin/python" --version
         shell: bash
 
       - name: Copy macOS binaries to simple path
