@@ -140,7 +140,12 @@ jobs:
           brew install python@3.12
 
           # Verify it's a standalone build
-          PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3"
+          # Note: brew --prefix returns the Cellar path, but the actual binary is in /opt/homebrew/bin
+          PYTHON_BIN="/opt/homebrew/bin/python3.12"
+          if [ ! -f "$PYTHON_BIN" ]; then
+            # Fallback to Intel Mac path
+            PYTHON_BIN="/usr/local/bin/python3.12"
+          fi
           echo "Python binary: $PYTHON_BIN"
           file "$PYTHON_BIN"
           "$PYTHON_BIN" --version
@@ -168,11 +173,16 @@ jobs:
           fi
 
           # Add to PATH for subsequent steps
-          echo "$(brew --prefix python@3.12)/bin" >> $GITHUB_PATH
-
-          # Set Python_ROOT_DIR for our venv creation script
-          echo "PYTHON_ROOT_DIR=$(brew --prefix python@3.12)" >> $GITHUB_ENV
-          echo "PYTHON_BIN=$(brew --prefix python@3.12)/bin/python3" >> $GITHUB_ENV
+          # Use the bin directory where brew installs the symlinks
+          if [[ -d "/opt/homebrew/bin" ]]; then
+            echo "/opt/homebrew/bin" >> $GITHUB_PATH
+            echo "PYTHON_ROOT_DIR=/opt/homebrew" >> $GITHUB_ENV
+            echo "PYTHON_BIN=/opt/homebrew/bin/python3.12" >> $GITHUB_ENV
+          else
+            echo "/usr/local/bin" >> $GITHUB_PATH
+            echo "PYTHON_ROOT_DIR=/usr/local" >> $GITHUB_ENV
+            echo "PYTHON_BIN=/usr/local/bin/python3.12" >> $GITHUB_ENV
+          fi
 
           brew install openssl@3
 
