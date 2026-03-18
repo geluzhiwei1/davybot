@@ -115,16 +115,45 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
 
         # Try to find libpython in various locations
         SYSTEM_LIBPYTHON=""
+        TOOLCACHE_RESOURCES=""
 
         # 1. Check GitHub Actions Python installation (toolcache) - PRIORITY for CI
         if [ -n "$Python_ROOT_DIR" ]; then
             echo "Checking GitHub Actions toolcache Python at: $Python_ROOT_DIR"
-            # Toolcache Python has libpython in lib/ directory
-            SYSTEM_LIBPYTHON="$Python_ROOT_DIR/lib/libpython${PYTHON_MAJOR_MINOR}.dylib"
-            if [ -f "$SYSTEM_LIBPYTHON" ]; then
-                echo "✓ Found toolcache libpython: $SYSTEM_LIBPYTHON"
-            else
-                SYSTEM_LIBPYTHON=""
+            
+            # Toolcache Python has a special structure:
+            # lib/libpythonX.Y.dylib -> ../lib/Resources/Python.app/Contents/MacOS/Python
+            # We need to copy the actual binary and resolve the structure
+            
+            TOOLCACHE_LIBPYTHON="$Python_ROOT_DIR/lib/libpython${PYTHON_MAJOR_MINOR}.dylib"
+            
+            if [ -L "$TOOLCACHE_LIBPYTHON" ]; then
+                echo "  Found symlink libpython, resolving..."
+                TOOLCACHE_RESOURCES="$Python_ROOT_DIR/lib/Resources"
+                if [ -d "$TOOLCACHE_RESOURCES/Python.app/Contents/MacOS" ]; then
+                    ACTUAL_PYTHON_BIN="$TOOLCACHE_RESOURCES/Python.app/Contents/MacOS/Python"
+                    if [ -f "$ACTUAL_PYTHON_BIN" ]; then
+                        echo "✓ Found actual Python binary in toolcache: $ACTUAL_PYTHON_BIN"
+                        SYSTEM_LIBPYTHON="$ACTUAL_PYTHON_BIN"
+                    fi
+                fi
+            elif [ -f "$TOOLCACHE_LIBPYTHON" ]; then
+                # Check if it's a regular file that references Python.app
+                LIBPYTHON_DEPS_CHECK=$(otool -L "$TOOLCACHE_LIBPYTHON" 2>/dev/null | grep -c "Python.app" || true)
+                if [ "$LIBPYTHON_DEPS_CHECK" -gt 0 ]; then
+                    echo "  libpython references Python.app, checking Resources..."
+                    TOOLCACHE_RESOURCES="$Python_ROOT_DIR/lib/Resources"
+                    if [ -d "$TOOLCACHE_RESOURCES/Python.app/Contents/MacOS" ]; then
+                        ACTUAL_PYTHON_BIN="$TOOLCACHE_RESOURCES/Python.app/Contents/MacOS/Python"
+                        if [ -f "$ACTUAL_PYTHON_BIN" ]; then
+                            echo "✓ Found actual Python binary in toolcache: $ACTUAL_PYTHON_BIN"
+                            SYSTEM_LIBPYTHON="$ACTUAL_PYTHON_BIN"
+                        fi
+                    fi
+                else
+                    SYSTEM_LIBPYTHON="$TOOLCACHE_LIBPYTHON"
+                    echo "✓ Found toolcache libpython: $SYSTEM_LIBPYTHON"
+                fi
             fi
         fi
 
@@ -165,11 +194,45 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
         LIB_DIR="$PYTHON_ENV_DIR/lib"
         mkdir -p "$LIB_DIR"
 
-        # Copy libpython dylib to venv
-        LIBPYTHON_NAME="libpython${PYTHON_MAJOR_MINOR}.dylib"
-        LIBPYTHON="$LIB_DIR/$LIBPYTHON_NAME"
-        echo "Copying $SYSTEM_LIBPYTHON to $LIBPYTHON"
-        cp "$SYSTEM_LIBPYTHON" "$LIBPYTHON"
+        # Copy libpython to venv
+        # If we found toolcache Resources, we copy the actual binary directly
+        if [ -n "$TOOLCACHE_RESOURCES" ] && [ -d "$TOOLCACHE_RESOURCES" ]; then
+            echo "Found toolcache Python with Python.app structure..."
+            ACTUAL_PYTHON="$TOOLCACHE_RESOURCES/Python.app/Contents/MacOS/Python"
+            
+            if [ -f "$ACTUAL_PYTHON" ]; then
+                echo "✓ Found actual Python binary: $ACTUAL_PYTHON"
+                
+                # Verify it's a Mach-O binary (not a symlink or wrapper)
+                FILE_TYPE=$(file "$ACTUAL_PYTHON" | head -1)
+                echo "  File type: $FILE_TYPE"
+                
+                if [[ "$FILE_TYPE" == *"Mach-O"* ]] && [[ "$FILE_TYPE" == *"executable"* ]]; then
+                    echo "  ✓ Confirmed as Mach-O executable"
+                else
+                    echo "  ⚠️ Warning: Unexpected file type, proceeding anyway..."
+                fi
+                
+                # Copy the actual binary directly to lib/libpythonX.Y.dylib
+                LIBPYTHON_NAME="libpython${PYTHON_MAJOR_MINOR}.dylib"
+                LIBPYTHON="$LIB_DIR/$LIBPYTHON_NAME"
+                
+                echo "Copying actual Python binary to $LIBPYTHON"
+                cp "$ACTUAL_PYTHON" "$LIBPYTHON"
+                
+                echo "✓ Copied libpython to venv: $LIBPYTHON"
+                echo "Checking its current dependencies..."
+                otool -L "$LIBPYTHON" | head -10
+            else
+                echo "❌ Error: Actual Python binary not found at $ACTUAL_PYTHON"
+                exit 1
+            fi
+        else
+            LIBPYTHON_NAME="libpython${PYTHON_MAJOR_MINOR}.dylib"
+            LIBPYTHON="$LIB_DIR/$LIBPYTHON_NAME"
+            echo "Copying $SYSTEM_LIBPYTHON to $LIBPYTHON"
+            cp "$SYSTEM_LIBPYTHON" "$LIBPYTHON"
+        fi
 
         if [ ! -f "$LIBPYTHON" ]; then
             echo "❌ Error: Failed to copy libpython to venv"
@@ -177,6 +240,38 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
         fi
         echo "✓ Copied libpython to venv: $LIBPYTHON"
 
+        # Check and fix libpython's own dependencies
+        echo "Checking libpython's dynamic library dependencies..."
+        LIBPYTHON_DEPS=$(otool -L "$LIBPYTHON" | grep -E "^\t/" | awk '{print $1}')
+        if [ -n "$LIBPYTHON_DEPS" ]; then
+            echo "Found hardcoded paths in libpython:"
+            echo "$LIBPYTHON_DEPS"
+            echo ""
+            echo "Fixing libpython's internal references..."
+            
+            # Fix each hardcoded path in libpython
+            while IFS= read -r dep_path || [ -n "$dep_path" ]; do
+                if [ -n "$dep_path" ]; then
+                    # Skip system libraries
+                    if [[ "$dep_path" == /usr/lib/* ]] || [[ "$dep_path" == /System/Library/* ]]; then
+                        continue
+                    fi
+
+                    # Check if this is a Python-related reference
+                    # Match Python.framework, Python.app, or libpythonX.Y.dylib
+                    if [[ "$dep_path" == *Python.framework* ]] || [[ "$dep_path" == *Python.app* ]] || [[ "$dep_path" == */libpython*.dylib ]]; then
+                        # The libpython binary should reference itself
+                        # Set it to use @rpath
+                        echo "  Changing: $dep_path -> @rpath/$(basename "$LIBPYTHON")"
+                        install_name_tool -change "$dep_path" "@rpath/$(basename "$LIBPYTHON")" "$LIBPYTHON" 2>/dev/null || true
+                    fi
+                fi
+            done <<< "$LIBPYTHON_DEPS"
+            
+            # Set the libpython's own id
+            install_name_tool -id "@rpath/$(basename "$LIBPYTHON")" "$LIBPYTHON" 2>/dev/null || true
+        fi
+        
         # Remove and re-sign the copied libpython (required for portability)
         echo "Re-signing libpython with ad-hoc signature..."
         codesign --remove-signature "$LIBPYTHON" 2>/dev/null || true
@@ -206,10 +301,21 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
     echo ""
 
     # Use install_name_tool to fix the reference
-    install_name_tool -change "$PYTHON_FRAMEWORK_PATH" "$NEW_PYTHON_LIB" "$PYTHON_BIN"
+    if ! install_name_tool -change "$PYTHON_FRAMEWORK_PATH" "$NEW_PYTHON_LIB" "$PYTHON_BIN"; then
+        echo "⚠️  Warning: Failed to change library reference from $PYTHON_FRAMEWORK_PATH to $NEW_PYTHON_LIB"
+    fi
 
     # Also add rpath if needed
-    install_name_tool -add_rpath "@executable_path/../lib" "$PYTHON_BIN" 2>/dev/null || true
+    if ! install_name_tool -add_rpath "@executable_path/../lib" "$PYTHON_BIN" 2>/dev/null; then
+        echo "⚠️  Warning: Failed to add rpath to Python binary"
+    fi
+
+    # Add rpath to libpython so it can find its dependencies
+    if [ -n "$LIBPYTHON" ] && [ -f "$LIBPYTHON" ]; then
+        if ! install_name_tool -add_rpath "@loader_path" "$LIBPYTHON" 2>/dev/null; then
+            echo "⚠️  Warning: Failed to add rpath to libpython"
+        fi
+    fi
 
     # Re-sign the binary after modification (install_name_tool invalidates the signature)
     echo "Re-signing Python binary with ad-hoc signature..."
@@ -242,14 +348,18 @@ if [ -f "$PYTHON_FRAMEWORK_PATH" ]; then
         otool -L "$PYTHON_BIN" | grep -E "^/[^@]" || echo "  (no other absolute paths found)"
 
         # Check if Python.app is still referenced
-        PYTHON_APP_CHECK=$(strings "$PYTHON_BIN" 2>/dev/null | grep -i "Python.app" || true)
-        if [ -n "$PYTHON_APP_CHECK" ]; then
-            echo ""
-            echo "⚠️  Binary still contains Python.app references:"
-            echo "$PYTHON_APP_CHECK"
-            echo ""
-            echo "This binary may have been built from a framework Python installation."
-            echo "Consider rebuilding the venv with: python3 -m venv --symlinks=false .venv"
+        if command -v strings >/dev/null 2>&1; then
+            PYTHON_APP_CHECK=$(strings "$PYTHON_BIN" 2>/dev/null | grep -i "Python.app" || true)
+            if [ -n "$PYTHON_APP_CHECK" ]; then
+                echo ""
+                echo "⚠️  Binary still contains Python.app references:"
+                echo "$PYTHON_APP_CHECK"
+                echo ""
+                echo "This binary may have been built from a framework Python installation."
+                echo "Consider rebuilding the venv with: python3 -m venv --symlinks=false .venv"
+            fi
+        else
+            echo "  (skipping Python.app string check - 'strings' command not available)"
         fi
     fi
 else
