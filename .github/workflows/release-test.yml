@@ -22,17 +22,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-publish:
-    name: Build & Publish to TestPyPI
-    runs-on: ubuntu-latest
+  build-tauri:
+    name: Build Tauri (${{ matrix.os }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'ubuntu-22.04'
+            target: 'x86_64-unknown-linux-gnu'
+            arch: 'x86_64'
+            os: 'linux'
+            exe_name: 'dawei-gui-linux-x86_64'
+          - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            arch: 'x86_64'
+            os: 'darwin'
+            exe_name: 'dawei-gui-darwin-x86_64'
+          - platform: 'macos-latest'
+            target: 'aarch64-apple-darwin'
+            arch: 'aarch64'
+            os: 'darwin'
+            exe_name: 'dawei-gui-darwin-aarch64'
+          - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            arch: 'x86_64'
+            os: 'windows'
+            exe_name: 'dawei-gui-windows-x86_64.exe'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for setuptools_scm version detection
+          fetch-depth: 0
 
-      # ========== Frontend Build ==========
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -45,12 +68,34 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'webui/pnpm-lock.yaml'
 
+      - name: Setup Rust (for Tauri)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust targets (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: rustup target add ${{ matrix.target }}
+
       - name: Install frontend dependencies
         working-directory: ./webui
         run: pnpm install --frozen-lockfile
 
       - name: Prepare drawio resources
+        if: runner.os != 'Windows'
         working-directory: ./webui
+        run: |
+          # Prepare deps directory and clone drawio
+          mkdir -p ../deps
+          if [ ! -d "../deps/drawio" ]; then
+            echo "Cloning drawio repository..."
+            git clone https://github.com/geluzhiwei1/drawio.git ../deps/drawio
+          fi
+          # Run prepare-drawio.sh to copy resources
+          bash scripts/prepare-drawio.sh
+
+      - name: Prepare drawio resources (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./webui
+        shell: bash
         run: |
           # Prepare deps directory and clone drawio
           mkdir -p ../deps
@@ -65,12 +110,36 @@ jobs:
         working-directory: ./webui
         run: pnpm build
 
-      # ========== Backend Build ==========
-      - name: Copy frontend to agent
-        run: |
-          mkdir -p agent/dawei/frontend
-          rm -rf agent/dawei/frontend/*
-          cp -r webui/src-tauri/resources/* agent/dawei/frontend/
+      - name: Build Tauri app
+        working-directory: ./webui
+        run: pnpm tauri build --no-bundle --target ${{ matrix.target }}
+
+      - name: Upload Tauri executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-executable-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui
+            webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui.exe
+          if-no-files-found: error
+
+  build-wheel:
+    name: Build & Publish Wheel
+    runs-on: ubuntu-latest
+    needs: build-tauri
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for setuptools_scm version detection
+
+      - name: Download all Tauri executables
+        uses: actions/download-artifact@v4
+        with:
+          path: tauri-executables
+          pattern: tauri-executable-*
+          merge-multiple: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -82,6 +151,50 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install build setuptools_scm
+
+      - name: Copy frontend to agent
+        run: |
+          mkdir -p agent/dawei/frontend
+          rm -rf agent/dawei/frontend/*
+          cp -r webui/src-tauri/resources/* agent/dawei/frontend/
+          # Ensure welcome.html is included
+          if [ -f "webui/src-tauri/resources/welcome.html" ]; then
+            cp webui/src-tauri/resources/welcome.html agent/dawei/frontend/
+          fi
+
+      - name: Copy Tauri executables to agent
+        run: |
+          mkdir -p agent/dawei/bin
+          # Copy each platform executable directly with its target name
+          for artifact in tauri-executables/*/; do
+            artifact_name=$(basename "$artifact")
+            case "$artifact_name" in
+              *linux-x86_64*)
+                if [ -f "$artifact/dawei-gui" ]; then
+                  cp "$artifact/dawei-gui" agent/dawei/bin/dawei-gui-linux-x86_64
+                  chmod +x agent/dawei/bin/dawei-gui-linux-x86_64
+                fi
+                ;;
+              *darwin-x86_64*)
+                if [ -f "$artifact/dawei-gui" ]; then
+                  cp "$artifact/dawei-gui" agent/dawei/bin/dawei-gui-darwin-x86_64
+                  chmod +x agent/dawei/bin/dawei-gui-darwin-x86_64
+                fi
+                ;;
+              *darwin-aarch64*)
+                if [ -f "$artifact/dawei-gui" ]; then
+                  cp "$artifact/dawei-gui" agent/dawei/bin/dawei-gui-darwin-aarch64
+                  chmod +x agent/dawei/bin/dawei-gui-darwin-aarch64
+                fi
+                ;;
+              *windows-x86_64*)
+                if [ -f "$artifact/dawei-gui.exe" ]; then
+                  cp "$artifact/dawei-gui.exe" agent/dawei/bin/dawei-gui-windows-x86_64.exe
+                fi
+                ;;
+            esac
+          done
+          ls -la agent/dawei/bin/
 
       - name: Get version from setuptools_scm
         id: version
@@ -95,7 +208,7 @@ jobs:
           else
             # Auto-detect version from setuptools_scm
             cd agent
-            VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='../..', relative_to='pyproject.toml'))")
+            VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='..', relative_to='pyproject.toml'))")
             echo "Detected version: ${VERSION}"
             echo "version=${VERSION}" >> $GITHUB_OUTPUT
             echo "use_manual=false" >> $GITHUB_OUTPUT
