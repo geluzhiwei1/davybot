@@ -1,5 +1,21 @@
 name: Build Tauri Standalone
 
+# Python Version Requirement: 3.12+
+# ================================
+# This workflow requires Python 3.12 or higher for portable builds.
+#
+# Why Python 3.12+?
+# - Python 3.12+ supports --copies parameter for venv (not --symlinks=false)
+# - --copies ensures the Python binary is copied (not symlinked) for portability
+# - Python 3.11 and earlier use --symlinks=false which is deprecated
+# - Framework Python builds (common with Python 3.14) contain Python.app
+#   which breaks portable builds due to hardcoded paths
+#
+# Platform-specific Python:
+# - macOS: Homebrew python@3.12 (standalone build, no Python.app)
+# - Linux: GitHub Actions setup-python@v5 (3.12)
+# - Windows: GitHub Actions setup-python@v5 (3.12)
+
 on:
   push:
     tags:
@@ -114,29 +130,49 @@ jobs:
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
-          # Install Homebrew Python (standalone, no Python.app)
+          # Install Homebrew Python 3.12 (standalone, no Python.app)
           # This is CRITICAL for portable builds
+          # NOTE: We specifically use Python 3.12 because:
+          #   - Python 3.14 from Homebrew is a framework build with Python.app
+          #   - Python 3.12 is the last version with a reliable standalone build
+          #   - Python 3.12 supports --copies parameter for venv
           echo "Installing Homebrew Python 3.12..."
           brew install python@3.12
 
           # Verify it's a standalone build
-          PYTHON_BIN="$(brew --prefix)/bin/python3"
+          PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3"
           echo "Python binary: $PYTHON_BIN"
           file "$PYTHON_BIN"
+          "$PYTHON_BIN" --version
 
           # Check it's not a framework build
-          if "$PYTHON_BIN" -c "import sys; print('Framework:', getattr(sys, 'framework', 'None'))" | grep -q "Framework: None"; then
-            echo "✓ Homebrew Python is standalone (not framework)"
+          PYTHON_TYPE=$("$PYTHON_BIN" -c "import sys; print('framework' if hasattr(sys, 'framework') and sys.framework else 'standalone')")
+          echo "Python build type: $PYTHON_TYPE"
+
+          # Verify Python version is 3.12+
+          PYTHON_VERSION=$("$PYTHON_BIN" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+          echo "Python version: $PYTHON_VERSION"
+
+          if [[ "$(echo "$PYTHON_VERSION 3.12" | awk '{print ($1 < $2)}')" == "1" ]]; then
+            echo "❌ ERROR: Python 3.12+ is required for portable builds"
+            echo "Current version: $PYTHON_VERSION"
+            exit 1
+          fi
+
+          if [[ "$PYTHON_TYPE" == "framework" ]]; then
+            echo "❌ ERROR: Homebrew Python 3.12 is a framework build!"
+            echo "This will cause portable build failures."
+            exit 1
           else
-            echo "⚠️  Warning: Python might be a framework build"
+            echo "✓ Homebrew Python 3.12+ is standalone (good for portability)"
           fi
 
           # Add to PATH for subsequent steps
-          echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix python@3.12)/bin" >> $GITHUB_PATH
 
           # Set Python_ROOT_DIR for our venv creation script
-          echo "PYTHON_ROOT_DIR=$(brew --prefix)" >> $GITHUB_ENV
-          echo "PYTHON_BIN=$(brew --prefix)/bin/python3" >> $GITHUB_ENV
+          echo "PYTHON_ROOT_DIR=$(brew --prefix python@3.12)" >> $GITHUB_ENV
+          echo "PYTHON_BIN=$(brew --prefix python@3.12)/bin/python3" >> $GITHUB_ENV
 
           brew install openssl@3
 
@@ -220,17 +256,10 @@ jobs:
                 echo "✓ Python is standalone build (good for portability)"
               fi
 
-              # Create venv with --copies to copy binary (Python 3.12+) or --symlinks=false (Python 3.11-)
-              # Homebrew Python doesn't have Python.app, so no need to remove it
-              # Python 3.12+ changed from --symlinks=false to --copies
-              PYTHON_VERSION=$("$PYTHON_EXE" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-              if [[ "$(echo "$PYTHON_VERSION 3.12" | awk '{print ($1 < $2)}')" == "1" ]]; then
-                # Python < 3.12: use --symlinks=false
-                "$PYTHON_EXE" -m venv --symlinks=false .venv
-              else
-                # Python >= 3.12: use --copies
-                "$PYTHON_EXE" -m venv --copies .venv
-              fi
+              # Create venv with --copies to copy binary
+              # Python 3.12+ requires --copies (not --symlinks=false)
+              # This ensures portability by copying the actual Python binary
+              "$PYTHON_EXE" -m venv --copies .venv
               echo "✓ Created venv with Homebrew Python"
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               echo "Windows detected: using python3 for venv"
@@ -297,15 +326,10 @@ jobs:
                 exit 1
               fi
 
-              # Python 3.12+ changed from --symlinks=false to --copies
-              PYTHON_VERSION=$("$PYTHON_EXE" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-              if [[ "$(echo "$PYTHON_VERSION 3.12" | awk '{print ($1 < $2)}')" == "1" ]]; then
-                # Python < 3.12: use --symlinks=false
-                "$PYTHON_EXE" -m venv --symlinks=false .venv
-              else
-                # Python >= 3.12: use --copies
-                "$PYTHON_EXE" -m venv --copies .venv
-              fi
+              # Create venv with --copies to copy binary
+              # Python 3.12+ requires --copies (not --symlinks=false)
+              # This ensures portability by copying the actual Python binary
+              "$PYTHON_EXE" -m venv --copies .venv
               echo "✓ Recreated venv with Homebrew Python"
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
               python3 -m venv .venv
