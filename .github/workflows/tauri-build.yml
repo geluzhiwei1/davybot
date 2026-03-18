@@ -168,7 +168,15 @@ jobs:
       - name: Install UV package manager
         run: |
           # Install UV using pip (works on all platforms)
-          pip3 install uv --quiet
+          # NOTE: On macOS, we use Homebrew Python's pip3
+          # On Linux/Windows, we use the system Python from actions/setup-python
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Use Homebrew Python's pip3
+            "$(brew --prefix)/bin/pip3" install uv --quiet
+          else
+            # Use system pip3
+            pip3 install uv --quiet
+          fi
 
       - name: Create Python venv if cache miss
         run: |
