@@ -333,6 +333,12 @@ jobs:
             fi
           fi
 
+      - name: Copy README to agent directory
+        run: |
+          # Copy README.md to agent directory for PyPI long_description
+          cp README.md agent/README.md
+          cp README_CN.md agent/README_CN.md
+
       - name: Build wheel
         working-directory: ./agent
         run: |
