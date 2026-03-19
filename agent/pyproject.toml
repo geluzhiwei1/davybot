@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "Dawei AI Assistant - Server Package (Backend + Frontend)"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "Proprietary"}
+license = {text = "AGPL-3.0-only"}
 authors = [
     {name = "Dawei Team", email = "contact@dawei.com"}
 ]
@@ -95,6 +95,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 package-data = {dawei = ["*.yaml", "*.yml", "**/*.yaml", "**/*.yml", "**/*.j2", "**/*.jinja2", "**/*.md", "json/**/*.json", "frontend/**/*", "bin/**/*"]}
 include-package-data = true
+
+# Use README.md as long_description for PyPI
+[tool.setuptools.dynamic]
+readme = {file = "README.md", content-type = "text/markdown"}
 
 # setuptools_scm configuration for automatic versioning
 [tool.setuptools_scm]
