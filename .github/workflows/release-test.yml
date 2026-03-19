@@ -93,6 +93,28 @@ jobs:
             patchelf \
             p7zip-full
 
+      - name: Verify system dependencies (Ubuntu only)
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          echo "Verifying system dependencies..."
+
+          # Check pkg-config
+          if ! command -v pkg-config &> /dev/null; then
+            echo "ERROR: pkg-config not found"
+            exit 1
+          fi
+
+          # Check GTK3 and WebKit libraries
+          for lib in gtk+-3.0 libsoup-3.0 javascriptcoregtk-4.1; do
+            if ! pkg-config --exists $lib 2>/dev/null; then
+              echo "ERROR: $lib not found"
+              exit 1
+            fi
+            echo "✅ Found: $lib"
+          done
+
+          echo "✅ All system dependencies verified"
+
       - name: Install frontend dependencies
         working-directory: ./webui
         run: pnpm install --frozen-lockfile
@@ -132,13 +154,20 @@ jobs:
         working-directory: ./webui
         run: pnpm tauri build --no-bundle --target ${{ matrix.target }}
 
-      - name: Upload Tauri executable
+      - name: Upload Tauri executable (Linux/macOS)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: tauri-executable-${{ matrix.os }}-${{ matrix.arch }}
-          path: |
-            webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui
-            webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui.exe
+          path: webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui
+          if-no-files-found: error
+
+      - name: Upload Tauri executable (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-executable-${{ matrix.os }}-${{ matrix.arch }}
+          path: webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui.exe
           if-no-files-found: error
 
   build-wheel:
@@ -152,12 +181,17 @@ jobs:
         with:
           fetch-depth: 0  # Fetch all history for setuptools_scm version detection
 
-      - name: Download all Tauri executables
-        uses: actions/download-artifact@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          path: tauri-executables
-          pattern: tauri-executable-*
-          merge-multiple: false
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -169,6 +203,30 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install build setuptools_scm
+
+      - name: Download all Tauri executables
+        uses: actions/download-artifact@v4
+        with:
+          path: tauri-executables
+          pattern: tauri-executable-*
+          merge-multiple: false
+
+      - name: Install frontend dependencies
+        working-directory: ./webui
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare drawio resources
+        working-directory: ./webui
+        run: |
+          mkdir -p ../deps
+          if [ ! -d "../deps/drawio" ]; then
+            git clone https://github.com/geluzhiwei1/drawio.git ../deps/drawio
+          fi
+          bash scripts/prepare-drawio.sh
+
+      - name: Build frontend
+        working-directory: ./webui
+        run: pnpm build
 
       - name: Copy frontend to agent
         run: |
@@ -183,36 +241,72 @@ jobs:
       - name: Copy Tauri executables to agent
         run: |
           mkdir -p agent/dawei/bin
-          # Copy each platform executable directly with its target name
-          for artifact in tauri-executables/*/; do
-            artifact_name=$(basename "$artifact")
-            case "$artifact_name" in
-              *linux-x86_64*)
-                if [ -f "$artifact/dawei-gui" ]; then
-                  cp "$artifact/dawei-gui" agent/dawei/bin/dawei-gui-linux-x86_64
-                  chmod +x agent/dawei/bin/dawei-gui-linux-x86_64
-                fi
-                ;;
-              *darwin-x86_64*)
-                if [ -f "$artifact/dawei-gui" ]; then
-                  cp "$artifact/dawei-gui" agent/dawei/bin/dawei-gui-darwin-x86_64
-                  chmod +x agent/dawei/bin/dawei-gui-darwin-x86_64
-                fi
-                ;;
-              *darwin-aarch64*)
-                if [ -f "$artifact/dawei-gui" ]; then
-                  cp "$artifact/dawei-gui" agent/dawei/bin/dawei-gui-darwin-aarch64
-                  chmod +x agent/dawei/bin/dawei-gui-darwin-aarch64
-                fi
-                ;;
-              *windows-x86_64*)
-                if [ -f "$artifact/dawei-gui.exe" ]; then
-                  cp "$artifact/dawei-gui.exe" agent/dawei/bin/dawei-gui-windows-x86_64.exe
-                fi
-                ;;
-            esac
-          done
+
+          # Copy each platform executable with explicit error checking
+          if [ -f "tauri-executables/tauri-executable-linux-x86_64/dawei-gui" ]; then
+            cp tauri-executables/tauri-executable-linux-x86_64/dawei-gui \
+               agent/dawei/bin/dawei-gui-linux-x86_64
+            chmod +x agent/dawei/bin/dawei-gui-linux-x86_64
+          else
+            echo "ERROR: Linux x86_64 executable not found"
+            exit 1
+          fi
+
+          if [ -f "tauri-executables/tauri-executable-darwin-x86_64/dawei-gui" ]; then
+            cp tauri-executables/tauri-executable-darwin-x86_64/dawei-gui \
+               agent/dawei/bin/dawei-gui-darwin-x86_64
+            chmod +x agent/dawei/bin/dawei-gui-darwin-x86_64
+          else
+            echo "ERROR: macOS x86_64 executable not found"
+            exit 1
+          fi
+
+          if [ -f "tauri-executables/tauri-executable-darwin-aarch64/dawei-gui" ]; then
+            cp tauri-executables/tauri-executable-darwin-aarch64/dawei-gui \
+               agent/dawei/bin/dawei-gui-darwin-aarch64
+            chmod +x agent/dawei/bin/dawei-gui-darwin-aarch64
+          else
+            echo "ERROR: macOS aarch64 executable not found"
+            exit 1
+          fi
+
+          if [ -f "tauri-executables/tauri-executable-windows-x86_64/dawei-gui.exe" ]; then
+            cp tauri-executables/tauri-executable-windows-x86_64/dawei-gui.exe \
+               agent/dawei/bin/dawei-gui-windows-x86_64.exe
+          else
+            echo "ERROR: Windows x86_64 executable not found"
+            exit 1
+          fi
+
           ls -la agent/dawei/bin/
+
+      - name: Verify all files are present
+        run: |
+          echo "Verifying package structure..."
+
+          # Check frontend
+          if [ ! -f "agent/dawei/frontend/index.html" ]; then
+            echo "ERROR: frontend/index.html not found"
+            exit 1
+          fi
+
+          # Check bin directory
+          EXPECTED_BINS=(
+            "dawei-gui-linux-x86_64"
+            "dawei-gui-darwin-x86_64"
+            "dawei-gui-darwin-aarch64"
+            "dawei-gui-windows-x86_64.exe"
+          )
+
+          for bin in "${EXPECTED_BINS[@]}"; do
+            if [ ! -f "agent/dawei/bin/$bin" ]; then
+              echo "ERROR: bin/$bin not found"
+              exit 1
+            fi
+            echo "✅ Found: $bin ($(du -h agent/dawei/bin/$bin | cut -f1))"
+          done
+
+          echo "✅ All files verified successfully"
 
       - name: Get version from setuptools_scm
         id: version
@@ -252,10 +346,93 @@ jobs:
           fi
           python3 -m build
 
+      - name: Verify wheel package contents
+        working-directory: ./agent
+        run: |
+          echo "Verifying wheel package contents..."
+
+          # Check if wheel was created
+          WHEEL_FILE=$(ls dist/*.whl | head -1)
+          if [ -z "$WHEEL_FILE" ]; then
+            echo "ERROR: No wheel file found"
+            exit 1
+          fi
+
+          echo "Found wheel: $WHEEL_FILE"
+
+          # Verify wheel contains GUI executables
+          python3 - <<EOF
+          import zipfile
+          import sys
+
+          wheel_path = "$WHEEL_FILE"
+          expected_bins = [
+              "dawei/bin/dawei-gui-linux-x86_64",
+              "dawei/bin/dawei-gui-darwin-x86_64",
+              "dawei/bin/dawei-gui-darwin-aarch64",
+              "dawei/bin/dawei-gui-windows-x86_64.exe",
+          ]
+
+          with zipfile.ZipFile(wheel_path, 'r') as zf:
+              files = zf.namelist()
+
+              # Check GUI executables
+              for bin_file in expected_bins:
+                  if bin_file in files:
+                      info = zf.getinfo(bin_file)
+                      size_mb = info.file_size / 1024 / 1024
+                      print(f"✅ Found: {bin_file} ({size_mb:.1f} MB)")
+                  else:
+                      print(f"❌ Missing: {bin_file}")
+                      sys.exit(1)
+
+              # Check frontend
+              if "dawei/frontend/index.html" in files:
+                  print("✅ Found: dawei/frontend/index.html")
+              else:
+                  print("❌ Missing: dawei/frontend/index.html")
+                  sys.exit(1)
+
+          print("✅ Wheel package verification passed")
+          EOF
+
+          echo "✅ Wheel package is valid"
+
+      - name: Check wheel size
+        working-directory: ./agent
+        run: |
+          WHEEL_FILE=$(ls dist/*.whl | head -1)
+          WHEEL_SIZE=$(du -m "$WHEEL_FILE" | cut -f1)
+
+          echo "Wheel size: ${WHEEL_SIZE} MB"
+
+          # Wheel should be around 100-120 MB (包含所有平台的 GUI)
+          if [ "$WHEEL_SIZE" -lt 80 ]; then
+            echo "WARNING: Wheel size seems too small (expected ~100 MB)"
+            echo "This might indicate that GUI executables are missing"
+          elif [ "$WHEEL_SIZE" -gt 200 ]; then
+            echo "WARNING: Wheel size seems too large (expected ~100 MB)"
+          else
+            echo "✅ Wheel size is within expected range"
+          fi
+
       - name: Copy wheel to root dist
         run: |
           mkdir -p dist
           cp -r agent/dist/* dist/
+
+      - name: Build summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Wheel Size**: $(du -m agent/dist/*.whl | cut -f1) MB" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**:" >> $GITHUB_STEP_SUMMARY
+          echo "  - Linux x86_64: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "  - macOS x86_64: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "  - macOS aarch64: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "  - Windows x86_64: ✅" >> $GITHUB_STEP_SUMMARY
 
       - name: Publish distribution to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1

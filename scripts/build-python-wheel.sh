@@ -30,16 +30,16 @@ if [ "$(uname -s)" = "Linux" ]; then
     fi
 
     # 检查 GTK3 和 WebKit 相关库
-    for lib in libgtk-3 libsoup-3.0 libjavascriptcoregtk-4.1; do
+    for lib in gtk+-3.0 libsoup-3.0 javascriptcoregtk-4.1; do
         if ! pkg-config --exists $lib 2>/dev/null; then
             case $lib in
-                libgtk-3)
+                gtk+-3.0)
                     MISSING_DEPS="$MISSING_DEPS libgtk-3-dev"
                     ;;
                 libsoup-3.0)
                     MISSING_DEPS="$MISSING_DEPS libsoup-3.0-dev"
                     ;;
-                libjavascriptcoregtk-4.1)
+                javascriptcoregtk-4.1)
                     MISSING_DEPS="$MISSING_DEPS libwebkit2gtk-4.1-dev"
                     ;;
             esac
