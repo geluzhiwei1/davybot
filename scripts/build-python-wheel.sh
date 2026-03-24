@@ -53,7 +53,7 @@ if [ "$(uname -s)" = "Linux" ]; then
         echo ""
         echo "请运行以下命令安装:"
         echo -e "${GREEN}sudo apt-get update && sudo apt-get install -y \\"
-        echo "  libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev \\"
+        echo "  libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \\"
         echo "  librsvg2-dev libsoup-3.0-dev${NC}"
         echo ""
         echo "或在 CI/CD 环境中运行此脚本"

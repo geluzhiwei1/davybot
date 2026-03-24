@@ -593,6 +593,7 @@ const handleOpenFile = async (fileInfo: { path: string; name: string; is_directo
     const newFile = {
       id: fileInfo.path,
       name: fileInfo.name,
+      path: fileInfo.path,  // 添加 path 字段
       type,
       content,
       isDirty: false

@@ -65,6 +65,7 @@ import '@/assets/vue-office/excel.css'
 interface Props {
   modelValue: string
   filename: string
+  filepath?: string  // 添加 filepath 字段,用于传递文件的完整路径
   editable?: boolean  // 保持接口兼容，但组件不支持编辑
   workspaceId?: string
 }
@@ -194,7 +195,8 @@ async function loadDocumentSource(): Promise<void> {
     // 情况 5: 空字符串 - 通过 workspace API 加载
     else if (!modelValue || modelValue === '') {
       if (props.workspaceId) {
-        const filePath = encodeURIComponent(filename)
+        // 使用 filepath(完整路径)而不是 filename(仅文件名)
+        const filePath = encodeURIComponent(props.filepath || filename)
         const apiUrl = `/api/workspaces/${props.workspaceId}/files?path=${filePath}`
 
         const response = await fetch(apiUrl)

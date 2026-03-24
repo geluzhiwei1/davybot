@@ -153,7 +153,7 @@
 
           <!-- Office 文件预览（DOCX、Excel）- 使用 vue-office -->
           <VueOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
-            :filename="activeFile.name" :editable="false" :workspace-id="getCurrentWorkspaceId()"
+            :filename="activeFile.name" :filepath="activeFile.path" :editable="false" :workspace-id="getCurrentWorkspaceId()"
             @error="handleOfficeError" class="office-viewer-wrapper" />
           <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
             class="drawio-editor-tabs">
@@ -289,7 +289,7 @@
 
               <!-- Office 文件预览（DOCX、Excel）- 使用 vue-office -->
               <VueOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
-                :filename="activeFile.name" :editable="false" :workspace-id="getCurrentWorkspaceId()"
+                :filename="activeFile.name" :filepath="activeFile.path" :editable="false" :workspace-id="getCurrentWorkspaceId()"
                 @error="handleOfficeError" class="office-viewer-wrapper" />
 
               <!-- Drawio 编辑器 -->
@@ -359,6 +359,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 interface File {
   id: string
   name: string
+  path: string  // 添加 path 字段,存储文件的完整路径
   type: string
   content: string
   isDirty?: boolean
@@ -368,6 +369,7 @@ interface Props {
   files: File[]
   activeFileId: string | null
   isMobileDrawer?: boolean
+  workspaceId?: string  // 添加 workspaceId prop
 }
 
 interface Emits {
@@ -379,7 +381,8 @@ interface Emits {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  isMobileDrawer: false
+  isMobileDrawer: false,
+  workspaceId: undefined
 })
 const emit = defineEmits<Emits>()
 
@@ -389,7 +392,8 @@ const htmlActiveTab = ref('preview')
 
 // 获取当前 workspaceId 的辅助函数
 const getCurrentWorkspaceId = () => {
-  return workspaceStore.currentWorkspaceId || undefined
+  // 优先使用 props 传入的 workspaceId,否则从 store 获取
+  return props.workspaceId || workspaceStore.currentWorkspaceId || undefined
 }
 const drawioActiveTab = ref('xml')
 const isSaving = ref(false)

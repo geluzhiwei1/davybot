@@ -158,6 +158,12 @@
           </el-icon>
           <span>{{ t('sidePanel.copy') }}</span>
         </div>
+        <div v-if="selectedFileNode" class="context-menu-item" @click.stop.prevent="handleOpenInNewPage">
+          <el-icon>
+            <Document />
+          </el-icon>
+          <span>{{ t('sidePanel.openInNewPage') }}</span>
+        </div>
         <div v-if="selectedFileNode" class="context-menu-item" @click.stop.prevent="handleDownload">
           <el-icon>
             <Download />
@@ -193,6 +199,7 @@ import { useMobile } from '@/composables/useMobile';
 
 const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
+const router = useRouter();
 const { t } = useI18n();
 
 
@@ -846,6 +853,48 @@ const handleCopy = async () => {
     if (error !== 'cancel') {
       ElMessage.error(error?.response?.data?.detail || '复制失败');
     }
+  }
+};
+
+// 在新页面打开文件
+const handleOpenInNewPage = () => {
+  const node = selectedFileNode.value;
+  closeContextMenu();
+
+  if (!node) return;
+
+  try {
+    // 检查是否是文件(非目录)
+    const isDirectory = node.is_directory || node.type === 'directory';
+    if (isDirectory) {
+      ElMessage.warning(t('sidePanel.cannotOpenDirectory'));
+      return;
+    }
+
+    // 获取当前工作区ID
+    const workspaceId = props.workspaceId || workspaceStore.currentWorkspaceId;
+    if (!workspaceId) {
+      ElMessage.error(t('sidePanel.noWorkspaceId'));
+      return;
+    }
+
+    // 构建文件查看页面的URL
+    const fileUrl = router.resolve({
+      name: 'file',
+      params: { workspaceId },
+      query: {
+        path: node.path,
+        name: node.name
+      }
+    }).href;
+
+    // 在新标签页打开
+    window.open(fileUrl, '_blank');
+
+    ElMessage.success(t('sidePanel.openInNewPageSuccess'));
+  } catch (error: any) {
+    console.error('[SidePanel] 在新页面打开文件失败:', error);
+    ElMessage.error(t('sidePanel.openInNewPageFailed'));
   }
 };
 

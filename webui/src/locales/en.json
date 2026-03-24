@@ -714,6 +714,11 @@
     "rename": "Rename",
     "copy": "Copy",
     "download": "Download",
+    "openInNewPage": "Open in New Page",
+    "openInNewPageSuccess": "Opened in new page",
+    "openInNewPageFailed": "Failed to open in new page",
+    "cannotOpenDirectory": "Cannot open directory in new page",
+    "noWorkspaceId": "Missing workspace ID",
     "noFiles": "No files",
     "unknown": "Unknown",
     "loadFailed": "Load failed",
@@ -1217,6 +1222,19 @@
       "refresh": "Refresh",
       "default": "Default",
       "documentCount": "{count} documents"
+    }
+  },
+  "fileView": {
+    "title": "File Viewer",
+    "loading": "Loading file...",
+    "errorTitle": "Load Failed",
+    "goBack": "Go Back",
+    "close": "Close",
+    "errors": {
+      "noWorkspaceId": "Missing workspace ID",
+      "noFilePath": "Missing file path",
+      "loadFailed": "Failed to load file",
+      "unknown": "Unknown error"
     }
   }
 }

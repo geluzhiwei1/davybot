@@ -6,6 +6,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import ChatView from '../views/ChatView.vue'
 import WorkspacesView from '../views/WorkspacesView.vue'
+import FileView from '../views/FileView.vue'
 import ElementPlusTest from '../components/ElementPlusTest.vue'
 
 const router = createRouter({
@@ -15,6 +16,11 @@ const router = createRouter({
             path: '/dawei/:workspaceId?',
             name: 'chat',
             component: ChatView
+        },
+        {
+            path: '/file/:workspaceId',
+            name: 'file',
+            component: FileView
         },
         {
             path: '/workspaces',

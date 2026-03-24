@@ -720,6 +720,11 @@
     "rename": "重命名",
     "copy": "复制",
     "download": "下载",
+    "openInNewPage": "在新页面打开",
+    "openInNewPageSuccess": "已在新页面打开",
+    "openInNewPageFailed": "在新页面打开失败",
+    "cannotOpenDirectory": "不能在新页面打开目录",
+    "noWorkspaceId": "缺少工作区ID",
     "noFiles": "暂无文件",
     "unknown": "未知",
     "loadFailed": "加载失败",
@@ -1279,6 +1284,19 @@
       "refresh": "刷新",
       "default": "默认",
       "documentCount": "{count} 文档"
+    }
+  },
+  "fileView": {
+    "title": "文件查看",
+    "loading": "加载文件中...",
+    "errorTitle": "加载失败",
+    "goBack": "返回",
+    "close": "关闭",
+    "errors": {
+      "noWorkspaceId": "缺少工作区ID",
+      "noFilePath": "缺少文件路径",
+      "loadFailed": "文件加载失败",
+      "unknown": "未知错误"
     }
   }
 }
