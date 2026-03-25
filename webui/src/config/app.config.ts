@@ -162,7 +162,4 @@ if (import.meta.env.DEV) {
   if (!validation.valid) {
     console.warn('[AppConfig] Configuration errors:', validation.errors)
   }
-
-  // 开发环境：输出配置摘要
-  console.log('[AppConfig] Configuration:', getConfigSummary())
 }

@@ -103,7 +103,6 @@
 
           <div class="main-scroll-area">
             <MessageArea ref="messageAreaRef" />
-            <UserOperationArea ref="userOperationAreaRef" />
           </div>
           <UserInputArea />
         </el-main>
@@ -135,7 +134,6 @@
 
         <div class="main-scroll-area">
           <MessageArea ref="messageAreaRef" />
-          <UserOperationArea ref="userOperationAreaRef" />
         </div>
         <UserInputArea />
       </el-main>
@@ -259,7 +257,6 @@ import SidePanel from '@/components/layout/SidePanel.vue';
 import FileContentArea from '@/components/layout/FileContentArea.vue';
 import TopBar from '@/components/layout/TopBar.vue';
 import MessageArea from '@/components/layout/MessageArea.vue';
-import UserOperationArea from '@/components/layout/UserOperationArea.vue';
 import UserInputArea from '@/components/layout/UserInputArea.vue';
 import ServerStatusIndicator from '@/components/ServerStatusIndicator.vue';
 import BottomBar from '@/components/layout/BottomBar.vue';

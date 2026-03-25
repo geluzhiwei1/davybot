@@ -45,14 +45,27 @@
 
           <!-- 当前Agent信息 -->
           <div v-if="selectedAgent" class="agent-info">
-            <!-- 头部：模式 + 状态 -->
+            <!-- 头部：模式 + 状态 + 停止按钮 -->
             <div class="agent-header">
               <div class="header-text">
                 <div class="mode-label">{{ getModeLabel(selectedAgent.mode) }}</div>
                 <div class="task-preview">{{ getTaskPreview(selectedAgent) }}</div>
               </div>
-              <div class="status-badge" :class="`status-${selectedAgent.state}`">
-                {{ getStatusLabel(selectedAgent.state) }}
+              <div class="header-actions">
+                <div class="status-badge" :class="`status-${selectedAgent.state}`">
+                  {{ getStatusLabel(selectedAgent.state) }}
+                </div>
+                <button
+                  v-if="selectedAgent.state === 'running' || selectedAgent.state === 'pending'"
+                  @click.stop="handleStopAgent(selectedAgent.taskId)"
+                  class="stop-button"
+                  title="停止任务"
+                >
+                  <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4 4h8v8H4z"/>
+                  </svg>
+                  <span>停止</span>
+                </button>
               </div>
             </div>
 
@@ -108,9 +121,12 @@
 import { computed, ref, watch } from 'vue'
 import { useMonitoringStore } from '@/stores/monitoringStore'
 import { useParallelTasksStore } from '@/stores/parallelTasks'
+import { useChatStore } from '@/stores/chat'
+import { ElMessage } from 'element-plus'
 
 const monitoringStore = useMonitoringStore()
 const parallelTasksStore = useParallelTasksStore()
+const chatStore = useChatStore()
 
 const selectedAgentId = ref<string | null>(null)
 
@@ -227,6 +243,17 @@ const getStatusLabel = (state: string) => {
 const getTaskPreview = (agent: unknown) => {
   const desc = agent.taskName || agent.description || ''
   return desc.length > 30 ? desc.substring(0, 30) + '...' : desc
+}
+
+// 停止Agent任务
+const handleStopAgent = async (taskId: string) => {
+  try {
+    await chatStore.stopAgent(taskId)
+    ElMessage.success('任务已停止')
+  } catch (error) {
+    console.error('[MinimalMonitoringPanel] Failed to stop agent:', error)
+    ElMessage.error('停止任务失败')
+  }
 }
 </script>
 
@@ -396,6 +423,7 @@ const getTaskPreview = (agent: unknown) => {
 .agent-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding: 12px;
   background: var(--el-bg-color);
@@ -406,6 +434,12 @@ const getTaskPreview = (agent: unknown) => {
 .header-text {
   flex: 1;
   min-width: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .mode-label {
@@ -449,6 +483,38 @@ const getTaskPreview = (agent: unknown) => {
 .status-badge.status-failed {
   background: var(--el-color-danger-light-9);
   color: var(--el-color-danger);
+}
+
+/* 停止按钮 */
+.stop-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--el-color-danger-light-9);
+  color: var(--el-color-danger);
+  border: 1px solid var(--el-color-danger-light-7);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.stop-button:hover {
+  background: var(--el-color-danger);
+  color: white;
+  border-color: var(--el-color-danger);
+}
+
+.stop-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.stop-button span {
+  line-height: 1;
 }
 
 /* 进度条 */

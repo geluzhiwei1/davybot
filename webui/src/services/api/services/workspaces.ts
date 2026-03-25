@@ -131,6 +131,63 @@ export class WorkspacesApiService {
     };
   }
 
+  // 创建新对话（后端期望接收会话数组）
+  async createConversation(
+    workspaceId: string,
+    conversations: Array<{
+      id: string;
+      title: string;
+      created_at: string;
+      updated_at: string;
+      messages: unknown[];
+      message_count: number;
+      task_type?: string;
+      metadata?: Record<string, unknown>;
+    }>
+  ): Promise<{
+    success: boolean;
+    message: string;
+    workspace_name: string;
+    saved_count: number;
+  }> {
+    return await httpClient.post<{
+      success: boolean;
+      message: string;
+      workspace_name: string;
+      saved_count: number;
+    }>(
+      `${this.baseUrl}/${workspaceId}/conversations`,
+      conversations
+    );
+  }
+
+  // 更新对话（支持更新标题等）
+  async updateConversation(
+    workspaceId: string,
+    conversationId: string,
+    data: {
+      title?: string;
+      messages?: unknown[];
+      message_count?: number;
+      updated_at?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    workspace_name: string;
+    conversation_id: string;
+  }> {
+    return await httpClient.post<{
+      success: boolean;
+      message: string;
+      workspace_name: string;
+      conversation_id: string;
+    }>(
+      `${this.baseUrl}/${workspaceId}/conversations/${conversationId}`,
+      data
+    )
+  }
+
   // 获取单个对话详情（包含消息）支持分页
   async getConversationById(
     workspaceId: string,
@@ -1636,6 +1693,8 @@ export const {
   deleteWorkspace,
   validatePath,
   getConversations,
+  createConversation,
+  updateConversation,
   getConversationById,
   deleteConversation,
   deleteAllConversations,

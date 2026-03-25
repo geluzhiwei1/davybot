@@ -19,13 +19,6 @@ export class HttpClient {
   constructor(config: HttpConfig) {
     this.config = config;
 
-    // Debug: Log the base URL being used
-    if (import.meta.env.DEV) {
-      console.log('[HttpClient] Initializing with baseURL:', config.baseURL);
-      console.log('[HttpClient] Is dev mode:', import.meta.env.DEV);
-      console.log('[HttpClient] Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-    }
-
     this.instance = axios.create({
       baseURL: config.baseURL,
       timeout: config.timeout || 10000,
@@ -45,18 +38,6 @@ export class HttpClient {
       (config) => {
         // 添加请求时间戳
         config.metadata = { startTime: new Date() };
-
-        // Debug: Log the actual request URL
-        if (import.meta.env.DEV) {
-          console.log('[HttpClient] Request URL:', config.baseURL + config.url);
-          console.log('[HttpClient] Full config:', {
-            baseURL: config.baseURL,
-            url: config.url,
-            method: config.method,
-            params: config.params,
-            data: config.data
-          });
-        }
 
         // 添加认证token（如果存在）
         const token = this.getAuthToken();

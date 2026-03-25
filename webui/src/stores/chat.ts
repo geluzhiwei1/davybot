@@ -124,7 +124,6 @@ export const useChatStore = defineStore('chat', () => {
   const currentTaskId = computed(() => agentStore.currentTaskId)
   const currentWorkspaceId = computed(() => workspaceStore.currentWorkspaceId)
   const currentConversationId = computed(() => workspaceStore.currentConversationId)
-  const isTempConversation = computed(() => workspaceStore.isTempConversation)
   const currentThinking = computed(() => messageStore.currentThinking)
   const sessionId = computed(() => connectionStore.getSessionId())
   const workspaceId = computed(() => workspaceStore.currentWorkspaceId)
@@ -227,8 +226,34 @@ export const useChatStore = defineStore('chat', () => {
       role: MessageRole.USER,
       timestamp: new Date().toISOString(),
       content: [{ type: ContentType.TEXT, text }],
+      conversationId: workspaceStore.currentConversationId  // ✅ 关联当前会话ID
     }
-    messageStore.addMessage(userMessage, workspaceStore.currentWorkspaceId)
+    messageStore.addMessage(userMessage, workspaceStore.currentWorkspaceId, workspaceStore.currentConversationId)
+
+    // ✅ 自动更新会话标题：如果标题是"新会话"，则使用第一个问题作为标题
+    const conversationId = workspaceStore.currentConversationId
+    if (!conversationId) {
+      return
+    }
+
+    // 获取当前会话信息
+    const currentConversation = workspaceStore.currentConversation
+    const currentTitle = currentConversation ? (currentConversation as any).title || '' : ''
+
+    // ✅ 简化条件：只要标题是"新会话"就尝试更新
+    const shouldUpdateTitle = currentTitle === '新会话' || currentTitle.trim() === ''
+
+    if (shouldUpdateTitle) {
+      const newTitle = workspaceStore.generateConversationTitle(text)
+
+      if (newTitle !== '新会话' && newTitle.trim() !== '') {
+        // 异步更新标题，不阻塞消息发送
+        workspaceStore.updateConversationTitle(conversationId, newTitle)
+          .catch(err => {
+            logger.warn('[CHAT_STORE] Failed to update conversation title:', err)
+          })
+      }
+    }
 
     agentStore.setThinking(true)
     messageStore.setThinking('')
@@ -260,9 +285,6 @@ export const useChatStore = defineStore('chat', () => {
     if (Object.keys(uiContext.value.userPreferences).length > 0) {
       userUIContext.user_preferences = uiContext.value.userPreferences
     }
-
-    // 【调试】记录即将发送给 WebSocket 的 knowledgeBaseIds
-    console.log('[CHAT_STORE.sendMessage] Sending to WebSocket with knowledgeBaseIds:', knowledgeBaseIds);
 
     // 发送消息（使用当前workspace的客户端）
     const workspaceId = workspaceStore.currentWorkspaceId || 'default'
@@ -350,20 +372,20 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 设置临时会话
-   */
-  const setTempConversation = (conversationId: string) => {
-    workspaceStore.setConversation(conversationId)
-    // isTempConversation会在setConversation中设置为false，所以这里不需要额外设置
-  }
-
-  /**
-   * 加载历史会话
+   * 加载历史会话 (支持多会话缓存,不清空其他会话)
    */
   const loadConversation = async (conversationId: string) => {
     try {
       // 标记正在加载，避免 watch 重复触发
       isLoadingConversation = true
+
+      const targetWorkspaceId = workspaceStore.currentWorkspaceId
+      if (!targetWorkspaceId) {
+        throw new Error('未找到工作区ID')
+      }
+
+      // ✅ 简化：先清空目标会话的消息，避免重复添加
+      messageStore.clearConversationMessages(targetWorkspaceId, conversationId)
 
       // 使用workspace store加载会话
       const loadedMessages = await workspaceStore.loadConversation(
@@ -371,13 +393,12 @@ export const useChatStore = defineStore('chat', () => {
         messageStore.convertBackendMessageToChatMessage
       )
 
-      // 清空当前消息
-      messageStore.clearMessages()
+      // 将加载的消息添加到指定会话 (每个会话的消息是独立的)
+      for (const msg of loadedMessages) {
+        messageStore.addMessage(msg, targetWorkspaceId, conversationId)
+      }
 
-      // 添加加载的消息
-      messageStore.addMessages(loadedMessages)
-
-      logger.debug(`[CHAT_STORE] Successfully loaded ${loadedMessages.length} messages`)
+      logger.debug(`[CHAT_STORE] Successfully loaded ${loadedMessages.length} messages for conversation:${conversationId}`)
     } catch (error) {
       logger.error('[CHAT_STORE] Error loading conversation:', error)
       messageStore.addMessage({
@@ -388,7 +409,7 @@ export const useChatStore = defineStore('chat', () => {
           type: ContentType.ERROR,
           message: `加载会话失败: ${error instanceof Error ? error.message : String(error)}`
         }],
-      }, workspaceStore.currentWorkspaceId)  // 添加 workspaceId
+      }, workspaceStore.currentWorkspaceId, conversationId)  // 添加到指定会话
     } finally {
       // 恢复加载标志
       setTimeout(() => {
@@ -719,18 +740,22 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * Get or create stream message
+   * Get or create stream message (支持指定会话)
    */
   const getOrCreateStreamMessage = (
     messageBubbleId: string,
     taskId: string,
     sessionId: string,
     workspaceId: string,
-    llmMessageId?: string  // ✅ 新增：LLM message_id参数
+    llmMessageId?: string,  // ✅ LLM message_id参数
+    conversationId?: string  // ✅ 会话ID参数
   ): ChatMessage => {
     let chatMessage = messageStore.getMessageById(messageBubbleId)
 
     if (!chatMessage) {
+      // 如果没有指定conversationId,使用当前workspace的当前会话
+      const targetConversationId = conversationId || workspaceStore.currentConversationId || 'active'
+
       // Create new message
       chatMessage = {
         id: messageBubbleId,
@@ -740,20 +765,22 @@ export const useChatStore = defineStore('chat', () => {
         taskId: taskId,
         sessionId: sessionId,
         workspaceId: workspaceId,
-        messageId: llmMessageId || messageBubbleId  // ✅ 优先使用LLM message_id，否则fallback到bubble ID
+        messageId: llmMessageId || messageBubbleId,  // ✅ 优先使用LLM message_id，否则fallback到bubble ID
+        conversationId: targetConversationId  // ✅ 关联会话ID
       }
 
       logger.debug('Creating new message', {
         messageBubbleId,
         taskId,
         workspaceId,
+        conversationId: targetConversationId,  // ✅ 记录会话ID
         llmMessageId,  // ✅ 记录LLM message_id
         finalMessageId: llmMessageId || messageBubbleId  // ✅ 记录最终设置的messageId
       })
 
       try {
-        messageStore.addMessage(chatMessage, workspaceId)
-        logger.debug('New message created', { messageBubbleId, workspaceId })
+        messageStore.addMessage(chatMessage, workspaceId, targetConversationId)  // ✅ 传递conversationId
+        logger.debug('New message created', { messageBubbleId, workspaceId, conversationId: targetConversationId })
       } catch (error) {
         const errorMsg = `Failed to add message: ${error instanceof Error ? error.message : String(error)}`
         logger.error(errorMsg, error instanceof Error ? error : new Error(String(error)), { messageBubbleId, workspaceId })
@@ -863,34 +890,44 @@ export const useChatStore = defineStore('chat', () => {
       // Determine message bubble ID
       const messageBubbleId = messageId || `msg_${taskId}`
 
+      // ✅ 解析conversationId - 优先级：
+      // 1. 从消息metadata获取
+      // 2. 从task store获取（task所属的conversation）
+      // 3. 最后才fallback到当前会话（不推荐）
+      const streamContentMsg = message as unknown
+      let conversationId = streamContentMsg.conversation_id
+
+      if (!conversationId) {
+        // 尝试从parallelTasksStore获取task的conversationId
+        const task = parallelTasksStore.allTasks.find(t => t.taskId === taskId)
+        if (task?.conversationId) {
+          conversationId = task.conversationId
+        } else {
+          // 最后的fallback（不应该到达这里）
+          conversationId = workspaceStore.currentConversationId || 'active'
+        }
+      }
+
       // Get or create message
       const chatMessage = getOrCreateStreamMessage(
         messageBubbleId,
         taskId,
         sessionId,
         workspaceId,
-        messageId  // ✅ 传递LLM message_id
+        messageId,  // ✅ 传递LLM message_id
+        conversationId  // ✅ 传递conversationId
       )
-
-      logger.debug('Found existing message:', {
-        messageBubbleId,
-        llmMessageId: messageId,  // ✅ LLM message_id
-        chatMessageId: chatMessage.messageId,  // ✅ ChatMessage.messageId当前值
-        contentLength: chatMessage.content.length,
-        idMatch: chatMessage.messageId === messageId  // ✅ Debug: ID是否匹配
-      })
 
       // Update message content
       updateStreamMessageContent(messageBubbleId, chatMessage, content)
 
-      // Trigger reactive update
-      messageStore.triggerMessagesUpdate()
-
-      logger.debug('Stream content processing complete', { messageBubbleId })
+      // Trigger reactive update (只有当前查看的会话才触发UI更新)
+      if (conversationId === workspaceStore.currentConversationId) {
+        messageStore.triggerMessagesUpdate()
+      }
     } finally {
       // Cleanup processing mark
       processingMessages.delete(message.id)
-      logger.debug('Processing mark removed', { messageId: message.id })
     }
   }
 
@@ -1427,6 +1464,9 @@ export const useChatStore = defineStore('chat', () => {
           true // Allow fallback to current workspace for LLM API responses
         )
 
+        // ✅ 解析conversationId
+        const conversationId = apiResponse.conversation_id || workspaceStore.currentConversationId || 'active'
+
         let chatMessage = messageStore.getMessageById(messageId)
 
         if (!chatMessage) {
@@ -1437,11 +1477,12 @@ export const useChatStore = defineStore('chat', () => {
             content: [],
             taskId: taskId,
             sessionId: apiResponse.session_id,
+            conversationId: conversationId  // ✅ 关联会话ID
           }
 
           try {
-            messageStore.addMessage(chatMessage, workspaceId)
-            logger.debug(`[handleLLMApiResponse] ✅ Created new message for streaming: messageId=${messageId}`)
+            messageStore.addMessage(chatMessage, workspaceId, conversationId)  // ✅ 传递conversationId
+            logger.debug(`[handleLLMApiResponse] ✅ Created new message for streaming: messageId=${messageId}, conversation=${conversationId}`)
           } catch (error) {
             logger.error('[handleLLMApiResponse] ❌ Failed to add message:', error)
           }
@@ -1603,6 +1644,9 @@ export const useChatStore = defineStore('chat', () => {
       }
     }
 
+    // ✅ 解析conversationId
+    const conversationId = errorMessage.conversation_id || workspaceStore.currentConversationId || 'active'
+
     const errorMsg: ChatMessage = {
       id: errorMessage.id || uuidv4(),
       role: MessageRole.SYSTEM,
@@ -1610,6 +1654,7 @@ export const useChatStore = defineStore('chat', () => {
       taskId: errorMessage.task_id,
       sessionId: errorMessage.session_id,  // Use sessionId (camelCase) not session_id
       content: [errorContent],
+      conversationId: conversationId  // ✅ 关联会话ID
     }
 
     // ✅ Use workspace resolver utility (eliminates 35+ lines of duplicate code)
@@ -1620,16 +1665,19 @@ export const useChatStore = defineStore('chat', () => {
 
     logger.debug('Workspace resolved for error message:', {
       sessionId: errorMessage.session_id,
-      workspaceId
+      workspaceId,
+      conversationId: conversationId
     })
 
     // 尝试添加消息，捕获任何异常
     try {
       logger.debug('[ERROR] Adding error message with workspaceId:', workspaceId)
-      messageStore.addMessage(errorMsg, workspaceId)
+      messageStore.addMessage(errorMsg, workspaceId, conversationId)  // ✅ 传递conversationId
 
-      // ✅ 确保UI更新 - 触发响应式更新
-      messageStore.triggerMessagesUpdate()
+      // ✅ 确保UI更新 - 触发响应式更新 (只有当前会话才触发)
+      if (conversationId === workspaceStore.currentConversationId) {
+        messageStore.triggerMessagesUpdate()
+      }
 
       // 记录性能指标（不使用fallback）
       const duration = performance.now() - startTime
@@ -1675,8 +1723,8 @@ export const useChatStore = defineStore('chat', () => {
     // 如果新值与旧值相同，跳过
     if (newConversationId === oldConversationId) return
 
-    // 如果为空或为临时会话，跳过
-    if (!newConversationId || isTempConversation.value) return
+    // ✅ 简化：如果为空，跳过加载
+    if (!newConversationId) return
 
     logger.debug(`[CHAT_STORE] Auto-loading conversation on ID change: ${oldConversationId} -> ${newConversationId}`)
 
@@ -1800,7 +1848,6 @@ export const useChatStore = defineStore('chat', () => {
     sendWebSocketMessage,
     updateUIContext,
     clearChat,
-    setTempConversation,
     setWorkspaceId,
     loadConversation,
     stopAgent,

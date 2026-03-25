@@ -397,9 +397,6 @@ export function useAgents(workspaceId?: string) {
             'modes',  // 重新加载modes配置
             true  // 强制重新加载
           );
-          if (result.success) {
-            console.log('[Agents] Config reload result:', result);
-          }
         } catch (error) {
           console.error('[Agents] Failed to reload config:', error);
           // 即使重新加载失败,也继续刷新前端列表

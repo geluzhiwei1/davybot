@@ -789,12 +789,12 @@ class ToolExecutor(IToolCallService):
             if not tool_name or not tool_name.strip():
                 raise ValidationError("tool_name", tool_name, "must be non-empty string")
 
-            # Validate tool_input is not empty
-            if not tool_input or not isinstance(tool_input, dict):
+            # Validate tool_input type
+            if not isinstance(tool_input, dict):
                 raise ValidationError(
                     "tool_input",
                     tool_input,
-                    "must be a non-empty dictionary with tool parameters",
+                    "must be a dictionary with tool parameters",
                 )
 
             # Get tool to check required parameters before execution
@@ -809,22 +809,25 @@ class ToolExecutor(IToolCallService):
                     # Get required fields
                     required_fields = [name for name, field in schema.model_fields.items() if field.is_required()]
 
-                    # Check if required fields are missing
-                    missing_fields = [f for f in required_fields if f not in tool_input]
-                    if missing_fields:
-                        # Build helpful error message for LLM
-                        field_descriptions = []
-                        for field_name in required_fields:
-                            field_info = schema.model_fields[field_name]
-                            desc = field_info.description or ""
-                            field_descriptions.append(f"  - {field_name}: {desc}")
+                    # Only validate non-empty if there are required fields
+                    if required_fields:
+                        # Check if required fields are missing
+                        missing_fields = [f for f in required_fields if f not in tool_input]
+                        # Only raise error if there are actually missing fields
+                        if missing_fields:
+                            # Build helpful error message for LLM
+                            field_descriptions = []
+                            for field_name in required_fields:
+                                field_info = schema.model_fields[field_name]
+                                desc = field_info.description or ""
+                                field_descriptions.append(f"  - {field_name}: {desc}")
 
-                        error_msg = f"Tool '{tool_name}' missing required parameters: {', '.join(missing_fields)}\n\nRequired parameters:\n" + "\n".join(field_descriptions) + "\n\nPlease retry the tool call with all required parameters."
-                        raise ValidationError(
-                            "tool_input",
-                            tool_input,
-                            error_msg,
-                        )
+                            error_msg = f"Tool '{tool_name}' missing required parameters: {', '.join(missing_fields)}\n\nRequired parameters:\n" + "\n".join(field_descriptions) + "\n\nPlease retry the tool call with all required parameters."
+                            raise ValidationError(
+                                "tool_input",
+                                tool_input,
+                                error_msg,
+                            )
 
             # Emit validation progress event
             from dawei.core.events import TaskEventType, emit_typed_event

@@ -89,6 +89,7 @@ export interface ParallelTaskInfo {
   taskNodeId?: string  // 后端字段名: task_node_id
   nodeType: string     // 后端字段名: node_type
   description: string
+  conversationId?: string  // 关联的会话ID
 
   // 状态
   state: ParallelTaskState

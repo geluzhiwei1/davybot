@@ -100,9 +100,26 @@
                   class="conversation-menu">
                   <el-menu-item v-for="conv in conversations" :key="conv.id" :index="conv.id"
                     class="conversation-menu-item">
-                    <div class="conversation-item">
+                    <div class="conversation-item" :class="{ 'has-notification': hasNotification(conv.id) }">
                       <div class="conv-content">
-                        <span class="conv-title">{{ conv.title }}</span>
+                        <div class="conv-header">
+                          <span class="conv-title">{{ conv.title }}</span>
+                          <!-- 后台会话通知徽章 -->
+                          <el-badge v-if="hasNotification(conv.id)" :value="getNotificationCount(conv.id)"
+                            :max="99" class="conv-badge" />
+                        </div>
+                        <!-- Agent运行状态指示器 -->
+                        <div v-if="hasActiveAgent(conv.id)" class="conv-agent-status">
+                          <el-icon class="is-loading">
+                            <Loading />
+                          </el-icon>
+                          <span class="agent-status-text">Agent运行中</span>
+                        </div>
+                        <!-- 新消息预览 -->
+                        <div v-if="hasNotification(conv.id) && getNotificationPreview(conv.id)"
+                          class="conv-message-preview">
+                          {{ getNotificationPreview(conv.id) }}
+                        </div>
                         <span class="conv-date">{{ formatDate(conv.lastUpdated) }}</span>
                         <span class="conv-id">ID: {{ conv.id }}</span>
                       </div>
@@ -188,17 +205,21 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useChatStore } from '@/stores/chat';
 import { useWorkspaceStore } from '@/stores/workspace';
+import { useParallelTasksStore } from '@/stores/parallelTasks';
+import { useConversationNotifications } from '@/composables/useConversationNotifications';
 import { apiManager } from '@/services/api';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import {
   ChatDotRound, Folder, Document, Plus, Delete,
-  FolderAdd, Edit, CopyDocument, Upload, Refresh, Download, Close
+  FolderAdd, Edit, CopyDocument, Upload, Refresh, Download, Close, Loading
 } from '@element-plus/icons-vue';
 import FileUploadDialog from '@/components/FileUploadDialog.vue';
 import { useMobile } from '@/composables/useMobile';
 
 const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
+const parallelTasksStore = useParallelTasksStore();
+const conversationNotifications = useConversationNotifications();
 const router = useRouter();
 const { t } = useI18n();
 
@@ -212,23 +233,6 @@ const handleClickOutside = (event: Event) => {
     const contextMenu = document.querySelector('.context-menu');
     if (contextMenu && !contextMenu.contains(target)) {
       closeContextMenu();
-    }
-  }
-};
-
-// Update temporary conversation to real conversation
-const updateTempConversation = (tempId: string, realId: string) => {
-  // Find temporary conversation index in list
-  const tempIndex = conversations.value.findIndex((c: any) => c.id === tempId);
-
-  if (tempIndex !== -1) {
-    // Update conversation ID and remove temporary flag
-    conversations.value[tempIndex].id = realId;
-    conversations.value[tempIndex].isTemp = false;
-
-    // If currently selected is temporary, update selected state
-    if (activeConversationId.value === tempId) {
-      activeConversationId.value = realId;
     }
   }
 };
@@ -252,11 +256,6 @@ const emit = defineEmits<{
 // 注册全局函数供chat store调用
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
-
-  // Register global function for updating temporary conversations
-  if (typeof window !== 'undefined') {
-    (window as unknown).updateTempConversation = updateTempConversation;
-  }
 
   // ✅ 监听任务完成事件，自动刷新文件树
   window.addEventListener('task-node-complete-refresh', handleTaskCompleteRefresh);
@@ -354,6 +353,8 @@ const loadConversations = async () => {
   loading.value = true;
   try {
     const convs = await apiManager.getWorkspacesApi().getConversations(props.workspaceId);
+
+    // ✅ 简化：直接使用后端返回的会话列表（不再需要保留临时会话）
     conversations.value = convs?.items || [];
 
     // 同步到 workspaceStore，让 TopBar 能获取到会话列表
@@ -367,10 +368,10 @@ const loadConversations = async () => {
         return dateB.getTime() - dateA.getTime();
       });
       const latestConversation = sortedConversations[0] as any;
+
+      // 设置 activeConversationId 会自动触发 el-menu 的 @select 事件
+      // 进而调用 handleSelectConversation
       activeConversationId.value = latestConversation.id;
-
-      await chatStore.loadConversation(latestConversation.id);
-
     }
   } catch (e) {
     console.error('Failed to load conversations:', e);
@@ -418,31 +419,34 @@ const loadFiles = async () => {
   }
 };
 
-const handleNewChat = () => {
-  // 清空聊天
-  chatStore.clearChat();
+const handleNewChat = async () => {
+  if (!props.workspaceId) {
+    ElMessage.error('请先选择工作区');
+    return;
+  }
 
-  // Generate temporary conversation ID (using timestamp and random number)
-  const tempConversationId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  try {
+    // 清空聊天
+    chatStore.clearChat();
 
-  // Set as temporary conversation (don't send conversationId to backend)
-  chatStore.setTempConversation(tempConversationId);
+    // ✅ 简化：直接调用后端API创建会话
+    const newConversation = await workspaceStore.createConversation('新会话');
 
-  // Create temporary conversation object
-  const tempConversation = {
-    id: tempConversationId,
-    title: '新会话',
-    lastUpdated: new Date().toISOString(),
-    isTemp: true // Mark as temporary conversation to distinguish from saved conversations
-  };
+    if (newConversation && newConversation.id) {
+      // 设置为当前会话
+      activeConversationId.value = newConversation.id;
 
-  // Add temporary conversation to top of list
-  conversations.value.unshift(tempConversation);
+      // 重新加载会话列表（确保列表是最新的）
+      await loadConversations();
 
-  // Set as currently selected conversation
-  activeConversationId.value = tempConversationId;
-  // 更新 workspace store，标记为临时会话
-  workspaceStore.createTempConversation();
+      ElMessage.success('会话已创建');
+    } else {
+      throw new Error('创建会话失败：未返回会话ID');
+    }
+  } catch (error) {
+    console.error('[handleNewChat] Failed to create conversation:', error);
+    ElMessage.error(error?.response?.data?.detail || '创建会话失败，请重试');
+  }
 };
 
 const handleSelectConversation = (id: string) => {
@@ -451,6 +455,45 @@ const handleSelectConversation = (id: string) => {
   workspaceStore.setConversation(id);
   chatStore.loadConversation(id);
 };
+
+// ========== 会话通知相关方法 ==========
+
+/**
+ * 检查会话是否有新消息通知
+ */
+const hasNotification = (conversationId: string): boolean => {
+  const notification = conversationNotifications.getConversationNotification(conversationId);
+  return notification !== undefined && notification.count > 0
+}
+
+/**
+ * 获取会话的新消息数量
+ */
+const getNotificationCount = (conversationId: string): number => {
+  const notification = conversationNotifications.getConversationNotification(conversationId)
+  return notification?.count || 0
+}
+
+/**
+ * 获取会话的最新消息预览
+ */
+const getNotificationPreview = (conversationId: string): string => {
+  const notification = conversationNotifications.getConversationNotification(conversationId)
+  return notification?.lastMessagePreview || ''
+}
+
+/**
+ * 检查会话是否有活跃的Agent
+ */
+const hasActiveAgent = (conversationId: string): boolean => {
+  // ✅ 临时修复：只检查当前会话是否有活跃任务
+  // TODO: 需要后端提供 task_id → conversation_id 映射，以支持精确的后台会话状态判断
+  const isCurrentConversation = conversationId === activeConversationId.value
+  const hasActiveTasks = conversationNotifications.hasActiveAgentInConversation(conversationId)
+
+  // 只有当前会话且有活跃任务时，才显示"运行中"图标
+  return isCurrentConversation && hasActiveTasks
+}
 
 const handleDeleteConversation = async (conv: unknown) => {
   try {
@@ -1555,6 +1598,54 @@ defineExpose({
   .custom-tree-node {
     font-size: 14px;
     padding: 8px 0;
+  }
+
+  /* ========== 会话通知和Agent状态样式 ========== */
+
+  .conversation-item.has-notification {
+    background: rgba(64, 158, 255, 0.05);
+  }
+
+  .conv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .conv-badge {
+    flex-shrink: 0;
+  }
+
+  .conv-agent-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #409eff;
+    margin-top: 4px;
+  }
+
+  .conv-agent-status .el-icon {
+    animation: rotate 2s linear infinite;
+  }
+
+  @keyframes rotate {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .conv-message-preview {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 </style>

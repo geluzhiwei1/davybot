@@ -327,9 +327,6 @@ export function useSkills(workspaceId?: string) {
             'skills',  // 重新加载skills配置
             true  // 强制重新加载
           );
-          if (result.success) {
-            console.log('[Skills] Config reload result:', result);
-          }
         } catch (error) {
           console.error('[Skills] Failed to reload config:', error);
           // 即使重新加载失败,也继续刷新前端列表

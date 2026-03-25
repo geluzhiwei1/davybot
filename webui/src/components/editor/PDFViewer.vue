@@ -159,7 +159,6 @@ const loadPDF = async () => {
 
     // 直接使用 PDF 源（浏览器原生查看器会处理）
     src.value = props.modelValue
-    console.log('[PDFViewer] PDF source set successfully:', src.value?.substring(0, 50))
 
   } catch (err: unknown) {
     console.error('[PDFViewer] Load error:', err)

@@ -242,9 +242,6 @@ export const useMarketStore = defineStore('market', () => {
             true  // 强制重新加载
           );
 
-          if (result.success) {
-            console.log('[MarketStore] Config reload result:', result);
-          }
         } catch (error) {
           console.error('[MarketStore] Failed to reload config:', error);
           // 即使重新加载失败,也继续刷新前端列表

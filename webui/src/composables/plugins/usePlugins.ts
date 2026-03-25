@@ -217,9 +217,6 @@ export function usePlugins(workspaceId?: string) {
             'tools',  // plugin 对应 tools 配置
             true  // 强制重新加载
           );
-          if (result.success) {
-            console.log('[Plugins] Config reload result:', result);
-          }
         } catch (error) {
           console.error('[Plugins] Failed to reload config:', error);
           // 即使重新加载失败,也继续刷新前端列表

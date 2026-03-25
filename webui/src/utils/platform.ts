@@ -38,22 +38,10 @@ export function getApiBaseUrl(): string {
   const tauriDetected = isTauri();
   const isDev = import.meta.env.DEV;
 
-  // Debug logging
-  if (import.meta.env.DEV) {
-    console.log('[getApiBaseUrl] isDev:', isDev);
-    console.log('[getApiBaseUrl] tauriDetected:', tauriDetected);
-    console.log('[getApiBaseUrl] Current page origin:', window.location.origin);
-    console.log('[getApiBaseUrl] VITE_API_BASE_URL from env:', import.meta.env.VITE_API_BASE_URL);
-  }
-
   // Development mode: ALWAYS use proxy, ignore ALL environment variables
   // This prevents .env.tauri from interfering with web development
   if (isDev) {
     const devUrl = '/api';  // Relative path - will use browser's origin
-    if (import.meta.env.DEV) {
-      console.log('[getApiBaseUrl] DEV MODE - Using proxy URL:', devUrl);
-      console.log('[getApiBaseUrl] Full API URL will be:', window.location.origin + devUrl);
-    }
     return devUrl;
   }
 
@@ -83,14 +71,6 @@ export function getWsBaseUrl(): string {
   const isDev = import.meta.env.DEV;
   const hostname = window.location.hostname;
 
-  // Debug logging
-  if (import.meta.env.DEV) {
-    console.log('[getWsBaseUrl] isDev:', isDev);
-    console.log('[getWsBaseUrl] tauriDetected:', tauriDetected);
-    console.log('[getWsBaseUrl] Current page origin:', window.location.origin);
-    console.log('[getWsBaseUrl] VITE_WS_BASE_URL from env:', import.meta.env.VITE_WS_BASE_URL);
-  }
-
   // Development mode: ALWAYS use proxy, ignore ALL environment variables
   // This prevents .env.tauri from interfering with web development
   if (isDev) {
@@ -98,9 +78,6 @@ export function getWsBaseUrl(): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const devUrl = `${protocol}//${host}/ws`;
-    if (import.meta.env.DEV) {
-      console.log('[getWsBaseUrl] DEV MODE - Using proxy URL:', devUrl);
-    }
     return devUrl;
   }
 

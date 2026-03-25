@@ -88,7 +88,7 @@ const chatStore = useChatStore();
 const workspaceStore = useWorkspaceStore();
 const { t } = useI18n();
 const { connectionStatus } = storeToRefs(chatStore);
-const { currentConversation, isTempConversation } = storeToRefs(workspaceStore);
+const { currentConversation } = storeToRefs(workspaceStore);
 
 const agentName = ref('Dawei');
 
@@ -123,9 +123,6 @@ const handleZoomCommand = (command: string | number) => {
 
 // 计算当前会话标题
 const conversationTitle = computed(() => {
-  if (isTempConversation.value) {
-    return t('topBar.newConversation');
-  }
   if (currentConversation.value) {
     // 尝试多个可能的字段名（后端可能使用不同的命名）
     const conv = currentConversation.value as any;

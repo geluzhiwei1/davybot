@@ -89,20 +89,10 @@ const isLoading = computed(() => {
 
 const handleSendMessage = () => {
   if (newMessage.value.trim() && !isLoading.value && chatStore.isConnected) {
-    // 【调试】打印知识库 ID
-    console.log('[CHAT_AREA] ========================================');
-    console.log('[CHAT_AREA] Sending message with knowledge base IDs:', selectedKnowledgeBases.value);
-    console.log('[CHAT_AREA] chatStore.selectedKnowledgeBaseIds:', chatStore.selectedKnowledgeBaseIds);
-    console.log('[CHAT_AREA] Type:', typeof selectedKnowledgeBases.value);
-    console.log('[CHAT_AREA] Length:', selectedKnowledgeBases.value?.length);
-    console.log('[CHAT_AREA] Is Array:', Array.isArray(selectedKnowledgeBases.value));
-    console.log('[CHAT_AREA] ========================================');
-
     // 发送消息时，将选中的知识库 ID 列表传递给后端
     const kbIds = selectedKnowledgeBases.value && selectedKnowledgeBases.value.length > 0
       ? selectedKnowledgeBases.value
       : undefined;
-    console.log('[CHAT_AREA] Final kbIds being sent:', kbIds);
 
     chatStore.sendMessage(
       newMessage.value,

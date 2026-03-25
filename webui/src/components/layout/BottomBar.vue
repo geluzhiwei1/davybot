@@ -295,7 +295,6 @@ const loadKnowledgeBases = async () => {
 
 // 处理知识库选择变化
 const handleKnowledgeBasesChange = (baseIds: string[]) => {
-  console.log('[BOTTOM_BAR] Selected knowledge bases:', baseIds);
   // 更新 chat store
   chatStore.selectedKnowledgeBaseIds = baseIds;
 };
@@ -314,13 +313,6 @@ const getKnowledgeBaseDisplayText = (): string => {
 
 // 切换知识库选择状态
 const toggleKnowledgeBase = (base: KnowledgeBase) => {
-  console.log('[BOTTOM_BAR] toggleKnowledgeBase called with:', {
-    'base.id': base.id,
-    'base.id type': typeof base.id,
-    'base.id length': base.id.length,
-    'base.name': base.name
-  });
-
   const index = selectedKnowledgeBases.value.indexOf(base.id);
   if (index > -1) {
     // 已选中，移除
@@ -328,12 +320,9 @@ const toggleKnowledgeBase = (base: KnowledgeBase) => {
   } else {
     // 未选中，添加
     selectedKnowledgeBases.value.push(base.id);
-    console.log('[BOTTOM_BAR] Added base.id to selectedKnowledgeBases:', base.id);
   }
   // 【修复】更新 chat store，确保 ChatArea 能读取到选择的知识库
   chatStore.selectedKnowledgeBaseIds = [...selectedKnowledgeBases.value];
-  console.log('[BOTTOM_BAR] Updated chatStore.selectedKnowledgeBaseIds:', chatStore.selectedKnowledgeBaseIds);
-  console.log('[BOTTOM_BAR] Verification - First ID length:', chatStore.selectedKnowledgeBaseIds[0]?.length);
 };
 
 // 打开知识库管理抽屉

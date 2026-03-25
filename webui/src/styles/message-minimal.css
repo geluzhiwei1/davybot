@@ -179,20 +179,6 @@
   color: #1e293b !important;
 }
 
-/* 确保折叠按钮可点击 */
-.assistant-message-content .collapse-toggle,
-.tool-message-content .collapse-toggle {
-  position: relative !important;
-  z-index: 10 !important;
-  pointer-events: auto !important;
-}
-
-/* 修复CollapsibleMessage容器 */
-.assistant-message-content .collapsible-message,
-.tool-message-content .collapsible-message {
-  overflow: visible !important;
-}
-
 .tool-card .tool-message-content {
   font-family: 'Source Sans Pro', sans-serif !important;
   font-size: 14px !important;

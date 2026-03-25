@@ -813,15 +813,11 @@ const refreshRemoteStatus = async () => {
       httpClient.get(`${REMOTE_API_BASE}/nat/status`)
     ]);
 
-    console.log('Config response:', configRes);
-
     // httpClient.get() 返回的是 response.data，格式是 { success: boolean, data: T, message: string }
     if (configRes && typeof configRes === 'object' && 'success' in configRes) {
       if ((configRes as any).success && (configRes as any).data) {
         const config = (configRes as any).data;
-        console.log('Processed config:', config);
         natConfig.value = config as NATConfig;
-        console.log('Final natConfig:', natConfig.value);
         // 配置接口返回成功，说明允许远程访问
         remoteConfig.value.allowRemote = true;
       } else {
@@ -832,8 +828,6 @@ const refreshRemoteStatus = async () => {
       console.error('Config API returned invalid response format');
       remoteConfig.value.allowRemote = false;
     }
-
-    console.log('Status response:', statusRes);
 
     // 状态接口直接返回 NATServiceStatus，没有包装
     if (statusRes && typeof statusRes === 'object') {
@@ -883,7 +877,6 @@ const loadRemoteTunnels = async () => {
 // 处理允许远程配置变更
 const handleRemoteConfigChange = async (value: boolean) => {
   // 这里可以保存用户偏好设置到本地存储或服务器
-  console.log('Remote access config changed:', value);
   if (!value) {
     // 如果关闭远程访问，同时停止服务
     if (remoteConfig.value.running) {
@@ -894,7 +887,6 @@ const handleRemoteConfigChange = async (value: boolean) => {
 
 // 处理 SSH 配置变更
 const handleSSHConfigChange = async (value: boolean) => {
-  console.log('SSH config changed:', value);
   // 这里可以保存 SSH 配置
   // 如果服务正在运行，需要动态添加/删除 SSH 隧道
   if (remoteConfig.value.running && value) {

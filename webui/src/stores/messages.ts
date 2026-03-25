@@ -58,12 +58,29 @@ export const useMessageStore = defineStore('messages', () => {
     return null
   }
 
-  // --- State (按workspace隔离) ---
+  // --- State (按workspace和conversation隔离) ---
 
   /**
-   * 消息列表映射（按workspace隔离） - 使用 shallowRef 避免深度响应式造成的性能问题
+   * 多会话消息列表映射（支持后台会话消息缓存）
+   * 结构: Map<workspaceId, Map<conversationId, ChatMessage[]>>
+   *
+   * ✅ 支持场景:
+   * - 用户在会话A中启动Agent
+   * - 用户切换到会话B查看历史
+   * - 会话A的Agent继续运行,消息被缓存
+   * - 用户切换回会话A时,看到Agent运行期间的所有消息
    */
-  const workspaceMessages = ref<Map<string, ChatMessage[]>>(new Map())
+  const workspaceConversationMessages = ref<Map<string, Map<string, ChatMessage[]>>>(new Map())
+
+  /**
+   * 后台会话新消息计数（用于通知）
+   * 结构: Map<workspaceId, Map<conversationId, {count, lastMessageTime, lastMessagePreview}>>
+   */
+  const backgroundConversationNotifications = ref<Map<string, Map<string, {
+    count: number
+    lastMessageTime: number
+    lastMessagePreview: string
+  }>>>(new Map())
 
   /**
    * 当前思考内容映射（按workspace隔离）
@@ -106,21 +123,56 @@ export const useMessageStore = defineStore('messages', () => {
     lastUpdate: number
   }>>>(new Map())
 
-  // --- Helper functions to get current workspace state ---
+  // --- Helper functions to get current workspace/conversation state ---
 
   /**
-   * 获取当前workspace的消息列表
+   * 获取当前会话ID (优先使用workspaceStore的当前会话,fallback到'active')
    */
-  const getCurrentMessages = (): ChatMessage[] => {
-    const workspaceId = getCurrentWorkspaceId()
-    if (!workspaceMessages.value.has(workspaceId)) {
-      workspaceMessages.value.set(workspaceId, [])
-    }
-    return workspaceMessages.value.get(workspaceId)!
+  const getCurrentConversationId = (): string => {
+    const workspaceStore = _useWorkspaceStore()
+    return workspaceStore.currentConversationId || 'active'
   }
 
   /**
-   * 获取当前workspace的消息列表（响应式）
+   * 获取当前会话的消息列表 (支持多会话缓存)
+   */
+  const getCurrentMessages = (): ChatMessage[] => {
+    const workspaceId = getCurrentWorkspaceId()
+    const conversationId = getCurrentConversationId()
+
+    // 获取或创建workspace的conversation map
+    if (!workspaceConversationMessages.value.has(workspaceId)) {
+      workspaceConversationMessages.value.set(workspaceId, new Map())
+    }
+
+    const conversationMap = workspaceConversationMessages.value.get(workspaceId)!
+
+    // 获取或创建当前会话的消息数组
+    if (!conversationMap.has(conversationId)) {
+      conversationMap.set(conversationId, [])
+    }
+
+    return conversationMap.get(conversationId)!
+  }
+
+  /**
+   * 获取指定会话的消息列表
+   */
+  const getMessagesByConversation = (workspaceId: string, conversationId: string): ChatMessage[] => {
+    if (!workspaceConversationMessages.value.has(workspaceId)) {
+      return []
+    }
+
+    const conversationMap = workspaceConversationMessages.value.get(workspaceId)!
+    if (!conversationMap.has(conversationId)) {
+      return []
+    }
+
+    return conversationMap.get(conversationId)!
+  }
+
+  /**
+   * 获取当前会话的消息列表（响应式）
    */
   const messages = computed(() => getCurrentMessages())
 
@@ -266,14 +318,95 @@ export const useMessageStore = defineStore('messages', () => {
   // --- Actions ---
 
   /**
-   * 添加消息 - 使用替换数组确保 shallowRef 响应式更新
+   * 增加后台会话的新消息通知计数
+   */
+  const incrementBackgroundNotification = (conversationId: string, message: ChatMessage): void => {
+    const workspaceId = getCurrentWorkspaceId()
+
+    // 获取或创建workspace的通知map
+    if (!backgroundConversationNotifications.value.has(workspaceId)) {
+      backgroundConversationNotifications.value.set(workspaceId, new Map())
+    }
+    const notificationMap = backgroundConversationNotifications.value.get(workspaceId)!
+
+    // 获取或创建会话的通知
+    const current = notificationMap.get(conversationId) || {
+      count: 0,
+      lastMessageTime: 0,
+      lastMessagePreview: ''
+    }
+
+    // 提取消息预览
+    let preview = ''
+    if (message.content && message.content.length > 0) {
+      const textBlock = message.content.find(c => c.type === ContentType.TEXT)
+      if (textBlock && 'text' in textBlock) {
+        preview = textBlock.text.substring(0, 50) + (textBlock.text.length > 50 ? '...' : '')
+      }
+    }
+
+    // 更新通知
+    notificationMap.set(conversationId, {
+      count: current.count + 1,
+      lastMessageTime: Date.now(),
+      lastMessagePreview: preview
+    })
+
+    logger.debug(`[MessageStore] Background notification incremented for conversation:${conversationId}, count:${current.count + 1}`)
+  }
+
+  /**
+   * 清除后台会话的通知计数 (用户切换到该会话时调用)
+   */
+  const clearBackgroundNotification = (conversationId: string): void => {
+    const workspaceId = getCurrentWorkspaceId()
+
+    if (!backgroundConversationNotifications.value.has(workspaceId)) {
+      return
+    }
+
+    const notificationMap = backgroundConversationNotifications.value.get(workspaceId)!
+    notificationMap.delete(conversationId)
+
+    logger.debug(`[MessageStore] Background notification cleared for conversation:${conversationId}`)
+  }
+
+  /**
+   * 获取后台会话的通知信息
+   */
+  const getBackgroundNotification = (conversationId: string): { count: number; lastMessageTime: number; lastMessagePreview: string } | undefined => {
+    const workspaceId = getCurrentWorkspaceId()
+
+    if (!backgroundConversationNotifications.value.has(workspaceId)) {
+      return undefined
+    }
+
+    const notificationMap = backgroundConversationNotifications.value.get(workspaceId)!
+    return notificationMap.get(conversationId)
+  }
+
+  /**
+   * 获取所有后台会话的通知 (用于UI显示)
+   */
+  const getAllBackgroundNotifications = (): Map<string, { count: number; lastMessageTime: number; lastMessagePreview: string }> => {
+    const workspaceId = getCurrentWorkspaceId()
+
+    if (!backgroundConversationNotifications.value.has(workspaceId)) {
+      return new Map()
+    }
+
+    return backgroundConversationNotifications.value.get(workspaceId)!
+  }
+
+  /**
+   * 添加消息 - 支持多会话缓存
    *
    * ⚠️ 物理隔离原则：
    * 1. 必须明确知道消息属于哪个workspace
-   * 2. 如果无法确定workspace_id，抛出异常
-   * 3. 不允许"当前workspace"模糊fallback，防止数据串台
+   * 2. 支持指定conversationId,用于后台会话消息缓存
+   * 3. 如果消息添加到后台会话,自动增加通知计数
    */
-  const addMessage = (message: ChatMessage, workspaceId?: string): void => {
+  const addMessage = (message: ChatMessage, workspaceId?: string, conversationId?: string): void => {
     // 策略1: 使用传入的workspaceId参数
     let targetWorkspaceId = workspaceId
 
@@ -302,7 +435,11 @@ export const useMessageStore = defineStore('messages', () => {
       )
     }
 
-    logger.debug(`[MessageStore] Adding message to workspace: ${targetWorkspaceId}`, {
+    // 确定目标会话ID: 优先使用传入的conversationId,其次使用消息中的,最后使用当前会话
+    const workspaceStore = _useWorkspaceStore()
+    let targetConversationId = conversationId || message.conversationId || workspaceStore.currentConversationId || 'active'
+
+    logger.debug(`[MessageStore] Adding message to workspace:${targetWorkspaceId}, conversation:${targetConversationId}`, {
       messageId: message.id,
       role: message.role,
       contentLength: Array.isArray(message.content)
@@ -310,16 +447,31 @@ export const useMessageStore = defineStore('messages', () => {
         : 0,
       contentTypes: Array.isArray(message.content) ? message.content.map(c => c.type) : [],
       currentWorkspaceId: getCurrentWorkspaceId(),
-      targetWorkspaceId
+      currentConversationId: getCurrentConversationId(),
+      targetWorkspaceId,
+      targetConversationId
     })
 
-    // 确保目标workspace的消息数组存在
-    if (!workspaceMessages.value.has(targetWorkspaceId)) {
-      workspaceMessages.value.set(targetWorkspaceId, [])
+    // 确保目标workspace的conversation map存在
+    if (!workspaceConversationMessages.value.has(targetWorkspaceId)) {
+      workspaceConversationMessages.value.set(targetWorkspaceId, new Map())
     }
-    const currentMessages = workspaceMessages.value.get(targetWorkspaceId)!
+    const conversationMap = workspaceConversationMessages.value.get(targetWorkspaceId)!
 
-    workspaceMessages.value.set(targetWorkspaceId, [...currentMessages, message])
+    // 确保目标会话的消息数组存在
+    if (!conversationMap.has(targetConversationId)) {
+      conversationMap.set(targetConversationId, [])
+    }
+    const currentMessages = conversationMap.get(targetConversationId)!
+
+    // 添加消息
+    conversationMap.set(targetConversationId, [...currentMessages, message])
+
+    // 🔥 如果消息添加到后台会话,增加通知计数
+    const currentConvId = getCurrentConversationId()
+    if (targetConversationId !== currentConvId && targetWorkspaceId === getCurrentWorkspaceId()) {
+      incrementBackgroundNotification(targetConversationId, message)
+    }
   }
 
   /**
@@ -336,44 +488,62 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   /**
-   * 更新消息 - 使用替换数组确保 shallowRef 响应式更新
+   * 更新消息 - 支持在所有会话中查找并更新
    *
    * 关键修复：
    * 1. 如果更新 content 数组，创建全新的数组副本
    * 2. 使用深拷贝确保 Vue 能检测到嵌套对象的变化
+   * 3. 支持跨会话查找消息 (Agent可能在后台会话运行)
    */
   const updateMessage = (messageId: string, updates: Partial<ChatMessage>): void => {
     const workspaceId = getCurrentWorkspaceId()
-    const currentMessages = getCurrentMessages()
-    const index = currentMessages.findIndex(m => m.id === messageId)
 
-    if (index !== -1) {
-      const newMessages = [...currentMessages]
-      const existingMessage = newMessages[index]
+    // 首先在当前会话中查找
+    let conversationId = getCurrentConversationId()
+    let messageFound = false
 
-      // ✅ 关键修复：如果有 content 更新，确保创建全新的 content 数组
-      if (updates.content) {
-        // 创建全新的消息对象和 content 数组
-        newMessages[index] = {
-          ...existingMessage,
-          ...updates,
-          // 强制创建新的 content 数组引用
-          content: [...updates.content]
+    // 在当前workspace的所有会话中查找消息
+    if (workspaceConversationMessages.value.has(workspaceId)) {
+      const conversationMap = workspaceConversationMessages.value.get(workspaceId)!
+
+      // 遍历所有会话查找消息
+      for (const [convId, messages] of conversationMap.entries()) {
+        const index = messages.findIndex(m => m.id === messageId)
+        if (index !== -1) {
+          conversationId = convId
+          const currentMessages = messages
+          const newMessages = [...currentMessages]
+          const existingMessage = newMessages[index]
+
+          // ✅ 关键修复：如果有 content 更新，确保创建全新的 content 数组
+          if (updates.content) {
+            // 创建全新的消息对象和 content 数组
+            newMessages[index] = {
+              ...existingMessage,
+              ...updates,
+              // 强制创建新的 content 数组引用
+              content: [...updates.content]
+            }
+            logger.debug(`[MessageStore] Updated message ${messageId} in conversation ${convId} with new content array`, {
+              old_content_length: existingMessage.content?.length || 0,
+              new_content_length: updates.content.length,
+              content_types: updates.content.map(c => c.type)
+            })
+          } else {
+            // 没有 content 更新，正常合并
+            newMessages[index] = { ...existingMessage, ...updates }
+            logger.debug(`[MessageStore] Updated message ${messageId} in conversation ${convId} (no content change)`)
+          }
+
+          conversationMap.set(conversationId, newMessages)
+          messageFound = true
+          break
         }
-        logger.debug(`[MessageStore] Updated message ${messageId} with new content array`, {
-          old_content_length: existingMessage.content?.length || 0,
-          new_content_length: updates.content.length,
-          content_types: updates.content.map(c => c.type)
-        })
-      } else {
-        // 没有 content 更新，正常合并
-        newMessages[index] = { ...existingMessage, ...updates }
-        logger.debug(`[MessageStore] Updated message ${messageId} (no content change)`)
       }
+    }
 
-      workspaceMessages.value.set(workspaceId, newMessages)
-    } else {
-      logger.warn(`[MessageStore] ⚠️ Message ${messageId} not found for update`)
+    if (!messageFound) {
+      logger.warn(`[MessageStore] ⚠️ Message ${messageId} not found for update in any conversation`)
     }
   }
 
@@ -387,11 +557,18 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   /**
-   * 清空当前workspace的所有消息
+   * 清空当前会话的消息 (不影响其他会话)
    */
   const clearMessages = (): void => {
     const workspaceId = getCurrentWorkspaceId()
-    workspaceMessages.value.set(workspaceId, [])
+    const conversationId = getCurrentConversationId()
+
+    // 只清空当前会话的消息,保留其他会话
+    if (workspaceConversationMessages.value.has(workspaceId)) {
+      const conversationMap = workspaceConversationMessages.value.get(workspaceId)!
+      conversationMap.set(conversationId, [])
+    }
+
     workspaceThinking.value.set(workspaceId, '')
     workspaceStreamingContent.value.set(workspaceId, '')
 
@@ -407,11 +584,57 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   /**
-   * 根据ID获取消息
+   * 清空指定会话的消息 (不影响其他会话)
+   */
+  const clearConversationMessages = (workspaceId: string, conversationId: string): void => {
+    // 清空指定会话的消息,保留其他会话
+    if (workspaceConversationMessages.value.has(workspaceId)) {
+      const conversationMap = workspaceConversationMessages.value.get(workspaceId)!
+      conversationMap.set(conversationId, [])
+      logger.debug(`[MessageStore] Cleared messages for conversation:${conversationId} in workspace:${workspaceId}`)
+    }
+
+    // 如果是当前会话，也需要清空思考内容和流式内容
+    const currentWorkspaceId = getCurrentWorkspaceId()
+    const currentConversationId = getCurrentConversationId()
+
+    if (currentWorkspaceId === workspaceId && currentConversationId === conversationId) {
+      workspaceThinking.value.set(workspaceId, '')
+      workspaceStreamingContent.value.set(workspaceId, '')
+
+      const currentBuffers = getCurrentStreamBuffers()
+      currentBuffers.clear()
+
+      // 清除所有定时器
+      const currentTimers = getCurrentStreamUpdateTimers()
+      for (const timer of currentTimers.values()) {
+        clearTimeout(timer)
+      }
+      currentTimers.clear()
+    }
+  }
+
+  /**
+   * 根据ID获取消息 (在当前workspace的所有会话中查找)
    */
   const getMessageById = (messageId: string): ChatMessage | undefined => {
-    const currentMessages = getCurrentMessages()
-    return currentMessages.find(m => m.id === messageId)
+    const workspaceId = getCurrentWorkspaceId()
+
+    if (!workspaceConversationMessages.value.has(workspaceId)) {
+      return undefined
+    }
+
+    const conversationMap = workspaceConversationMessages.value.get(workspaceId)!
+
+    // 在所有会话中查找消息
+    for (const messages of conversationMap.values()) {
+      const message = messages.find(m => m.id === messageId)
+      if (message) {
+        return message
+      }
+    }
+
+    return undefined
   }
 
   /**
@@ -419,7 +642,12 @@ export const useMessageStore = defineStore('messages', () => {
    */
   const triggerMessagesUpdate = (): void => {
     const workspaceId = getCurrentWorkspaceId()
-    triggerRef(workspaceMessages.value.get(workspaceId))
+    const conversationId = getCurrentConversationId()
+
+    if (workspaceConversationMessages.value.has(workspaceId)) {
+      const conversationMap = workspaceConversationMessages.value.get(workspaceId)!
+      triggerRef(conversationMap.get(conversationId))
+    }
   }
 
   /**
@@ -633,11 +861,12 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   /**
-   * 获取或创建助手消息
+   * 获取或创建助手消息 (支持指定会话)
    */
   const getOrCreateAssistantMessage = (
     taskId: string,
-    workspaceId?: string
+    workspaceId?: string,
+    conversationId?: string
   ): ChatMessage => {
     if (!taskId) {
       logger.error('[getOrCreateAssistantMessage] called with empty taskId')
@@ -646,13 +875,22 @@ export const useMessageStore = defineStore('messages', () => {
 
     // 使用传入的workspaceId或当前workspaceId
     const targetWorkspaceId = workspaceId || getCurrentWorkspaceId()
+    const workspaceStore = _useWorkspaceStore()
+    const targetConversationId = conversationId || workspaceStore.currentConversationId || 'active'
 
-    // 获取目标workspace的消息
-    if (!workspaceMessages.value.has(targetWorkspaceId)) {
-      workspaceMessages.value.set(targetWorkspaceId, [])
+    // 确保目标workspace的conversation map存在
+    if (!workspaceConversationMessages.value.has(targetWorkspaceId)) {
+      workspaceConversationMessages.value.set(targetWorkspaceId, new Map())
     }
-    const currentMessages = workspaceMessages.value.get(targetWorkspaceId)!
+    const conversationMap = workspaceConversationMessages.value.get(targetWorkspaceId)!
 
+    // 确保目标会话的消息数组存在
+    if (!conversationMap.has(targetConversationId)) {
+      conversationMap.set(targetConversationId, [])
+    }
+    const currentMessages = conversationMap.get(targetConversationId)!
+
+    // 查找是否已有该task的assistant消息
     let message = currentMessages.find(m => m.role === MessageRole.ASSISTANT && m.taskId === taskId)
     if (!message) {
       const msgId = uuidv4()
@@ -662,10 +900,14 @@ export const useMessageStore = defineStore('messages', () => {
         timestamp: new Date().toISOString(),
         content: [],
         taskId: taskId,
-        messageId: msgId  // ✅ 设置messageId
+        messageId: msgId,  // ✅ 设置messageId
+        conversationId: targetConversationId  // ✅ 关联会话ID
       }
-      workspaceMessages.value.set(targetWorkspaceId, [...currentMessages, message])
+      conversationMap.set(targetConversationId, [...currentMessages, message])
+
+      logger.debug(`[getOrCreateAssistantMessage] Created new assistant message for task:${taskId} in conversation:${targetConversationId}`)
     }
+
     return message
   }
 
@@ -1281,7 +1523,9 @@ export const useMessageStore = defineStore('messages', () => {
     updateMessage,
     removeMessage,
     clearMessages,
+    clearConversationMessages,
     getMessageById,
+    getMessagesByConversation,
     triggerMessagesUpdate,
     appendStreamingContent,
     clearStreamingContent,
@@ -1304,5 +1548,10 @@ export const useMessageStore = defineStore('messages', () => {
 
     // 工具调用状态推断
     backfillHistoricalToolCallStatus,
+
+    // 多会话支持
+    clearBackgroundNotification,
+    getBackgroundNotification,
+    getAllBackgroundNotifications,
   }
 })

@@ -14,10 +14,12 @@
 
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { v4 as uuidv4 } from 'uuid'
 import { apiManager } from '@/services/api'
 import { logger } from '@/utils/logger'
 import { ElMessage } from 'element-plus'
 import type { Workspace, Conversation } from '@/services/api/types'
+import { useMessageStore } from './messages'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   // --- State ---
@@ -31,11 +33,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
    * 当前Conversation ID
    */
   const currentConversationId = ref<string | null>(null)
-
-  /**
-   * 是否是临时会话
-   */
-  const isTempConversation = ref<boolean>(false)
 
   /**
    * Workspace列表
@@ -90,19 +87,21 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   /**
-   * 设置Conversation
+   * 设置Conversation (支持多会话切换,不影响Agent运行)
    */
   const setConversation = (conversationId: string): void => {
-    currentConversationId.value = conversationId
-    isTempConversation.value = false
-  }
+    const oldConversationId = currentConversationId.value
 
-  /**
-   * 创建临时会话
-   */
-  const createTempConversation = (): void => {
-    currentConversationId.value = null
-    isTempConversation.value = true
+    // 更新当前会话ID
+    currentConversationId.value = conversationId
+
+    // 清除该会话的后台通知 (用户正在查看)
+    if (oldConversationId && oldConversationId !== conversationId) {
+      const messageStore = useMessageStore()
+      messageStore.clearBackgroundNotification(conversationId)
+
+      logger.debug(`[WorkspaceStore] Switched conversation: ${oldConversationId} -> ${conversationId}`)
+    }
   }
 
   /**
@@ -122,6 +121,55 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   /**
+   * 从用户消息生成会话标题
+   */
+  const generateConversationTitle = (userMessage: string): string => {
+    // 移除首尾空白
+    const trimmed = userMessage.trim()
+
+    // 如果消息很短（≤20字符），直接使用
+    if (trimmed.length <= 20) {
+      return trimmed
+    }
+
+    // 提取前30个字符作为标题
+    const title = trimmed.substring(0, 30)
+
+    // 如果在第30个字符之前有句子结束符（。！？.!?），在那里截断
+    const sentenceEnd = title.search(/[。！？.!?\n]/)
+    if (sentenceEnd !== -1 && sentenceEnd > 5) {
+      return title.substring(0, sentenceEnd)
+    }
+
+    // 否则添加省略号
+    return title + '...'
+  }
+
+  /**
+   * 更新会话标题
+   */
+  const updateConversationTitle = async (conversationId: string, title: string): Promise<void> => {
+    try {
+      if (!currentWorkspaceId.value) {
+        throw new Error('No workspace selected')
+      }
+
+      // 使用后端API更新会话（POST /workspaces/{workspaceId}/conversations/{conversationId}）
+      await apiManager.getWorkspacesApi().updateConversation(
+        currentWorkspaceId.value,
+        conversationId,
+        { title }
+      )
+
+      // 重新加载会话列表以确保同步
+      await loadConversations(currentWorkspaceId.value)
+    } catch (error) {
+      logger.error('[WORKSPACE_STORE] Failed to update conversation title:', error)
+      throw error
+    }
+  }
+
+  /**
    * 创建Conversation
    */
   const createConversation = async (title: string): Promise<unknown> => {
@@ -130,14 +178,38 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         throw new Error('No workspace selected')
       }
 
-      const conversation = await apiManager.getConversationsApi().createConversation({
-        workspace_id: currentWorkspaceId.value,
-        title,
-      })
+      // ✅ 使用 workspaces API 创建会话
+      // 后端期望一个会话数组，每个会话需要包含完整的结构
+      const now = new Date().toISOString()
+      const conversationId = uuidv4()
+      const conversationData = [{
+        id: conversationId,
+        title: title,
+        created_at: now,
+        updated_at: now,
+        messages: [],
+        message_count: 0,
+        task_type: 'user',
+        metadata: {}
+      }]
 
-      conversationList.value.push(conversation)
-      await setConversation(conversation.id)
-      return conversation
+      const response = await apiManager.getWorkspacesApi().createConversation(
+        currentWorkspaceId.value,
+        conversationData
+      )
+
+      // 后端返回的是保存结果，需要从数据中提取会话信息
+      const newConversation = {
+        id: conversationId,
+        title: title,
+        createdAt: now,
+        updatedAt: now,
+        lastUpdated: now
+      }
+
+      conversationList.value.push(newConversation)
+      await setConversation(newConversation.id)
+      return newConversation
     } catch (error) {
       logger.error('Failed to create conversation', error)
       ElMessage.error('创建会话失败')
@@ -179,7 +251,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         const latestConversation = sortedConversations[0]
         logger.debug(`Auto-selecting latest conversation: ${latestConversation.title || latestConversation.name}`)
         currentConversationId.value = latestConversation.id
-        isTempConversation.value = false
       }
     } catch (error) {
       logger.error('Failed to load conversations', error)
@@ -193,7 +264,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
    */
   const clearCurrentConversation = (): void => {
     currentConversationId.value = null
-    isTempConversation.value = false
   }
 
   /**
@@ -345,7 +415,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // State
     currentWorkspaceId,
     currentConversationId,
-    isTempConversation,
     workspaceList,
     conversationList,
     messagePagination,
@@ -358,9 +427,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // Actions
     setWorkspace,
     setConversation,
-    createTempConversation,
     createWorkspace,
     createConversation,
+    generateConversationTitle,
+    updateConversationTitle,
     loadWorkspaces,
     loadConversations,
     clearCurrentConversation,

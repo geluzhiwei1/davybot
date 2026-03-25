@@ -80,8 +80,7 @@
             <!-- 主消息气泡（包含文本和其他内容） -->
             <div v-if="getOtherBlocks(message).length > 0" class="message-card assistant-card">
               <div class="assistant-message-content">
-                <CollapsibleMessage ref="collapsibleMsgRefs" :max-height="400"
-                  :collapsed="!isMessageExpanded(message.id, 'assistant')">
+                <div class="message-content-blocks">
                   <div v-for="(contentBlock, index) in getOtherBlocks(message)"
                     :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
                     <TextContent v-if="contentBlock.type === ContentType.TEXT" :block="contentBlock"
@@ -94,18 +93,13 @@
                       :block="contentBlock" :key="contentBlock.toolCallId" />
                     <UnknownContent v-else :block="contentBlock" :key="`unknown-${contentBlock.type}`" />
                   </div>
-                </CollapsibleMessage>
+                </div>
               </div>
               <!-- 操作按钮 -->
               <div class="message-actions assistant-actions">
                 <el-button size="small" circle @click="copyMessage(message)">
                   <el-icon>
                     <DocumentCopy />
-                  </el-icon>
-                </el-button>
-                <el-button size="small" circle @click="toggleMessageExpand(message.id)">
-                  <el-icon :class="{ 'rotate-180': isMessageExpanded(message.id, 'assistant') }">
-                    <ArrowDown />
                   </el-icon>
                 </el-button>
                 <!-- Markdown/纯文本切换按钮 -->
@@ -175,39 +169,24 @@
         <!-- 系统消息（错误等） -->
         <div v-else-if="message.role === 'system'" class="system-message-container">
           <div class="message-content-wrapper">
-            <div class="message-card system-card" :class="{ 'collapsed': !isMessageExpanded(message.id, 'system') }">
-              <!-- 折叠状态：显示摘要 -->
-              <div v-if="!isMessageExpanded(message.id, 'system')" class="system-summary"
-                @click="toggleMessageExpand(message.id)">
-                <span class="error-icon">⚠️</span>
-                <span class="summary-text">{{ getSystemMessageSummary(message) }}</span>
+            <div class="message-card system-card">
+              <div class="system-message-content">
+                <div v-for="(contentBlock, index) in message.content"
+                  :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
+                  <ErrorContent v-if="contentBlock.type === ContentType.ERROR" :block="contentBlock" />
+                  <TextContent v-else-if="contentBlock.type === ContentType.TEXT" :block="contentBlock"
+                    :messageId="message.id" />
+                  <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{
+                    contentBlock.text }}</div>
+                  <UnknownContent v-else :block="contentBlock" />
+                </div>
               </div>
 
-              <!-- 展开状态：显示完整内容 -->
-              <el-collapse-transition>
-                <div v-show="isMessageExpanded(message.id, 'system')" class="system-message-content">
-                  <div v-for="(contentBlock, index) in message.content"
-                    :key="`${message.id}-${contentBlock.type}-${index}`" class="content-block">
-                    <ErrorContent v-if="contentBlock.type === ContentType.ERROR" :block="contentBlock" />
-                    <TextContent v-else-if="contentBlock.type === ContentType.TEXT" :block="contentBlock"
-                      :messageId="message.id" />
-                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="simple-text">{{
-                      contentBlock.text }}</div>
-                    <UnknownContent v-else :block="contentBlock" />
-                  </div>
-                </div>
-              </el-collapse-transition>
-
-              <!-- 操作按钮：仅在展开状态显示 -->
-              <div v-show="isMessageExpanded(message.id, 'system')" class="message-actions system-actions" @click.stop>
+              <!-- 操作按钮 -->
+              <div class="message-actions system-actions" @click.stop>
                 <el-button size="small" circle @click="copyMessage(message)">
                   <el-icon>
                     <DocumentCopy />
-                  </el-icon>
-                </el-button>
-                <el-button size="small" circle @click="toggleMessageExpand(message.id)">
-                  <el-icon :class="{ 'rotate-180': isMessageExpanded(message.id, 'system') }">
-                    <ArrowDown />
                   </el-icon>
                 </el-button>
               </div>
@@ -241,8 +220,7 @@ import { useWorkspaceStore } from '@/stores/workspace';
 import { useMarkdownSettingsStore } from '@/stores/markdownSettings';
 import { ContentType, type ChatMessage } from '@/types/websocket';
 import { ElScrollbar, ElAvatar, ElButton, ElMessage, ElCollapseTransition } from 'element-plus';
-import { DocumentCopy, ArrowDown } from '@element-plus/icons-vue';
-import CollapsibleMessage from '@/components/chat/content/CollapsibleMessage.vue';
+import { DocumentCopy } from '@element-plus/icons-vue';
 
 // 导入子组件
 import TextContent from '../chat/content/TextContent.vue';
@@ -266,9 +244,6 @@ const userExpandedStates = ref<Map<string, boolean>>(new Map());
 
 // 工具消息展开状态管理
 const toolExpandedStates = ref<Map<string, boolean>>(new Map());
-
-// 统一的消息展开状态管理（用于assistant和system消息）
-const messageExpandedStates = ref<Map<string, boolean>>(new Map());
 
 // 分离不同类型的 content blocks（用于每条消息）- 使用缓存避免重复计算
 const messageBlockCache = new Map<string, { reasoning: unknown[], toolCalls: unknown[], others: unknown[] }>()
@@ -425,51 +400,6 @@ const getMessageModeTitle = (messageId: string) => {
 // ============================================================================
 // 统一的消息展开状态管理（用于assistant和system消息）
 // ============================================================================
-
-// 助手消息默认展开,系统消息默认折叠
-const isMessageExpanded = (messageId: string, role?: string) => {
-  // 助手消息默认展开
-  if (role === 'assistant') {
-    return messageExpandedStates.value.get(messageId) ?? true
-  }
-  // 其他消息(如system)默认折叠
-  return messageExpandedStates.value.get(messageId) ?? false
-}
-
-const toggleMessageExpand = (messageId: string) => {
-  const currentState = messageExpandedStates.value.get(messageId) ?? false
-  messageExpandedStates.value.set(messageId, !currentState)
-}
-
-// 获取系统消息摘要（用于折叠状态显示）
-const getSystemMessageSummary = (message: ChatMessage) => {
-  // 查找错误类型内容块
-  const errorBlock = message.content.find(b => b.type === ContentType.ERROR)
-  if (errorBlock && 'message' in errorBlock) {
-    const errorMsg = (errorBlock as unknown).message || '未知错误'
-    // 提取关键错误信息
-    if (errorMsg.includes('Agent initialization failed')) {
-      return 'Agent 初始化失败'
-    }
-    if (errorMsg.includes('No module named')) {
-      return '缺少依赖模块'
-    }
-    if (errorMsg.includes('Connection')) {
-      return '连接错误'
-    }
-    // 返回错误消息的前30个字符
-    return errorMsg.substring(0, 30) + (errorMsg.length > 30 ? '...' : '')
-  }
-
-  // 查找文本内容块
-  const textBlock = message.content.find(b => b.type === ContentType.TEXT || b.type === ContentType.SIMPLE_TEXT)
-  if (textBlock) {
-    const text = (textBlock as unknown).text || ''
-    return text.substring(0, 30) + (text.length > 30 ? '...' : '')
-  }
-
-  return '系统消息'
-}
 </script>
 
 <style scoped>
@@ -864,6 +794,10 @@ const getSystemMessageSummary = (message: ChatMessage) => {
   line-height: 1.7;
 }
 
+.message-content-blocks {
+  width: 100%;
+}
+
 .tool-message-content {
   padding: 0 !important;
   color: #e2e8f0;
@@ -1149,37 +1083,11 @@ const getSystemMessageSummary = (message: ChatMessage) => {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
   overflow: hidden;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .system-card:hover {
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-}
-
-/* 折叠状态的系统卡片 */
-.system-card.collapsed {
-  padding: 12px 16px;
-}
-
-/* 系统消息摘要 */
-.system-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #dc2626;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.system-summary .error-icon {
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
-.system-summary .summary-text {
-  flex: 1;
-  line-height: 1.4;
 }
 
 .system-card::before {

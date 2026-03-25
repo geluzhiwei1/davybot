@@ -316,12 +316,17 @@ export const useTaskStore = defineStore('task', () => {
       workspaceActiveNodes.value.set(workspaceId, [...currentActive, nodeStart.task_node_id])
     }
 
+    // ✅ 获取当前conversationId（如果有）
+    const workspaceStore = _useWorkspaceStore()
+    const conversationId = workspaceStore.currentConversationId || undefined
+
     // 同步到parallelTasks store
     parallelTasksStore.handleTaskNodeStart({
       task_id: nodeStart.task_node_id,
       task_node_id: nodeStart.task_node_id,
       node_type: nodeStart.node_type || 'unknown',
-      description: nodeStart.description || ''
+      description: nodeStart.description || '',
+      conversation_id: conversationId  // ✅ 传递conversationId
     })
 
     // 触发自定义事件供监控界面使用

@@ -503,14 +503,7 @@ function isMarkdownFile(file: File): boolean {
 }
 
 function isOfficeFile(file: File): boolean {
-  const result = file.type === 'office' || OFFICE_EXTENSIONS.some(ext => file.name.endsWith(`.${ext}`))
-  console.log('[FileContentArea] 🔍 isOfficeFile 检查:', {
-    fileName: file.name,
-    fileType: file.type,
-    isOffice: result,
-    extensions: OFFICE_EXTENSIONS.filter(ext => file.name.endsWith(`.${ext}`))
-  })
-  return result
+  return file.type === 'office' || OFFICE_EXTENSIONS.some(ext => file.name.endsWith(`.${ext}`))
 }
 
 function isExcelFile(file: File): boolean {
@@ -799,8 +792,6 @@ const handleGlobalClick = (event: Event) => {
 
 // 处理预览中的图片链接
 const processImagesInPreview = (element: HTMLElement) => {
-  console.log('[processImagesInPreview] 开始处理图片')
-
   // 检查 workspaceId - 使用 currentWorkspaceId 而不是 workspaceId
   const workspaceId = workspaceStore.currentWorkspaceId
   if (!workspaceId) {
@@ -809,35 +800,71 @@ const processImagesInPreview = (element: HTMLElement) => {
     return
   }
 
-  console.log('[processImagesInPreview] workspaceId:', workspaceId)
-
   const imgElements = element.querySelectorAll('img')
-  console.log('[processImagesInPreview] 找到图片数量:', imgElements.length)
 
   imgElements.forEach((img) => {
     const originalSrc = img.getAttribute('src')
-    console.log('[processImagesInPreview] 处理图片:', originalSrc)
 
-    // 跳过已经处理过的图片(data: URL 或 http URL)
-    if (!originalSrc ||
-        originalSrc.startsWith('data:') ||
-        originalSrc.startsWith('http://') ||
-        originalSrc.startsWith('https://')) {
-      console.log('[processImagesInPreview] 跳过已处理的图片')
+    // 跳过已经处理过的图片(data: URL 或已转换的API URL)
+    if (!originalSrc || originalSrc.startsWith('data:')) {
       return
     }
 
-    // 处理相对路径 ./xxx.png, ../xxx.png, ../../xxx.png 和绝对路径 /xxx.png
-    if (originalSrc.startsWith('/') || originalSrc.startsWith('./') || originalSrc.startsWith('../')) {
+    // ✅ 关键修复: 检查是否已经是正确的API URL
+    // 如果URL中包含 /workspaces/{workspaceId}/files?path=，说明已经处理过
+    if (originalSrc.includes(`/workspaces/${workspaceId}/files?path=`)) {
+      return
+    }
+
+    // ✅ 新增: 处理已经被浏览器/Vditor转换成HTTP URL的图片
+    // 例如: http://10.168.1.122:8460/figures/human_raters_agreement.png
+    // 需要将其转换为: /api/workspaces/{workspaceId}/files?path=figures/human_raters_agreement.png
+    let imagePath = originalSrc
+
+    // 如果是HTTP URL，提取路径部分
+    if (originalSrc.startsWith('http://') || originalSrc.startsWith('https://')) {
+      try {
+        const url = new URL(originalSrc)
+        imagePath = url.pathname  // 提取路径部分，如 /figures/human_raters_agreement.png
+      } catch (e) {
+        console.error('[processImagesInPreview] 无效的URL:', originalSrc)
+        return
+      }
+    }
+
+    // ✅ 关键修复：处理所有图片路径，包括没有前导斜杠的路径
+    // 例如: figures/xxx.png, ./figures/xxx.png, ../figures/xxx.png, /figures/xxx.png
+
+    let resolvedPath = imagePath  // 初始化 resolvedPath
+
+    if (!imagePath.startsWith('/') &&
+        !imagePath.startsWith('./') &&
+        !imagePath.startsWith('../') &&
+        !imagePath.startsWith('http://') &&
+        !imagePath.startsWith('https://')) {
+      // 这是相对路径但没有前缀，如 figures/xxx.png
+      // 需要基于当前文件路径解析
+      if (activeFile.value && activeFile.value.id) {
+        const currentFilePath = activeFile.value.id
+        const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'))
+        const pathSegments = currentDir ? currentDir.split('/').filter(p => p) : []
+
+        // 将当前路径加入到 pathSegments
+        resolvedPath = pathSegments.length > 0
+          ? [...pathSegments, imagePath].join('/')
+          : imagePath
+      } else {
+        resolvedPath = imagePath
+      }
+    } else if (imagePath.startsWith('/') || imagePath.startsWith('./') || imagePath.startsWith('../')) {
+      // 处理相对路径 ./xxx.png, ../xxx.png, ../../xxx.png 和绝对路径 /xxx.png
       // 获取 API base URL
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
 
-      console.log('[processImagesInPreview] 转换前:', originalSrc)
-
       // 解析相对路径
-      let resolvedPath = originalSrc
+      let resolvedPath = imagePath
 
-      if (!originalSrc.startsWith('/')) {
+      if (!imagePath.startsWith('/')) {
         // 这是相对路径,需要基于当前文件路径解析
         if (activeFile.value && activeFile.value.id) {
           // 使用 activeFile.value.id 而不是 name,因为 id 包含完整路径
@@ -845,11 +872,6 @@ const processImagesInPreview = (element: HTMLElement) => {
           //       name = "统计分析报告.md"
           const currentFilePath = activeFile.value.id
           const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'))
-
-          console.log('[processImagesInPreview] 当前文件完整路径 (id):', currentFilePath)
-          console.log('[processImagesInPreview] 当前目录:', currentDir)
-          console.log('[processImagesInPreview] activeFile.value.id:', activeFile.value.id)
-          console.log('[processImagesInPreview] activeFile.value.name:', activeFile.value.name)
 
           // 使用 path 模块解析相对路径
           // 例如: currentDir = results-for-paper
@@ -860,7 +882,7 @@ const processImagesInPreview = (element: HTMLElement) => {
           const pathSegments = currentDir ? currentDir.split('/').filter(p => p) : []
 
           // 处理 ../ 前缀
-          let relativePath = originalSrc
+          let relativePath = imagePath
           while (relativePath.startsWith('../')) {
             relativePath = relativePath.substring(3) // 移除 ../
             if (pathSegments.length > 0) {
@@ -877,39 +899,36 @@ const processImagesInPreview = (element: HTMLElement) => {
           resolvedPath = pathSegments.length > 0
             ? [...pathSegments, relativePath].join('/')
             : relativePath
-
-          console.log('[processImagesInPreview] pathSegments:', pathSegments)
-          console.log('[processImagesInPreview] relativePath:', relativePath)
         } else {
           // 没有当前文件信息,直接使用原始路径(移除 ./ 前缀)
-          resolvedPath = originalSrc.startsWith('./') ? originalSrc.substring(2) : originalSrc
-          console.log('[processImagesInPreview] 没有当前文件信息,使用原始路径:', resolvedPath)
+          resolvedPath = imagePath.startsWith('./') ? imagePath.substring(2) : imagePath
         }
       } else {
         // 绝对路径,移除前导 /
-        resolvedPath = originalSrc.startsWith('/') ? originalSrc.substring(1) : originalSrc
+        resolvedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath
       }
+    } else {
+      // 其他情况（http URL等），直接跳过
+      return
+    }
 
-      const encodedPath = encodeURIComponent(resolvedPath)
-      // 使用正确的 API 路径: /files?path=xxx
-      const fileApiUrl = `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodedPath}`
+    const encodedPath = encodeURIComponent(resolvedPath)
+    // 使用正确的 API 路径: /files?path=xxx
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+    const fileApiUrl = `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodedPath}`
 
-      console.log('[processImagesInPreview] 解析路径:', resolvedPath)
-      console.log('[processImagesInPreview] 转换后:', fileApiUrl)
+    img.setAttribute('src', fileApiUrl)
 
-      img.setAttribute('src', fileApiUrl)
+    // 添加点击预览功能
+    img.style.cursor = 'pointer'
+    img.onclick = () => {
+      openImageViewer()
+    }
 
-      // 添加点击预览功能
-      img.style.cursor = 'pointer'
-      img.onclick = () => {
-        openImageViewer()
-      }
-
-      // 添加错误处理
-      img.onerror = () => {
-        console.error('[Vditor] 加载图片失败:', fileApiUrl)
-        img.setAttribute('alt', `图片加载失败: ${originalSrc}`)
-      }
+    // 添加错误处理
+    img.onerror = () => {
+      console.error('[Vditor] 加载图片失败:', fileApiUrl)
+      img.setAttribute('alt', `图片加载失败: ${imagePath}`)
     }
   })
 }
@@ -947,6 +966,10 @@ const initVditor = () => {
     mode: 'wysiwyg',
     height: '100%',
     value: editableContent.value,
+    // ✅ 禁用图片懒加载，让我们的 processImagesInPreview 能够立即处理
+    lazyLoadImage: {
+      enable: false
+    },
     cache: {
       enable: false,
       id: `markdown-file-${activeFile.value.id}`
@@ -1063,7 +1086,6 @@ const initVditor = () => {
     },
     preview: {
       parse: (element: HTMLElement) => {
-        console.log('[Vditor preview.parse] 被调用')
         // 处理预览中的图片链接
         processImagesInPreview(element)
 
@@ -1112,8 +1134,7 @@ const initVditor = () => {
         })
       },
       hljs: {
-        enable: true,
-        style: themeStore.theme === 'dark' ? 'github-dark' : 'github'
+        enable: false, // 禁用代码高亮，避免 CDN 请求
       },
       math: {
         inlineDigit: true,
@@ -1138,65 +1159,46 @@ const initVditor = () => {
       // 保存对 ref 的引用,因为 targetRef 在闭包中可能不可用
       const currentRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
 
-      console.log('[Vditor after] Vditor 初始化完成')
-      console.log('[Vditor after] currentRef:', currentRef)
-      console.log('[Vditor after] isPageFullscreen:', isPageFullscreen.value)
-      console.log('[Vditor after] vditorRef.value:', vditorRef.value)
-      console.log('[Vditor after] vditorRefFullscreen.value:', vditorRefFullscreen.value)
+      // ✅ 关键修复：立即处理图片，在浏览器加载图片之前
+      // 使用 requestAnimationFrame 确保在 DOM 渲染后、图片加载前执行
+      requestAnimationFrame(() => {
+        const processImages = () => {
+          if (!currentRef) {
+            console.error('[Vditor after] currentRef 为空,无法处理图片')
+            return
+          }
 
-      // 定义图片处理函数
-      const processImages = () => {
-        if (!currentRef) {
-          console.error('[Vditor after] currentRef 为空,无法处理图片')
-          return
-        }
+          // 尝试多个可能的选择器
+          const selectors = [
+            '.vditor-wysiwyg .vditor-reset',
+            '.vditor-wysiwyg__area .vditor-reset',
+            '.vditor-content .vditor-reset',
+            '.vditor-reset'
+          ]
 
-        // 尝试多个可能的选择器
-        const selectors = [
-          '.vditor-wysiwyg .vditor-reset',
-          '.vditor-wysiwyg__area .vditor-reset',
-          '.vditor-content .vditor-reset',
-          '.vditor-reset'
-        ]
+          for (const selector of selectors) {
+            const previewElement = currentRef.querySelector(selector)
+            if (previewElement) {
+              const images = previewElement.querySelectorAll('img')
 
-        for (const selector of selectors) {
-          const previewElement = currentRef.querySelector(selector)
-          if (previewElement) {
-            const images = previewElement.querySelectorAll('img')
-            console.log(`[Vditor after] 使用选择器 "${selector}" 找到 ${images.length} 个图片`)
-
-            if (images.length > 0) {
-              console.log('[Vditor after] 准备处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
-              processImagesInPreview(previewElement as HTMLElement)
-              return
+              if (images.length > 0) {
+                processImagesInPreview(previewElement as HTMLElement)
+                return
+              }
             }
           }
         }
 
-        console.warn('[Vditor after] 未找到任何图片元素')
-      }
-
-      // 立即检查并尝试处理
-      setTimeout(() => {
-        console.log('[Vditor after] 第一次尝试处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
-
         if (workspaceStore.currentWorkspaceId) {
-          console.log('[Vditor after] workspaceId 已准备好,立即处理')
           processImages()
         } else {
-          console.warn('[Vditor after] workspaceId 未准备好,等待后重试')
-          // 等待 workspaceId 准备好
           setTimeout(() => {
-            console.log('[Vditor after] 第二次尝试处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
             if (workspaceStore.currentWorkspaceId) {
-              console.log('[Vditor after] workspaceId 已准备好,开始处理')
               processImages()
-            } else {
-              console.error('[Vditor after] workspaceId 仍然未准备好,跳过图片处理')
             }
-          }, 500)
+          }, 100)
         }
-      }, 200)
+      })
     },
   })
 }
@@ -1208,18 +1210,9 @@ watch(() => themeStore.theme, (newTheme) => {
 
 
 watch(activeFile, (newFile, oldFile) => {
-  console.log('[FileContentArea] 🔍 activeFile 变化:')
-  console.log('[FileContentArea] 🔍 新文件:', newFile?.name, newFile?.type)
-  console.log('[FileContentArea] 🔍 旧文件:', oldFile?.name, oldFile?.type)
-
   if (!newFile) {
-    console.log('[FileContentArea] ⚠️  新文件为空，返回')
     return
   }
-
-  // 检查是否是 Office 文件
-  const isOffice = isOfficeFile(newFile)
-  console.log('[FileContentArea] 🔍 是否为 Office 文件:', isOffice)
 
   // 更新编辑内容
   editableContent.value = newFile.content
@@ -1262,14 +1255,10 @@ watch(activeFile, (newFile, oldFile) => {
             const targetRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
             const previewElement = targetRef?.querySelector('.vditor-wysiwyg .vditor-reset')
             if (previewElement) {
-              console.log('[watch activeFile] 重新处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
-
               // 检查 workspaceId 是否存在
               if (!workspaceStore.currentWorkspaceId) {
-                console.warn('[watch activeFile] workspaceId 还未准备好,稍后重试')
                 setTimeout(() => {
                   if (workspaceStore.currentWorkspaceId && previewElement) {
-                    console.log('[watch activeFile] 重试处理图片, workspaceId:', workspaceStore.currentWorkspaceId)
                     processImagesInPreview(previewElement as HTMLElement)
                   }
                 }, 300)

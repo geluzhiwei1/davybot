@@ -93,7 +93,7 @@ export const useParallelTasksStore = defineStore('parallelTasks', () => {
   /**
    * 添加新任务或更新已存在的任务
    */
-  function addTask(taskId: string, nodeType: string, description: string, taskNodeId?: string): void {
+  function addTask(taskId: string, nodeType: string, description: string, taskNodeId?: string, conversationId?: string): void {
     // ✅ Fast Fail: 验证必需参数
     if (!taskId || taskId.trim() === '') {
       throw new Error('[ParallelTasks] taskId cannot be empty')
@@ -117,6 +117,9 @@ export const useParallelTasksStore = defineStore('parallelTasks', () => {
         existingTask.nodeType = nodeType
         existingTask.description = description
         existingTask.taskNodeId = taskNodeId
+        if (conversationId) {
+          existingTask.conversationId = conversationId
+        }
       }
 
       existingTask.updatedAt = now
@@ -145,6 +148,7 @@ export const useParallelTasksStore = defineStore('parallelTasks', () => {
       taskNodeId,
       nodeType,
       description,
+      conversationId,  // ✅ 添加会话ID
       state: ParallelTaskState.PENDING,
       progress: {
         current: 0,
@@ -347,7 +351,7 @@ export const useParallelTasksStore = defineStore('parallelTasks', () => {
    * 处理任务节点开始消息
    */
   function handleTaskNodeStart(data: unknown): void {
-    const { task_id, node_type, description, task_node_id } = data
+    const { task_id, node_type, description, task_node_id, conversation_id } = data
 
     // ✅ Fast Fail: 验证必需字段
     if (!task_id) {
@@ -366,6 +370,9 @@ export const useParallelTasksStore = defineStore('parallelTasks', () => {
       })
       throw error
     }
+
+    // 添加或更新任务
+    addTask(task_id, node_type, description, task_node_id, conversation_id)
 
     if (!description) {
       const error = new Error('[ParallelTasks] task_node_start message missing required field: description')

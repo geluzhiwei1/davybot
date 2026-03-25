@@ -1402,9 +1402,7 @@ const saveProxyConfig = async () => {
   if (!props.workspaceId) return;
   savingProxy.value = true;
   try {
-    console.log('[Proxy] Saving config:', JSON.stringify(proxyConfig.value));
     const result = await apiManager.getWorkspacesApi().updateProxyConfig(props.workspaceId, proxyConfig.value);
-    console.log('[Proxy] Save success, result:', result);
 
     // ✅ 更新本地状态，确保数据一致性
     proxyConfig.value = {
@@ -1412,7 +1410,6 @@ const saveProxyConfig = async () => {
       https_proxy: result.https_proxy || '',
       no_proxy: result.no_proxy || ''
     };
-    console.log('[Proxy] Local state updated:', proxyConfig.value);
 
     ElMessage.success(t('workspaceSettings.proxy.saveSuccess'));
   } catch (error) {
@@ -1523,8 +1520,6 @@ const openDocsLink = async (event: Event | string, urlParam?: string) => {
     event.stopPropagation();
   }
 
-  console.log('[openDocsLink] Called with URL:', url, 'event handled:', eventHandled);
-
   // URL 验证
   if (!url || typeof url !== 'string') {
     ElMessage.error('无效的链接地址');
@@ -1548,7 +1543,6 @@ const openDocsLink = async (event: Event | string, urlParam?: string) => {
   if (isTauri()) {
     // Tauri 环境：使用系统浏览器打开
     try {
-      console.log('[Tauri] Opening URL via system browser:', url);
       await invoke('open_by_system_browser', { url });
       ElMessage.success('已使用系统浏览器打开链接');
     } catch (error) {
@@ -2837,9 +2831,7 @@ const handleResourceInstalled = async (type: ResourceType) => {
       true  // 强制重新加载
     );
 
-    if (result.success) {
-      console.log('[WorkspaceSettings] Config reload result:', result);
-    }
+    // Config reload successful
   } catch (error) {
     console.error('[WorkspaceSettings] Failed to reload config:', error);
     // 即使重新加载失败,也继续刷新前端列表
