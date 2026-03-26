@@ -148,7 +148,7 @@ async def create_file_or_directory(
 async def get_workspace_file_tree(
     workspace_id: str,
     path: str = Query(".", description="要列出的路径"),
-    include_hidden: bool = Query(False, description="是否包含隐藏文件"),
+    include_hidden: bool = Query(True, description="是否包含隐藏文件"),
     max_depth: int = Query(5, description="递归最大深度"),
     file_service: Storage = Depends(get_workspace_file_service),
 ):

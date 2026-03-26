@@ -348,7 +348,7 @@ export class WorkspacesApiService {
       // 默认启用递归获取，以便显示完整的文件树
       const requestParams = {
         path: params?.path,
-        include_hidden: params?.includeHidden ?? false,
+        include_hidden: params?.includeHidden ?? true,
         max_depth: params?.maxDepth ?? 3,
         recursive: params?.recursive ?? true  // 默认启用递归
       };

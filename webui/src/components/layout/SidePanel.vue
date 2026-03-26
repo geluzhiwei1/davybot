@@ -48,7 +48,8 @@
                       :load="loadTreeNode" @node-click="handleTreeNodeClick" @node-contextmenu="handleNodeContextMenu"
                       :expand-on-click-node="false" :highlight-current="true" draggable :allow-drag="allowDrag"
                       :allow-drop="allowDrop" @node-drag-start="handleDragStart" @node-drag-end="handleDragEnd"
-                      @node-drop="handleDrop">
+                      @node-drop="handleDrop" :default-expand-keys="expandedKeys" @node-expand="handleNodeExpand"
+                      @node-collapse="handleNodeCollapse">
                       <template #default="{ node, data }">
                         <span class="custom-tree-node" :class="{ 'is-dragging': isDragging }">
                           <span class="tree-node-label">
@@ -259,6 +260,9 @@ onMounted(() => {
 
   // ✅ 监听任务完成事件，自动刷新文件树
   window.addEventListener('task-node-complete-refresh', handleTaskCompleteRefresh);
+
+  // ✅ 加载文件树展开状态
+  loadExpandedState();
 });
 
 onUnmounted(() => {
@@ -281,6 +285,65 @@ const handleTaskCompleteRefresh = async (event: unknown) => {
         tree.setData(fileTree.value)
       }
     }
+  }
+}
+
+// ✅ 文件树展开状态管理
+/**
+ * 获取 localStorage 键名
+ */
+const getExpandedStateKey = () => {
+  return `file-tree-expanded-${props.workspaceId || 'default'}`
+}
+
+/**
+ * 从 localStorage 加载展开状态
+ */
+const loadExpandedState = () => {
+  try {
+    const key = getExpandedStateKey()
+    const saved = localStorage.getItem(key)
+    if (saved) {
+      expandedKeys.value = JSON.parse(saved)
+    }
+  } catch (error) {
+    console.error('[FileTree] Failed to load expanded state:', error)
+    expandedKeys.value = []
+  }
+}
+
+/**
+ * 保存展开状态到 localStorage
+ */
+const saveExpandedState = () => {
+  try {
+    const key = getExpandedStateKey()
+    localStorage.setItem(key, JSON.stringify(expandedKeys.value))
+  } catch (error) {
+    console.error('[FileTree] Failed to save expanded state:', error)
+  }
+}
+
+/**
+ * 处理节点展开事件
+ */
+const handleNodeExpand = (data: FileTreeNode, node: unknown) => {
+  const path = data.path
+  if (!expandedKeys.value.includes(path)) {
+    expandedKeys.value.push(path)
+    saveExpandedState()
+  }
+}
+
+/**
+ * 处理节点折叠事件
+ */
+const handleNodeCollapse = (data: FileTreeNode, node: unknown) => {
+  const path = data.path
+  const index = expandedKeys.value.indexOf(path)
+  if (index > -1) {
+    expandedKeys.value.splice(index, 1)
+    saveExpandedState()
   }
 }
 
@@ -331,6 +394,9 @@ const fileTreeRef = ref<unknown>(null);
 // 拖拽相关状态
 const isDragging = ref(false);
 const draggedNode = ref<FileTreeNode | null>(null);
+
+// 文件树展开状态管理
+const expandedKeys = ref<string[]>([]);
 
 // el-tree 组件的默认 props 配置（懒加载模式）
 const defaultProps = {
@@ -1067,6 +1133,8 @@ watch(() => props.workspaceId, (newVal) => {
     loadConversations();
     loadWorkspaceInfo();
     loadFiles();
+    // ✅ 重新加载文件树展开状态
+    loadExpandedState();
   }
 }, { immediate: true });
 
