@@ -339,6 +339,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { useThemeStore } from '@/stores/theme'
@@ -390,10 +391,16 @@ const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
 const htmlActiveTab = ref('preview')
 
+const route = useRoute()
+
 // 获取当前 workspaceId 的辅助函数
 const getCurrentWorkspaceId = () => {
-  // 优先使用 props 传入的 workspaceId,否则从 store 获取
-  return props.workspaceId || workspaceStore.currentWorkspaceId || undefined
+  // 优先从 URL 获取，再从 props，最后从 store
+  return (route.params.workspaceId as string)
+    || (route.query.workspaceId as string)
+    || props.workspaceId
+    || workspaceStore.currentWorkspaceId
+    || undefined
 }
 const drawioActiveTab = ref('xml')
 const isSaving = ref(false)
@@ -790,145 +797,94 @@ const handleGlobalClick = (event: Event) => {
   }
 }
 
-// 处理预览中的图片链接
-const processImagesInPreview = (element: HTMLElement) => {
-  // 检查 workspaceId - 使用 currentWorkspaceId 而不是 workspaceId
-  const workspaceId = workspaceStore.currentWorkspaceId
-  if (!workspaceId) {
-    console.error('[processImagesInPreview] 未找到 workspaceId,跳过图片处理')
-    console.error('[processImagesInPreview] workspaceStore.currentWorkspaceId:', workspaceStore.currentWorkspaceId)
-    return
+// 将相对路径基于 baseDir 解析为从 workspace 根目录开始的路径
+const resolveRelativePath = (relativePath: string, baseDir: string): string => {
+  let path = relativePath
+  if (path.startsWith('./')) path = path.substring(2)
+  if (path.startsWith('/')) return path.substring(1)
+
+  const segments = baseDir ? baseDir.split('/').filter(p => p) : []
+  while (path.startsWith('../')) {
+    path = path.substring(3)
+    if (segments.length > 0) segments.pop()
+  }
+  return segments.length > 0 ? [...segments, path].join('/') : path
+}
+
+// 构建图片的 API URL
+const buildImageApiUrl = (imagePath: string): string | null => {
+  const workspaceId = getCurrentWorkspaceId()
+  if (!workspaceId || !activeFile.value) return null
+
+  const currentDir = activeFile.value.id.includes('/')
+    ? activeFile.value.id.substring(0, activeFile.value.id.lastIndexOf('/'))
+    : ''
+
+  const resolvedPath = resolveRelativePath(imagePath, currentDir)
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+  return `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodeURIComponent(resolvedPath)}`
+}
+
+/**
+ * 修复 DOM 中所有图片的 src 属性，将相对路径替换为 API URL。
+ * 用于在 Vditor 初始渲染后（after 回调）修复已渲染的图片。
+ */
+const fixRenderedImageSrcs = () => {
+  const targetRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
+  if (!targetRef) return
+
+  const container = targetRef.querySelector('.vditor-wysiwyg .vditor-reset') as HTMLElement
+  if (!container) return
+
+  container.querySelectorAll('img').forEach((img) => {
+    const src = img.getAttribute('src')
+    if (!src || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return
+
+    const apiUrl = buildImageApiUrl(src)
+    if (!apiUrl) return
+
+    img.setAttribute('src', apiUrl)
+    img.style.cursor = 'pointer'
+    img.onclick = () => openImageViewer()
+    img.onerror = () => {
+      console.error('[Vditor] 加载图片失败:', apiUrl)
+    }
+  })
+}
+
+/**
+ * 通过 Lute 的 SetJSRenderers 设置自定义 renderLinkDest，
+ * 拦截后续编辑/粘贴产生的图片和链接路径。
+ */
+const setupLuteImageRenderer = () => {
+  if (!vditor.value) return
+  const lute = vditor.value.vditor?.lute
+  if (!lute) return
+
+  const Lute = (window as any).Lute
+  if (!Lute) return
+
+  const renderLinkDest = (node: any, entering: boolean): [string, number] => {
+    if (!entering) return ['', Lute.WalkContinue]
+
+    // 只处理图片节点（Type === 34），跳过链接节点
+    const parentType = node.__internal_object__?.Parent?.Type
+    if (parentType !== 34) return ['', Lute.WalkContinue]
+
+    const src = node.TokensStr()
+    if (!src || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
+      return ['', Lute.WalkContinue]
+    }
+
+    const apiUrl = buildImageApiUrl(src)
+    if (!apiUrl) return ['', Lute.WalkContinue]
+
+    return [`"${apiUrl}"`, Lute.WalkSkipChildren]
   }
 
-  const imgElements = element.querySelectorAll('img')
-
-  imgElements.forEach((img) => {
-    const originalSrc = img.getAttribute('src')
-
-    // 跳过已经处理过的图片(data: URL 或已转换的API URL)
-    if (!originalSrc || originalSrc.startsWith('data:')) {
-      return
-    }
-
-    // ✅ 关键修复: 检查是否已经是正确的API URL
-    // 如果URL中包含 /workspaces/{workspaceId}/files?path=，说明已经处理过
-    if (originalSrc.includes(`/workspaces/${workspaceId}/files?path=`)) {
-      return
-    }
-
-    // ✅ 新增: 处理已经被浏览器/Vditor转换成HTTP URL的图片
-    // 例如: http://10.168.1.122:8460/figures/human_raters_agreement.png
-    // 需要将其转换为: /api/workspaces/{workspaceId}/files?path=figures/human_raters_agreement.png
-    let imagePath = originalSrc
-
-    // 如果是HTTP URL，提取路径部分
-    if (originalSrc.startsWith('http://') || originalSrc.startsWith('https://')) {
-      try {
-        const url = new URL(originalSrc)
-        imagePath = url.pathname  // 提取路径部分，如 /figures/human_raters_agreement.png
-      } catch (e) {
-        console.error('[processImagesInPreview] 无效的URL:', originalSrc)
-        return
-      }
-    }
-
-    // ✅ 关键修复：处理所有图片路径，包括没有前导斜杠的路径
-    // 例如: figures/xxx.png, ./figures/xxx.png, ../figures/xxx.png, /figures/xxx.png
-
-    let resolvedPath = imagePath  // 初始化 resolvedPath
-
-    if (!imagePath.startsWith('/') &&
-        !imagePath.startsWith('./') &&
-        !imagePath.startsWith('../') &&
-        !imagePath.startsWith('http://') &&
-        !imagePath.startsWith('https://')) {
-      // 这是相对路径但没有前缀，如 figures/xxx.png
-      // 需要基于当前文件路径解析
-      if (activeFile.value && activeFile.value.id) {
-        const currentFilePath = activeFile.value.id
-        const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'))
-        const pathSegments = currentDir ? currentDir.split('/').filter(p => p) : []
-
-        // 将当前路径加入到 pathSegments
-        resolvedPath = pathSegments.length > 0
-          ? [...pathSegments, imagePath].join('/')
-          : imagePath
-      } else {
-        resolvedPath = imagePath
-      }
-    } else if (imagePath.startsWith('/') || imagePath.startsWith('./') || imagePath.startsWith('../')) {
-      // 处理相对路径 ./xxx.png, ../xxx.png, ../../xxx.png 和绝对路径 /xxx.png
-      // 获取 API base URL
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-
-      // 解析相对路径
-      let resolvedPath = imagePath
-
-      if (!imagePath.startsWith('/')) {
-        // 这是相对路径,需要基于当前文件路径解析
-        if (activeFile.value && activeFile.value.id) {
-          // 使用 activeFile.value.id 而不是 name,因为 id 包含完整路径
-          // 例如: id = "results-for-paper/统计分析报告.md"
-          //       name = "统计分析报告.md"
-          const currentFilePath = activeFile.value.id
-          const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'))
-
-          // 使用 path 模块解析相对路径
-          // 例如: currentDir = results-for-paper
-          //       ../image.png -> image.png
-          //       ./image.png -> results-for-paper/image.png
-          //       ../../image.png -> image.png
-
-          const pathSegments = currentDir ? currentDir.split('/').filter(p => p) : []
-
-          // 处理 ../ 前缀
-          let relativePath = imagePath
-          while (relativePath.startsWith('../')) {
-            relativePath = relativePath.substring(3) // 移除 ../
-            if (pathSegments.length > 0) {
-              pathSegments.pop() // 回退一级目录
-            }
-          }
-
-          // 处理 ./ 前缀
-          if (relativePath.startsWith('./')) {
-            relativePath = relativePath.substring(2) // 移除 ./
-          }
-
-          // 组合路径 - 注意:不添加前导 /,路径应该从工作区根目录开始
-          resolvedPath = pathSegments.length > 0
-            ? [...pathSegments, relativePath].join('/')
-            : relativePath
-        } else {
-          // 没有当前文件信息,直接使用原始路径(移除 ./ 前缀)
-          resolvedPath = imagePath.startsWith('./') ? imagePath.substring(2) : imagePath
-        }
-      } else {
-        // 绝对路径,移除前导 /
-        resolvedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath
-      }
-    } else {
-      // 其他情况（http URL等），直接跳过
-      return
-    }
-
-    const encodedPath = encodeURIComponent(resolvedPath)
-    // 使用正确的 API 路径: /files?path=xxx
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-    const fileApiUrl = `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodedPath}`
-
-    img.setAttribute('src', fileApiUrl)
-
-    // 添加点击预览功能
-    img.style.cursor = 'pointer'
-    img.onclick = () => {
-      openImageViewer()
-    }
-
-    // 添加错误处理
-    img.onerror = () => {
-      console.error('[Vditor] 加载图片失败:', fileApiUrl)
-      img.setAttribute('alt', `图片加载失败: ${imagePath}`)
+  lute.SetJSRenderers({
+    renderers: {
+      Md2VditorDOM: { renderLinkDest },
     }
   })
 }
@@ -966,7 +922,7 @@ const initVditor = () => {
     mode: 'wysiwyg',
     height: '100%',
     value: editableContent.value,
-    // ✅ 禁用图片懒加载，让我们的 processImagesInPreview 能够立即处理
+    // 禁用图片懒加载
     lazyLoadImage: {
       enable: false
     },
@@ -1086,9 +1042,6 @@ const initVditor = () => {
     },
     preview: {
       parse: (element: HTMLElement) => {
-        // 处理预览中的图片链接
-        processImagesInPreview(element)
-
         // 处理代码块的复制按钮
         const codeBlocks = element.querySelectorAll('pre code')
         codeBlocks.forEach((block) => {
@@ -1153,52 +1106,12 @@ const initVditor = () => {
     },
     after: () => {
       vditorInitialized.value = true
-      // 记录初始化时的全屏状态
       vditorInitFullscreen.value = isPageFullscreen.value
 
-      // 保存对 ref 的引用,因为 targetRef 在闭包中可能不可用
-      const currentRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
-
-      // ✅ 关键修复：立即处理图片，在浏览器加载图片之前
-      // 使用 requestAnimationFrame 确保在 DOM 渲染后、图片加载前执行
-      requestAnimationFrame(() => {
-        const processImages = () => {
-          if (!currentRef) {
-            console.error('[Vditor after] currentRef 为空,无法处理图片')
-            return
-          }
-
-          // 尝试多个可能的选择器
-          const selectors = [
-            '.vditor-wysiwyg .vditor-reset',
-            '.vditor-wysiwyg__area .vditor-reset',
-            '.vditor-content .vditor-reset',
-            '.vditor-reset'
-          ]
-
-          for (const selector of selectors) {
-            const previewElement = currentRef.querySelector(selector)
-            if (previewElement) {
-              const images = previewElement.querySelectorAll('img')
-
-              if (images.length > 0) {
-                processImagesInPreview(previewElement as HTMLElement)
-                return
-              }
-            }
-          }
-        }
-
-        if (workspaceStore.currentWorkspaceId) {
-          processImages()
-        } else {
-          setTimeout(() => {
-            if (workspaceStore.currentWorkspaceId) {
-              processImages()
-            }
-          }, 100)
-        }
-      })
+      // 修复初始渲染的图片路径（Lute 已渲染完毕，需直接操作 DOM）
+      fixRenderedImageSrcs()
+      // 设置 Lute 自定义渲染器，拦截后续编辑/粘贴产生的图片路径
+      setupLuteImageRenderer()
     },
   })
 }
@@ -1249,24 +1162,6 @@ watch(activeFile, (newFile, oldFile) => {
       nextTick(() => {
         if (vditor.value) {
           vditor.value.setValue(newFile.content)
-
-          // 在 wysiwyg 模式下， setValue 后需要重新处理图片
-          setTimeout(() => {
-            const targetRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
-            const previewElement = targetRef?.querySelector('.vditor-wysiwyg .vditor-reset')
-            if (previewElement) {
-              // 检查 workspaceId 是否存在
-              if (!workspaceStore.currentWorkspaceId) {
-                setTimeout(() => {
-                  if (workspaceStore.currentWorkspaceId && previewElement) {
-                    processImagesInPreview(previewElement as HTMLElement)
-                  }
-                }, 300)
-              } else {
-                processImagesInPreview(previewElement as HTMLElement)
-              }
-            }
-          }, 200)
         }
       })
     }
