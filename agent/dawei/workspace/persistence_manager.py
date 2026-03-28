@@ -80,6 +80,7 @@ class ResourceType(Enum):
     WORKSPACE_SETTINGS = "workspace_settings"
     WORKSPACE_INFO = "workspace_info"
     SCHEDULED_TASK = "scheduled_task"
+    EVOLUTION = "evolution"
 
 
 T = TypeVar("T")
@@ -121,6 +122,7 @@ class WorkspacePersistenceManager:
         self.task_graphs_dir = self.persistence_dir / "task_graphs"
         self.task_nodes_dir = self.persistence_dir / "task_nodes"
         self.scheduled_tasks_dir = self.persistence_dir / "scheduled_tasks"
+        self.evolution_dir = self.persistence_dir / "evolution"
         # 向后兼容：保留 conversations_dir 指向工作区级别（旧数据）
         self.conversations_dir = self.persistence_dir / "conversations"
 
@@ -145,6 +147,7 @@ class WorkspacePersistenceManager:
             self.task_graphs_dir,
             self.task_nodes_dir,
             self.conversations_dir,  # 向后兼容
+            self.evolution_dir,
         ]
 
         # 创建所有目录
@@ -475,6 +478,7 @@ class WorkspacePersistenceManager:
             ResourceType.WORKSPACE_SETTINGS: self.persistence_dir,
             ResourceType.WORKSPACE_INFO: self.persistence_dir,
             ResourceType.SCHEDULED_TASK: self.scheduled_tasks_dir,
+            ResourceType.EVOLUTION: self.evolution_dir,
         }
         return dir_map[resource_type]
 
@@ -588,3 +592,128 @@ class WorkspacePersistenceManager:
     async def load_workspace_settings(self) -> Dict[str, Any] | None:
         """加载workspace设置"""
         return await self.load_resource(ResourceType.WORKSPACE_SETTINGS, "workspace")
+
+    # ==================== Atomic Write 通用方法 ====================
+
+    async def atomic_write(self, file_path: Path, content: str) -> bool:
+        """原子性写入文件
+
+        使用临时文件+重命名机制确保写入的原子性，避免写入中途崩溃导致数据损坏。
+
+        Args:
+            file_path: 目标文件路径
+            content: 要写入的内容（字符串）
+
+        Returns:
+            bool: 是否写入成功
+
+        Raises:
+            WorkspacePersistenceError: 当写入失败时
+
+        """
+        try:
+            # 确保目标目录存在
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # 原子性写入: 先写临时文件,再重命名
+            temp_path = file_path.with_suffix(".tmp")
+
+            logger.debug(f"[PERSISTENCE] Atomic write to temp file: {temp_path}")
+
+            # 写入临时文件
+            try:
+                with temp_path.open("w", encoding="utf-8") as f:
+                    f.write(content)
+                    f.flush()  # 确保数据写入磁盘
+                    os.fsync(f.fileno())  # 强制同步到磁盘
+            except (OSError, TypeError) as write_error:
+                logger.error(
+                    f"[PERSISTENCE] Failed to write temp file {temp_path}: {write_error}",
+                    exc_info=True,
+                )
+                raise WorkspacePersistenceError(
+                    f"Failed to write temp file {temp_path}: {write_error}"
+                )
+
+            # 验证临时文件存在
+            if not temp_path.exists():
+                logger.error(f"[PERSISTENCE] Temp file {temp_path} does not exist after write!")
+                raise FileNotFoundError(f"Temp file {temp_path} was not created")
+
+            # 原子性重命名 - Windows 兼容处理
+            max_retries = 5
+            retry_delay = 0.05  # 50ms
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    temp_path.replace(file_path)
+                    logger.debug(f"[PERSISTENCE] Renamed {temp_path} to {file_path}")
+                    break  # 成功，退出重试循环
+                except (OSError, PermissionError) as rename_error:
+                    last_error = rename_error
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            f"[PERSISTENCE] Retry {attempt + 1}/{max_retries}: Failed to rename {temp_path} to {file_path}: {rename_error}",
+                        )
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # 指数退避
+                    else:
+                        # 最后一次重试失败，清理临时文件
+                        logger.exception(
+                            f"[PERSISTENCE] All retries failed for {temp_path} -> {file_path}",
+                        )
+                        if temp_path.exists():
+                            with contextlib.suppress(OSError):
+                                temp_path.unlink()
+                        raise WorkspacePersistenceError(
+                            f"Failed to rename {temp_path} to {file_path} after all retries: {last_error}"
+                        )
+
+            logger.debug(f"[PERSISTENCE] Atomic write completed: {file_path}")
+            return True
+
+        except WorkspacePersistenceError:
+            # 已经记录了详细错误，直接向上抛出
+            raise
+        except Exception as e:
+            logger.error(
+                f"[PERSISTENCE] Unexpected error in atomic write to {file_path}: {e}",
+                exc_info=True,
+            )
+            raise WorkspacePersistenceError(f"Unexpected error in atomic write to {file_path}: {e}")
+
+    # ==================== Evolution 专用方法 ====================
+
+    async def save_evolution_metadata(self, evolution_id: str, metadata: Dict[str, Any]) -> bool:
+        """保存evolution cycle元数据"""
+        return await self.save_resource(
+            ResourceType.EVOLUTION,
+            f"{evolution_id}_metadata",
+            metadata,
+            use_timestamp=False,
+        )
+
+    async def load_evolution_metadata(self, evolution_id: str) -> Dict[str, Any] | None:
+        """加载evolution cycle元数据"""
+        return await self.load_resource(ResourceType.EVOLUTION, f"{evolution_id}_metadata")
+
+    async def save_evolution_phase(
+        self, evolution_id: str, phase: str, content: str
+    ) -> bool:
+        """保存evolution phase输出（plan.md, do.md, check.md, act.md）"""
+        # 使用atomic_write直接写入文件（不通过save_resource）
+        evolution_dir = self.persistence_dir / f"evolution-{evolution_id}"
+        phase_file = evolution_dir / f"{phase}.md"
+        return await self.atomic_write(phase_file, content)
+
+    async def load_evolution_phase(
+        self, evolution_id: str, phase: str
+    ) -> str | None:
+        """加载evolution phase输出"""
+        evolution_dir = self.persistence_dir / f"evolution-{evolution_id}"
+        phase_file = evolution_dir / f"{phase}.md"
+        if phase_file.exists():
+            return phase_file.read_text(encoding="utf-8")
+        return None
+

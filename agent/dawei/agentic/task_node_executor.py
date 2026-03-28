@@ -36,7 +36,7 @@ from dawei.entity.stream_message import (
     UsageMessage,
 )
 
-# 使用内置的 asyncio.timeout (Python 3.11+)
+# 使用内置的 asyncio.timeout (Python 3.12+)
 from dawei.entity.task_types import TaskStatus
 from dawei.interfaces import IEventBus, ILLMService, IMessageProcessor, IToolCallService
 from dawei.logg.logging import get_logger
@@ -449,12 +449,14 @@ class TaskNodeExecutionEngine:
 
         try:
             # LLM调用使用独立的超时控制
-            async with asyncio.timeout(llm_timeout):
-                await self._llm_service.create_message_with_callback(
+            await asyncio.wait_for(
+                self._llm_service.create_message_with_callback(
                     messages,
                     callback=stream_callback,
                     tools=api_request.get("tools", []),
-                )
+                ),
+                timeout=llm_timeout,
+            )
 
             self.logger.info(
                 f"Message processed successfully (LLM: {llm_timeout}s, Tools: {tool_execution_timeout}s)",

@@ -122,7 +122,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true,
-        rewrite: (path) => path,
         onError(err, req, res) {
           if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
             console.log('Proxy connection closed by client')

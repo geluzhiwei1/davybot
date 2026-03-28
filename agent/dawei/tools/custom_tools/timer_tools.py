@@ -95,7 +95,7 @@ class TimerTool(CustomBaseTool):
         "- repeat_interval: 重复间隔(秒)\n"
         "- max_repeats: 最大重复次数\n"
         "- cron: Cron表达式 (如 '0 9 * * *' 每天9点, '*/5 * * * *' 每5分钟)\n"
-        "- llm: LLM 模型 (可选, 如 'deepseek/deepseek-chat', 覆盖 workspace 默认值)\n"
+        "- llm: LLM 模型 (可选, 覆盖 workspace 默认值)\n"
         "- mode: Agent 模式 (可选, 如 'orchestrator/plan/do/check/act', 覆盖 workspace 默认值)\n\n"
         "Cron表达式格式: 分 时 日 月 周 (如: '0 9 * * 1-5' 工作日每天9点)"
     )

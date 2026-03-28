@@ -89,7 +89,7 @@ class AgentExecutionService:
         try:
             # 1. 加载 workspace 设置
             settings = await workspace.get_settings()
-            llm_model = llm or settings.get("llm_model", "deepseek/deepseek-chat")
+            llm_model = llm or settings.get("llm_model", None)
             agent_mode = mode or settings.get("agent_mode", "orchestrator")
 
             logger.info(f"[AGENT_EXECUTION] Config: LLM={llm_model}, Mode={agent_mode} {'(override)' if llm or mode else '(workspace default)'}")

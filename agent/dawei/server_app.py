@@ -253,6 +253,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Dawei Server] ⚠ Failed to initialize scheduler: {e}")
 
+    # Initialize Evolution Scheduler
+    from dawei.evolution import evolution_scheduler
+    await evolution_scheduler.start()
+
     # Initialize Remote Ping Service
     try:
         from dawei.remote import start_ping_service
@@ -284,6 +288,16 @@ async def lifespan(app: FastAPI):
         print(f"[Dawei Server] ⚠ Scheduler module not available during shutdown: {e}")
     except Exception as e:
         print(f"[Dawei Server] ⚠ Failed to shutdown scheduler: {e}")
+
+    # Shutdown Evolution Scheduler
+    try:
+        from dawei.evolution import evolution_scheduler
+        await evolution_scheduler.stop()
+        print("[Dawei Server] ✓ Evolution scheduler stopped")
+    except ImportError as e:
+        print(f"[Dawei Server] ⚠ Evolution module not available during shutdown: {e}")
+    except Exception as e:
+        print(f"[Dawei Server] ⚠ Failed to stop evolution scheduler: {e}")
 
     # Cleanup knowledge base embedding managers
     try:

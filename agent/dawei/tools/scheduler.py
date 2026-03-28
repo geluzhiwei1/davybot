@@ -337,7 +337,7 @@ class SchedulerEngine:
         try:
             # 获取 LLM 模型（从 workspace 设置）
             settings = await user_workspace.get_settings()
-            llm_model = llm or settings.get("llm_model", "deepseek/deepseek-chat")
+            llm_model = llm or settings.get("llm_model", None)
             agent_mode = mode or settings.get("agent_mode", "orchestrator")
 
             logger.info(f"[SCHEDULER] Config: LLM={llm_model}, Mode={agent_mode} {'(override)' if llm or mode else '(workspace default)'}")

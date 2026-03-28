@@ -301,7 +301,8 @@ class ListCodeDefinitionsTool(CustomBaseTool):
             # Process all Python files in directory
             for root, _dirs, files in Path(full_path).walk():
                 for file in files:
-                    if file.suffix == ".py":
+                    # Get file extension
+                    if Path(file).suffix == ".py":
                         file_path = str(root / file)
                         file_defs = self._extract_definitions(file_path)
                         if file_defs:
@@ -327,7 +328,5 @@ class ListCodeDefinitionsTool(CustomBaseTool):
                 definitions.append(f"Function: {node.name} (line {node.lineno})")
             elif isinstance(node, ast.AsyncFunctionDef):
                 definitions.append(f"Async Function: {node.name} (line {node.lineno})")
-            elif isinstance(node, ast.Method):
-                definitions.append(f"Method: {node.name} (line {node.lineno})")
 
         return definitions

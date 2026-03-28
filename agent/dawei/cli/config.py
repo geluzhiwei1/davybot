@@ -32,9 +32,9 @@ class CLIConfig:
     """
 
     workspace: str
-    llm: str
     mode: str
     message: str
+    llm: str | None = None
     verbose: bool = False
     timeout: int = 1800  # 默认30分钟
 
@@ -153,7 +153,7 @@ class CLIConfig:
 
 def create_config(
     workspace: str,
-    llm: str,
+    llm: str | None,
     mode: str,
     message: str,
     verbose: bool = False,

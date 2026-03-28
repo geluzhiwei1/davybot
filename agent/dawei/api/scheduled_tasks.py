@@ -78,7 +78,7 @@ async def create_scheduled_task(workspace_id: str, task: Dict[str, Any]):
         "execution_type": "message",
         "execution_data": {
             "message": "要执行的消息",
-            "llm": "deepseek/deepseek-chat",  // 可选：覆盖默认 LLM
+            "llm": "",  // 可选：覆盖默认 LLM
             "mode": "orchestrator"  // 可选：覆盖默认模式
         }
     }

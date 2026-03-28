@@ -427,6 +427,13 @@ jobs:
           mkdir -p dist
           cp -r agent/dist/* dist/
 
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel-${{ steps.version.outputs.version }}
+          path: dist/
+          if-no-files-found: error
+
       - name: Build summary
         if: always()
         run: |
@@ -465,6 +472,29 @@ jobs:
           path: release-artifacts
           pattern: '*'
           merge-multiple: false
+
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-wheel-*
+          path: dist
+          merge-multiple: true
+
+      - name: Verify wheel files exist
+        run: |
+          echo "Verifying distribution files..."
+          ls -la dist/
+
+          # Check if wheel exists
+          if [ ! -f "dist/*.whl" ]; then
+            echo "ERROR: No wheel file found in dist/"
+            ls -la dist/
+            exit 1
+          fi
+
+          WHEEL_FILE=$(ls dist/*.whl | head -1)
+          echo "✅ Found wheel: $WHEEL_FILE"
+          echo "Wheel size: $(du -h "$WHEEL_FILE" | cut -f1)"
 
       - name: Set up Python
         uses: actions/setup-python@v5

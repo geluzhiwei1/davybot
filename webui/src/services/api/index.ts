@@ -102,6 +102,17 @@ export {
 
 export { MemoryApiService, createMemoryApiService } from './services/memory';
 
+// Evolution API Service
+export { evolutionService } from './evolution';
+export type {
+  EvolutionConfig,
+  PhaseStatus,
+  CycleMetadata,
+  EvolutionStatusResponse,
+  CycleResponse,
+  CycleDetailResponse
+} from './evolution';
+
 // Plugin Configuration API Service
 export { pluginConfigClient } from './pluginConfig';
 export type {

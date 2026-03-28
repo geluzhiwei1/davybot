@@ -167,7 +167,6 @@ Refactor this code for better performance
 ```bash
 # LLM Provider
 LITELLM_API_KEY=your_api_key
-LITELLM_MODEL=deepseek/deepseek-chat
 
 # DAWEI Home (all workspace data root, default ~/.dawei)
 DAWEI_HOME=~/.dawei

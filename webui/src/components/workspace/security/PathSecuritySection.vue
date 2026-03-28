@@ -30,7 +30,7 @@
           multiple
           filterable
           allow-create
-          :placeholder="t('workspace.settings.security.pathSecurity.extensionsPlaceholder')"
+          :placeholder="t('workspace.settings.security.pathSecurity.allowedExtensionsPlaceholder')"
           @change="handleUpdate"
         >
           <el-option

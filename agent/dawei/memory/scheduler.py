@@ -50,7 +50,7 @@ class MemoryExtractionScheduler:
             extraction_hour: 提取时间（小时，默认0）
             extraction_minute: 提取时间（分钟，默认0）
         """
-        self.workspace_path = Path(workspace_path).absolute_path
+        self.workspace_path = Path(workspace_path).absolute()
         self.memory_graph = memory_graph
         self.llm_service = llm_service
         self.extraction_hour = extraction_hour

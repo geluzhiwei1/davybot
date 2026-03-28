@@ -724,14 +724,7 @@ class UserWorkspace:
             # 获取所有属性
             settings_dict = self.workspace_settings.to_dict()
 
-            # 添加 LLM 模型配置（从 llm_manager 获取默认模型）
-            if self.llm_manager and hasattr(self.llm_manager, "get_default_model"):
-                try:
-                    settings["llm_model"] = self.llm_manager.get_default_model()
-                except Exception:
-                    settings["llm_model"] = "deepseek/deepseek-chat"
-            else:
-                settings["llm_model"] = "deepseek/deepseek-chat"
+            settings["llm_model"] = self.llm_manager.get_default_model()
 
             # 添加 Agent 模式配置
             settings["agent_mode"] = getattr(self.workspace_settings, "agent_mode", "orchestrator")

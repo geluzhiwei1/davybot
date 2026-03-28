@@ -21,9 +21,8 @@ def agent_cmd():
 @click.option(
     "--llm",
     "-l",
-    default="deepseek/deepseek-chat",
-    show_default=True,
-    help="LLM model to use",
+    default=None,
+    help="LLM model to use (default: workspace default from settings.json)",
 )
 @click.option(
     "--mode",
@@ -43,8 +42,14 @@ def agent_cmd():
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.option("--output", "-o", type=click.Path(path_type=Path), help="Save result to file")
 @click.option("--super", is_flag=True, help="⚠️  Enable super mode (bypass all security)")
+@click.option(
+    "--evolution",
+    "-e",
+    is_flag=True,
+    help="Enable evolution mode — run a full PDCA improvement cycle on the workspace",
+)
 @click.pass_context
-def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, super):
+def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, super, evolution):
     """Run an agent task directly without HTTP/WebSocket.
 
     This command executes the agent synchronously in the current process,
@@ -66,6 +71,9 @@ def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, supe
         # With super mode (bypass security)
         dawei agent run ./my-ws "Dangerous task" --super
 
+        # Run evolution cycle (PDCA improvement loop)
+        dawei agent run ./my-ws "Improve code quality" --evolution
+
     """
     # Check if super mode is enabled globally or per-command
     super_mode = super or ctx.obj.get("super", False)
@@ -75,12 +83,19 @@ def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, supe
         workspace.mkdir(parents=True, exist_ok=True)
         click.echo(click.style(f"✓ Created workspace directory: {workspace}", fg="green"))
 
-    click.echo(click.style("🤖 Running Agent Task", fg="blue", bold=True))
-    click.echo(f"   Workspace: {workspace}")
-    click.echo(f"   LLM: {llm}")
-    click.echo(f"   Mode: {mode}")
-    click.echo(f"   Message: {message[:80]}{'...' if len(message) > 80 else ''}")
-    click.echo(f"   Timeout: {timeout}s")
+    if evolution:
+        click.echo(click.style("🔄 Evolution Mode", fg="magenta", bold=True))
+        click.echo(f"   Workspace: {workspace}")
+        click.echo(f"   LLM: {llm or 'workspace default'}")
+        click.echo(f"   Timeout: {timeout}s")
+        click.echo("   PDCA cycle will run: plan → do → check → act")
+    else:
+        click.echo(click.style("🤖 Running Agent Task", fg="blue", bold=True))
+        click.echo(f"   Workspace: {workspace}")
+        click.echo(f"   LLM: {llm or 'workspace default'}")
+        click.echo(f"   Mode: {mode}")
+        click.echo(f"   Message: {message[:80]}{'...' if len(message) > 80 else ''}")
+        click.echo(f"   Timeout: {timeout}s")
 
     if super_mode:
         click.echo()
@@ -90,38 +105,54 @@ def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, supe
     click.echo()
 
     try:
-        # Import runner
         import os
-
-        from dawei.cli.runner import run_agent_sync
 
         # Set super mode environment variable
         if super_mode:
             os.environ["DAWEI_SUPER_MODE"] = "1"
 
-        # Execute agent
         start_time = time.time()
 
-        with click.progressbar(
-            length=100,
-            label="Executing",
-            show_pos=True,
-            fill_char=click.style("█", fg="blue"),
-            empty_char="░",
-        ) as bar:
-            # This is a fake progress bar since we can't easily track real progress
-            # In a real implementation, you'd want to hook into the agent's events
-            result = run_agent_sync(
-                workspace=str(workspace),
-                llm=llm,
-                mode=mode,
-                message=message,
-                verbose=verbose,
-                timeout=timeout,
-            )
+        if evolution:
+            # === Evolution mode: run a full PDCA improvement cycle ===
+            from dawei.cli.runner import run_evolution_sync
 
-            # Update progress bar to 100%
-            bar.update(100)
+            with click.progressbar(
+                length=100,
+                label="Evolving",
+                show_pos=True,
+                fill_char=click.style("█", fg="magenta"),
+                empty_char="░",
+            ) as bar:
+                result = run_evolution_sync(
+                    workspace=str(workspace),
+                    llm=llm,
+                    message=message,
+                    verbose=verbose,
+                    timeout=timeout,
+                )
+                bar.update(100)
+
+        else:
+            # === Normal mode: run a single agent task ===
+            from dawei.cli.runner import run_agent_sync
+
+            with click.progressbar(
+                length=100,
+                label="Executing",
+                show_pos=True,
+                fill_char=click.style("█", fg="blue"),
+                empty_char="░",
+            ) as bar:
+                result = run_agent_sync(
+                    workspace=str(workspace),
+                    llm=llm,
+                    mode=mode,
+                    message=message,
+                    verbose=verbose,
+                    timeout=timeout,
+                )
+                bar.update(100)
 
         duration = time.time() - start_time
 

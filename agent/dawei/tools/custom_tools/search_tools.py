@@ -56,7 +56,7 @@ class SearchFilesTool(CustomBaseTool):
                 if file_pattern:
                     import fnmatch
 
-                    if not fnmatch.fnmatch(file.name, file_pattern):
+                    if not fnmatch.fnmatch(file, file_pattern):
                         continue
 
                 file_path = root / file
@@ -126,10 +126,12 @@ class FullTextSearchTool(CustomBaseTool):
 
         for root, dirs, files in Path(path).walk():
             # Skip hidden and build directories
-            dirs[:] = [d for d in dirs if not d.name.startswith(".") and d.name not in ["node_modules", "__pycache__", "target", "dist", "build"]]
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ["node_modules", "__pycache__", "target", "dist", "build"]]
 
             for file in files:
-                if file.suffix not in file_extensions:
+                # Get file extension
+                file_ext = Path(file).suffix
+                if file_ext not in file_extensions:
                     continue
 
                 file_path = root / file

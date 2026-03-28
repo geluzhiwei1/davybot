@@ -251,7 +251,7 @@ class LLMProviderConfig(BaseSettings):
     )
 
     # 默认模型
-    default_model: str = Field(default="deepseek/deepseek-chat")
+    default_model: str = Field(default="")
 
     # OpenAI 配置
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")

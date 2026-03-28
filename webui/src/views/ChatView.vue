@@ -61,6 +61,12 @@
               <Icon icon="cil:calendar" width="24" height="24" />
             </el-button>
           </el-tooltip>
+          <!-- Evolution -->
+          <el-tooltip :content="t('evolution.title')" placement="right">
+            <el-button @click="handleOpenEvolutionDrawer" text circle>
+              <Icon icon="streamline-plump-color:recycle-1" width="24" height="24" />
+            </el-button>
+          </el-tooltip>
           <el-tooltip :content="t('sidePanel.memory')" placement="right">
             <el-button @click="handleOpenMemoryDrawer" text circle>
               <Icon icon="arcticons:breeno-memory" width="24" height="24" />
@@ -194,6 +200,11 @@
       <ScheduledTasksDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
+    <!-- Evolution抽屉 -->
+    <el-drawer v-model="isEvolutionDrawerVisible" :title="t('evolution.title')" direction="rtl" size="90%">
+      <EvolutionDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
+    </el-drawer>
+
     <!-- 知识库抽屉 -->
     <KnowledgeDrawer v-model="isKnowledgeDrawerVisible" :workspace-id="chatStore.workspaceId ?? undefined" />
 
@@ -269,6 +280,7 @@ import AgentsDrawer from '@/components/drawers/AgentsDrawer.vue';
 import PluginsDrawer from '@/components/drawers/PluginsDrawer.vue';
 import MCPDrawer from '@/components/drawers/MCPDrawer.vue';
 import ScheduledTasksDrawer from '@/components/drawers/ScheduledTasksDrawer.vue';
+import EvolutionDrawer from '@/components/drawers/EvolutionDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
 import ImageViewer from '@/components/chat/ImageViewer.vue';
@@ -324,6 +336,7 @@ const isAgentsDrawerVisible = ref(false);
 const isPluginsDrawerVisible = ref(false);
 const isMCPDrawerVisible = ref(false);
 const isScheduledTasksDrawerVisible = ref(false);
+const isEvolutionDrawerVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
 // 移动端侧边栏抽屉状态
@@ -709,6 +722,11 @@ const handleOpenMCPDrawer = () => {
 // 打开定时任务抽屉
 const handleOpenScheduledTasksDrawer = () => {
   isScheduledTasksDrawerVisible.value = true;
+};
+
+// 打开Evolution抽屉
+const handleOpenEvolutionDrawer = () => {
+  isEvolutionDrawerVisible.value = true;
 };
 
 const getValidWorkspaceId = async (): Promise<string | null> => {

@@ -1,0 +1,506 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""Evolution API Endpoints
+
+提供Evolution功能的REST API接口。
+"""
+
+import logging
+from typing import Dict, Any
+
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
+
+from dawei.api.workspaces.core import get_user_workspace
+from dawei.evolution.evolution_lock import EvolutionLock
+from dawei.evolution.evolution_manager import EvolutionCycleManager
+from dawei.evolution.evolution_storage import EvolutionStorage
+from dawei.evolution.exceptions import (
+    EvolutionAlreadyRunningError,
+    EvolutionError,
+    EvolutionStateError,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/{workspace_id}/evolution", tags=["evolution"])
+
+
+# ==================== Request/Response Models ====================
+
+
+class EvolutionConfigRequest(BaseModel):
+    """Evolution配置请求"""
+
+    enabled: bool
+    schedule: str = "0 * * * *"  # 默认每小时
+    phase_duration: str = "15m"  # 默认每个phase 15分钟
+    max_cycles: int = 999  # 默认最大cycle数
+    goals: list[str] = []  # 可选的目标列表
+
+
+class EvolutionStatusResponse(BaseModel):
+    """Evolution状态响应"""
+
+    enabled: bool
+    is_running: bool
+    is_paused: bool
+    current_cycle: Dict[str, Any] | None
+    all_cycles: list[Dict[str, Any]]
+    config: Dict[str, Any] | None
+
+
+class CycleResponse(BaseModel):
+    """Cycle操作响应"""
+
+    cycle_id: str
+    status: str
+    message: str | None = None
+
+
+class CycleDetailResponse(BaseModel):
+    """Cycle详情响应"""
+
+    metadata: Dict[str, Any]
+    phases: Dict[str, str]
+    workspace_md: str | None
+
+
+# ==================== API Endpoints ====================
+
+
+@router.post("/enable", response_model=Dict[str, str])
+async def enable_evolution(workspace_id: str, config: EvolutionConfigRequest):
+    """启用evolution功能
+
+    Args:
+        workspace_id: Workspace ID
+        config: Evolution配置
+
+    Returns:
+        {"status": "enabled", "config": {...}}
+
+    Raises:
+        HTTPException: 当workspace不存在或配置保存失败时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        # 更新workspace配置
+        if not workspace.workspace_config:
+            workspace.workspace_config = {}
+
+        workspace.workspace_config["evolution"] = {
+            "enabled": config.enabled,
+            "schedule": config.schedule,
+            "phase_duration": config.phase_duration,
+            "max_cycles": config.max_cycles,
+            "goals": config.goals,
+        }
+
+        # 保存配置
+        await workspace.save_settings()
+
+        logger.info(f"[EVOLUTION_API] Enabled evolution for workspace {workspace_id}")
+
+        return {
+            "status": "enabled",
+            "workspace_id": workspace_id,
+            "config": workspace.workspace_config["evolution"],
+        }
+
+    except Exception as e:
+        logger.error(f"[EVOLUTION_API] Failed to enable evolution for workspace {workspace_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to enable evolution: {str(e)}",
+        )
+
+
+@router.post("/disable", response_model=Dict[str, str])
+async def disable_evolution(workspace_id: str):
+    """禁用evolution功能
+
+    Args:
+        workspace_id: Workspace ID
+
+    Returns:
+        {"status": "disabled", "workspace_id": "..."}
+
+    Raises:
+        HTTPException: 当workspace不存在或配置保存失败时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        # 更新workspace配置
+        if not workspace.workspace_config:
+            workspace.workspace_config = {}
+
+        workspace.workspace_config["evolution"] = {"enabled": False}
+
+        # 保存配置
+        await workspace.save_settings()
+
+        logger.info(f"[EVOLUTION_API] Disabled evolution for workspace {workspace_id}")
+
+        return {"status": "disabled", "workspace_id": workspace_id}
+
+    except Exception as e:
+        logger.error(f"[EVOLUTION_API] Failed to disable evolution for workspace {workspace_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to disable evolution: {str(e)}",
+        )
+
+
+@router.get("/status", response_model=EvolutionStatusResponse)
+async def get_evolution_status(workspace_id: str):
+    """获取evolution状态
+
+    Args:
+        workspace_id: Workspace ID
+
+    Returns:
+        EvolutionStatusResponse
+
+    Raises:
+        HTTPException: 当workspace不存在时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        # 获取配置
+        workspace_config = workspace.workspace_config or {}
+        evolution_config = workspace_config.get("evolution", {})
+        enabled = evolution_config.get("enabled", False)
+
+        # 检查是否正在运行
+        lock = EvolutionLock(workspace)
+        is_running = await lock.is_locked()
+
+        # 获取当前cycle
+        storage = EvolutionStorage(workspace)
+        current_cycle = await storage.get_latest_cycle()
+        is_paused = current_cycle and current_cycle.get("status") == "paused"
+
+        # 获取所有cycles
+        all_cycles = await storage.get_all_cycles()
+
+        return EvolutionStatusResponse(
+            enabled=enabled,
+            is_running=is_running,
+            is_paused=is_paused if is_paused else False,
+            current_cycle=current_cycle,
+            all_cycles=all_cycles,
+            config=evolution_config if enabled else None,
+        )
+
+    except Exception as e:
+        logger.error(f"[EVOLUTION_API] Failed to get evolution status for workspace {workspace_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get evolution status: {str(e)}",
+        )
+
+
+@router.post("/trigger", response_model=CycleResponse)
+async def trigger_evolution(workspace_id: str):
+    """手动触发evolution cycle
+
+    Args:
+        workspace_id: Workspace ID
+
+    Returns:
+        CycleResponse
+
+    Raises:
+        HTTPException: 当workspace不存在或无法启动cycle时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        # 检查是否已启用evolution
+        workspace_config = workspace.workspace_config or {}
+        evolution_config = workspace_config.get("evolution", {})
+        if not evolution_config.get("enabled", False):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Evolution is not enabled for this workspace. Enable it first.",
+            )
+
+        # 启动新cycle
+        manager = EvolutionCycleManager(workspace)
+        cycle_id = await manager.start_cycle()
+
+        logger.info(f"[EVOLUTION_API] Triggered evolution cycle {cycle_id} for workspace {workspace_id}")
+
+        return CycleResponse(
+            cycle_id=cycle_id,
+            status="started",
+            message=f"Evolution cycle {cycle_id} started successfully",
+        )
+
+    except EvolutionAlreadyRunningError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"[EVOLUTION_API] Failed to trigger evolution for workspace {workspace_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger evolution: {str(e)}",
+        )
+
+
+@router.post("/cycles/{cycle_id}/pause", response_model=CycleResponse)
+async def pause_cycle(workspace_id: str, cycle_id: str):
+    """暂停evolution cycle（在当前phase结束后生效）
+
+    Args:
+        workspace_id: Workspace ID
+        cycle_id: Cycle ID
+
+    Returns:
+        CycleResponse
+
+    Raises:
+        HTTPException: 当workspace不存在或操作失败时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        manager = EvolutionCycleManager(workspace)
+        await manager.pause_cycle(cycle_id)
+
+        logger.info(f"[EVOLUTION_API] Paused evolution cycle {cycle_id} for workspace {workspace_id}")
+
+        return CycleResponse(
+            cycle_id=cycle_id,
+            status="pausing",
+            message="Cycle will pause at the next phase boundary",
+        )
+
+    except EvolutionStateError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            f"[EVOLUTION_API] Failed to pause cycle {cycle_id} for workspace {workspace_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to pause cycle: {str(e)}",
+        )
+
+
+@router.post("/cycles/{cycle_id}/resume", response_model=CycleResponse)
+async def resume_cycle(workspace_id: str, cycle_id: str):
+    """恢复暂停的evolution cycle
+
+    Args:
+        workspace_id: Workspace ID
+        cycle_id: Cycle ID
+
+    Returns:
+        CycleResponse
+
+    Raises:
+        HTTPException: 当workspace不存在或操作失败时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        manager = EvolutionCycleManager(workspace)
+        await manager.resume_cycle(cycle_id)
+
+        logger.info(f"[EVOLUTION_API] Resumed evolution cycle {cycle_id} for workspace {workspace_id}")
+
+        return CycleResponse(
+            cycle_id=cycle_id,
+            status="running",
+            message="Cycle resumed successfully",
+        )
+
+    except EvolutionStateError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            f"[EVOLUTION_API] Failed to resume cycle {cycle_id} for workspace {workspace_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to resume cycle: {str(e)}",
+        )
+
+
+@router.post("/cycles/{cycle_id}/abort", response_model=CycleResponse)
+async def abort_cycle(workspace_id: str, cycle_id: str, reason: str = ""):
+    """中止evolution cycle（在当前phase结束后或下次phase边界生效）
+
+    Args:
+        workspace_id: Workspace ID
+        cycle_id: Cycle ID
+        reason: 中止原因（可选）
+
+    Returns:
+        CycleResponse
+
+    Raises:
+        HTTPException: 当workspace不存在或操作失败时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        manager = EvolutionCycleManager(workspace)
+        await manager.abort_cycle(cycle_id, reason)
+
+        logger.info(
+            f"[EVOLUTION_API] Aborted evolution cycle {cycle_id} for workspace {workspace_id}"
+            + (f": {reason}" if reason else "")
+        )
+
+        return CycleResponse(
+            cycle_id=cycle_id,
+            status="aborting",
+            message="Cycle will abort at the next phase boundary"
+            + (f": {reason}" if reason else ""),
+        )
+
+    except EvolutionStateError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            f"[EVOLUTION_API] Failed to abort cycle {cycle_id} for workspace {workspace_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to abort cycle: {str(e)}",
+        )
+
+
+@router.get("/cycles/{cycle_id}", response_model=CycleDetailResponse)
+async def get_cycle_detail(workspace_id: str, cycle_id: str):
+    """获取evolution cycle详情
+
+    Args:
+        workspace_id: Workspace ID
+        cycle_id: Cycle ID
+
+    Returns:
+        CycleDetailResponse
+
+    Raises:
+        HTTPException: 当workspace不存在或cycle不存在时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        storage = EvolutionStorage(workspace)
+
+        # 检查cycle是否存在
+        if not await storage.cycle_exists(cycle_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cycle {cycle_id} not found",
+            )
+
+        # 加载metadata和phases
+        metadata = await storage.load_metadata(cycle_id)
+
+        phases = {}
+        for phase in EvolutionCycleManager.PHASES:
+            try:
+                phase_content = await storage.load_phase_output(cycle_id, phase)
+                phases[phase] = phase_content or ""
+            except Exception:
+                phases[phase] = ""
+
+        # 加载dao.md
+        workspace_md = await storage.load_workspace_md()
+
+        return CycleDetailResponse(
+            metadata=metadata, phases=phases, workspace_md=workspace_md
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"[EVOLUTION_API] Failed to get cycle detail for {cycle_id} in workspace {workspace_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get cycle detail: {str(e)}",
+        )
+
+
+@router.delete("/cycles/{cycle_id}", response_model=Dict[str, str])
+async def delete_cycle(workspace_id: str, cycle_id: str):
+    """删除evolution cycle（谨慎使用！）
+
+    Args:
+        workspace_id: Workspace ID
+        cycle_id: Cycle ID
+
+    Returns:
+        {"status": "deleted", "cycle_id": "..."}
+
+    Raises:
+        HTTPException: 当workspace不存在或删除失败时
+
+    """
+    try:
+        workspace = await get_user_workspace(workspace_id)
+
+        storage = EvolutionStorage(workspace)
+
+        # 检查cycle是否存在
+        if not await storage.cycle_exists(cycle_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cycle {cycle_id} not found",
+            )
+
+        # 删除cycle
+        success = await storage.delete_cycle(cycle_id)
+
+        if success:
+            logger.info(
+                f"[EVOLUTION_API] Deleted evolution cycle {cycle_id} for workspace {workspace_id}"
+            )
+            return {"status": "deleted", "cycle_id": cycle_id}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete cycle {cycle_id}",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"[EVOLUTION_API] Failed to delete cycle {cycle_id} for workspace {workspace_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete cycle: {str(e)}",
+        )
