@@ -56,7 +56,7 @@ export class WorkspacesApiService {
       wordWrap?: boolean;
     };
   }): Promise<Workspace> {
-    const response = await httpClient.post<{ workspace: Workspace }>(this.crudUrl, data);
+    const response = await httpClient.post<{ workspace: Workspace }>(`${this.crudUrl}/create`, data);
     return response.workspace;
   }
 

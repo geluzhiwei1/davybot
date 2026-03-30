@@ -164,7 +164,7 @@ async def validate_path(request: ValidatePathRequest):
 # ==================== 创建工作区 API ====================
 
 
-@router.post("/", response_model=WorkspaceResponse, status_code=201)
+@router.post("/create", response_model=WorkspaceResponse, status_code=201)
 async def create_workspace(request: CreateWorkspaceRequest):
     """创建工作区
 
