@@ -27,6 +27,8 @@ from .models import *
 from .plugin_config import router as plugin_config_router
 from .plugins import router as plugins_router
 from .ui_settings import router as ui_settings_router
+from .acp_agents import router as acp_agents_router
+from .channels import router as channels_router
 from . import security as security_api
 
 # 创建主路由器
@@ -46,6 +48,8 @@ router.include_router(plugins_router)
 router.include_router(plugin_config_router)
 router.include_router(mcp_servers_router)  # 新增:MCP服务器管理 API
 router.include_router(evolution_router)  # 新增:Evolution功能 API
+router.include_router(acp_agents_router)  # 新增:ACP Agent管理 API
+router.include_router(channels_router)    # 新增:Channel管理 API
 
 # 注册记忆系统路由器
 # Note: Memory router has its own prefix with workspace_id: /api/workspaces/{workspace_id}/memory

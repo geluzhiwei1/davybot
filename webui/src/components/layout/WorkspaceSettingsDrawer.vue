@@ -435,9 +435,16 @@
         <el-tab-pane :label="t('workspaceSettings.tabs.checkpoints')" name="checkpoints">
           <CheckpointPanel v-if="props.workspaceId && activeTab === 'checkpoints'" :workspace-id="props.workspaceId" />
         </el-tab-pane>
+
         <!-- 安全设置 Tab -->
         <el-tab-pane :label="t('workspaceSettings.tabs.security')" name="security">
           <WorkspaceSecuritySettingsTab v-if="props.workspaceId && activeTab === 'security'"
+            :workspace-id="props.workspaceId" />
+        </el-tab-pane>
+
+        <!-- ACP Agents Tab -->
+        <el-tab-pane label="ACP Agents" name="acp-agents">
+          <AcpAgentsPanel v-if="props.workspaceId && activeTab === 'acp-agents'"
             :workspace-id="props.workspaceId" />
         </el-tab-pane>
       </el-tabs>
@@ -901,6 +908,7 @@ import MarketDialog from '@/components/market/MarketDialog.vue';
 import CodeEditor from '@/components/editor/CodeEditor.vue';
 import CheckpointPanel from './CheckpointPanel.vue';
 import WorkspaceSecuritySettingsTab from '@/components/workspace/WorkspaceSecuritySettingsTab.vue';
+import AcpAgentsPanel from '@/components/workspace/AcpAgentsPanel.vue';
 import type { ResourceType } from '@/services/api/services/market';
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';

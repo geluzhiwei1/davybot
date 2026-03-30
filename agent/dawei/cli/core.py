@@ -22,6 +22,7 @@ if sys.platform == "win32":
 # Import command groups to register them
 # Import after definition to avoid circular imports
 from dawei.cli.commands.agent import agent_cmd
+from dawei.cli.commands.acp import acp_cmd
 from dawei.cli.commands.gui import gui_cmd
 from dawei.cli.commands.server import server_cmd
 from dawei.cli.commands.tui import tui_cmd
@@ -109,6 +110,7 @@ cli.add_command(server_cmd)
 cli.add_command(tui_cmd)
 cli.add_command(agent_cmd)
 cli.add_command(gui_cmd)
+cli.add_command(acp_cmd)
 
 
 if __name__ == "__main__":

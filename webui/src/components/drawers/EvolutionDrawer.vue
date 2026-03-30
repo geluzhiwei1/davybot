@@ -399,13 +399,13 @@ const isPaused = computed(() => evolutionStatus.value?.is_paused || false);
 const loadStatus = async () => {
   loading.value = true;
   try {
-    const response = await evolutionService.getEvolutionStatus(props.workspaceId);
-    evolutionStatus.value = response.data;
-    evolutionEnabled.value = response.data.enabled;
+    const data = await evolutionService.getEvolutionStatus(props.workspaceId);
+    evolutionStatus.value = data;
+    evolutionEnabled.value = data.enabled;
 
-    if (response.data.config) {
-      configForm.value = { ...response.data.config };
-      goalsInput.value = response.data.config.goals.join('\n');
+    if (data.config) {
+      configForm.value = { ...data.config };
+      goalsInput.value = data.config.goals.join('\n');
     }
   } catch (error) {
     console.error('Failed to load evolution status:', error);
@@ -419,6 +419,7 @@ const handleEnableChange = async (enabled: boolean) => {
   savingConfig.value = true;
   try {
     if (enabled) {
+      configForm.value.enabled = true;
       await evolutionService.enableEvolution(props.workspaceId, configForm.value);
       ElMessage.success(t('evolution.enabled'));
     } else {
@@ -464,8 +465,8 @@ const handleSaveConfig = async () => {
 const handleTrigger = async () => {
   triggerLoading.value = true;
   try {
-    const response = await evolutionService.triggerEvolution(props.workspaceId);
-    ElMessage.success(t('evolution.triggered', { cycleId: response.data.cycle_id }));
+    const data = await evolutionService.triggerEvolution(props.workspaceId);
+    ElMessage.success(t('evolution.triggered', { cycleId: data.cycle_id }));
     await loadStatus();
   } catch (error) {
     console.error('Failed to trigger evolution:', error);
@@ -536,8 +537,8 @@ const handleViewCycleDetail = async (cycleId: string) => {
 
   loadingCycleDetail.value = true;
   try {
-    const response = await evolutionService.getCycleDetail(props.workspaceId, cycleId);
-    cycleDetail.value = response.data;
+    const data = await evolutionService.getCycleDetail(props.workspaceId, cycleId);
+    cycleDetail.value = data;
   } catch (error) {
     console.error('Failed to load cycle detail:', error);
     ElMessage.error(t('evolution.loadDetailFailed'));

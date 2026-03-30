@@ -17,6 +17,7 @@ This package provides a comprehensive set of tools organized by functionality:
 
 # Original tools
 from .command_tools import ExecuteCommandTool, RunSlashCommandTool, ShellCommandTool
+from .acp_tools import CallACPAgentTool
 from .diff_applier import ApplyDiffTool
 from .document_parser import DocumentParsingTool
 from .edit_tools import ApplyDiffTool as EnhancedApplyDiffTool
@@ -80,6 +81,7 @@ __all__ = [
     "ExecuteCommandTool",
     "RunSlashCommandTool",
     "ShellCommandTool",
+    "CallACPAgentTool",
     # MCP Tools
     "UseMCPTool",
     "AccessMCPResource",

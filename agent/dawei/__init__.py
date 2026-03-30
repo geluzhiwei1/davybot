@@ -45,6 +45,7 @@ def get_dawei_home() -> Path:
 from . import (
     agentic,
     async_task,
+    channels,
     conversation,
     core,
     entity,
@@ -141,6 +142,7 @@ __all__ = [
     "websocket",
     "tools",
     "agentic",
+    "channels",
     "core",
     "conversation",
     "entity",
@@ -165,6 +167,7 @@ def get_module_info():
             "websocket",
             "tools",
             "agentic",
+            "channels",
             "core",
             "conversation",
             "entity",

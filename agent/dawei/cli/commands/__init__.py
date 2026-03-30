@@ -7,6 +7,7 @@ Import all command groups to register them with the CLI.
 """
 
 from dawei.cli.commands.agent import agent_cmd
+from dawei.cli.commands.acp import acp_cmd
 from dawei.cli.commands.gui import gui_cmd
 from dawei.cli.commands.server import server_cmd
 from dawei.cli.commands.tui import tui_cmd
@@ -16,6 +17,7 @@ from dawei.cli.commands.tui import tui_cmd
 
 __all__ = [
     "agent_cmd",
+    "acp_cmd",
     "gui_cmd",
     "server_cmd",
     "tui_cmd",

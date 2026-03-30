@@ -61,6 +61,12 @@
               <Icon icon="cil:calendar" width="24" height="24" />
             </el-button>
           </el-tooltip>
+          <!-- Channels -->
+          <el-tooltip content="Channels" placement="right">
+            <el-button @click="handleOpenChannelsDrawer" text circle>
+              <Icon icon="material-symbols:swap-horiz" width="24" height="24" />
+            </el-button>
+          </el-tooltip>
           <!-- Evolution -->
           <el-tooltip :content="t('evolution.title')" placement="right">
             <el-button @click="handleOpenEvolutionDrawer" text circle>
@@ -200,6 +206,12 @@
       <ScheduledTasksDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 
+    <!-- Channels抽屉 -->
+    <el-drawer v-model="isChannelsDrawerVisible" title="Channels"
+      direction="rtl" size="90%">
+      <ChannelsPanel v-if="chatStore.workspaceId" :workspace-id="chatStore.workspaceId" />
+    </el-drawer>
+
     <!-- Evolution抽屉 -->
     <el-drawer v-model="isEvolutionDrawerVisible" :title="t('evolution.title')" direction="rtl" size="90%">
       <EvolutionDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
@@ -280,6 +292,7 @@ import AgentsDrawer from '@/components/drawers/AgentsDrawer.vue';
 import PluginsDrawer from '@/components/drawers/PluginsDrawer.vue';
 import MCPDrawer from '@/components/drawers/MCPDrawer.vue';
 import ScheduledTasksDrawer from '@/components/drawers/ScheduledTasksDrawer.vue';
+import ChannelsPanel from '@/components/workspace/ChannelsPanel.vue';
 import EvolutionDrawer from '@/components/drawers/EvolutionDrawer.vue';
 import FollowupQuestionDialog from '@/components/FollowupQuestionDialog.vue';
 import MinimalMonitoringPanel from '@/components/monitoring/MinimalMonitoringPanel.vue';
@@ -336,6 +349,7 @@ const isAgentsDrawerVisible = ref(false);
 const isPluginsDrawerVisible = ref(false);
 const isMCPDrawerVisible = ref(false);
 const isScheduledTasksDrawerVisible = ref(false);
+const isChannelsDrawerVisible = ref(false);
 const isEvolutionDrawerVisible = ref(false);
 const initialSettingsTab = ref<string | undefined>(undefined);
 
@@ -722,6 +736,10 @@ const handleOpenMCPDrawer = () => {
 // 打开定时任务抽屉
 const handleOpenScheduledTasksDrawer = () => {
   isScheduledTasksDrawerVisible.value = true;
+};
+
+const handleOpenChannelsDrawer = () => {
+  isChannelsDrawerVisible.value = true;
 };
 
 // 打开Evolution抽屉

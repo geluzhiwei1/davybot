@@ -66,6 +66,7 @@ class EvolutionLock:
         self._pm = WorkspacePersistenceManager(workspace.workspace_path)
         self._resource_key = f"evolution:{workspace.workspace_id}"
         self._lock_holder = False
+        self._async_lock: asyncio.Lock | None = None
 
         logger.debug(f"[EVOLUTION_LOCK] Initialized for workspace {workspace.workspace_id}")
 
@@ -78,15 +79,20 @@ class EvolutionLock:
             bool: True表示成功获取锁，False表示锁已被持有
 
         """
-        # 尝试获取锁
-        acquired = await self._pm._resource_lock.acquire(self._resource_key)
+        # ResourceLock.acquire() returns an asyncio.Lock, not a bool
+        self._async_lock = await self._pm._resource_lock.acquire(self._resource_key)
+
+        # asyncio.Lock 没有 acquire_nowait()，用 locked() 检查 + acquire() 获取
+        if self._async_lock.locked():
+            acquired = False
+        else:
+            await self._async_lock.acquire()
+            acquired = True
 
         if acquired:
-            # 获取锁成功
             self._lock_holder = True
             logger.info(f"[EVOLUTION_LOCK] Acquired lock for {self._resource_key}")
         else:
-            # 锁已被持有
             logger.debug(f"[EVOLUTION_LOCK] Lock already held for {self._resource_key}")
 
         return acquired
@@ -98,9 +104,10 @@ class EvolutionLock:
         如果未持有锁，此方法不执行任何操作。
 
         """
-        if self._lock_holder:
-            await self._pm._resource_lock.release(self._resource_key)
+        if self._lock_holder and self._async_lock is not None:
+            self._async_lock.release()
             self._lock_holder = False
+            self._async_lock = None
             logger.info(f"[EVOLUTION_LOCK] Released lock for {self._resource_key}")
         else:
             logger.debug(f"[EVOLUTION_LOCK] Not holding lock for {self._resource_key}, skipping release")
@@ -112,20 +119,13 @@ class EvolutionLock:
             bool: True表示锁被持有，False表示锁未被持有
 
         """
-        # 检查锁是否被持有
-        # 注意：ResourceLock没有直接的is_held方法，我们通过尝试acquire来判断
-        # 如果acquire返回False，说明锁已被持有
         if self._lock_holder:
-            # 当前持有锁
             return True
 
-        # 尝试获取锁（非阻塞）
-        test_lock = asyncio.Lock()
-        if not test_lock.locked():
-            # 如果我们能立即获取锁，说明锁未被持有
-            return False
+        if self._async_lock is not None:
+            return self._async_lock.locked()
 
-        return True
+        return False
 
     async def __aenter__(self):
         """async上下文管理器入口

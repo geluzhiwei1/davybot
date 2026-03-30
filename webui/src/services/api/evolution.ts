@@ -102,7 +102,7 @@ export interface CycleDetailResponse {
 // ==================== API Service ====================
 
 class EvolutionService {
-  private readonly basePath = '/api/workspaces';
+  private readonly basePath = '/workspaces';
 
   /**
    * 启用evolution功能

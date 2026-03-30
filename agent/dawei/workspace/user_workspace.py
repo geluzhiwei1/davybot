@@ -304,10 +304,18 @@ class UserWorkspace:
     @property
     def mode(self):
         """当前mode"""
+        if not self.workspace_info or not self.workspace_info.user_ui_context:
+            return None
         return self.workspace_info.user_ui_context.current_mode
 
     @mode.setter
     def mode(self, value):
+        if not self.workspace_info:
+            logger.warning(f"Cannot set mode to '{value}': workspace_info is None")
+            return
+        if not self.workspace_info.user_ui_context:
+            logger.warning(f"Cannot set mode to '{value}': user_ui_context is None")
+            return
         self.workspace_info.user_ui_context.current_mode = value
 
     @property

@@ -58,7 +58,7 @@ TOOL_GROUPS = {
         "tools": ["execute_command"],
     },
     "mcp": {
-        "tools": ["use_mcp_tool", "access_mcp_resource"],
+        "tools": ["use_mcp_tool", "access_mcp_resource", "call_acp_agent"],
     },
     "modes": {
         "tools": ["switch_mode", "new_task"],

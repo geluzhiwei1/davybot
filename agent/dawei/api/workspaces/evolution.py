@@ -6,7 +6,9 @@
 提供Evolution功能的REST API接口。
 """
 
+import json
 import logging
+from pathlib import Path
 from typing import Dict, Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -25,6 +27,28 @@ from dawei.evolution.exceptions import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/{workspace_id}/evolution", tags=["evolution"])
+
+EVOLUTION_CONFIG_FILE = "evolution.json"
+
+
+def _load_evolution_config(workspace_path: Path) -> Dict[str, Any]:
+    """从 .dawei/evolution.json 加载 evolution 配置"""
+    config_file = workspace_path / ".dawei" / EVOLUTION_CONFIG_FILE
+    if config_file.exists():
+        try:
+            with config_file.open(encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning(f"Failed to load evolution config: {e}")
+    return {}
+
+
+def _save_evolution_config(workspace_path: Path, config: Dict[str, Any]) -> None:
+    """保存 evolution 配置到 .dawei/evolution.json"""
+    config_file = workspace_path / ".dawei" / EVOLUTION_CONFIG_FILE
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    with config_file.open("w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
 
 
 # ==================== Request/Response Models ====================
@@ -70,7 +94,7 @@ class CycleDetailResponse(BaseModel):
 # ==================== API Endpoints ====================
 
 
-@router.post("/enable", response_model=Dict[str, str])
+@router.post("/enable")
 async def enable_evolution(workspace_id: str, config: EvolutionConfigRequest):
     """启用evolution功能
 
@@ -85,38 +109,26 @@ async def enable_evolution(workspace_id: str, config: EvolutionConfigRequest):
         HTTPException: 当workspace不存在或配置保存失败时
 
     """
-    try:
-        workspace = await get_user_workspace(workspace_id)
+    workspace = get_user_workspace(workspace_id)
 
-        # 更新workspace配置
-        if not workspace.workspace_config:
-            workspace.workspace_config = {}
+    evolution_config = {
+        "enabled": config.enabled,
+        "schedule": config.schedule,
+        "phase_duration": config.phase_duration,
+        "max_cycles": config.max_cycles,
+        "goals": config.goals,
+    }
 
-        workspace.workspace_config["evolution"] = {
-            "enabled": config.enabled,
-            "schedule": config.schedule,
-            "phase_duration": config.phase_duration,
-            "max_cycles": config.max_cycles,
-            "goals": config.goals,
-        }
+    # 保存到 .dawei/evolution.json
+    _save_evolution_config(Path(workspace.absolute_path), evolution_config)
 
-        # 保存配置
-        await workspace.save_settings()
+    logger.info(f"[EVOLUTION_API] Enabled evolution for workspace {workspace_id}")
 
-        logger.info(f"[EVOLUTION_API] Enabled evolution for workspace {workspace_id}")
-
-        return {
-            "status": "enabled",
-            "workspace_id": workspace_id,
-            "config": workspace.workspace_config["evolution"],
-        }
-
-    except Exception as e:
-        logger.error(f"[EVOLUTION_API] Failed to enable evolution for workspace {workspace_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to enable evolution: {str(e)}",
-        )
+    return {
+        "status": "enabled",
+        "workspace_id": workspace_id,
+        "config": evolution_config,
+    }
 
 
 @router.post("/disable", response_model=Dict[str, str])
@@ -134,16 +146,9 @@ async def disable_evolution(workspace_id: str):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
-        # 更新workspace配置
-        if not workspace.workspace_config:
-            workspace.workspace_config = {}
-
-        workspace.workspace_config["evolution"] = {"enabled": False}
-
-        # 保存配置
-        await workspace.save_settings()
+        _save_evolution_config(Path(workspace.absolute_path), {"enabled": False})
 
         logger.info(f"[EVOLUTION_API] Disabled evolution for workspace {workspace_id}")
 
@@ -172,11 +177,10 @@ async def get_evolution_status(workspace_id: str):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
-        # 获取配置
-        workspace_config = workspace.workspace_config or {}
-        evolution_config = workspace_config.get("evolution", {})
+        # 从 .dawei/evolution.json 加载配置
+        evolution_config = _load_evolution_config(Path(workspace.absolute_path))
         enabled = evolution_config.get("enabled", False)
 
         # 检查是否正在运行
@@ -223,11 +227,14 @@ async def trigger_evolution(workspace_id: str):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
-        # 检查是否已启用evolution
-        workspace_config = workspace.workspace_config or {}
-        evolution_config = workspace_config.get("evolution", {})
+        # 确保工作区已初始化（Agent需要llm_manager、workspace_info等）
+        if not workspace.is_initialized():
+            await workspace.initialize()
+
+        # 从 .dawei/evolution.json 加载配置
+        evolution_config = _load_evolution_config(Path(workspace.absolute_path))
         if not evolution_config.get("enabled", False):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -275,7 +282,7 @@ async def pause_cycle(workspace_id: str, cycle_id: str):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
         manager = EvolutionCycleManager(workspace)
         await manager.pause_cycle(cycle_id)
@@ -319,7 +326,7 @@ async def resume_cycle(workspace_id: str, cycle_id: str):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
         manager = EvolutionCycleManager(workspace)
         await manager.resume_cycle(cycle_id)
@@ -364,7 +371,7 @@ async def abort_cycle(workspace_id: str, cycle_id: str, reason: str = ""):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
         manager = EvolutionCycleManager(workspace)
         await manager.abort_cycle(cycle_id, reason)
@@ -412,7 +419,7 @@ async def get_cycle_detail(workspace_id: str, cycle_id: str):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
         storage = EvolutionStorage(workspace)
 
@@ -469,7 +476,7 @@ async def delete_cycle(workspace_id: str, cycle_id: str):
 
     """
     try:
-        workspace = await get_user_workspace(workspace_id)
+        workspace = get_user_workspace(workspace_id)
 
         storage = EvolutionStorage(workspace)
 
