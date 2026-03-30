@@ -1,6 +1,9 @@
 name: Release to PyPI
 
-# 手动发布到 PyPI（需要人工确认后手动触发）
+# 手动发布（需要人工确认后手动触发）
+# 产出两种 wheel：
+#   - standalone: 含 Tauri GUI + drawio，发布到 GitHub Release，不推 PyPI
+#   - pypi:       纯 Python 包（无 Tauri/drawio），发布到 GitHub Release 并推送到 PyPI
 
 on:
   workflow_dispatch:
@@ -19,6 +22,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Job 1: 构建所有平台 Tauri GUI 可执行文件
+  # ─────────────────────────────────────────────────────────────
   build-tauri:
     name: Build Tauri (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ${{ matrix.platform }}
@@ -120,13 +126,11 @@ jobs:
         if: runner.os != 'Windows'
         working-directory: ./webui
         run: |
-          # Prepare deps directory and clone drawio
           mkdir -p ../deps
           if [ ! -d "../deps/drawio" ]; then
             echo "Cloning drawio repository..."
             git clone https://github.com/geluzhiwei1/drawio.git ../deps/drawio
           fi
-          # Run prepare-drawio.sh to copy resources
           bash scripts/prepare-drawio.sh
 
       - name: Prepare drawio resources (Windows)
@@ -134,13 +138,11 @@ jobs:
         working-directory: ./webui
         shell: bash
         run: |
-          # Prepare deps directory and clone drawio
           mkdir -p ../deps
           if [ ! -d "../deps/drawio" ]; then
             echo "Cloning drawio repository..."
             git clone https://github.com/geluzhiwei1/drawio.git ../deps/drawio
           fi
-          # Run prepare-drawio.sh to copy resources
           bash scripts/prepare-drawio.sh
 
       - name: Build frontend
@@ -167,19 +169,20 @@ jobs:
           path: webui/src-tauri/target/${{ matrix.target }}/release/dawei-gui.exe
           if-no-files-found: error
 
-  build-wheel:
-    name: Build & Publish Wheel
+  # ─────────────────────────────────────────────────────────────
+  # Job 2: 构建 standalone wheel（含 Tauri + drawio）
+  #         → 仅发布到 GitHub Release，不推 PyPI
+  # ─────────────────────────────────────────────────────────────
+  build-wheel-standalone:
+    name: Build Standalone Wheel (with Tauri + drawio)
     runs-on: ubuntu-latest
     needs: build-tauri
-    environment:
-      name: pypi
-      url: https://pypi.org/p/davybot
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for setuptools_scm version detection
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -233,7 +236,6 @@ jobs:
           mkdir -p agent/dawei/frontend
           rm -rf agent/dawei/frontend/*
           cp -r webui/src-tauri/resources/* agent/dawei/frontend/
-          # Ensure welcome.html is included
           if [ -f "webui/src-tauri/resources/welcome.html" ]; then
             cp webui/src-tauri/resources/welcome.html agent/dawei/frontend/
           fi
@@ -242,7 +244,6 @@ jobs:
         run: |
           mkdir -p agent/dawei/bin
 
-          # Copy each platform executable with explicit error checking
           if [ -f "tauri-executables/tauri-executable-linux-x86_64/dawei-gui" ]; then
             cp tauri-executables/tauri-executable-linux-x86_64/dawei-gui \
                agent/dawei/bin/dawei-gui-linux-x86_64
@@ -282,22 +283,19 @@ jobs:
 
       - name: Verify all files are present
         run: |
-          echo "Verifying package structure..."
+          echo "Verifying standalone package structure..."
 
-          # Check frontend
           if [ ! -f "agent/dawei/frontend/index.html" ]; then
             echo "ERROR: frontend/index.html not found"
             exit 1
           fi
 
-          # Check bin directory
           EXPECTED_BINS=(
             "dawei-gui-linux-x86_64"
             "dawei-gui-darwin-x86_64"
             "dawei-gui-darwin-aarch64"
             "dawei-gui-windows-x86_64.exe"
           )
-
           for bin in "${EXPECTED_BINS[@]}"; do
             if [ ! -f "agent/dawei/bin/$bin" ]; then
               echo "ERROR: bin/$bin not found"
@@ -306,44 +304,228 @@ jobs:
             echo "✅ Found: $bin ($(du -h agent/dawei/bin/$bin | cut -f1))"
           done
 
-          echo "✅ All files verified successfully"
+          echo "✅ All standalone files verified"
 
-      - name: Get version from setuptools_scm
+      - name: Get version
         id: version
         run: |
-          # If manual version input is provided, use it directly
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
-            echo "Using manual version: ${VERSION}"
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
             echo "use_manual=true" >> $GITHUB_OUTPUT
           else
-            # Auto-detect version from setuptools_scm
             cd agent
             VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='..', relative_to='pyproject.toml'))")
-            echo "Detected version: ${VERSION}"
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-            echo "use_manual=false" >> $GITHUB_OUTPUT
-
-            # Validate version format (should not contain git hash like +g7093f5e57)
             if [[ "$VERSION" =~ \+g[0-9a-f]+ ]]; then
               echo "ERROR: Version contains git hash which is not PyPI compatible: $VERSION"
-              echo "The local_scheme = 'no-local-version' setting should prevent this"
               exit 1
             fi
+            echo "use_manual=false" >> $GITHUB_OUTPUT
           fi
+          echo "Detected version: ${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Copy README to agent directory
         run: |
-          # Copy README.md to agent directory for PyPI long_description
           cp README.md agent/README.md
           cp README_CN.md agent/README_CN.md
 
-      - name: Build wheel
+      - name: Build standalone wheel
         working-directory: ./agent
         run: |
           rm -rf dist/ build/ *.egg-info
-          # If manual version is provided, use SETUPTOOLS_SCM_PRETEND_VERSION to override
+          if [ "${{ steps.version.outputs.use_manual }}" = "true" ]; then
+            export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT="${{ steps.version.outputs.version }}"
+          fi
+          # Rename package to davybot-standalone to区分 PyPI 包
+          # 通过环境变量注入覆盖包名
+          STANDALONE_VERSION="${{ steps.version.outputs.version }}"
+          python3 - <<'PYEOF'
+import subprocess, os, sys, re, pathlib
+
+version = os.environ.get("SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT") or \
+          subprocess.check_output(
+              ["python3", "-c",
+               "from setuptools_scm import get_version; print(get_version(root='..', relative_to='pyproject.toml'))"],
+              text=True
+          ).strip()
+
+# 临时修改 pyproject.toml 中的包名为 davybot-standalone
+toml_path = pathlib.Path("pyproject.toml")
+original = toml_path.read_text()
+patched = original.replace('name = "davybot"', 'name = "davybot-standalone"', 1)
+toml_path.write_text(patched)
+
+try:
+    env = os.environ.copy()
+    env["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT_STANDALONE"] = version
+    env["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT"] = version
+    result = subprocess.run(["python3", "-m", "build"], env=env)
+    sys.exit(result.returncode)
+finally:
+    # 恢复原始 pyproject.toml
+    toml_path.write_text(original)
+PYEOF
+
+      - name: Verify standalone wheel contents
+        working-directory: ./agent
+        run: |
+          WHEEL_FILE=$(ls dist/*.whl | head -1)
+          echo "Found standalone wheel: $WHEEL_FILE"
+          python3 - <<EOF
+          import zipfile, sys
+          wheel_path = "$WHEEL_FILE"
+          expected_bins = [
+              "dawei/bin/dawei-gui-linux-x86_64",
+              "dawei/bin/dawei-gui-darwin-x86_64",
+              "dawei/bin/dawei-gui-darwin-aarch64",
+              "dawei/bin/dawei-gui-windows-x86_64.exe",
+          ]
+          with zipfile.ZipFile(wheel_path, 'r') as zf:
+              files = zf.namelist()
+              for bin_file in expected_bins:
+                  if bin_file in files:
+                      info = zf.getinfo(bin_file)
+                      print(f"✅ Found: {bin_file} ({info.file_size/1024/1024:.1f} MB)")
+                  else:
+                      print(f"❌ Missing: {bin_file}")
+                      sys.exit(1)
+              if "dawei/frontend/index.html" in files:
+                  print("✅ Found: dawei/frontend/index.html")
+              else:
+                  print("❌ Missing: dawei/frontend/index.html")
+                  sys.exit(1)
+          print("✅ Standalone wheel verification passed")
+          EOF
+
+      - name: Check standalone wheel size
+        working-directory: ./agent
+        run: |
+          WHEEL_FILE=$(ls dist/*.whl | head -1)
+          WHEEL_SIZE=$(du -m "$WHEEL_FILE" | cut -f1)
+          echo "Standalone wheel size: ${WHEEL_SIZE} MB"
+          if [ "$WHEEL_SIZE" -lt 80 ]; then
+            echo "WARNING: Wheel size seems too small (expected ~100 MB)"
+          elif [ "$WHEEL_SIZE" -gt 300 ]; then
+            echo "WARNING: Wheel size seems too large (expected ~100 MB)"
+          else
+            echo "✅ Standalone wheel size is within expected range"
+          fi
+
+      - name: Upload standalone wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel-standalone-${{ steps.version.outputs.version }}
+          path: agent/dist/
+          if-no-files-found: error
+
+      - name: Build summary (standalone)
+        if: always()
+        run: |
+          echo "## Standalone Wheel Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: standalone (Tauri + drawio + frontend bundled)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Wheel Size**: $(du -m agent/dist/*.whl 2>/dev/null | cut -f1 || echo 'N/A') MB" >> $GITHUB_STEP_SUMMARY
+          echo "- **PyPI**: ❌ Not published (standalone only)" >> $GITHUB_STEP_SUMMARY
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 3: 构建 PyPI wheel（纯 Python 包，不含 Tauri/drawio）
+  #         → 发布到 GitHub Release 并推送到 PyPI
+  # ─────────────────────────────────────────────────────────────
+  build-wheel-pypi:
+    name: Build & Publish PyPI Wheel (pure Python)
+    runs-on: ubuntu-latest
+    needs: build-tauri
+    environment:
+      name: pypi
+      url: https://pypi.org/p/davybot
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: 'webui/pnpm-lock.yaml'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        working-directory: ./agent
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install build setuptools_scm
+
+      - name: Install frontend dependencies
+        working-directory: ./webui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend (without drawio)
+        working-directory: ./webui
+        run: |
+          # 确保 public/drawio 不存在，使构建产物中不包含 drawio 资源
+          rm -rf public/drawio
+          pnpm build
+
+      - name: Copy frontend to agent (no Tauri executables, no drawio)
+        run: |
+          mkdir -p agent/dawei/frontend
+          rm -rf agent/dawei/frontend/*
+          cp -r webui/src-tauri/resources/* agent/dawei/frontend/
+          if [ -f "webui/src-tauri/resources/welcome.html" ]; then
+            cp webui/src-tauri/resources/welcome.html agent/dawei/frontend/
+          fi
+          # 确认 drawio 未被打入前端产物
+          if [ -d "agent/dawei/frontend/drawio" ]; then
+            echo "ERROR: drawio directory should not be in PyPI wheel frontend"
+            exit 1
+          fi
+          echo "✅ drawio excluded from frontend"
+          # 确保 bin 目录为空（PyPI 包不包含 Tauri 可执行文件）
+          mkdir -p agent/dawei/bin
+          rm -f agent/dawei/bin/dawei-gui-*
+          echo "PyPI wheel: Tauri executables excluded" > agent/dawei/bin/.gitkeep
+          ls -la agent/dawei/bin/
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "use_manual=true" >> $GITHUB_OUTPUT
+          else
+            cd agent
+            VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='..', relative_to='pyproject.toml'))")
+            if [[ "$VERSION" =~ \+g[0-9a-f]+ ]]; then
+              echo "ERROR: Version contains git hash: $VERSION"
+              exit 1
+            fi
+            echo "use_manual=false" >> $GITHUB_OUTPUT
+          fi
+          echo "Detected version: ${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Copy README to agent directory
+        run: |
+          cp README.md agent/README.md
+          cp README_CN.md agent/README_CN.md
+
+      - name: Build PyPI wheel
+        working-directory: ./agent
+        run: |
+          rm -rf dist/ build/ *.egg-info
           if [ "${{ steps.version.outputs.use_manual }}" = "true" ]; then
             export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT="${{ steps.version.outputs.version }}"
             echo "Building with manual version: ${{ steps.version.outputs.version }}"
@@ -352,112 +534,84 @@ jobs:
           fi
           python3 -m build
 
-      - name: Verify wheel package contents
+      - name: Verify PyPI wheel contents
         working-directory: ./agent
         run: |
-          echo "Verifying wheel package contents..."
-
-          # Check if wheel was created
           WHEEL_FILE=$(ls dist/*.whl | head -1)
-          if [ -z "$WHEEL_FILE" ]; then
-            echo "ERROR: No wheel file found"
-            exit 1
-          fi
-
-          echo "Found wheel: $WHEEL_FILE"
-
-          # Verify wheel contains GUI executables
+          echo "Found PyPI wheel: $WHEEL_FILE"
           python3 - <<EOF
-          import zipfile
-          import sys
-
+          import zipfile, sys
           wheel_path = "$WHEEL_FILE"
-          expected_bins = [
+          tauri_bins = [
               "dawei/bin/dawei-gui-linux-x86_64",
               "dawei/bin/dawei-gui-darwin-x86_64",
               "dawei/bin/dawei-gui-darwin-aarch64",
               "dawei/bin/dawei-gui-windows-x86_64.exe",
           ]
-
           with zipfile.ZipFile(wheel_path, 'r') as zf:
               files = zf.namelist()
-
-              # Check GUI executables
-              for bin_file in expected_bins:
-                  if bin_file in files:
-                      info = zf.getinfo(bin_file)
-                      size_mb = info.file_size / 1024 / 1024
-                      print(f"✅ Found: {bin_file} ({size_mb:.1f} MB)")
-                  else:
-                      print(f"❌ Missing: {bin_file}")
-                      sys.exit(1)
-
-              # Check frontend
+              # 确认前端已包含
               if "dawei/frontend/index.html" in files:
                   print("✅ Found: dawei/frontend/index.html")
               else:
                   print("❌ Missing: dawei/frontend/index.html")
                   sys.exit(1)
-
-          print("✅ Wheel package verification passed")
+              # 确认 Tauri 可执行文件未包含
+              for bin_file in tauri_bins:
+                  if bin_file in files:
+                      print(f"❌ Tauri executable should NOT be in PyPI wheel: {bin_file}")
+                      sys.exit(1)
+              print("✅ PyPI wheel correctly excludes Tauri executables")
+              # 确认 drawio 资源未包含
+              drawio_files = [f for f in files if "frontend/drawio/" in f]
+              if drawio_files:
+                  print(f"❌ drawio resources should NOT be in PyPI wheel ({len(drawio_files)} files found)")
+                  sys.exit(1)
+              print("✅ PyPI wheel correctly excludes drawio resources")
+          print("✅ PyPI wheel verification passed")
           EOF
 
-          echo "✅ Wheel package is valid"
-
-      - name: Check wheel size
+      - name: Check PyPI wheel size
         working-directory: ./agent
         run: |
           WHEEL_FILE=$(ls dist/*.whl | head -1)
           WHEEL_SIZE=$(du -m "$WHEEL_FILE" | cut -f1)
-
-          echo "Wheel size: ${WHEEL_SIZE} MB"
-
-          # Wheel should be around 100-120 MB (包含所有平台的 GUI)
-          if [ "$WHEEL_SIZE" -lt 80 ]; then
-            echo "WARNING: Wheel size seems too small (expected ~100 MB)"
-            echo "This might indicate that GUI executables are missing"
-          elif [ "$WHEEL_SIZE" -gt 200 ]; then
-            echo "WARNING: Wheel size seems too large (expected ~100 MB)"
+          echo "PyPI wheel size: ${WHEEL_SIZE} MB"
+          if [ "$WHEEL_SIZE" -gt 100 ]; then
+            echo "WARNING: PyPI wheel is too large (>${WHEEL_SIZE} MB). Check for accidentally included binaries."
           else
-            echo "✅ Wheel size is within expected range"
+            echo "✅ PyPI wheel size is acceptable"
           fi
 
-      - name: Copy wheel to root dist
-        run: |
-          mkdir -p dist
-          cp -r agent/dist/* dist/
-
-      - name: Upload wheel as artifact
+      - name: Upload PyPI wheel as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: python-wheel-${{ steps.version.outputs.version }}
-          path: dist/
+          name: python-wheel-pypi-${{ steps.version.outputs.version }}
+          path: agent/dist/
           if-no-files-found: error
 
-      - name: Build summary
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: agent/dist/
+          skip-existing: false
+
+      - name: Build summary (PyPI)
         if: always()
         run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## PyPI Wheel Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Wheel Size**: $(du -m agent/dist/*.whl | cut -f1) MB" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platforms**:" >> $GITHUB_STEP_SUMMARY
-          echo "  - Linux x86_64: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "  - macOS x86_64: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "  - macOS aarch64: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "  - Windows x86_64: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: pypi (frontend bundled without drawio, no Tauri executables)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Wheel Size**: $(du -m agent/dist/*.whl 2>/dev/null | cut -f1 || echo 'N/A') MB" >> $GITHUB_STEP_SUMMARY
+          echo "- **PyPI**: ✅ Published to https://pypi.org/p/davybot" >> $GITHUB_STEP_SUMMARY
 
-      # - name: Publish distribution to PyPI
-      #   uses: pypa/gh-action-pypi-publish@release/v1
-      #   with:
-      #     password: ${{ secrets.PYPI_API_TOKEN }}
-      #     packages-dir: agent/dist/
-      #     skip-existing: false
-
+  # ─────────────────────────────────────────────────────────────
+  # Job 4: 创建 GitHub Release，包含两种 wheel
+  # ─────────────────────────────────────────────────────────────
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-tauri, build-wheel]
+    needs: [build-tauri, build-wheel-standalone, build-wheel-pypi]
     if: success()
 
     steps:
@@ -466,86 +620,102 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-artifacts
-          pattern: '*'
-          merge-multiple: false
-
-      - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: python-wheel-*
-          path: dist
-          merge-multiple: true
-
-      - name: Verify wheel files exist
-        run: |
-          echo "Verifying distribution files..."
-          ls -la dist/
-
-          # Check if wheel exists
-          if [ ! -f "dist/*.whl" ]; then
-            echo "ERROR: No wheel file found in dist/"
-            ls -la dist/
-            exit 1
-          fi
-
-          WHEEL_FILE=$(ls dist/*.whl | head -1)
-          echo "✅ Found wheel: $WHEEL_FILE"
-          echo "Wheel size: $(du -h "$WHEEL_FILE" | cut -f1)"
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Get version from setuptools_scm
+      - name: Install setuptools_scm
+        run: python3 -m pip install setuptools_scm
+
+      - name: Get version
         id: version
         run: |
-          # If manual version input is provided, use it directly
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            # Auto-detect version from setuptools_scm
             cd agent
             VERSION=$(python3 -c "from setuptools_scm import get_version; print(get_version(root='..', relative_to='pyproject.toml'))")
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
+      - name: Download standalone wheel
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-wheel-standalone-*
+          path: dist/standalone
+          merge-multiple: true
+
+      - name: Download PyPI wheel
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-wheel-pypi-*
+          path: dist/pypi
+          merge-multiple: true
+
+      - name: List release artifacts
+        run: |
+          echo "=== Standalone wheel ==="
+          ls -lh dist/standalone/
+          echo "=== PyPI wheel ==="
+          ls -lh dist/pypi/
+
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # Create release with all artifacts
+          # 重命名 standalone wheel 以便在 Release 中区分
+          for f in dist/standalone/*.whl; do
+            base=$(basename "$f" .whl)
+            mv "$f" "dist/standalone/${base}-standalone.whl"
+          done
+
           gh release create '${{ steps.version.outputs.version }}' \
             --repo '${{ github.repository }}' \
             --title "Release ${{ steps.version.outputs.version }}" \
             --notes "## Release ${{ steps.version.outputs.version }}
 
-          ### Changes
-          - Full Python backend with FastAPI
-          - Vue 3 frontend with Element Plus
-          - Tauri desktop GUI for all platforms:
-            - Linux x86_64
-            - macOS x86_64 (Intel)
-            - macOS aarch64 (Apple Silicon)
-            - Windows x86_64
+          ### Packages
+
+          | Package | Description | PyPI |
+          |---------|-------------|------|
+          | \`davybot-standalone-*.whl\` | Full standalone (Tauri GUI + drawio bundled, all platforms) | ❌ Not on PyPI |
+          | \`davybot-*.whl\` | Standard Python package (frontend bundled, pip installable) | ✅ Published |
 
           ### Installation
+
+          **Standard (pip):**
           \`\`\`bash
           pip install davybot==${{ steps.version.outputs.version }}
+          dawei server start
+          \`\`\`
+
+          **Standalone (download from Release):**
+          Download \`davybot-standalone-*.whl\` and install manually:
+          \`\`\`bash
+          pip install davybot_standalone-*.whl
           dawei gui  # Launch desktop GUI
           \`\`\`
 
-          ### Verification
-          - ✅ All platform GUI executables included
-          - ✅ Frontend resources bundled
-          - ✅ Wheel size: $(du -h agent/dist/*.whl 2>/dev/null | cut -f1 || echo "N/A")
+          ### Platform Support (standalone)
+          - ✅ Linux x86_64
+          - ✅ macOS x86_64 (Intel)
+          - ✅ macOS aarch64 (Apple Silicon)
+          - ✅ Windows x86_64
+
+          ### Wheel Sizes
+          - Standalone: $(du -h dist/standalone/*.whl 2>/dev/null | cut -f1 || echo 'N/A')
+          - PyPI: $(du -h dist/pypi/*.whl 2>/dev/null | cut -f1 || echo 'N/A')
           " \
-            dist/*.whl \
-            dist/*.tar.gz
+            dist/standalone/*.whl \
+            dist/pypi/*.whl \
+            dist/pypi/*.tar.gz 2>/dev/null || \
+          gh release create '${{ steps.version.outputs.version }}' \
+            --repo '${{ github.repository }}' \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --notes "Release ${{ steps.version.outputs.version }}" \
+            dist/standalone/*.whl \
+            dist/pypi/*.whl
 
       - name: Release summary
         run: |
@@ -554,11 +724,10 @@ jobs:
           echo "**Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Published to:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ [PyPI](https://pypi.org/p/davybot)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ [PyPI](https://pypi.org/p/davybot) — standard wheel (no Tauri)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}) — both standalone + pypi wheels" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Included Platforms:" >> $GITHUB_STEP_SUMMARY
-          echo "- Linux x86_64" >> $GITHUB_STEP_SUMMARY
-          echo "- macOS x86_64 (Intel)" >> $GITHUB_STEP_SUMMARY
-          echo "- macOS aarch64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
-          echo "- Windows x86_64" >> $GITHUB_STEP_SUMMARY
+          echo "### Standalone wheel includes:" >> $GITHUB_STEP_SUMMARY
+          echo "- Tauri GUI (Linux x86_64 / macOS x86_64 / macOS aarch64 / Windows x86_64)" >> $GITHUB_STEP_SUMMARY
+          echo "- drawio resources" >> $GITHUB_STEP_SUMMARY
+          echo "- Vue3 frontend" >> $GITHUB_STEP_SUMMARY
