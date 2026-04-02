@@ -345,11 +345,11 @@ class Agent:
 
             # 【修复】使用 WorkspaceToolManager 而不是 ToolManager
             # WorkspaceToolManager 会初始化 Skills 工具
-            workspace_tool_manager = WorkspaceToolManager(workspace_path=user_workspace.absolute_path)
+            workspace_tool_manager = WorkspaceToolManager(workspace_root=user_workspace.absolute_path)
             await workspace_tool_manager.initialize()
 
             # 创建 ToolManager 传递给 ToolExecutor (向后兼容)
-            tool_manager = ToolManager(workspace_path=user_workspace.absolute_path)
+            tool_manager = ToolManager(workspace_root=user_workspace.absolute_path)
 
             tool_call_service = ToolExecutor(
                 tool_manager=tool_manager,

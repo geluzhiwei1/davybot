@@ -315,7 +315,6 @@ async def delete_workspace_mode(
 
     删除指定工作区的自定义模式配置，包括：
     - 删除 rules-{mode_slug} 目录（如果存在）
-    - 从 modes.yaml 中移除模式定义
 
     注意：不能删除内置系统模式（orchestrator, plan, do, check, act）
 
@@ -739,7 +738,7 @@ async def get_workspace_stats(workspace_id: str):
 
     # 统计工作区级 modes (agents) 数量
     agents_count = 0
-    modes_file = Path(workspace_path) / ".dawei" / "modes.yaml"
+    modes_file = Path(workspace_path) / ".dawei" / ".roomode"
     if modes_file.exists():
         with modes_file.open(encoding="utf-8") as f:
             modes_data = yaml.safe_load(f)
@@ -785,7 +784,7 @@ async def get_global_stats():
 
     # 3. 统计用户级 modes (agents) 总数
     modes_count = 0
-    modes_file = get_dawei_home() / ".dawei" / "modes.yaml"
+    modes_file = get_dawei_home() / ".dawei" / ".roomode"
     if modes_file.exists():
         with modes_file.open(encoding="utf-8") as f:
             modes_data = yaml.safe_load(f)

@@ -187,11 +187,11 @@ class SwitchModeTool(CustomBaseTool):
     description: ClassVar[str] = "Changes to a different mode for specialized tasks."
     args_schema: ClassVar[type[BaseModel]] = SwitchModeInput
 
-    def __init__(self, task_graph=None, workspace_path: str | None = None):
+    def __init__(self, task_graph=None, workspace_root: str | None = None):
         super().__init__()
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
-        self.workspace_path = workspace_path
+        self.workspace_root = workspace_root
         # Lazy load available modes
         self._available_modes: dict[str, dict[str, Any]] | None = None
 
@@ -203,7 +203,7 @@ class SwitchModeTool(CustomBaseTool):
         try:
             from dawei.mode.mode_manager import ModeManager
 
-            mode_manager = ModeManager(workspace_path=self.workspace_path)
+            mode_manager = ModeManager(workspace_path=self.workspace_root)
             all_modes = mode_manager.get_all_modes()
 
             # 转换为工具所需的格式
@@ -334,11 +334,11 @@ class NewTaskTool(CustomBaseTool):
     description: ClassVar[str] = "Creates a new subtask in specified mode with initial instructions."
     args_schema: ClassVar[type[BaseModel]] = NewTaskInput
 
-    def __init__(self, task_graph=None, workspace_path: str | None = None):
+    def __init__(self, task_graph=None, workspace_root: str | None = None):
         super().__init__()
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
-        self.workspace_path = workspace_path
+        self.workspace_root = workspace_root
         # Lazy load available modes
         self._available_modes: dict[str, str] | None = None
 
@@ -350,7 +350,7 @@ class NewTaskTool(CustomBaseTool):
         try:
             from dawei.mode.mode_manager import ModeManager
 
-            mode_manager = ModeManager(workspace_path=self.workspace_path)
+            mode_manager = ModeManager(workspace_path=self.workspace_root)
             all_modes = mode_manager.get_all_modes()
 
             # 转换为简化的格式 {slug: name}
@@ -2424,9 +2424,9 @@ class ExecuteTaskGraphTool(CustomBaseTool):
 class WorkflowToolFactory:
     """工作流工具工厂，支持新旧架构"""
 
-    def __init__(self, task_graph=None, workspace_path: str | None = None):
+    def __init__(self, task_graph=None, workspace_root: str | None = None):
         self.task_graph = task_graph
-        self.workspace_path = workspace_path
+        self.workspace_root = workspace_root
         self.logger = get_logger(__name__)
 
     def create_tools(self) -> List[CustomBaseTool]:
@@ -2434,8 +2434,8 @@ class WorkflowToolFactory:
         tools = [
             AskFollowupQuestionTool(self.task_graph),
             AttemptCompletionTool(self.task_graph),
-            SwitchModeTool(self.task_graph, self.workspace_path),
-            NewTaskTool(self.task_graph, self.workspace_path),
+            SwitchModeTool(self.task_graph, self.workspace_root),
+            NewTaskTool(self.task_graph, self.workspace_root),
             UpdateTodoListTool(self.task_graph),
             GetTaskStatusTool(self.task_graph),
             # TODO 计划生成工具
@@ -2466,13 +2466,13 @@ class WorkflowToolFactory:
 
 
 # 便捷函数
-def create_workflow_tools(task_graph=None, workspace_path: str | None = None) -> list[CustomBaseTool]:
+def create_workflow_tools(task_graph=None, workspace_root: str | None = None) -> list[CustomBaseTool]:
     """创建工作流工具的便捷函数"""
-    factory = WorkflowToolFactory(task_graph, workspace_path)
+    factory = WorkflowToolFactory(task_graph, workspace_root)
     return factory.create_tools()
 
 
-def create_workflow_tool(tool_name: str, task_graph=None, workspace_path: str | None = None) -> CustomBaseTool | None:
+def create_workflow_tool(tool_name: str, task_graph=None, workspace_root: str | None = None) -> CustomBaseTool | None:
     """创建单个工作流工具的便捷函数"""
-    factory = WorkflowToolFactory(task_graph, workspace_path)
+    factory = WorkflowToolFactory(task_graph, workspace_root)
     return factory.get_tool(tool_name)

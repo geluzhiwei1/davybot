@@ -20,8 +20,6 @@ import type { ApiResponse } from './types';
 export interface EvolutionConfig {
   enabled: boolean;
   schedule: string; // cron表达式，如 "0 * * * *" 表示每小时
-  phase_duration: string; // 每个phase的持续时间，如 "15m"
-  max_cycles: number; // 最大cycle数
   goals: string[]; // 目标列表
 }
 
@@ -128,8 +126,8 @@ class EvolutionService {
   /**
    * 手动触发evolution cycle
    */
-  async triggerEvolution(workspaceId: string): Promise<ApiResponse<CycleResponse>> {
-    return httpClient.post(`${this.basePath}/${workspaceId}/evolution/trigger`);
+  async triggerEvolution(workspaceId: string, daoPath?: string): Promise<ApiResponse<CycleResponse>> {
+    return httpClient.post(`${this.basePath}/${workspaceId}/evolution/trigger`, { dao_path: daoPath });
   }
 
   /**

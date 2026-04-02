@@ -60,9 +60,9 @@ class UseMCPTool(CustomBaseTool):
     description: str = "Uses a tool provided by a connected MCP server with specified parameters. Requires MCP server to be configured and connected."
     args_schema: type[BaseModel] = UseMCPToolInput
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.mcp_manager = MCPToolManager(workspace_path=workspace_path)
+        self.mcp_manager = MCPToolManager(workspace_root=workspace_root)
 
     @safe_tool_operation(
         "use_mcp_tool",
@@ -103,9 +103,9 @@ class AccessMCPResource(CustomBaseTool):
     description: str = "Accesses a resource provided by a connected MCP server using its URI. Requires MCP server to be configured and connected."
     args_schema: type[BaseModel] = AccessMCPResourceInput
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.mcp_manager = MCPToolManager(workspace_path=workspace_path)
+        self.mcp_manager = MCPToolManager(workspace_root=workspace_root)
 
     @safe_tool_operation(
         "access_mcp_resource",
@@ -144,9 +144,9 @@ class ListMCPServers(CustomBaseTool):
     description: str = "Lists all configured MCP servers and their connection status."
     args_schema: type[BaseModel] = ListMCPServersInput
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.mcp_manager = MCPToolManager(workspace_path=workspace_path)
+        self.mcp_manager = MCPToolManager(workspace_root=workspace_root)
 
     @safe_tool_operation(
         "list_mcp_servers",
@@ -216,9 +216,9 @@ class ConnectMCPServer(CustomBaseTool):
     description: str = "Connects to a configured MCP server and initializes its tools/resources."
     args_schema: type[BaseModel] = ConnectMCPServerInput
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.mcp_manager = MCPToolManager(workspace_path=workspace_path)
+        self.mcp_manager = MCPToolManager(workspace_root=workspace_root)
 
     @safe_tool_operation(
         "connect_mcp_server",
@@ -277,9 +277,9 @@ class DisconnectMCPServer(CustomBaseTool):
     description: str = "Disconnects from a connected MCP server."
     args_schema: type[BaseModel] = DisconnectMCPServerInput
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.mcp_manager = MCPToolManager(workspace_path=workspace_path)
+        self.mcp_manager = MCPToolManager(workspace_root=workspace_root)
 
     @safe_tool_operation(
         "disconnect_mcp_server",

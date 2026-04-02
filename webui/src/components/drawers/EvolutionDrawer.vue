@@ -36,51 +36,6 @@
 
       <!-- Evolution Control Panel (when enabled) -->
       <div v-if="evolutionEnabled">
-        <!-- Config Panel -->
-        <el-card shadow="never" style="margin-bottom: 16px;">
-          <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>{{ $t('evolution.config') }}</span>
-              <el-button
-                v-if="!isRunning"
-                type="primary"
-                size="small"
-                @click="showConfigDialog = true"
-              >
-                <el-icon><Setting /></el-icon>
-                {{ $t('evolution.editConfig') }}
-              </el-button>
-            </div>
-          </template>
-
-          <div v-if="evolutionStatus?.config">
-            <el-descriptions :column="2" size="small" border>
-              <el-descriptions-item :label="$t('evolution.schedule')">
-                <el-tag size="small">{{ formatSchedule(evolutionStatus.config.schedule) }}</el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item :label="$t('evolution.phaseDuration')">
-                {{ evolutionStatus.config.phase_duration }}
-              </el-descriptions-item>
-              <el-descriptions-item :label="$t('evolution.maxCycles')" :span="2">
-                {{ evolutionStatus.config.max_cycles }}
-              </el-descriptions-item>
-              <el-descriptions-item :label="$t('evolution.goals')" :span="2">
-                <el-tag
-                  v-for="(goal, index) in evolutionStatus.config.goals"
-                  :key="index"
-                  size="small"
-                  style="margin-right: 4px; margin-bottom: 4px;"
-                >
-                  {{ goal }}
-                </el-tag>
-                <span v-if="!evolutionStatus.config.goals.length" style="color: var(--el-text-color-secondary);">
-                  {{ $t('evolution.noGoals') }}
-                </span>
-              </el-descriptions-item>
-            </el-descriptions>
-          </div>
-        </el-card>
-
         <!-- Current Cycle Status -->
         <el-card shadow="never" style="margin-bottom: 16px;" v-if="evolutionStatus?.current_cycle">
           <template #header>
@@ -150,19 +105,32 @@
           <template #header>
             <span>{{ $t('evolution.manualTrigger') }}</span>
           </template>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
             <span style="font-size: 13px; color: var(--el-text-color-secondary);">
               {{ $t('evolution.manualTriggerDescription') }}
             </span>
-            <el-button
-              type="primary"
+            <el-input
+              v-model="daoPathInput"
+              :placeholder="$t('evolution.daoPathPlaceholder')"
+              clearable
               size="small"
-              @click="handleTrigger"
-              :loading="triggerLoading"
+              @keyup.enter="handleTrigger"
             >
-              <el-icon><CaretRight /></el-icon>
-              {{ $t('evolution.triggerNow') }}
-            </el-button>
+              <template #prepend>
+                <span style="white-space: nowrap;">dao.md</span>
+              </template>
+            </el-input>
+            <div style="display: flex; justify-content: flex-end;">
+              <el-button
+                type="primary"
+                size="small"
+                @click="handleTrigger"
+                :loading="triggerLoading"
+              >
+                <el-icon><CaretRight /></el-icon>
+                {{ $t('evolution.triggerNow') }}
+              </el-button>
+            </div>
           </div>
         </el-card>
 
@@ -182,6 +150,11 @@
           </template>
 
           <el-table :data="cycleHistory" stripe style="width: 100%;" max-height="400">
+            <template #empty>
+              <div style="padding: 24px 0; color: var(--el-text-color-secondary); text-align: center;">
+                {{ $t('evolution.noCycles') }}
+              </div>
+            </template>
             <el-table-column prop="cycle_id" :label="$t('evolution.cycleId')" width="100" />
             <el-table-column prop="status" :label="$t('evolution.status')" width="120">
               <template #default="scope">
@@ -230,44 +203,6 @@
         </el-card>
       </div>
     </div>
-
-    <!-- Config Dialog -->
-    <el-dialog
-      v-model="showConfigDialog"
-      :title="$t('evolution.editConfig')"
-      width="600px"
-    >
-      <el-form :model="configForm" label-width="120px">
-        <el-form-item :label="$t('evolution.schedule')">
-          <el-select v-model="configForm.schedule" style="width: 100%;">
-            <el-option label="每小时" value="0 * * * *" />
-            <el-option label="每天" value="0 0 * * *" />
-            <el-option label="每周" value="0 0 * * 0" />
-            <el-option label="每月" value="0 0 1 * *" />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="$t('evolution.phaseDuration')">
-          <el-input v-model="configForm.phase_duration" placeholder="15m" />
-        </el-form-item>
-        <el-form-item :label="$t('evolution.maxCycles')">
-          <el-input-number v-model="configForm.max_cycles" :min="1" :max="9999" />
-        </el-form-item>
-        <el-form-item :label="$t('evolution.goals')">
-          <el-input
-            v-model="goalsInput"
-            type="textarea"
-            :rows="3"
-            :placeholder="$t('evolution.goalsPlaceholder')"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showConfigDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="handleSaveConfig" :loading="savingConfig">
-          {{ $t('common.save') }}
-        </el-button>
-      </template>
-    </el-dialog>
 
     <!-- Cycle Detail Dialog -->
     <el-dialog
@@ -343,7 +278,6 @@ import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import {
-  Setting,
   VideoPause,
   VideoPlay,
   CloseBold,
@@ -353,7 +287,6 @@ import {
 } from '@element-plus/icons-vue';
 import { evolutionService } from '@/services/api/evolution';
 import type {
-  EvolutionConfig,
   EvolutionStatusResponse,
   CycleDetailResponse
 } from '@/services/api/evolution';
@@ -374,19 +307,8 @@ const loadingCycleDetail = ref(false);
 const evolutionEnabled = ref(false);
 const evolutionStatus = ref<EvolutionStatusResponse | null>(null);
 
-const showConfigDialog = ref(false);
 const showCycleDetailDialog = ref(false);
 const activeTab = ref('overview');
-
-const configForm = ref<EvolutionConfig>({
-  enabled: false,
-  schedule: '0 * * * *',
-  phase_duration: '15m',
-  max_cycles: 999,
-  goals: []
-});
-
-const goalsInput = ref('');
 
 const cycleHistory = computed(() => evolutionStatus.value?.all_cycles || []);
 const currentCycleId = ref('');
@@ -395,6 +317,8 @@ const cycleDetail = ref<CycleDetailResponse | null>(null);
 const isRunning = computed(() => evolutionStatus.value?.is_running || false);
 const isPaused = computed(() => evolutionStatus.value?.is_paused || false);
 
+const daoPathInput = ref('');
+
 // Methods
 const loadStatus = async () => {
   loading.value = true;
@@ -402,11 +326,6 @@ const loadStatus = async () => {
     const data = await evolutionService.getEvolutionStatus(props.workspaceId);
     evolutionStatus.value = data;
     evolutionEnabled.value = data.enabled;
-
-    if (data.config) {
-      configForm.value = { ...data.config };
-      goalsInput.value = data.config.goals.join('\n');
-    }
   } catch (error) {
     console.error('Failed to load evolution status:', error);
     ElMessage.error(t('evolution.loadFailed'));
@@ -419,8 +338,11 @@ const handleEnableChange = async (enabled: boolean) => {
   savingConfig.value = true;
   try {
     if (enabled) {
-      configForm.value.enabled = true;
-      await evolutionService.enableEvolution(props.workspaceId, configForm.value);
+      await evolutionService.enableEvolution(props.workspaceId, {
+        enabled: true,
+        schedule: '* * * * *',
+        goals: []
+      });
       ElMessage.success(t('evolution.enabled'));
     } else {
       await evolutionService.disableEvolution(props.workspaceId);
@@ -429,34 +351,8 @@ const handleEnableChange = async (enabled: boolean) => {
     await loadStatus();
   } catch (error) {
     console.error('Failed to toggle evolution:', error);
-    ElMessage.error(t('evology.toggleFailed'));
+    ElMessage.error(t('evolution.toggleFailed'));
     evolutionEnabled.value = !enabled; // Revert
-  } finally {
-    savingConfig.value = false;
-  }
-};
-
-const handleSaveConfig = async () => {
-  savingConfig.value = true;
-  try {
-    // Parse goals
-    const goals = goalsInput.value
-      .split('\n')
-      .map(g => g.trim())
-      .filter(g => g);
-
-    const config = {
-      ...configForm.value,
-      goals
-    };
-
-    await evolutionService.enableEvolution(props.workspaceId, config);
-    ElMessage.success(t('evolution.configSaved'));
-    showConfigDialog.value = false;
-    await loadStatus();
-  } catch (error) {
-    console.error('Failed to save config:', error);
-    ElMessage.error(t('evolution.saveConfigFailed'));
   } finally {
     savingConfig.value = false;
   }
@@ -465,8 +361,10 @@ const handleSaveConfig = async () => {
 const handleTrigger = async () => {
   triggerLoading.value = true;
   try {
-    const data = await evolutionService.triggerEvolution(props.workspaceId);
+    const daoPath = daoPathInput.value.trim() || undefined;
+    const data = await evolutionService.triggerEvolution(props.workspaceId, daoPath);
     ElMessage.success(t('evolution.triggered', { cycleId: data.cycle_id }));
+    daoPathInput.value = '';
     await loadStatus();
   } catch (error) {
     console.error('Failed to trigger evolution:', error);
@@ -602,15 +500,6 @@ const getPhaseStatus = (phase: string) => {
   return statusMap[phaseData.status] || phaseData.status;
 };
 
-const formatSchedule = (schedule: string) => {
-  const scheduleMap: Record<string, string> = {
-    '0 * * * *': t('evolution.hourly'),
-    '0 0 * * *': t('evolution.daily'),
-    '0 0 * * 0': t('evolution.weekly'),
-    '0 0 1 * *': t('evolution.monthly')
-  };
-  return scheduleMap[schedule] || schedule;
-};
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '-';

@@ -213,7 +213,7 @@
     </el-drawer>
 
     <!-- Evolution抽屉 -->
-    <el-drawer v-model="isEvolutionDrawerVisible" :title="t('evolution.title')" direction="rtl" size="90%">
+    <el-drawer v-model="isEvolutionDrawerVisible" :title="t('evolution.title')" direction="rtl" size="90%" destroy-on-close>
       <EvolutionDrawer :workspace-id="chatStore.workspaceId ?? undefined" />
     </el-drawer>
 

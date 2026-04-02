@@ -148,65 +148,88 @@ class SkillManager:
                         scope=scope,
                     )
 
+            # 3. Roo Code 兼容: .roo/skills/
+            roo_skills_dir = root / ".roo" / "skills"
+            if roo_skills_dir.exists() and roo_skills_dir.is_dir():
+                self._discover_skills_in_dir(roo_skills_dir, mode=None, scope=scope)
+
+            # 4. Roo Code 兼容: .roo/skills-{mode}/
+            if self.current_mode:
+                roo_mode_skills_dir = root / ".roo" / f"skills-{self.current_mode}"
+                if roo_mode_skills_dir.exists() and roo_mode_skills_dir.is_dir():
+                    self._discover_skills_in_dir(
+                        roo_mode_skills_dir,
+                        mode=self.current_mode,
+                        scope=scope,
+                    )
+
         self._initialized = True
         logger.info(
             f"Discovered {len(self._skills)} unique skills from {len(self.skills_roots)} root(s)",
         )
 
     def _discover_skills_in_dir(self, skills_dir: Path, mode: str | None, scope: str) -> None:
-        """在指定目录发现skills"""
+        """在指定目录递归发现skills
+
+        如果当前子目录包含SKILL.md则注册为skill，
+        否则递归遍历其子目录继续查找。
+        """
         if not skills_dir.exists() or not skills_dir.is_dir():
             logger.debug(f"Skills directory not found: {skills_dir}")
             return
 
         try:
-            for skill_path in skills_dir.iterdir():
-                if not skill_path.is_dir():
+            for child in skills_dir.iterdir():
+                if not child.is_dir():
                     continue
 
-                skill_file = skill_path / "SKILL.md"
-                if not skill_file.exists():
-                    logger.debug(f"No SKILL.md found in {skill_path}")
-                    continue
-
-                # 解析frontmatter
-                name, description = self._parse_frontmatter(skill_file)
-                if not name:
-                    logger.warning(f"Invalid frontmatter (missing name) in {skill_file}")
-                    continue
-
-                # 允许空的 description，使用默认值
-                if not description:
-                    description = f"{name} skill"
-                    logger.debug(f"Empty description for {name}, using default")
-
-                # 验证name匹配目录名
-                if name != skill_path.name:
-                    logger.warning(
-                        f"Skill name '{name}' does not match directory '{skill_path.name}', skipping",
-                    )
-                    continue
-
-                skill = Skill(
-                    name=name,
-                    description=description,
-                    path=skill_file,
-                    mode=mode,
-                    scope=scope,
-                )
-
-                # 添加到注册表（使用覆盖逻辑）
-                if name not in self._skills:
-                    self._skills[name] = []
-
-                # 检查是否已存在相同配置的skill
-                exists = any(s.mode == mode and s.scope == scope for s in self._skills[name])
-                if not exists:
-                    self._skills[name].append(skill)
-                    logger.debug(f"Discovered skill: {name} (mode={mode}, scope={scope})")
+                skill_file = child / "SKILL.md"
+                if skill_file.exists():
+                    self._register_skill(child, skill_file, mode, scope)
+                else:
+                    # 当前目录没有SKILL.md，递归查找子目录
+                    self._discover_skills_in_dir(child, mode, scope)
         except OSError as e:
             logger.exception(f"Failed to iterate skills directory {skills_dir}: {e}")
             return
+
+    def _register_skill(self, skill_path: Path, skill_file: Path, mode: str | None, scope: str) -> None:
+        """解析并注册单个skill"""
+        # 解析frontmatter
+        name, description = self._parse_frontmatter(skill_file)
+        if not name:
+            logger.warning(f"Invalid frontmatter (missing name) in {skill_file}")
+            return
+
+        # 允许空的 description，使用默认值
+        if not description:
+            description = f"{name} skill"
+            logger.debug(f"Empty description for {name}, using default")
+
+        # 验证name匹配目录名
+        if name != skill_path.name:
+            logger.warning(
+                f"Skill name '{name}' does not match directory '{skill_path.name}', skipping",
+            )
+            return
+
+        skill = Skill(
+            name=name,
+            description=description,
+            path=skill_file,
+            mode=mode,
+            scope=scope,
+        )
+
+        # 添加到注册表（使用覆盖逻辑）
+        if name not in self._skills:
+            self._skills[name] = []
+
+        # 检查是否已存在相同配置的skill
+        exists = any(s.mode == mode and s.scope == scope for s in self._skills[name])
+        if not exists:
+            self._skills[name].append(skill)
+            logger.debug(f"Discovered skill: {name} (mode={mode}, scope={scope})")
 
     def _parse_frontmatter(self, skill_file: Path) -> tuple[str | None, str | None]:
         """解析SKILL.md的frontmatter

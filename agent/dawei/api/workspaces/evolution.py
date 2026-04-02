@@ -58,9 +58,7 @@ class EvolutionConfigRequest(BaseModel):
     """Evolution配置请求"""
 
     enabled: bool
-    schedule: str = "0 * * * *"  # 默认每小时
-    phase_duration: str = "15m"  # 默认每个phase 15分钟
-    max_cycles: int = 999  # 默认最大cycle数
+    schedule: str = "* * * * *"  # 默认每分钟
     goals: list[str] = []  # 可选的目标列表
 
 
@@ -81,6 +79,12 @@ class CycleResponse(BaseModel):
     cycle_id: str
     status: str
     message: str | None = None
+
+
+class TriggerEvolutionRequest(BaseModel):
+    """手动触发evolution cycle请求"""
+
+    dao_path: str | None = None  # 自定义dao文件路径，覆盖默认的workspace/dao.md
 
 
 class CycleDetailResponse(BaseModel):
@@ -213,11 +217,12 @@ async def get_evolution_status(workspace_id: str):
 
 
 @router.post("/trigger", response_model=CycleResponse)
-async def trigger_evolution(workspace_id: str):
+async def trigger_evolution(workspace_id: str, body: TriggerEvolutionRequest | None = None):
     """手动触发evolution cycle
 
     Args:
         workspace_id: Workspace ID
+        body: 触发请求参数（可选），包含自定义dao_path
 
     Returns:
         CycleResponse
@@ -241,8 +246,11 @@ async def trigger_evolution(workspace_id: str):
                 detail="Evolution is not enabled for this workspace. Enable it first.",
             )
 
+        # 提取自定义dao_path（如果提供）
+        dao_path = body.dao_path if body else None
+
         # 启动新cycle
-        manager = EvolutionCycleManager(workspace)
+        manager = EvolutionCycleManager(workspace, dao_path=dao_path)
         cycle_id = await manager.start_cycle()
 
         logger.info(f"[EVOLUTION_API] Triggered evolution cycle {cycle_id} for workspace {workspace_id}")

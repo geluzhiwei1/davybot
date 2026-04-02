@@ -232,8 +232,8 @@ class MCPConfigLoader:
 class MCPToolManager:
     """MCP工具管理器 - 实现二级加载和管理机制 (user, workspace)"""
 
-    def __init__(self, workspace_path: str | None = None):
-        self.workspace_path = workspace_path
+    def __init__(self, workspace_root: str | None = None):
+        self.workspace_root = workspace_root
         self.loader = MCPConfigLoader()
 
         # 二级配置缓存
@@ -255,8 +255,8 @@ class MCPToolManager:
         # 按优先级顺序加载
         self._user_configs = self.loader.load_user_mcp_configs()
 
-        if self.workspace_path:
-            self._workspace_configs = self.loader.load_workspace_mcp_configs(self.workspace_path)
+        if self.workspace_root:
+            self._workspace_configs = self.loader.load_workspace_mcp_configs(self.workspace_root)
 
         # 合并配置
         self._merge_configs()
@@ -304,13 +304,13 @@ class MCPToolManager:
         for name, config in self._merged_configs.items():
             self._servers[name] = MCPServerInfo(name=name, config=config, status="disconnected")
 
-    def set_workspace_path(self, workspace_path: str):
+    def set_workspace_root(self, workspace_root: str):
         """设置工作区路径并重新加载配置"""
-        self.workspace_path = workspace_path
-        self._workspace_configs = self.loader.load_workspace_mcp_configs(workspace_path)
+        self.workspace_root = workspace_root
+        self._workspace_configs = self.loader.load_workspace_mcp_configs(workspace_root)
         self._merge_configs()
         self._initialize_servers()
-        logger.info(f"Workspace path set to {workspace_path}, MCP configs reloaded")
+        logger.info(f"Workspace root set to {workspace_root}, MCP configs reloaded")
 
     def get_all_configs(self) -> Dict[str, MCPConfig]:
         """获取所有合并后的MCP配置"""
@@ -658,7 +658,7 @@ class MCPToolManager:
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return {
-            "workspace_path": self.workspace_path,
+            "workspace_root": self.workspace_root,
             "configs": {name: config.to_dict() for name, config in self._merged_configs.items()},
             "servers": {name: server.to_dict() for name, server in self._servers.items()},
             "statistics": self.get_statistics(),

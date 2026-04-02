@@ -29,14 +29,14 @@ class ToolProvider(ABC):
 class CustomToolProvider(ToolProvider):
     """Provides custom-defined tools."""
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         """Initialize CustomToolProvider.
 
         Args:
-            workspace_path: Optional workspace path for loading workspace-specific skills
+            workspace_root: Optional workspace path for loading workspace-specific skills
 
         """
-        self.workspace_path = workspace_path
+        self.workspace_root = workspace_root
 
     def _instantiate_tool(self, tool_class, tool_name: str):
         """Instantiate a tool class with appropriate parameters.
@@ -58,22 +58,19 @@ class CustomToolProvider(ToolProvider):
         init_signature = inspect.signature(tool_class.__init__)
         parameters = init_signature.parameters
 
-        # Check if 'workspace' is a required parameter
-        if "workspace" in parameters:
-            # Check if it's required (no default value)
-            param = parameters["workspace"]
+        if "workspace_root" in parameters:
+            param = parameters["workspace_root"]
             if param.default == inspect.Parameter.empty:
-                # workspace is required
-                if not self.workspace_path:
+                # workspace_root is required
+                if not self.workspace_root:
                     raise TypeError(
-                        f"Tool {tool_name} requires workspace_path but none was provided to CustomToolProvider",
+                        f"Tool {tool_name} requires workspace_root but none was provided to CustomToolProvider",
                     )
-                return tool_class(workspace=self.workspace_path)
+                return tool_class(workspace_root=self.workspace_root)
 
-        # Check if 'workspace' is an optional parameter
-        if "workspace" in parameters and parameters["workspace"].default != inspect.Parameter.empty:
-            # workspace is optional, provide it if we have it
-            return tool_class(workspace=self.workspace_path)
+            # workspace_root is optional, provide it if we have it
+            if self.workspace_root:
+                return tool_class(workspace_root=self.workspace_root)
 
         # Default: instantiate with no parameters
         return tool_class()
@@ -210,13 +207,20 @@ class CustomToolProvider(ToolProvider):
                 dawei_home = get_dawei_home()
 
                 # Level 1: Workspace (优先级最高) - if workspace_path provided
-                if self.workspace_path:
-                    ws_path = Path(self.workspace_path)
+                if self.workspace_root:
+                    ws_path = Path(self.workspace_root)
                     ws_skills_dir = ws_path / ".dawei" / "skills"
                     logger.info(f"[Skills] Checking workspace skills: {ws_skills_dir}")
                     if ws_skills_dir.exists():
                         skills_roots.append(ws_path)
                         logger.info(f"[Skills] ✓ Added workspace skills root: {ws_skills_dir}")
+
+                    # Roo Code 兼容: {workspace}/.roo/skills/
+                    ws_roo_skills_dir = ws_path / ".roo" / "skills"
+                    logger.info(f"[Skills] Checking workspace Roo skills: {ws_roo_skills_dir}")
+                    if ws_roo_skills_dir.exists() and ws_path not in skills_roots:
+                        skills_roots.append(ws_path)
+                        logger.info(f"[Skills] ✓ Added workspace Roo skills root: {ws_roo_skills_dir}")
 
                 # Level 2: Global user (DAWEI_HOME) - always included
                 global_skills_dir = dawei_home / ".dawei" / "skills"
@@ -224,6 +228,13 @@ class CustomToolProvider(ToolProvider):
                 if global_skills_dir.exists():
                     skills_roots.append(dawei_home)
                     logger.info(f"[Skills] ✓ Added global skills root: {global_skills_dir}")
+
+                # Roo Code 兼容: ~/.dawei/.roo/skills/ (global level)
+                global_roo_skills_dir = dawei_home / ".roo" / "skills"
+                logger.info(f"[Skills] Checking global Roo skills: {global_roo_skills_dir}")
+                if global_roo_skills_dir.exists() and dawei_home not in skills_roots:
+                    skills_roots.append(dawei_home)
+                    logger.info(f"[Skills] ✓ Added global Roo skills root: {global_roo_skills_dir}")
 
                 # Always create skills tools, even if skills_roots is empty
                 # This allows list_skills to work as a discovery tool

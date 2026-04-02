@@ -458,6 +458,11 @@ class OpenaiCompatibleClient(BaseClient):
         params["stream"] = True
         params["tool_stream"] = True
 
+        # 设置显式 max_tokens，防止模型输出过长导致 SSE 流被截断
+        # 如果配置了 max_output_tokens，使用配置值；否则不设置（使用模型默认值）
+        if self.max_output_tokens and self.max_output_tokens > 0:
+            params["max_tokens"] = self.max_output_tokens
+
         return params
 
     def _convert_response_to_chat_result(self, response_data: Dict[str, Any]) -> ChatResult:

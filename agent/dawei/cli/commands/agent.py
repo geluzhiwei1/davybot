@@ -48,8 +48,14 @@ def agent_cmd():
     is_flag=True,
     help="Enable evolution mode — run a full PDCA improvement cycle on the workspace",
 )
+@click.option(
+    "--dao-path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Custom dao.md file path, overrides default workspace/dao.md",
+)
 @click.pass_context
-def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, super, evolution):
+def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, super, evolution, dao_path):
     """Run an agent task directly without HTTP/WebSocket.
 
     This command executes the agent synchronously in the current process,
@@ -74,6 +80,9 @@ def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, supe
         # Run evolution cycle (PDCA improvement loop)
         dawei agent run ./my-ws "Improve code quality" --evolution
 
+        # Run evolution cycle with custom dao.md
+        dawei agent run ./my-ws "Improve code quality" --evolution --dao-path ./custom/dao.md
+
     """
     # Check if super mode is enabled globally or per-command
     super_mode = super or ctx.obj.get("super", False)
@@ -87,6 +96,7 @@ def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, supe
         click.echo(click.style("🔄 Evolution Mode", fg="magenta", bold=True))
         click.echo(f"   Workspace: {workspace}")
         click.echo(f"   LLM: {llm or 'workspace default'}")
+        click.echo(f"   Dao path: {dao_path or 'default (workspace/dao.md)'}")
         click.echo(f"   Timeout: {timeout}s")
         click.echo("   PDCA cycle will run: plan → do → check → act")
     else:
@@ -130,6 +140,7 @@ def agent_run(ctx, workspace, message, llm, mode, timeout, verbose, output, supe
                     message=message,
                     verbose=verbose,
                     timeout=timeout,
+                    dao_path=str(dao_path) if dao_path else None,
                 )
                 bar.update(100)
 

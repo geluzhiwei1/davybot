@@ -86,7 +86,7 @@ class WorkspaceContext:
                 logger.info(f"  ✓ PersistenceManager initialized: {self.absolute_path}")
 
                 # 2. 初始化工具管理器（4层配置加载）
-                self.tool_manager = ToolManager(workspace_path=self.absolute_path)
+                self.tool_manager = ToolManager(workspace_root=self.absolute_path)
                 # 注意：不需要显式加载配置，ToolManager 会自动加载
                 logger.info("  ✓ ToolManager initialized")
 

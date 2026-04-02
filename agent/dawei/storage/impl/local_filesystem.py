@@ -52,6 +52,12 @@ class LocalFileSystemStorage(Storage):
                 if not include_hidden and entry.name.startswith("."):
                     continue
 
+                try:
+                    entry_stat = entry.stat(follow_symlinks=False)
+                except (FileNotFoundError, OSError):
+                    # Skip broken symlinks or files removed between iterdir and stat
+                    continue
+
                 rel_path = entry.relative_to(self.root_dir).as_posix()
                 is_dir = entry.is_dir()
 
@@ -59,8 +65,8 @@ class LocalFileSystemStorage(Storage):
                     "name": entry.name,
                     "path": rel_path,
                     "is_directory": is_dir,
-                    "size": entry.stat().st_size if not is_dir else 0,
-                    "last_modified": entry.stat().st_mtime,
+                    "size": entry_stat.st_size if not is_dir else 0,
+                    "last_modified": entry_stat.st_mtime,
                 }
                 results.append(file_info)
 

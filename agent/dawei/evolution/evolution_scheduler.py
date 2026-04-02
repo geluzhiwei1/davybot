@@ -213,7 +213,7 @@ class EvolutionScheduler:
             return False
 
         # 3. 检查cron调度时间
-        schedule = evolution_config.get("schedule", "0 * * * *")  # 默认每小时
+        schedule = evolution_config.get("schedule", "* * * * *")  # 默认每分钟
         last_cycle_time = None
 
         if last_cycle:

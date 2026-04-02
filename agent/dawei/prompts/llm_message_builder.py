@@ -262,6 +262,9 @@ class EnhancedSystemBuilder(IMessageProcessor):
         # 规则段落
         sections["rules"] = self._generate_rules_content(context)
 
+        # 响应长度限制段落（放在 RULES 之后，强调重要性）
+        sections["response_limits"] = self._generate_response_limits_content(context)
+
         # 工具使用段落
         sections["tool_use"] = self._generate_tool_use_content(context)
 
@@ -311,6 +314,19 @@ class EnhancedSystemBuilder(IMessageProcessor):
         """
         # 使用模板文件代替硬编码规则
         template_path = "sections/rules.j2"
+        return self.template_manager.render_template(template_path, context)
+
+    def _generate_response_limits_content(self, context: dict[str, Any]) -> str:
+        """生成响应长度限制内容
+
+        Args:
+            context: 渲染上下文
+
+        Returns:
+            str: 响应长度限制内容
+
+        """
+        template_path = "sections/response_limits.j2"
         return self.template_manager.render_template(template_path, context)
 
     def _generate_tool_use_content(self, context: dict[str, Any]) -> str:

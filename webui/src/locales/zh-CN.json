@@ -1306,13 +1306,6 @@
     "enableDescription": "开启后将按计划自动执行改进循环",
     "enabled": "Evolution 已启用",
     "disabled": "Evolution 已禁用",
-    "config": "配置",
-    "editConfig": "编辑配置",
-    "schedule": "调度",
-    "phaseDuration": "Phase 持续时间",
-    "maxCycles": "最大 Cycle 数",
-    "goals": "目标",
-    "noGoals": "未设置目标",
     "currentCycle": "当前 Cycle",
     "phases": "阶段",
     "pause": "暂停",
@@ -1340,10 +1333,6 @@
     "deleteConfirm": "确定要删除此 Cycle 吗？",
     "cycleDetails": "Cycle 详情",
     "overview": "概览",
-    "hourly": "每小时",
-    "daily": "每天",
-    "weekly": "每周",
-    "monthly": "每月",
     "phasePending": "待执行",
     "phaseInProgress": "进行中",
     "phaseCompleted": "已完成",
@@ -1358,11 +1347,10 @@
     "resumeFailed": "恢复失败",
     "aborted": "已中止",
     "abortFailed": "中止失败",
-    "configSaved": "配置已保存",
-    "saveConfigFailed": "保存配置失败",
     "cycleDeleted": "Cycle 已删除",
     "deleteFailed": "删除失败",
     "loadDetailFailed": "加载详情失败",
-    "goalsPlaceholder": "每行一个目标"
+    "noCycles": "暂无 Cycle 记录。点击「立即触发」启动第一个改进循环。",
+    "daoPathPlaceholder": "自定义 dao.md 路径（留空使用默认路径）"
   }
 }

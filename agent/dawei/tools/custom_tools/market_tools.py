@@ -61,9 +61,9 @@ class SkillSearchTool(CustomBaseTool):
     description: str = "Search for skills in the davybot market. Use this to discover available skills that can be installed."
     args_schema: type[BaseModel] = SkillSearchInput
 
-    def __init__(self, workspace: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.workspace = workspace
+        self.workspace_root = workspace_root
         self.client = CliWrapper()
 
     @safe_tool_operation(
@@ -116,12 +116,12 @@ class SkillInstallTool(CustomBaseTool):
     description: str = "Install a skill from the davybot market to the workspace. After installation, the skill will be available for use."
     args_schema: type[BaseModel] = SkillInstallInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "skill_install",
@@ -160,12 +160,12 @@ class SkillListTool(CustomBaseTool):
     description: str = "List all skills installed in the workspace"
     args_schema: type[BaseModel] = SkillListInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "skill_list",
@@ -213,9 +213,9 @@ class AgentSearchTool(CustomBaseTool):
     description: str = "Search for agents in the davybot market. Use this to discover available agents that can be installed."
     args_schema: type[BaseModel] = AgentSearchInput
 
-    def __init__(self, workspace: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.workspace = workspace
+        self.workspace_root = workspace_root
         self.client = CliWrapper()
 
     @safe_tool_operation(
@@ -271,12 +271,12 @@ class AgentInstallTool(CustomBaseTool):
     description: str = "Install an agent from the davybot market to the workspace. After installation, the agent template will be available."
     args_schema: type[BaseModel] = AgentInstallInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "agent_install",
@@ -315,12 +315,12 @@ class AgentListTool(CustomBaseTool):
     description: str = "List all agents installed in the workspace"
     args_schema: type[BaseModel] = AgentListInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "agent_list",
@@ -356,12 +356,12 @@ class AgentUninstallTool(CustomBaseTool):
     description: str = "Uninstall an agent from the workspace"
     args_schema: type[BaseModel] = AgentUninstallInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "agent_uninstall",
@@ -409,9 +409,9 @@ class PluginSearchTool(CustomBaseTool):
     description: str = "Search for plugins in the davybot market. Use this to discover available plugins that can be installed."
     args_schema: type[BaseModel] = PluginSearchInput
 
-    def __init__(self, workspace: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         super().__init__()
-        self.workspace = workspace
+        self.workspace_root = workspace_root
         self.client = CliWrapper()
 
     @safe_tool_operation(
@@ -470,12 +470,12 @@ class PluginInstallTool(CustomBaseTool):
     description: str = "Install a plugin from the davybot market to the workspace. After installation, the plugin will be loaded on next restart."
     args_schema: type[BaseModel] = PluginInstallInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "plugin_install",
@@ -514,12 +514,12 @@ class PluginListTool(CustomBaseTool):
     description: str = "List all plugins installed in the workspace"
     args_schema: type[BaseModel] = PluginListInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "plugin_list",
@@ -557,12 +557,12 @@ class PluginUninstallTool(CustomBaseTool):
     description: str = "Uninstall a plugin from the workspace"
     args_schema: type[BaseModel] = PluginUninstallInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
-        self.installer = MarketInstaller(workspace)
+        self.workspace_root = workspace_root
+        self.installer = MarketInstaller(workspace_root)
 
     @safe_tool_operation(
         "plugin_uninstall",
@@ -620,26 +620,26 @@ class MarketSlashCommandsTool(CustomBaseTool):
     description: str = "Execute market resource management commands. Supports /skill, /agent, and /plugin commands with search, install, list, and uninstall operations."
     args_schema: type[BaseModel] = MarketSlashCommandInput
 
-    def __init__(self, workspace: str):
+    def __init__(self, workspace_root: str):
         super().__init__()
         if not MARKET_AVAILABLE:
             raise MarketNotAvailableError("davy-market CLI is not available. Install it with: pip install davybot-market-cli")
-        self.workspace = workspace
+        self.workspace_root = workspace_root
 
         # Initialize sub-tools
-        self.skill_search = SkillSearchTool(workspace)
-        self.skill_install = SkillInstallTool(workspace)
-        self.skill_list = SkillListTool(workspace)
+        self.skill_search = SkillSearchTool(workspace_root)
+        self.skill_install = SkillInstallTool(workspace_root)
+        self.skill_list = SkillListTool(workspace_root)
 
-        self.agent_search = AgentSearchTool(workspace)
-        self.agent_install = AgentInstallTool(workspace)
-        self.agent_list = AgentListTool(workspace)
-        self.agent_uninstall = AgentUninstallTool(workspace)
+        self.agent_search = AgentSearchTool(workspace_root)
+        self.agent_install = AgentInstallTool(workspace_root)
+        self.agent_list = AgentListTool(workspace_root)
+        self.agent_uninstall = AgentUninstallTool(workspace_root)
 
-        self.plugin_search = PluginSearchTool(workspace)
-        self.plugin_install = PluginInstallTool(workspace)
-        self.plugin_list = PluginListTool(workspace)
-        self.plugin_uninstall = PluginUninstallTool(workspace)
+        self.plugin_search = PluginSearchTool(workspace_root)
+        self.plugin_install = PluginInstallTool(workspace_root)
+        self.plugin_list = PluginListTool(workspace_root)
+        self.plugin_uninstall = PluginUninstallTool(workspace_root)
 
     def _parse_command(self, command: str) -> tuple:
         """Parse slash command into components.

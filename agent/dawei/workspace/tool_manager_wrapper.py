@@ -33,15 +33,15 @@ class WorkspaceToolManager:
     - 工具和MCP统计信息
     """
 
-    def __init__(self, workspace_path: Path):
+    def __init__(self, workspace_root: Path):
         """初始化工具管理器
 
         Args:
-            workspace_path: 工作区路径
+            workspace_root: 工作区路径
 
         """
-        self.workspace_path = Path(workspace_path).resolve()
-        self.absolute_path = str(self.workspace_path)
+        self.workspace_root = Path(workspace_root).resolve()
+        self.absolute_path = str(self.workspace_root)
 
         # 工具管理器
         self.tool_manager: ToolManager | None = None
@@ -79,7 +79,7 @@ class WorkspaceToolManager:
         logger.info("Initializing MCP tool manager...")
 
         # 创建 MCP 工具管理器，传入工作区路径以支持工作区级配置
-        self.mcp_tool_manager = MCPToolManager(workspace_path=self.absolute_path)
+        self.mcp_tool_manager = MCPToolManager(workspace_root=self.absolute_path)
         logger.info("MCPToolManager created.")
 
         # 记录 MCP 配置统计信息
@@ -103,7 +103,7 @@ class WorkspaceToolManager:
         logger.info("Initializing tools...")
 
         # 创建工具管理器，传入工作区路径以支持工作区级配置
-        self.tool_manager = ToolManager(workspace_path=self.absolute_path)
+        self.tool_manager = ToolManager(workspace_root=self.absolute_path)
         logger.info("ToolManager created.")
 
         # 初始化Skills工具 - 直接使用 SkillManager

@@ -271,6 +271,7 @@ async def run_evolution_directly(
     message: str,
     verbose: bool = False,
     timeout: int = 1800,
+    dao_path: str | None = None,
 ) -> Dict[str, Any]:
     """直接运行Evolution Cycle（同步阻塞，等待cycle完成）
 
@@ -282,6 +283,7 @@ async def run_evolution_directly(
         message: 用户消息（作为evolution目标）
         verbose: 是否输出详细日志
         timeout: 执行超时时间（秒）
+        dao_path: 自定义dao文件路径，覆盖默认的workspace/dao.md
 
     Returns:
         执行结果字典，包含：
@@ -326,7 +328,7 @@ async def run_evolution_directly(
         # 3. 创建EvolutionCycleManager
         from dawei.evolution.evolution_manager import EvolutionCycleManager
 
-        manager = EvolutionCycleManager(user_workspace)
+        manager = EvolutionCycleManager(user_workspace, dao_path=dao_path)
         log.info("[EVOLUTION_CLI] EvolutionCycleManager created")
 
         # 4. 直接运行phases（同步等待完成），而非start_cycle（异步后台）
@@ -408,6 +410,7 @@ def run_evolution_sync(
     message: str,
     verbose: bool = False,
     timeout: int = 1800,
+    dao_path: str | None = None,
 ) -> Dict[str, Any]:
     """同步版本的Evolution执行器（用于Click CLI）
 
@@ -417,6 +420,7 @@ def run_evolution_sync(
         message: 用户消息（evolution目标）
         verbose: 是否输出详细日志
         timeout: 执行超时时间（秒）
+        dao_path: 自定义dao文件路径，覆盖默认的workspace/dao.md
 
     Returns:
         执行结果字典
@@ -429,5 +433,6 @@ def run_evolution_sync(
             message=message,
             verbose=verbose,
             timeout=timeout,
+            dao_path=dao_path,
         ),
     )

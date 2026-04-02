@@ -832,7 +832,11 @@ class UserWorkspace:
             """查找所有可能包含skills的根目录
             返回两个级别的根目录列表（workspace和global user）
 
-            新的路径结构：.dawei/skills/
+            路径结构：
+            - .dawei/skills/ (dawei 格式)
+            - .dawei/skills-{mode}/ (dawei 格式，mode-specific)
+            - .roo/skills/ (Roo Code 兼容格式)
+            - .roo/skills-{mode}/ (Roo Code 兼容格式，mode-specific)
             """
             roots = []
             ws_path = Path(self.absolute_path)
@@ -870,6 +874,23 @@ class UserWorkspace:
                     )
                     roots.append(ws_path)
 
+            # 1.3 {workspace}/.roo/skills/ (Roo Code 兼容)
+            ws_roo_skills_dir = ws_path / ".roo" / "skills"
+            if ws_roo_skills_dir.exists() and any(ws_roo_skills_dir.iterdir()):
+                logger.info("[Level 1: Workspace] Found .roo/skills in workspace")
+                if ws_path not in roots:
+                    roots.append(ws_path)
+
+            # 1.4 {workspace}/.roo/skills-{mode}/ (Roo Code 兼容，mode-specific)
+            if current_mode:
+                ws_roo_mode_skills = ws_path / ".roo" / f"skills-{current_mode}"
+                if ws_roo_mode_skills.exists() and any(ws_roo_mode_skills.iterdir()):
+                    logger.info(
+                        f"[Level 1: Workspace] Found .roo/skills-{current_mode} in workspace",
+                    )
+                    if ws_path not in roots:
+                        roots.append(ws_path)
+
             # ===== Level 2: Global User级别 =====
             # 2.1 {DAWEI_HOME}/skills/
             dawei_home = get_dawei_home()
@@ -887,6 +908,23 @@ class UserWorkspace:
                         f"[Level 2: Global User] Found .dawei/skills-{current_mode} in DAWEI_HOME",
                     )
                     roots.append(dawei_home)
+
+            # 2.3 {DAWEI_HOME}/.roo/skills/ (Roo Code 兼容，global level)
+            global_roo_skills_dir = dawei_home / ".roo" / "skills"
+            if global_roo_skills_dir.exists() and any(global_roo_skills_dir.iterdir()):
+                logger.info("[Level 2: Global User] Found .roo/skills in DAWEI_HOME")
+                if dawei_home not in roots:
+                    roots.append(dawei_home)
+
+            # 2.4 {DAWEI_HOME}/.roo/skills-{mode}/ (Roo Code 兼容，global mode-specific)
+            if current_mode:
+                global_roo_mode_skills = dawei_home / ".roo" / f"skills-{current_mode}"
+                if global_roo_mode_skills.exists() and any(global_roo_mode_skills.iterdir()):
+                    logger.info(
+                        f"[Level 2: Global User] Found .roo/skills-{current_mode} in DAWEI_HOME",
+                    )
+                    if dawei_home not in roots:
+                        roots.append(dawei_home)
 
             logger.info(f"Skills discovery: found {len(roots)} root(s) with skills")
             return roots
@@ -1462,7 +1500,7 @@ class UserWorkspace:
                     logger.info("Attempting to initialize tool_manager synchronously")
                     from dawei.tools.tool_manager import ToolManager
 
-                    self.tool_manager = ToolManager(workspace_path=self.absolute_path)
+                    self.tool_manager = ToolManager(workspace_root=self.absolute_path)
                     logger.info(
                         f"ToolManager created synchronously: {self.tool_manager is not None}",
                     )

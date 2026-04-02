@@ -55,7 +55,7 @@ class EvolutionStorage:
     BASE_DIR = ".dawei"
     PREFIX = "evolution-"
     CURRENT_LINK = "evolution-current"
-    WORKSPACE_MD = "dao.md"
+    WORKSPACE_MD = "/../dao.md"
 
     def __init__(self, workspace):
         """初始化EvolutionStorage
@@ -241,25 +241,36 @@ class EvolutionStorage:
             logger.error(f"[EVOLUTION_STORAGE] Error loading {phase}.md for cycle {cycle_id}: {e}")
             raise EvolutionStorageError(f"Error loading {phase}.md for cycle {cycle_id}: {e}")
 
-    async def load_workspace_md(self) -> str:
+    async def load_workspace_md(self, dao_path: str | None = None) -> str:
         """加载dao.md文件
 
+        Args:
+            dao_path: 自定义dao文件路径。如果提供，则覆盖默认的workspace/dao.md路径。
+
         Returns:
-            str: dao.md内容，如果文件不存在返回空字符串
+            str: dao.md内容
+
+        Raises:
+            EvolutionStorageError: 当文件不存在时
 
         """
-        try:
+        if dao_path:
+            workspace_md_path = Path(dao_path)
+            if not workspace_md_path.is_absolute():
+                workspace_md_path = (Path(self.workspace.workspace_path) / dao_path).resolve()
+        else:
             workspace_md_path = self.base / self.WORKSPACE_MD
-            if workspace_md_path.exists():
-                content = workspace_md_path.read_text(encoding="utf-8")
-                logger.debug(f"[EVOLUTION_STORAGE] Loaded dao.md ({len(content)} chars)")
-                return content
-            logger.debug("[EVOLUTION_STORAGE] dao.md not found, returning empty string")
-            return ""
 
-        except Exception as e:
-            logger.error(f"[EVOLUTION_STORAGE] Error loading dao.md: {e}")
-            return ""
+        if workspace_md_path.exists():
+            content = workspace_md_path.read_text(encoding="utf-8")
+            logger.debug(f"[EVOLUTION_STORAGE] Loaded dao.md from {workspace_md_path} ({len(content)} chars)")
+            return content
+        else:
+            raise EvolutionStorageError(
+                f"dao.md not found at {workspace_md_path}. "
+                "Please create a dao.md file with workspace goals and success criteria."
+            )
+
 
     async def get_all_cycles(self) -> list[dict[str, Any]]:
         """获取所有cycles的metadata列表

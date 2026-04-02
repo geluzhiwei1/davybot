@@ -6,6 +6,7 @@
 """
 
 import asyncio
+import json
 import time
 from typing import List, Dict, Any
 
@@ -446,6 +447,28 @@ class TaskNodeExecutionEngine:
                     # Tool execution timeout - log but don't include stack trace (expected flow)
                     self.logger.exception(f"Tool execution timeout after {tool_execution_timeout}s")
                     # 工具执行超时不中断整个流程，继续保存checkpoint
+                except (json.JSONDecodeError, RuntimeError, ValueError) as e:
+                    # 工具调用参数解析失败（通常因 SSE 流截断导致 JSON 不完整）
+                    self.logger.error(
+                        f"Tool execution failed (likely truncated stream): {type(e).__name__}: {e}",
+                    )
+                    # 将截断错误作为 tool result 返回给 LLM，使其能在下一轮自动重试
+                    truncated_tool_calls = getattr(stream_message, "tool_calls", [])
+                    for tc in truncated_tool_calls:
+                        self._user_workspace.current_conversation.say(
+                            ToolMessage(
+                                content=json.dumps(
+                                    {
+                                        "error": f"Tool call was truncated due to output length limit. "
+                                        f"Please split this operation into smaller calls "
+                                        f"(e.g. use apply_diff instead of write_to_file for large files).",
+                                        "details": str(e)[:500],
+                                    },
+                                    ensure_ascii=False,
+                                ),
+                                tool_call_id=tc.tool_call_id,
+                            ),
+                        )
 
         try:
             # LLM调用使用独立的超时控制

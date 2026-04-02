@@ -60,11 +60,12 @@ class EvolutionCycleManager:
     PHASES = ("plan", "do", "check", "act")
     MAX_RETRIES = 3
 
-    def __init__(self, workspace):
+    def __init__(self, workspace, dao_path: str | None = None):
         """初始化EvolutionCycleManager
 
         Args:
             workspace: UserWorkspace实例
+            dao_path: 自定义dao文件路径，覆盖默认的workspace/dao.md
 
         """
         from dawei.workspace.user_workspace import UserWorkspace
@@ -73,6 +74,7 @@ class EvolutionCycleManager:
             raise EvolutionError(f"workspace must be UserWorkspace, got {type(workspace)}")
 
         self.workspace = workspace
+        self.dao_path = dao_path
         self.lock = EvolutionLock(workspace)
         self.storage = EvolutionStorage(workspace)
         self._abort_event = asyncio.Event()
@@ -475,7 +477,7 @@ class EvolutionCycleManager:
             dict: 输入数据字典
 
         """
-        workspace_md = await self.storage.load_workspace_md()
+        workspace_md = await self.storage.load_workspace_md(dao_path=self.dao_path)
         prev_action = ""
         if prev_cycle_id:
             prev_action = await self.storage.load_phase_output(prev_cycle_id, "action")

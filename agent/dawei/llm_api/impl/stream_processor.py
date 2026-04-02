@@ -281,6 +281,8 @@ class StreamProcessor:
         last_chunk = None
         last_data_time = time.monotonic()
         idle_timeout_event = asyncio.Event()
+        stream_done_received = False
+        chunk_count = 0
 
         async def check_idle_timeout_task():
             """后台任务：定期检查空闲超时"""
@@ -318,6 +320,7 @@ class StreamProcessor:
                 if line.startswith("data: "):
                     data = line[6:]
                     if data == "[DONE]":
+                        stream_done_received = True
                         break
 
                     # 解析 JSON
@@ -327,6 +330,7 @@ class StreamProcessor:
                         raise ValueError(f"Invalid JSON in stream data: {data[:100]}...")
 
                     last_chunk = chunk
+                    chunk_count += 1
 
                     # 解析数据块
                     try:
@@ -335,6 +339,18 @@ class StreamProcessor:
                             yield message
                     except Exception as e:
                         raise RuntimeError(f"Failed to parse stream chunk: {e}")
+
+            # 检测 SSE 流是否异常结束（无 [DONE] 标记）
+            if not stream_done_received and last_chunk is not None:
+                last_finish_reason = "unknown"
+                choices = last_chunk.get("choices", [])
+                if choices:
+                    last_finish_reason = choices[0].get("finish_reason", "unknown")
+                logger.warning(
+                    f"SSE stream ended WITHOUT [DONE] marker after {chunk_count} chunks. "
+                    f"Last finish_reason={last_finish_reason}. "
+                    f"Response may be TRUNCATED - tool calls with incomplete JSON arguments are likely.",
+                )
 
             # 流式结束后，发送完成消息
             try:

@@ -115,9 +115,9 @@ class ModeConfigLoader:
             modes.update(self._load_dawei_directory(config_dir))
 
         # 然后加载 modes 文件（这样可以覆盖规则加载器创建的默认配置）
-        # 对于 builtin: config_dir/modes.yaml = builtin/agents/modes.yaml
-        # 对于 user: config_dir/modes.yaml = ~/.dawei/agents/modes.yaml
-        modes_file = config_dir / "modes.yaml"
+        # 对于 builtin: config_dir/.roomode = builtin/agents/.roomode
+        # 对于 user: config_dir/.roomode = ~/.dawei/agents/.roomode
+        modes_file = config_dir / ".roomode"
         if modes_file.exists():
             modes.update(self._load_modes_file(modes_file, modes))
 
@@ -139,9 +139,11 @@ class ModeConfigLoader:
     def load_workspace_modes(self, workspace_path: str) -> Dict[str, ModeConfig]:
         """加载工作区级模式配置
 
-        支持两个加载路径：
+        支持四个加载路径：
         1. {workspace}/.dawei/agents/ - 直接存放的 agents
         2. {workspace}/.dawei/agents/{team-name}/ - 团队目录下的 agents
+        3. {workspace}/.roomodes - Roo Code 模式定义文件（YAML/JSON）
+        4. {workspace}/.roo/rules-{mode}/ - Roo Code 规则目录
 
         Args:
             workspace_path: 工作区路径
@@ -166,6 +168,26 @@ class ModeConfigLoader:
                     team_modes = self._load_modes_from_directory(team_dir, "workspace")
                     modes.update(team_modes)
                     logger.debug(f"Loaded {len(team_modes)} modes from team directory: {team_dir.name}")
+
+        # 路径3: {workspace}/.roomodes (Roo Code 兼容)
+        roomodes_file = workspace_dir / ".roomodes"
+        if roomodes_file.exists():
+            roo_modes = self._load_roomodes_file(roomodes_file, modes)
+            modes.update(roo_modes)
+            logger.debug(f"Loaded {len(roo_modes)} modes from .roomodes")
+
+        # 路径4: {workspace}/.roo/rules-{mode}/ (Roo Code 规则目录)
+        roo_dir = workspace_dir / ".roo"
+        if roo_dir.exists() and roo_dir.is_dir():
+            roo_rules = self._load_dawei_directory(roo_dir)
+            if roo_rules:
+                # 合并规则到已有模式，或创建新模式
+                for slug, roo_config in roo_rules.items():
+                    if slug in modes:
+                        modes[slug].rules.update(roo_config.rules)
+                    else:
+                        modes[slug] = roo_config
+                logger.debug(f"Loaded {len(roo_rules)} mode rules from .roo/rules-*")
 
         return modes
 
@@ -198,6 +220,80 @@ class ModeConfigLoader:
                 logger.warning(f"customModes in {file_path} is not a list: {type(custom_modes)}")
 
         logger.debug(f"Loaded {len(modes)} modes from {file_path}")
+
+        return modes
+
+    def _load_roomodes_file(
+        self,
+        file_path: Path,
+        existing_modes: Dict[str, ModeConfig] | None = None,
+    ) -> Dict[str, ModeConfig]:
+        """加载 Roo Code 格式的 .roomodes 文件
+
+        .roomodes 支持 YAML 和 JSON 两种格式，包含 customModes 列表。
+        字段映射：slug, name, description, roleDefinition -> role_definition,
+        whenToUse -> when_to_use, customInstructions -> custom_instructions, groups
+
+        Args:
+            file_path: .roomodes 文件路径
+            existing_modes: 已有的模式配置（用于保留规则）
+
+        Returns:
+            Dict[str, ModeConfig]: 加载的模式配置
+
+        """
+        modes = {}
+        try:
+            content = file_path.read_text(encoding="utf-8").strip()
+
+            # 尝试 JSON 解析（Roo Code 也支持 JSON 格式）
+            if content.startswith("{") or content.startswith("["):
+                import json
+
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError:
+                    logger.warning(f"JSON parsing error in {file_path}, trying YAML")
+                    data = None
+            else:
+                data = None
+
+            # 如果 JSON 解析失败或不是 JSON，尝试 YAML
+            if data is None:
+                try:
+                    data = yaml.safe_load(content)
+                except yaml.YAMLError:
+                    logger.exception(f"YAML parsing error in {file_path}: ")
+                    return {}
+
+        except (OSError, UnicodeDecodeError) as e:
+            logger.error(f"Failed to read {file_path}: {e}")
+            return {}
+
+        if not data or "customModes" not in data:
+            return {}
+
+        custom_modes = data.get("customModes")
+        if not isinstance(custom_modes, list):
+            logger.warning(f"customModes in {file_path} is not a list: {type(custom_modes)}")
+            return {}
+
+        for mode_data in custom_modes:
+            if not mode_data or "slug" not in mode_data:
+                continue
+
+            # 将 Roo Code 的 camelCase 字段映射到 snake_case
+            mode_config = ModeConfig.from_dict(mode_data)
+
+            # 如果已存在该模式，保留其规则
+            if existing_modes and mode_config.slug in existing_modes:
+                mode_config.rules = existing_modes[mode_config.slug].rules
+
+            # 标记来源为 roo
+            mode_config.source = "roo"
+
+            modes[mode_config.slug] = mode_config
+            logger.debug(f"Loaded Roo Code mode: {mode_config.slug} from {file_path}")
 
         return modes
 
@@ -461,8 +557,8 @@ class ModeManager:
             shutil.rmtree(rules_dir)
             logger.info(f"Deleted rules directory: {rules_dir}")
 
-        # 从 modes.yaml 中删除模式定义（支持 customModes 和直接列表）
-        modes_file = config_dir / "modes.yaml"
+        # 从 .roomode 中删除模式定义（支持 customModes 和直接列表）
+        modes_file = config_dir / ".roomode"
         mode_removed = False
 
         if modes_file.exists():
@@ -502,11 +598,11 @@ class ModeManager:
                 logger.error(f"Failed to update modes file {modes_file}: {e}")
                 raise
 
-        # 如果在主 modes.yaml 中没有找到，检查市场安装的代理包
+        # 如果在主 .roomode 中没有找到，检查市场安装的代理包
         if not mode_removed and config_dir.exists():
             for agent_dir in config_dir.iterdir():
-                if agent_dir.is_dir() and (agent_dir / "modes.yaml").exists():
-                    agent_modes_file = agent_dir / "modes.yaml"
+                if agent_dir.is_dir() and (agent_dir / ".roomode").exists():
+                    agent_modes_file = agent_dir / ".roomode"
                     try:
                         with agent_modes_file.open(encoding="utf-8") as f:
                             agent_data = yaml.safe_load(f) or {}
@@ -597,8 +693,8 @@ class ModeManager:
         # 确保配置目录存在
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        # 加载或创建 modes.yaml
-        modes_file = config_dir / "modes.yaml"
+        # 加载或创建 .roomode
+        modes_file = config_dir / ".roomode"
         if modes_file.exists():
             try:
                 with modes_file.open(encoding="utf-8") as f:

@@ -178,11 +178,11 @@ class ToolConfig:
         return merged
 
 
-def _load_builtin_tools(workspace_path: str | None = None) -> Dict[str, ToolConfig]:
+def _load_builtin_tools(workspace_root: str | None = None) -> Dict[str, ToolConfig]:
     """加载内置工具 (CustomToolProvider)
 
     Args:
-        workspace_path: 工作区路径（可选）
+        workspace_root: 工作区路径（可选）
 
     Returns:
         工具配置字典
@@ -195,7 +195,7 @@ def _load_builtin_tools(workspace_path: str | None = None) -> Dict[str, ToolConf
 
     # 从 CustomToolProvider 加载自定义工具
     try:
-        custom_provider = CustomToolProvider(workspace_path=workspace_path)
+        custom_provider = CustomToolProvider(workspace_root=workspace_root)
         custom_tools = custom_provider.get_tools()
         for tool_dict in custom_tools:
             tool_config = ToolConfig.from_dict(tool_dict, "default")
@@ -246,11 +246,11 @@ def _load_user_tools() -> Dict[str, ToolConfig]:
     return tools
 
 
-def _load_workspace_tools(workspace_path: str) -> Dict[str, ToolConfig]:
+def _load_workspace_tools(workspace_root: str) -> Dict[str, ToolConfig]:
     """加载工作区级工具配置
 
     Args:
-        workspace_path: 工作区路径
+        workspace_root: 工作区路径
 
     Returns:
         工具配置字典
@@ -260,7 +260,7 @@ def _load_workspace_tools(workspace_path: str) -> Dict[str, ToolConfig]:
 
     """
     tools = {}
-    workspace_dir = Path(workspace_path)
+    workspace_dir = Path(workspace_root)
     workspace_config_dir = workspace_dir / ".dawei" / ".config"
     tools_config_file = workspace_config_dir / ".tools.json"
 
@@ -304,17 +304,17 @@ class ToolManager:
 
     """
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         """初始化工具管理器
 
         Args:
-            workspace_path: 工作区路径（可选）
+            workspace_root: 工作区路径（可选）
 
         Raises:
             RuntimeError: 如果必需的工具加载失败
 
         """
-        self.workspace_path = workspace_path
+        self.workspace_root = workspace_root
 
         # 加载所有工具（2层：default + workspace）
         self._tools = self._load_tools()
@@ -336,7 +336,7 @@ class ToolManager:
         # 1. 加载默认工具（builtin + user）
         # Note: knowledge tools are already included in _load_builtin_tools via CustomToolProvider
         try:
-            tools.update(_load_builtin_tools(self.workspace_path))
+            tools.update(_load_builtin_tools(self.workspace_root))
             tools.update(_load_user_tools())
             logger.info(f"Loaded {len(tools)} default tools")
         except Exception as e:
@@ -345,9 +345,9 @@ class ToolManager:
             raise RuntimeError(f"Cannot load default tools: {e}")
 
         # 2. 如果有工作区，应用工作区覆盖（简单更新）
-        if self.workspace_path:
+        if self.workspace_root:
             try:
-                workspace_tools = _load_workspace_tools(self.workspace_path)
+                workspace_tools = _load_workspace_tools(self.workspace_root)
                 override_count = 0
                 for name, config in workspace_tools.items():
                     if name in tools:
@@ -364,16 +364,16 @@ class ToolManager:
 
         return tools
 
-    def set_workspace_path(self, workspace_path: str):
+    def set_workspace_root(self, workspace_root: str):
         """设置工作区路径并重新加载工具
 
         Args:
-            workspace_path: 新的工作区路径
+            workspace_root: 新的工作区路径
 
         """
-        self.workspace_path = workspace_path
+        self.workspace_root = workspace_root
         self._tools = self._load_tools()
-        logger.info(f"Workspace path set to {workspace_path}, tools reloaded")
+        logger.info(f"Workspace root set to {workspace_root}, tools reloaded")
 
     def get_builtin_providers_info(self) -> Dict[str, Any]:
         """获取内置工具提供者信息（向后兼容）"""
