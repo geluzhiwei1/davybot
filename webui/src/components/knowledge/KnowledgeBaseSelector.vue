@@ -135,8 +135,10 @@ const handleCreateBase = async () => {
     // 重置表单并关闭对话框
     createForm.value = { name: '', description: '', is_default: false }
     showCreateDialog.value = false
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '创建知识库失败')
+  } catch (error: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const err = error as any
+    ElMessage.error(err.response?.data?.detail || '创建知识库失败')
   } finally {
     creating.value = false
   }

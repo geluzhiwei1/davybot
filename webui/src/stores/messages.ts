@@ -437,7 +437,7 @@ export const useMessageStore = defineStore('messages', () => {
 
     // 确定目标会话ID: 优先使用传入的conversationId,其次使用消息中的,最后使用当前会话
     const workspaceStore = _useWorkspaceStore()
-    let targetConversationId = conversationId || message.conversationId || workspaceStore.currentConversationId || 'active'
+    const targetConversationId = conversationId || message.conversationId || workspaceStore.currentConversationId || 'active'
 
     logger.debug(`[MessageStore] Adding message to workspace:${targetWorkspaceId}, conversation:${targetConversationId}`, {
       messageId: message.id,

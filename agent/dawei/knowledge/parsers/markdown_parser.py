@@ -1,13 +1,66 @@
 # Copyright (c) 2025 格律至微
 # SPDX-License-Identifier: AGPL-3.0-only
 
-"""Markdown document parser"""
+"""Markdown document parser
+
+Supports:
+- YAML frontmatter metadata extraction
+- Page marker parsing: ``<--- Page N --->``
+"""
 
 import hashlib
+import re
 from pathlib import Path
+from typing import Any
 
 from dawei.knowledge.models import Document, DocumentMetadata, DocumentType
 from dawei.knowledge.parsers.base import BaseParser
+
+# Regex patterns
+_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
+_PAGE_MARKER_RE = re.compile(r"^<---\s*Page\s+(\d+)\s*--->\s*$", re.MULTILINE)
+
+def _parse_frontmatter_yaml(text: str) -> dict[str, Any]:
+    """Minimal YAML frontmatter parser (handles scalars and simple lists).
+
+    Not a full YAML parser — just enough for our markdown metadata format.
+    """
+    result: dict[str, Any] = {}
+    current_key: str | None = None
+    current_list: list[str] | None = None
+
+    for line in text.split("\n"):
+        # Key-value pair
+        m = re.match(r"^(\w[\w-]*):\s*(.*?)\s*$", line)
+        if m:
+            # Flush previous list
+            if current_key and current_list is not None:
+                result[current_key] = current_list
+                current_list = None
+
+            key, val = m.group(1), m.group(2)
+            if val == "":
+                # Could be start of a list block
+                current_key = key
+                current_list = []
+            else:
+                result[key] = val.strip("\"'")
+                current_key = None
+                current_list = None
+            continue
+
+        # List item (indented dash)
+        if current_list is not None and current_key:
+            m_list = re.match(r"^\s+-\s+(.+)$", line)
+            if m_list:
+                current_list.append(m_list.group(1).strip())
+                continue
+
+    # Flush last list
+    if current_key and current_list is not None:
+        result[current_key] = current_list
+
+    return result
 
 
 class MarkdownParser(BaseParser):
@@ -23,27 +76,53 @@ class MarkdownParser(BaseParser):
         # Read content
         content = file_path.read_text(encoding="utf-8")
 
-        # Extract metadata from frontmatter if present
-        import re
+        # --- 1. Parse frontmatter ---
+        fm: dict[str, Any] = {}
+        body = content
+        fm_match = _FRONTMATTER_RE.match(content)
+        if fm_match:
+            fm = _parse_frontmatter_yaml(fm_match.group(1))
+            body = fm_match.group(2)
 
-        title = None
+        # --- 2. Parse page markers (<--- Page N --->) ---
+        page_offsets: dict[int, int] = {}
+        for pm in _PAGE_MARKER_RE.finditer(body):
+            page_num = int(pm.group(1))
+            page_offsets[page_num] = pm.start()
+        page_count = max(page_offsets.keys()) if page_offsets else None
 
-        frontmatter_match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
-        if frontmatter_match:
-            frontmatter = frontmatter_match.group(1)
-            # Extract title from frontmatter
-            title_match = re.search(r"^title:\s*(.+)$", frontmatter, re.MULTILINE)
-            if title_match:
-                title = title_match.group(1).strip().strip('"').strip("'")
+        # --- 3. Collect keywords as tags ---
+        keywords = fm.get("keywords", [])
+        if isinstance(keywords, str):
+            keywords = [k.strip() for k in keywords.split(",") if k.strip()]
+        tags: list[str] = keywords if isinstance(keywords, list) else []
 
-        # Create metadata
+        # --- 4. Build extra metadata dict ---
+        # Known frontmatter keys that map to DocumentMetadata fields directly
+        _KNOWN_KEYS = {
+            "title", "title-zh", "file-name", "file-path", "file-type",
+            "file-size", "language", "keywords", "year", "description",
+            "publisher", "author",
+        }
+        extra: dict[str, Any] = {}
+        for k, v in fm.items():
+            if k not in _KNOWN_KEYS:
+                extra[k] = v
+
+        # --- 5. Create metadata ---
         metadata = DocumentMetadata(
-            file_path=str(file_path),
-            file_name=file_path.name,
+            file_path=fm.get("file-path", str(file_path)),
+            file_name=fm.get("file-name", file_path.name),
             file_size=file_path.stat().st_size,
             file_type=DocumentType.MARKDOWN,
             sha256=sha256_hash,
-            title=title,
+            title=fm.get("title"),
+            author=fm.get("author") or fm.get("publisher"),
+            language=fm.get("language"),
+            tags=tags,
+            page_count=page_count,
+            page_offsets=page_offsets,
+            metadata=extra,
         )
 
         return Document(id=sha256_hash, metadata=metadata, content=content)

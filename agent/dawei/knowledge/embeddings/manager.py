@@ -3,13 +3,13 @@
 
 """Embedding model manager for text/vector conversion"""
 
+import asyncio
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from dawei.knowledge.models import (
     EmbeddingModel,
@@ -20,16 +20,52 @@ from dawei.knowledge.models import (
 
 logger = logging.getLogger(__name__)
 
+# Default Ollama API settings
+DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+DEFAULT_OLLAMA_API_KEY = "ollama"
+DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:8b"
+
+
+def _get_embedding_api_config() -> tuple[str, str, str]:
+    """Get embedding API base_url, api_key, and model from settings or env.
+
+    Returns:
+        (base_url, api_key, model_name)
+    """
+    try:
+        from dawei.config.settings import get_settings
+        settings = get_settings()
+        base_url = getattr(settings, "llm_embedding_base_url", DEFAULT_OLLAMA_BASE_URL)
+        api_key = getattr(settings, "llm_embedding_api_key", DEFAULT_OLLAMA_API_KEY)
+        model = getattr(settings, "llm_embedding_model", DEFAULT_EMBEDDING_MODEL)
+        return base_url, api_key, model
+    except Exception:
+        import os
+        base_url = os.environ.get("LLM_EMBEDDING_BASE_URL", DEFAULT_OLLAMA_BASE_URL)
+        api_key = os.environ.get("LLM_EMBEDDING_API_KEY", DEFAULT_OLLAMA_API_KEY)
+        model = os.environ.get("LLM_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+        return base_url, api_key, model
+
 
 # Model configurations
 MODEL_CONFIGS: Dict[EmbeddingModelType, Dict[str, Any]] = {
-    # Text models
+    # API-based models (via Ollama OpenAI-compatible API)
+    EmbeddingModelType.QWEN3_EMBEDDING: {
+        "dimension": 1024,
+        "max_sequence_length": 8192,
+        "supports_multilingual": True,
+        "modalities": ["text"],
+        "model_name": "qwen3-embedding:8b",
+        "backend": "api",  # uses OpenAI-compatible API
+    },
+    # Local SentenceTransformer models
     EmbeddingModelType.MINILM: {
         "dimension": 384,
         "max_sequence_length": 512,
         "supports_multilingual": False,
         "modalities": ["text"],
         "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+        "backend": "local",
     },
     EmbeddingModelType.BGE_M3: {
         "dimension": 1024,
@@ -37,6 +73,7 @@ MODEL_CONFIGS: Dict[EmbeddingModelType, Dict[str, Any]] = {
         "supports_multilingual": True,
         "modalities": ["text"],
         "model_name": "BAAI/bge-m3",
+        "backend": "local",
     },
     EmbeddingModelType.BGE_LARGE: {
         "dimension": 1024,
@@ -44,6 +81,7 @@ MODEL_CONFIGS: Dict[EmbeddingModelType, Dict[str, Any]] = {
         "supports_multilingual": True,
         "modalities": ["text"],
         "model_name": "BAAI/bge-large-zh-v1.5",
+        "backend": "local",
     },
     EmbeddingModelType.JINA_V4: {
         "dimension": 768,
@@ -51,12 +89,17 @@ MODEL_CONFIGS: Dict[EmbeddingModelType, Dict[str, Any]] = {
         "supports_multilingual": True,
         "modalities": ["text"],
         "model_name": "jinaai/jina-embeddings-v4",
+        "backend": "local",
     },
 }
 
 
 class EmbeddingManager:
     """Manager for embedding model loading and inference
+
+    Supports two backends:
+    - "api": OpenAI-compatible API (e.g. Ollama) for remote/hosted models
+    - "local": SentenceTransformer for local models
 
     Features:
     - Automatic model caching
@@ -67,7 +110,7 @@ class EmbeddingManager:
 
     def __init__(
         self,
-        model_type: EmbeddingModelType = EmbeddingModelType.MINILM,
+        model_type: EmbeddingModelType = EmbeddingModelType.QWEN3_EMBEDDING,
         cache_dir: str | Path | None = None,
         device: str = "cpu",
     ):
@@ -87,11 +130,14 @@ class EmbeddingManager:
             raise ValueError(f"Unsupported model type: {model_type}")
 
         self.config = MODEL_CONFIGS[model_type]
-        self._model: SentenceTransformer | None = None
+        self._backend = self.config.get("backend", "local")
+        self._model: Any | None = None  # SentenceTransformer for local backend
 
     @property
-    def model(self) -> SentenceTransformer:
-        """Lazy-load model on first access"""
+    def model(self) -> Any:
+        """Lazy-load model on first access (local backend only)"""
+        if self._backend == "api":
+            raise RuntimeError("API backend does not load a local model")
         if self._model is None:
             self._load_model()
         return self._model
@@ -101,8 +147,15 @@ class EmbeddingManager:
         """Get embedding dimension"""
         return self.config["dimension"]
 
+    @property
+    def backend(self) -> str:
+        """Get current backend type"""
+        return self._backend
+
     def _load_model(self) -> None:
-        """Load embedding model"""
+        """Load local SentenceTransformer embedding model"""
+        from sentence_transformers import SentenceTransformer
+
         try:
             model_name = self.config["model_name"]
             logger.info(f"Loading embedding model: {model_name}")
@@ -115,7 +168,6 @@ class EmbeddingManager:
             import os
 
             if "HF_ENDPOINT" not in os.environ:
-                # Auto-detect and use mirror for better connectivity
                 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
                 logger.info(f"Using HF mirror: {os.environ['HF_ENDPOINT']}")
 
@@ -134,7 +186,7 @@ class EmbeddingManager:
                 except RuntimeError as e:
                     if "client has been closed" in str(e) and attempt < max_retries - 1:
                         logger.warning(f"HTTP client closed on attempt {attempt + 1}, retrying...")
-                        time.sleep(2**attempt)  # Exponential backoff
+                        time.sleep(2**attempt)
                         continue
                     else:
                         raise
@@ -144,6 +196,39 @@ class EmbeddingManager:
         except Exception as e:
             logger.error(f"Failed to load embedding model: {e}")
             raise
+
+    async def _embed_via_api(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+        """Generate embeddings via OpenAI-compatible API (e.g. Ollama)"""
+        import aiohttp
+
+        base_url, api_key, model_name = _get_embedding_api_config()
+        url = f"{base_url.rstrip('/')}/v1/embeddings"
+
+        all_embeddings: List[List[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            payload = {"model": model_name, "input": batch}
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise RuntimeError(f"Embedding API error {resp.status}: {body}")
+                    result = await resp.json()
+
+            # OpenAI-compatible response: data[].embedding
+            data = result.get("data", [])
+            if len(data) != len(batch):
+                raise RuntimeError(
+                    f"Embedding API returned {len(data)} results, expected {len(batch)}"
+                )
+            all_embeddings.extend([item["embedding"] for item in data])
+
+        return all_embeddings
 
     async def embed(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
         """Generate embeddings for texts
@@ -158,8 +243,11 @@ class EmbeddingManager:
         if not texts:
             return []
 
+        if self._backend == "api":
+            return await self._embed_via_api(texts, batch_size)
+
+        # Local backend
         try:
-            # Generate embeddings in batches
             embeddings = self.model.encode(
                 texts,
                 batch_size=batch_size,
@@ -167,10 +255,7 @@ class EmbeddingManager:
                 convert_to_numpy=True,
                 normalize_embeddings=True,
             )
-
-            # Convert to list of lists
             return embeddings.tolist()
-
         except Exception as e:
             logger.error(f"Failed to generate embeddings: {e}")
             raise

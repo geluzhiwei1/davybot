@@ -12,11 +12,14 @@
 - 每个workspace独立的锁（不同workspace可并发）
 """
 
-import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 from dawei.evolution.exceptions import EvolutionAlreadyRunningError, EvolutionError
 from dawei.workspace.persistence_manager import WorkspacePersistenceManager
+
+if TYPE_CHECKING:
+    import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -71,31 +74,28 @@ class EvolutionLock:
         logger.debug(f"[EVOLUTION_LOCK] Initialized for workspace {workspace.workspace_id}")
 
     async def acquire(self) -> bool:
-        """非阻塞尝试获取锁
+        """尝试获取锁（原子操作，无TOCTOU竞态）
 
-        如果锁已被其他进程持有，立即返回False而不等待。
+        直接尝试acquire，如果锁已被持有则立即返回False。
+        不存在check-then-acquire的竞态窗口。
 
         Returns:
             bool: True表示成功获取锁，False表示锁已被持有
 
         """
-        # ResourceLock.acquire() returns an asyncio.Lock, not a bool
+        # ResourceLock.acquire() returns an asyncio.Lock
         self._async_lock = await self._pm._resource_lock.acquire(self._resource_key)
 
-        # asyncio.Lock 没有 acquire_nowait()，用 locked() 检查 + acquire() 获取
-        if self._async_lock.locked():
-            acquired = False
-        else:
-            await self._async_lock.acquire()
-            acquired = True
-
-        if acquired:
+        # 原子尝试获取：acquire_nowait() 在已锁定时抛出 RuntimeError
+        try:
+            self._async_lock.acquire_nowait()
             self._lock_holder = True
             logger.info(f"[EVOLUTION_LOCK] Acquired lock for {self._resource_key}")
-        else:
+            return True
+        except RuntimeError:
+            # 锁已被其他协程持有
             logger.debug(f"[EVOLUTION_LOCK] Lock already held for {self._resource_key}")
-
-        return acquired
+            return False
 
     async def release(self):
         """释放锁
@@ -138,14 +138,16 @@ class EvolutionLock:
         """
         acquired = await self.acquire()
         if not acquired:
-            raise EvolutionAlreadyRunningError(f"Evolution already running for workspace {self._resource_key}. Only one evolution cycle can run at a time per workspace.")
+            raise EvolutionAlreadyRunningError(
+                f"Evolution already running for workspace {self._resource_key}. "
+                "Only one evolution cycle can run at a time per workspace."
+            )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """async上下文管理器出口
 
         自动释放锁。
-
         """
         await self.release()
         return False

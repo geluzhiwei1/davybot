@@ -6,7 +6,7 @@
 /** 知识库相关类型定义 */
 
 /** 文档类型 */
-export type DocumentType = 'text' | 'pdf' | 'docx' | 'markdown' | 'image' | 'audio' | 'video'
+export type DocumentType = 'markdown' | 'image' | 'audio' | 'video'
 
 /** 检索模式 */
 export type RetrievalMode = 'vector' | 'graph' | 'fulltext' | 'hybrid'
@@ -22,10 +22,16 @@ export type KnowledgeBaseStatus = 'active' | 'archived' | 'deleting'
 
 /** 知识库设置 */
 export interface KnowledgeBaseSettings {
+  // File directory watching
+  watch_dir: string
+  watch_enabled: boolean
+  watch_recursive: boolean
+  watch_extensions: string[]
+
   chunk_size: number
   chunk_overlap: number
   chunk_strategy: ChunkingStrategy
-  embedding_model: 'minilm' | 'bge-m3' | 'jina-v4'
+  embedding_model: 'qwen3-embedding' | 'minilm' | 'bge-m3' | 'bge-large-zh' | 'jina-v4' | 'text-embedding-3-large'
   embedding_dimension: number
   default_top_k: number
   default_mode: RetrievalMode
@@ -36,6 +42,9 @@ export interface KnowledgeBaseSettings {
   enable_graph: boolean
   enable_fulltext: boolean
   auto_reindex: boolean
+
+  // Domain knowledge graph
+  domain?: string
 }
 
 /** 知识库统计 */
@@ -214,4 +223,47 @@ export interface GraphRelation {
   to_entity: string
   relation_type: string
   properties: Record<string, any>
+}
+
+/** Domain schema - defines entity types and relations for a domain */
+export interface DomainSchema {
+  domain: string
+  description: string
+   
+  entity_types: Record<string, {
+    description: string
+    properties: Record<string, {
+      type: string
+      description: string
+      required: boolean
+    }>
+  }>
+   
+  relation_types: Record<string, {
+    description: string
+    from_type: string
+    to_type: string
+     
+    properties?: Record<string, {
+      type: string
+      description: string
+      required: boolean
+    }>
+  }>
+}
+
+/** Entity source - where entities can be extracted from */
+export interface EntitySource {
+  source_type: 'text' | 'table' | 'image' | 'audio' | 'video' | 'code' | 'structured'
+  description: string
+  extraction_method: string
+  confidence: number
+  example_count?: number
+}
+
+/** Domain option for dropdown/selection */
+export interface DomainOption {
+  value: string
+  label: string
+  description?: string
 }

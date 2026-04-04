@@ -22,14 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class EvolutionPromptBuilder:
-    """Evolution上下文注入器
+    """Evolution上下文注入器（无状态，所有方法均为 classmethod）
 
     为每个PDCA phase注入evolution特有的上下文信息。
     内置mode的roleDefinition处理"怎么做"，这里只提供"做什么"和"上下文"。
 
     使用方式：
-        builder = EvolutionPromptBuilder()
-        context = builder.build("plan", inputs, "001", None)
+        context = EvolutionPromptBuilder.build("plan", inputs, "001", None)
         # context 会作为用户消息发送给Agent
     """
 
@@ -40,7 +39,8 @@ class EvolutionPromptBuilder:
         "act": "action.md",
     }
 
-    def build(self, phase: str, inputs: dict, cycle_id: str, prev_cycle_id: str | None) -> str:
+    @classmethod
+    def build(cls, phase: str, inputs: dict, cycle_id: str, prev_cycle_id: str | None) -> str:
         """构建evolution上下文prompt
 
         Args:
@@ -56,16 +56,17 @@ class EvolutionPromptBuilder:
             ValueError: 当phase名称无效时
 
         """
-        if phase not in self.PHASE_OUTPUT_FILES:
-            raise ValueError(f"Unknown phase: {phase}. Must be one of: {list(self.PHASE_OUTPUT_FILES.keys())}")
+        if phase not in cls.PHASE_OUTPUT_FILES:
+            raise ValueError(f"Unknown phase: {phase}. Must be one of: {list(cls.PHASE_OUTPUT_FILES.keys())}")
 
-        prompt = self._build_evolution_context(phase, inputs, cycle_id, prev_cycle_id)
+        prompt = cls._build_evolution_context(phase, inputs, cycle_id, prev_cycle_id)
 
         logger.debug(f"[EVOLUTION_PROMPT] Built {phase.upper()} context for cycle {cycle_id} ({len(prompt)} chars)")
 
         return prompt
 
-    def _build_evolution_context(self, phase: str, inputs: dict, cycle_id: str, prev_cycle_id: str | None) -> str:
+    @classmethod
+    def _build_evolution_context(cls, phase: str, inputs: dict, cycle_id: str, prev_cycle_id: str | None) -> str:
         """构建evolution上下文
 
         只注入evolution特有的信息，不定义phase行为（由内置mode处理）。
@@ -73,13 +74,13 @@ class EvolutionPromptBuilder:
         """
         workspace_md = inputs.get("workspace_md", "")
         prev_action = inputs.get("prev_action", "")
-        output_file = self.PHASE_OUTPUT_FILES[phase]
+        output_file = cls.PHASE_OUTPUT_FILES[phase]
 
         # Phase-specific input files
-        phase_files = self._get_phase_input_files(phase, inputs, cycle_id)
+        phase_files = cls._get_phase_input_files(phase, inputs, cycle_id)
 
         # Previous cycle section
-        prev_section = self._get_prev_cycle_section(prev_cycle_id, prev_action)
+        prev_section = cls._get_prev_cycle_section(prev_cycle_id, prev_action)
 
         return f"""# Evolution Context
 
@@ -96,10 +97,11 @@ You are running as part of **Evolution Cycle {cycle_id}**, phase: **{phase.upper
 - Focus on the workspace goals above
 - Be specific and actionable
 - This is part of an automated PDCA improvement cycle
-- {self._get_phase_specific_rule(phase)}
+- {cls._get_phase_specific_rule(phase)}
 """
 
-    def _get_phase_input_files(self, phase: str, inputs: dict, cycle_id: str) -> str:
+    @classmethod
+    def _get_phase_input_files(cls, phase: str, inputs: dict, cycle_id: str) -> str:
         """获取phase特定的输入文件内容"""
         sections = []
 
@@ -127,7 +129,8 @@ You are running as part of **Evolution Cycle {cycle_id}**, phase: **{phase.upper
 
         return "\n\n".join(sections)
 
-    def _get_prev_cycle_section(self, prev_cycle_id: str | None, prev_action: str) -> str:
+    @classmethod
+    def _get_prev_cycle_section(cls, prev_cycle_id: str | None, prev_action: str) -> str:
         """获取上一个cycle的上下文"""
         if not prev_cycle_id or not prev_action:
             return "## Note\nThis is the FIRST evolution cycle. No previous action.md exists.\n"
@@ -142,7 +145,8 @@ You are running as part of **Evolution Cycle {cycle_id}**, phase: **{phase.upper
 ```
 """
 
-    def _get_phase_specific_rule(self, phase: str) -> str:
+    @classmethod
+    def _get_phase_specific_rule(cls, phase: str) -> str:
         """获取phase特定的补充规则"""
         rules = {
             "plan": "Analyze the workspace goals and previous actions to create an actionable improvement plan",

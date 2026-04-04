@@ -12,7 +12,6 @@ Fast and simple extraction strategy based on:
 import re
 import logging
 from typing import List, Dict, Any
-from pathlib import Path
 
 from dawei.knowledge.extraction.base import (
     ExtractionStrategy,
@@ -90,21 +89,50 @@ class RuleBasedExtractor(ExtractionStrategy):
     ]
 
     DEFAULT_ORG_PATTERNS = [
-        r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:公司|科技|有限|集团|Corp|Inc|Ltd)",
-        r"[A-Z]{2,}",  # Acronyms like API, HTTP
+        # Chinese company suffixes
+        r"[^\s,。，]{2,20}(?:公司|科技|集团|有限责任公司|股份有限公司|合伙企业|基金会|协会|委员会|研究院)",
+        # Western company suffixes
+        r"\b[A-Z][A-Za-z0-9&'\- ]{1,60}\s+(?:Corp(?:oration)?|Inc(?:orporated)?|Ltd|LLC|LLP|PLC|GmbH|S\.A\.|B\.V\.|AG|NV|SE|Foundation|Institute|Authority|Group|Holdings|Partners)\b",
     ]
 
-    DEFAULT_PERSON_PATTERN = r"[\u4e00-\u9fa5]{2,3}"  # Chinese names
+    # NOTE: Chinese person name extraction via regex is disabled.
+    # Pattern r"[\u4e00-\u9fa5]{2,4}" matches ANY 2-4 Chinese chars,
+    # producing massive false positives (e.g. "的详情", "请浏览", "与服务合").
+    # Chinese NER requires a proper model (spacy/LLM), not a naive regex.
+    # Western names: "First Last" or "Title + Name" (Title-cased, 2-4 tokens)
+    PERSON_PATTERN_WESTERN = (
+        r"\b(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?|Sir|Dame|Lord|Lady)\s+"
+        r"[A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20}){0,3}\b"
+        r"|"
+        r"\b[A-Z][a-z]{1,20}(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{1,20}\b"
+    )
 
     def __init__(self, config: Dict[str, Any] | None = None):
         super().__init__(config)
 
-        # Load dictionaries
-        self.tech_terms = set(self.config.get("tech_dict", self.DEFAULT_TECH_TERMS))
+        # Load domain profile if available
+        profile = self.config.get("domain_profile")
+        self._domain_profile = profile
+        self.entity_type_map = profile.entity_types if profile else {"TECH": "技术"}
+
+        if profile:
+            self.dictionary_entries = self._build_dictionary_entries(profile)
+            self.domain_patterns = self._compile_domain_patterns(profile)
+        else:
+            self.dictionary_entries = [
+                {
+                    "term": term,
+                    "type": "TECH",
+                    "category": self._categorize_tech_term(term),
+                }
+                for term in self.DEFAULT_TECH_TERMS
+            ]
+            self.domain_patterns = {}
+
         self.org_dict = set(self.config.get("org_dict", []))
 
         # Compile patterns
-        self.person_pattern = re.compile(self.DEFAULT_PERSON_PATTERN)
+        self.person_pattern_western = re.compile(self.PERSON_PATTERN_WESTERN)
         self.org_patterns = [re.compile(p) for p in self.config.get("org_patterns", self.DEFAULT_ORG_PATTERNS)]
 
         # Relation patterns
@@ -123,7 +151,11 @@ class RuleBasedExtractor(ExtractionStrategy):
         for rel_type, patterns in self.relation_patterns.items():
             self.compiled_relations[rel_type] = [re.compile(p, re.IGNORECASE) for p in patterns]
 
-        logger.info(f"RuleBasedExtractor initialized with {len(self.tech_terms)} tech terms")
+        logger.info(
+            "RuleBasedExtractor initialized with %s dictionary terms and %s domain pattern categories",
+            len(self.dictionary_entries),
+            len(self.domain_patterns),
+        )
 
     async def extract(self, text: str, **kwargs) -> ExtractionResult:
         """Extract entities and relations using rules
@@ -139,16 +171,40 @@ class RuleBasedExtractor(ExtractionStrategy):
         relations = []
 
         # Extract entities
-        tech_entities = self._extract_tech_terms(text)
+        dictionary_entities = self._extract_dictionary_entities(text)
+        pattern_entities = self._extract_pattern_entities(text)
         org_entities = self._extract_organizations(text)
         person_entities = self._extract_persons(text)
 
-        entities.extend(tech_entities)
+        entities.extend(dictionary_entities)
+        entities.extend(pattern_entities)
         entities.extend(org_entities)
         entities.extend(person_entities)
+        entities = self._deduplicate_entities(entities)
 
         # Extract relations
         relations = self._extract_relations(text, entities)
+
+        # Attach source provenance from kwargs
+        chunk_id = kwargs.get("chunk_id")
+        document_id = kwargs.get("document_id")
+        page_number = kwargs.get("page_number")
+
+        for entity in entities:
+            if entity.source_chunk_id is None and chunk_id:
+                entity.source_chunk_id = chunk_id
+            if entity.source_document_id is None and document_id:
+                entity.source_document_id = document_id
+            if entity.source_page_number is None and page_number is not None:
+                entity.source_page_number = page_number
+
+        for relation in relations:
+            if relation.source_chunk_id is None and chunk_id:
+                relation.source_chunk_id = chunk_id
+            if relation.source_document_id is None and document_id:
+                relation.source_document_id = document_id
+            if relation.source_page_number is None and page_number is not None:
+                relation.source_page_number = page_number
 
         result = ExtractionResult(
             entities=entities,
@@ -163,29 +219,180 @@ class RuleBasedExtractor(ExtractionStrategy):
         logger.debug(f"Rule-based extraction: {len(entities)} entities, {len(relations)} relations")
         return result
 
-    def _extract_tech_terms(self, text: str) -> List[ExtractedEntity]:
-        """Extract technology terms"""
-        entities = []
+    def _build_dictionary_entries(self, profile) -> List[Dict[str, str]]:
+        """Build dictionary entries with resolved entity types"""
+        entries = []
 
-        for term in self.tech_terms:
-            if term in text:
-                # Count mentions
-                count = text.count(term)
+        for category, terms in profile.dictionaries.items():
+            entity_type = self._resolve_dictionary_entity_type(profile, category)
+            if not entity_type:
+                continue
 
-                entities.append(
-                    ExtractedEntity(
-                        name=term,
-                        type="TECH",
-                        properties={
-                            "category": self._categorize_tech_term(term),
-                            "mentions": count,
-                        },
-                        confidence=0.9,
-                        mention_count=count,
-                    )
+            for term in terms:
+                entries.append(
+                    {
+                        "term": term,
+                        "type": entity_type,
+                        "category": category,
+                    }
                 )
 
+        return entries
+
+    def _compile_domain_patterns(self, profile) -> Dict[str, Dict[str, Any]]:
+        """Compile domain regex patterns with mapped entity types"""
+        compiled = {}
+
+        for category, patterns in profile.patterns.items():
+            entity_type = self._resolve_pattern_entity_type(profile, category)
+            if not entity_type:
+                continue
+
+            compiled[category] = {
+                "type": entity_type,
+                "patterns": [re.compile(pattern, re.IGNORECASE) for pattern in patterns],
+            }
+
+        return compiled
+
+    def _resolve_dictionary_entity_type(self, profile, category: str) -> str | None:
+        """Resolve dictionary category to entity type"""
+        entity_type = profile.get_dictionary_entity_type(category)
+        if entity_type:
+            return entity_type
+        return self._infer_entity_type_from_category(category, profile.entity_types)
+
+    def _resolve_pattern_entity_type(self, profile, category: str) -> str | None:
+        """Resolve pattern category to entity type"""
+        entity_type = profile.get_pattern_entity_type(category)
+        if entity_type:
+            return entity_type
+        return self._infer_entity_type_from_category(category, profile.entity_types)
+
+    def _infer_entity_type_from_category(self, category: str, entity_types: Dict[str, str]) -> str | None:
+        """Infer entity type from dictionary/pattern category name"""
+        normalized = category.strip().upper()
+        candidates = [normalized]
+
+        if normalized.endswith("IES"):
+            candidates.append(normalized[:-3] + "Y")
+        if normalized.endswith("S"):
+            candidates.append(normalized[:-1])
+
+        synonyms = {
+            "DRUGS": "DRUG",
+            "METHODS": "METHOD",
+            "DATASETS": "DATASET",
+            "OFFENSES": "CRIME",
+            "CRIMES": "CRIME",
+            "COURTS": "COURT",
+            "AGENCIES": "AGENCY",
+            "INSTITUTIONS": "INSTITUTION",
+            "ORGANIZATIONS": "ORG",
+            "ORGS": "ORG",
+            "JURISDICTIONS": "JURISDICTION",
+            "CONTRACTS": "CONTRACT",
+            "CLAUSES": "CLAUSE",
+            "ARTICLES": "ARTICLE",
+            "LAWS": "LAW",
+            "CASES": "CASE",
+            "AUTHORS": "AUTHOR",
+            "TOOLS": "TOOL",
+            "LAW_NAME": "LAW",
+            "CASE_NO": "CASE",
+            "ARTICLE_NO": "ARTICLE",
+            "PROVISION_REF": "ARTICLE",
+            "TRIBUNAL_NAME": "COURT",
+        }
+        synonym = synonyms.get(normalized)
+        if synonym:
+            candidates.append(synonym)
+
+        for candidate in candidates:
+            if candidate in entity_types:
+                return candidate
+
+        return None
+
+    def _extract_dictionary_entities(self, text: str) -> List[ExtractedEntity]:
+        """Extract entities from configured dictionaries"""
+        entities = []
+
+        for entry in self.dictionary_entries:
+            count = self._count_term_matches(text, entry["term"])
+            if count == 0:
+                continue
+
+            entities.append(
+                ExtractedEntity(
+                    name=entry["term"],
+                    type=entry["type"],
+                    properties={
+                        "category": entry["category"],
+                        "source": "dictionary",
+                        "mentions": count,
+                    },
+                    confidence=0.9,
+                    mention_count=count,
+                )
+            )
+
         return entities
+
+    def _extract_pattern_entities(self, text: str) -> List[ExtractedEntity]:
+        """Extract entities from domain-specific regex patterns"""
+        entities = []
+
+        for category, config in self.domain_patterns.items():
+            for pattern in config["patterns"]:
+                for match in pattern.finditer(text):
+                    entity_name = match.group(0).strip()
+                    if len(entity_name) < 2:
+                        continue
+
+                    entities.append(
+                        ExtractedEntity(
+                            name=entity_name,
+                            type=config["type"],
+                            properties={
+                                "category": category,
+                                "source": "pattern",
+                                "pattern": pattern.pattern,
+                            },
+                            confidence=0.85,
+                            mention_count=self._count_term_matches(text, entity_name) or 1,
+                        )
+                    )
+
+        return entities
+
+    def _deduplicate_entities(self, entities: List[ExtractedEntity]) -> List[ExtractedEntity]:
+        """Deduplicate entities while preserving strongest metadata"""
+        deduplicated: Dict[tuple[str, str], ExtractedEntity] = {}
+
+        for entity in entities:
+            key = (entity.name, entity.type)
+            if key not in deduplicated:
+                deduplicated[key] = entity
+                continue
+
+            existing = deduplicated[key]
+            existing.mention_count = max(existing.mention_count, entity.mention_count)
+            existing.confidence = max(existing.confidence, entity.confidence)
+            existing.properties.update(entity.properties)
+
+        return list(deduplicated.values())
+
+    def _count_term_matches(self, text: str, term: str) -> int:
+        """Count matches with safer boundaries for Latin-script terms"""
+        if not term:
+            return 0
+
+        if re.search(r"[A-Za-z]", term):
+            pattern = re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE)
+            return len(pattern.findall(text))
+
+        return text.count(term)
 
     def _extract_organizations(self, text: str) -> List[ExtractedEntity]:
         """Extract organization names"""
@@ -227,22 +434,27 @@ class RuleBasedExtractor(ExtractionStrategy):
         return entities
 
     def _extract_persons(self, text: str) -> List[ExtractedEntity]:
-        """Extract person names (Chinese)"""
+        """Extract person names (Western scripts only via regex)
+
+        Chinese person name extraction is NOT supported by regex —
+        r"[\\u4e00-\\u9fa5]{2,4}" matches any 2-4 Chinese chars and
+        produces massive false positives. Use LLM or NER strategy instead.
+        """
         entities = []
+        seen: set[str] = set()
 
-        matches = self.person_pattern.findall(text)
-        seen = set()
-
-        for match in matches:
-            if match not in seen and len(match) >= 2:
-                seen.add(match)
+        # Western names only (Title-cased with optional honorific)
+        for match in self.person_pattern_western.finditer(text):
+            name = match.group(0).strip()
+            if name not in seen and len(name) >= 4:
+                seen.add(name)
                 entities.append(
                     ExtractedEntity(
-                        name=match,
+                        name=name,
                         type="PERSON",
-                        properties={},
-                        confidence=0.6,  # Lower confidence for generic pattern
-                        mention_count=text.count(match),
+                        properties={"script": "latin"},
+                        confidence=0.6,
+                        mention_count=self._count_term_matches(text, name),
                     )
                 )
 

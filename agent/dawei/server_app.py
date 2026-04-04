@@ -14,12 +14,12 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from dawei.core.datetime_compat import UTC
 from pathlib import Path
+
+from dawei.core.datetime_compat import UTC
 
 # 强制 UTF-8 编码（解决 Windows 控制台编码问题）
 if sys.platform == "win32":
-    # Helper function to get the underlying binary stream
     def _get_binary_stream(stream):
         if hasattr(stream, "buffer"):
             return stream.buffer
@@ -28,47 +28,40 @@ if sys.platform == "win32":
         else:
             return stream
 
-    # Wrap stdout if needed
     if hasattr(sys.stdout, "buffer") or hasattr(sys.stdout, "raw"):
         try:
             sys.stdout = io.TextIOWrapper(_get_binary_stream(sys.stdout), encoding="utf-8", errors="replace")
         except (AttributeError, OSError):
-            pass  # Use default if wrapping fails
+            pass
 
-    # Wrap stderr if needed
     if hasattr(sys.stderr, "buffer") or hasattr(sys.stderr, "raw"):
         try:
             sys.stderr = io.TextIOWrapper(_get_binary_stream(sys.stderr), encoding="utf-8", errors="replace")
         except (AttributeError, OSError):
-            pass  # Use default if wrapping fails
+            pass
 
-# 共享的 UTF-8 流（避免重复创建文件描述符）
 _shared_utf8_stream = None
+
+logger = logging.getLogger(__name__)
 
 
 class UTF8StreamHandler(logging.StreamHandler):
-    """自定义 StreamHandler，强制使用 UTF-8 编码写入控制台
-
-    适用于 Windows 控制台编码为 GBK 的情况。
-    """
+    """自定义 StreamHandler，强制使用 UTF-8 编码写入控制台"""
 
     def __init__(self):
         super().__init__()
         self._setup_utf8_stream()
 
     def _setup_utf8_stream(self):
-        """设置 UTF-8 输出流"""
         global _shared_utf8_stream
 
         if sys.platform == "win32":
             if _shared_utf8_stream is None:
-                # Get the underlying binary stream (handle both .buffer and .raw attributes)
                 if hasattr(sys.stderr, "buffer"):
                     binary_stream = sys.stderr.buffer
                 elif hasattr(sys.stderr, "raw"):
                     binary_stream = sys.stderr.raw
                 else:
-                    # Fallback: use sys.stderr directly
                     binary_stream = sys.stderr
 
                 _shared_utf8_stream = io.TextIOWrapper(
@@ -82,17 +75,9 @@ class UTF8StreamHandler(logging.StreamHandler):
             self.stream = sys.stderr
 
     def emit(self, record):
-        """写入日志记录，强制使用 UTF-8 编码"""
-        try:
-            msg = self.format(record)
-            self.stream.write(msg + "\n")
-            self.flush()
-        except (OSError, ValueError):
-            self.handleError(record)
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Unexpected error in UTF8StreamHandler.emit: {e}")
-            self.handleError(record)
-            raise
+        msg = self.format(record)
+        self.stream.write(msg + "\n")
+        self.flush()
 
 
 # Configure root logger
@@ -107,74 +92,70 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-# Import API routers
-from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces, users
-from dawei.api import knowledge_bases  # Multi-knowledge base support
-from dawei.api import checkpoints, conversations, skills, system, tools, websocket, workspaces, users, auth
+from dawei.api import (
+    auth,
+    checkpoints,
+    conversations,
+    knowledge_bases,
+    knowledge_domains,
+    market,
+    privacy,
+    scheduled_tasks,
+    container_runtime,
+    skills,
+    system,
+    tools,
+    websocket,
+    workspaces,
+    users,
+)
 from dawei.api.exception_handlers import register_exception_handlers
 from dawei.websocket.handlers.chat import ConnectHandler
 from dawei.websocket.ws_server import websocket_server
-from dawei.api import market
-from dawei.api import privacy
-from dawei.api import scheduled_tasks
-from dawei.api import container_runtime
 from dawei import get_dawei_home
-
 
 
 def record_server_start(host: str, port: int) -> None:
     """Record server startup parameters to DAWEI_HOME/server.start file."""
-    try:
-        dawei_home = get_dawei_home()
-        dawei_home.mkdir(parents=True, exist_ok=True)
+    dawei_home = get_dawei_home()
+    dawei_home.mkdir(parents=True, exist_ok=True)
 
-        server_start_file = dawei_home / "server.start"
+    server_start_file = dawei_home / "server.start"
+    accessible_host = "localhost" if host == "0.0.0.0" else host
 
-        accessible_host = "localhost" if host == "0.0.0.0" else host
+    start_data = {
+        "host": host,
+        "port": port,
+        "started_at": datetime.now(UTC).isoformat(),
+        "web_ui": f"http://{accessible_host}:{port}/",
+        "api_docs": f"http://{accessible_host}:{port}/docs",
+        "websocket": f"ws://{accessible_host}:{port}/ws",
+    }
 
-        start_data = {
-            "host": host,
-            "port": port,
-            "started_at": datetime.now(UTC).isoformat(),
-            "web_ui": f"http://{accessible_host}:{port}/",
-            "api_docs": f"http://{accessible_host}:{port}/docs",
-            "websocket": f"ws://{accessible_host}:{port}/ws",
-        }
+    with server_start_file.open("w", encoding="utf-8") as f:
+        json.dump(start_data, f, indent=2, ensure_ascii=False)
 
-        with server_start_file.open("w", encoding="utf-8") as f:
-            json.dump(start_data, f, indent=2, ensure_ascii=False)
-
-        print(f"[Dawei Server] ✓ Server start info recorded to: {server_start_file}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to record server start info: {e}")
+    print(f"[Dawei Server] Server start info recorded to: {server_start_file}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI lifespan context manager for startup and shutdown events."""
-    # Startup
-    # Create global DAWEI_HOME directories
-    try:
-        dawei_home = get_dawei_home()
-        global_dirs = ["checkpoints", "sessions", "logs", "configs"]
-        for dir_name in global_dirs:
-            dir_path = dawei_home / dir_name
-            dir_path.mkdir(parents=True, exist_ok=True)
-        print(f"[Dawei Server] ✓ Global directories created at {dawei_home}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to create global directories: {e}")
+    # --- Startup ---
 
+    # Create global DAWEI_HOME directories
+    dawei_home = get_dawei_home()
+    for dir_name in ("checkpoints", "sessions", "logs", "configs"):
+        (dawei_home / dir_name).mkdir(parents=True, exist_ok=True)
+    print(f"[Dawei Server] Global directories created at {dawei_home}")
+
+    # Initialize WebSocket server
     await websocket_server.initialize()
 
     # Validate .dawei directory structure
-    try:
-        from dawei.workspace.dawei_structure_validator import validate_dawei_on_startup
-        validate_dawei_on_startup()
-        print("[Dawei Server] ✓ .dawei directory structure validation passed")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ .dawei validation module not available: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ❌ .dawei directory structure validation failed: {e}")
+    from dawei.workspace.dawei_structure_validator import validate_dawei_on_startup
+    validate_dawei_on_startup()
+    print("[Dawei Server] .dawei directory structure validation passed")
 
     # Record server startup parameters
     host = getattr(app.state, "host", "0.0.0.0")
@@ -191,150 +172,89 @@ async def lifespan(app: FastAPI):
     await websocket_server.message_router.register_handler(connect_handler)
 
     # Initialize LLM API protection layer
-    try:
-        from dawei.llm_api.base_client import BaseClient
-        await BaseClient.initialize_global_components()
-        print("[Dawei Server] ✓ LLM API protection layer initialized")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ LLM API protection module not available: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to initialize LLM API protection: {e}")
+    from dawei.llm_api.base_client import BaseClient
+    await BaseClient.initialize_global_components()
+    print("[Dawei Server] LLM API protection layer initialized")
 
     # Initialize DaweiMem memory system
-    try:
-        from dawei.memory.database import init_memory_database
-        print("[Dawei Server] ✓ DaweiMem memory system is enabled")
+    from dawei.memory.database import init_memory_database
+    print("[Dawei Server] DaweiMem memory system is enabled")
 
-        dawei_home = Path(os.getenv("DAWEI_HOME", "~/.dawei")).expanduser()
-        workspaces_root = dawei_home
-
-        if workspaces_root.exists():
-            initialized_count = 0
-            for workspace_dir in workspaces_root.iterdir():
-                if workspace_dir.is_dir():
-                    db_path = workspace_dir / ".dawei" / "memory.db"
-                    try:
-                        if init_memory_database(str(db_path)):
-                            initialized_count += 1
-                    except Exception as e:
-                        print(
-                            f"[Dawei Server] ⚠ Failed to initialize memory DB for {workspace_dir.name}: {e}",
-                        )
-
-            print(
-                f"[Dawei Server] ✓ Memory system initialized for {initialized_count} workspace(s)",
-            )
-        else:
-            print(
-                "[Dawei Server] ℹ Workspaces root not found, memory DBs will be created on demand",
-            )
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ DaweiMem memory system module not available: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to initialize DaweiMem memory system: {e}")
+    workspaces_root = dawei_home
+    if workspaces_root.exists():
+        initialized_count = 0
+        for workspace_dir in workspaces_root.iterdir():
+            if workspace_dir.is_dir():
+                db_path = workspace_dir / ".dawei" / "memory.db"
+                if init_memory_database(str(db_path)):
+                    initialized_count += 1
+        print(f"[Dawei Server] Memory system initialized for {initialized_count} workspace(s)")
+    else:
+        print("[Dawei Server] Workspaces root not found, memory DBs will be created on demand")
 
     # Initialize Knowledge Base Manager (Multi-tenancy support)
-    try:
-        from dawei.knowledge.init import initialize_knowledge_base_manager
-        kb_manager = initialize_knowledge_base_manager()
-        print("[Dawei Server] ✓ Knowledge Base Manager initialized (Multi-tenancy support enabled)")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ Knowledge Base Manager module not available: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to initialize Knowledge Base Manager: {e}")
+    from dawei.knowledge.init import initialize_knowledge_base_manager
+    kb_manager = initialize_knowledge_base_manager()
+    print("[Dawei Server] Knowledge Base Manager initialized (Multi-tenancy support enabled)")
+
+    # Initialize Knowledge Base Auto-Sync Scheduler
+    from dawei.knowledge.sync_scheduler import initialize_sync_scheduler
+    await initialize_sync_scheduler(kb_manager)
+    print("[Dawei Server] Knowledge Base Auto-Sync Scheduler started")
 
     # Initialize Scheduler Manager
-    try:
-        from dawei.tools.scheduler import scheduler_manager
-        await scheduler_manager.initialize()
-        print("[Dawei Server] ✓ Scheduler manager initialized")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ Scheduler module not available: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to initialize scheduler: {e}")
+    from dawei.tools.scheduler import scheduler_manager
+    await scheduler_manager.initialize()
+    print("[Dawei Server] Scheduler manager initialized")
 
     # Initialize Evolution Scheduler
     from dawei.evolution import evolution_scheduler
     await evolution_scheduler.start()
+    print("[Dawei Server] Evolution scheduler started")
 
     # Initialize Remote Ping Service
-    try:
-        from dawei.remote import start_ping_service
-        await start_ping_service()
-        print("[Dawei Server] ✓ Remote ping service started")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ Remote ping service module not available: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to start remote ping service: {e}")
+    from dawei.remote import start_ping_service
+    await start_ping_service()
+    print("[Dawei Server] Remote ping service started")
 
     yield
 
-    # Shutdown LLM API protection layer
-    try:
-        from dawei.llm_api.base_client import BaseClient
-        await BaseClient.shutdown_global_components()
-        print("[Dawei Server] ✓ LLM API protection layer shutdown")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ LLM API protection module not available during shutdown: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to shutdown LLM API protection: {e}")
+    # --- Shutdown ---
+    shutdown_errors = []
 
-    # Shutdown scheduler manager
-    try:
-        from dawei.tools.scheduler import scheduler_manager
-        await scheduler_manager.shutdown()
-        print("[Dawei Server] ✓ Scheduler manager shutdown")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ Scheduler module not available during shutdown: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to shutdown scheduler: {e}")
-
-    # Shutdown Evolution Scheduler
-    try:
-        from dawei.evolution import evolution_scheduler
-        await evolution_scheduler.stop()
-        print("[Dawei Server] ✓ Evolution scheduler stopped")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ Evolution module not available during shutdown: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to stop evolution scheduler: {e}")
-
-    # Cleanup knowledge base embedding managers
-    try:
-        from dawei.core.dependency_container import DEPENDENCY_CONTAINER
+    async def _safe_shutdown(name: str, coro) -> None:
+        """Run a shutdown coroutine, collecting errors to report at end."""
         try:
-            from dawei.knowledge.base_manager import KnowledgeBaseManager
-            kb_manager = DEPENDENCY_CONTAINER.get_service("KnowledgeBaseManager")
-            kb_manager.cleanup_embedding_managers()
-            print("[Dawei Server] ✓ Knowledge base embedding managers cleaned up")
-        except ValueError:
-            # Knowledge base manager not initialized, skip
-            pass
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ Knowledge base module not available during shutdown: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to cleanup embedding managers: {e}")
-    # Shutdown Remote Ping Service
+            await coro
+            print(f"[Dawei Server] {name} shutdown complete")
+        except Exception as e:
+            shutdown_errors.append(f"{name}: {e}")
+            logger.error("Failed to shutdown %s: %s", name, e)
+
+    await _safe_shutdown("LLM API protection", BaseClient.shutdown_global_components())
+    await _safe_shutdown("Scheduler", scheduler_manager.shutdown())
+    await _safe_shutdown("Evolution scheduler", evolution_scheduler.stop())
+
+    from dawei.knowledge.sync_scheduler import shutdown_sync_scheduler
+    await _safe_shutdown("Knowledge sync scheduler", shutdown_sync_scheduler())
+
+    from dawei.core.dependency_container import DEPENDENCY_CONTAINER
     try:
-        from dawei.remote import stop_ping_service
-        await stop_ping_service()
-        print("[Dawei Server] ✓ Remote ping service stopped")
-    except ImportError as e:
-        print(f"[Dawei Server] ⚠ Remote ping service module not available during shutdown: {e}")
-    except Exception as e:
-        print(f"[Dawei Server] ⚠ Failed to stop remote ping service: {e}")
+        kb_mgr = DEPENDENCY_CONTAINER.get_service("KnowledgeBaseManager")
+        kb_mgr.cleanup_embedding_managers()
+        print("[Dawei Server] Knowledge base embedding managers cleaned up")
+    except ValueError:
+        pass  # Not initialized, nothing to clean
+
+    from dawei.remote import stop_ping_service
+    await _safe_shutdown("Remote ping service", stop_ping_service())
+
+    if shutdown_errors:
+        logger.warning("Shutdown encountered %d error(s): %s", len(shutdown_errors), shutdown_errors)
 
 
 def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
-    """Create and configure the FastAPI application.
-
-    Args:
-        host: Server host address
-        port: Server port number
-
-    Returns:
-        FastAPI: Configured application instance
-    """
+    """Create and configure the FastAPI application."""
     app = FastAPI(
         title="Dawei Agent API - Orchestrator Mode",
         description="AI-powered agent platform with multi-agent orchestration",
@@ -342,7 +262,7 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Add CORS middleware
+    # CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -358,10 +278,8 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Add GZip middleware for response compression
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    # Store server configuration in app state for lifespan access
     app.state.host = host
     app.state.port = port
 
@@ -369,122 +287,61 @@ def create_app(host: str = "0.0.0.0", port: int = 8465) -> FastAPI:
     app.include_router(tools.router)
     app.include_router(websocket.router)
     app.include_router(workspaces.router)
-    app.include_router(users.router)  # User settings including security
+    app.include_router(users.router)
     app.include_router(conversations.router)
     app.include_router(system.router)
     app.include_router(skills.router)
     app.include_router(scheduled_tasks.router)
     app.include_router(checkpoints.router)
-    app.include_router(auth.router)  # OAuth2 authentication
-
-    # Knowledge Base Management API (Multi-tenancy support)
+    app.include_router(auth.router)
     app.include_router(knowledge_bases.router)
-    print("[Dawei Server] ✓ Knowledge Base Management API router registered")
+    app.include_router(knowledge_domains.router)
+    app.include_router(market.router)
+    app.include_router(privacy.router)
+    app.include_router(container_runtime.router)
 
     # Register unified exception handlers
     register_exception_handlers(app)
 
-    # Market API
-    app.include_router(market.router)
-    print("[Dawei Server] ✓ Market API router registered")
-
-    # Privacy Configuration API
-    app.include_router(privacy.router)
-    print("[Dawei Server] ✓ Privacy Configuration API router registered")
-
-    # Container Runtime Detection API
-    app.include_router(container_runtime.router)
-    print("[Dawei Server] ✓ Container Runtime Detection API router registered")
-
-    # User Settings API (including security)
-    print("[Dawei Server] ✓ User Settings API router registered (including /users/me/security)")
-
-    # Add monitoring endpoints
+    # Monitoring endpoints
     @app.get("/api/stats/llm")
     async def get_llm_stats():
-        """Get LLM API protection layer statistics"""
-        try:
-            from dawei.llm_api.base_client import BaseClient
-            stats = BaseClient.get_global_stats()
-            return {"success": True, "data": stats}
-        except ImportError as e:
-            return {"success": False, "error": f"LLM API protection module not available: {e}"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        from dawei.llm_api.base_client import BaseClient
+        return {"success": True, "data": BaseClient.get_global_stats()}
 
     @app.get("/api/stats/memory")
     async def get_memory_system_stats():
-        """Get DaweiMem memory system statistics"""
-        try:
-            dawei_home = Path(os.getenv("DAWEI_HOME", "~/.dawei")).expanduser()
-            workspaces_root = dawei_home
+        from dawei.memory.memory_graph import MemoryGraph
 
-            if not workspaces_root.exists():
-                return {
-                    "success": True,
-                    "data": {
-                        "enabled": True,
-                        "workspaces": [],
-                        "total_memories": 0,
-                        "message": "No workspaces found",
-                    },
-                }
+        workspaces_root = Path(os.getenv("DAWEI_HOME", "~/.dawei")).expanduser()
+        if not workspaces_root.exists():
+            return {"success": True, "data": {"enabled": True, "workspaces": [], "total_memories": 0}}
 
-            from dawei.memory.memory_graph import MemoryGraph
+        total_memories = 0
+        workspace_stats = []
+        for workspace_dir in workspaces_root.iterdir():
+            if not workspace_dir.is_dir():
+                continue
+            db_path = workspace_dir / ".dawei" / "memory.db"
+            if db_path.exists():
+                graph = MemoryGraph(str(db_path))
+                stats = await graph.get_stats()
+                total_memories += stats.total
+                workspace_stats.append({
+                    "workspace": workspace_dir.name,
+                    "memories": stats.total,
+                    "by_type": stats.by_type,
+                })
 
-            total_memories = 0
-            workspace_stats = []
-
-            for workspace_dir in workspaces_root.iterdir():
-                if workspace_dir.is_dir():
-                    db_path = workspace_dir / ".dawei" / "memory.db"
-                    if db_path.exists():
-                        try:
-                            graph = MemoryGraph(str(db_path))
-                            stats = await graph.get_stats()
-                            total_memories += stats.total
-                            workspace_stats.append(
-                                {
-                                    "workspace": workspace_dir.name,
-                                    "memories": stats.total,
-                                    "by_type": stats.by_type,
-                                },
-                            )
-                        except Exception as e:
-                            print(
-                                f"[Dawei Server] Warning: Failed to get stats for {workspace_dir.name}: {e}",
-                            )
-
-            return {
-                "success": True,
-                "data": {
-                    "enabled": True,
-                    "workspaces": workspace_stats,
-                    "total_memories": total_memories,
-                },
-            }
-        except ImportError as e:
-            return {"success": False, "error": f"Memory system module not available: {e}"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return {"success": True, "data": {"enabled": True, "workspaces": workspace_stats, "total_memories": total_memories}}
 
     @app.get("/api/metrics")
     async def get_prometheus_metrics():
-        """Get Prometheus metrics"""
-        try:
-            from dawei.llm_api.base_client import BaseClient
-            metrics = BaseClient.get_prometheus_metrics()
-            from fastapi.responses import Response
-            return Response(content=metrics, media_type="text/plain")
-        except ImportError as e:
-            return Response(
-                content=f"# Error generating metrics: LLM API protection module not available: {e}",
-                media_type="text/plain",
-            )
-        except Exception as e:
-            return Response(content=f"# Error generating metrics: {e}", media_type="text/plain")
+        from dawei.llm_api.base_client import BaseClient
+        from fastapi.responses import Response
+        return Response(content=BaseClient.get_prometheus_metrics(), media_type="text/plain")
 
-    # Mount static files for frontend
+    # Mount frontend static files
     _mount_frontend_static(app)
 
     return app
@@ -506,11 +363,7 @@ def _mount_frontend_static(app: FastAPI) -> None:
         frontend_path = repo_root / "webui" / "dist"
 
     if frontend_path.exists():
-        app.mount(
-            "/app",
-            StaticFiles(directory=str(frontend_path), html=True),
-            name="frontend",
-        )
-        print(f"[Dawei Server] ✓ Frontend mounted from: {frontend_path}")
+        app.mount("/app", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+        print(f"[Dawei Server] Frontend mounted from: {frontend_path}")
     else:
-        print("[Dawei Server] ⚠ Frontend not found. API-only mode.")
+        print("[Dawei Server] Frontend not found. API-only mode.")

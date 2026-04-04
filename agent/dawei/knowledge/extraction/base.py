@@ -18,6 +18,11 @@ class ExtractedEntity(BaseModel):
     confidence: float = 0.8
     mention_count: int = 1
 
+    # Source provenance — which chunk/document this entity was extracted from
+    source_chunk_id: str | None = None
+    source_document_id: str | None = None
+    source_page_number: int | None = None
+
 
 class ExtractedRelation(BaseModel):
     """Extracted relation between entities"""
@@ -28,6 +33,11 @@ class ExtractedRelation(BaseModel):
     properties: Dict[str, Any] = field(default_factory=dict)
     confidence: float = 0.8
     mention_count: int = 1
+
+    # Source provenance
+    source_chunk_id: str | None = None
+    source_document_id: str | None = None
+    source_page_number: int | None = None
 
 
 @dataclass
@@ -97,8 +107,8 @@ class ExtractionStrategy(ABC):
         Returns:
             Merged ExtractionResult
         """
-        all_entities = {}
-        all_relations = {}
+        all_entities: Dict[str, ExtractedEntity] = {}
+        all_relations: Dict[str, ExtractedRelation] = {}
 
         for result in results:
             # Merge entities (deduplicate by name)
@@ -111,6 +121,28 @@ class ExtractionStrategy(ABC):
                     existing.confidence = (existing.confidence + entity.confidence) / 2
                     # Merge properties
                     existing.properties.update(entity.properties)
+
+                    # Merge source provenance
+                    if entity.source_document_id and entity.source_document_id not in (
+                        existing.source_document_id or ""
+                    ):
+                        if existing.source_document_id:
+                            # Keep first, already have one
+                            pass
+                        else:
+                            existing.source_document_id = entity.source_document_id
+                    if entity.source_chunk_id and entity.source_chunk_id not in (
+                        existing.source_chunk_id or ""
+                    ):
+                        if existing.source_chunk_id:
+                            pass
+                        else:
+                            existing.source_chunk_id = entity.source_chunk_id
+                    if (
+                        entity.source_page_number is not None
+                        and existing.source_page_number is None
+                    ):
+                        existing.source_page_number = entity.source_page_number
                 else:
                     all_entities[entity.name] = entity
 
@@ -123,6 +155,14 @@ class ExtractionStrategy(ABC):
                     existing.mention_count += relation.mention_count
                     existing.confidence = (existing.confidence + relation.confidence) / 2
                     existing.properties.update(relation.properties)
+
+                    # Merge source provenance for relations
+                    if relation.source_document_id and not existing.source_document_id:
+                        existing.source_document_id = relation.source_document_id
+                    if relation.source_chunk_id and not existing.source_chunk_id:
+                        existing.source_chunk_id = relation.source_chunk_id
+                    if relation.source_page_number is not None and existing.source_page_number is None:
+                        existing.source_page_number = relation.source_page_number
                 else:
                     all_relations[key] = relation
 

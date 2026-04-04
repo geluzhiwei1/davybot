@@ -17,9 +17,6 @@ from pydantic import BaseModel, Field
 class DocumentType(str, Enum):
     """Document type enumeration"""
 
-    TEXT = "text"
-    PDF = "pdf"
-    DOCX = "docx"
     MARKDOWN = "markdown"
     IMAGE = "image"
     AUDIO = "audio"
@@ -43,6 +40,7 @@ class EmbeddingModelType(str, Enum):
     """Embedding model type"""
 
     # Text models
+    QWEN3_EMBEDDING = "Qwen/Qwen3-Embedding-0.6B"
     MINILM = "sentence-transformers/all-MiniLM-L6-v2"
     BGE_M3 = "BAAI/bge-m3"
     BGE_LARGE = "BAAI/bge-large-zh-v1.5"
@@ -101,6 +99,7 @@ class DocumentMetadata(BaseModel):
     tags: List[str] = Field(default_factory=list)
     language: str | None = None
     page_count: int | None = None
+    page_offsets: Dict[int, int] = Field(default_factory=dict)  # {page_num(1-based): char_offset}
     chunk_count: int = 0
     metadata: Dict[str, Any] = Field(default_factory=dict)
 

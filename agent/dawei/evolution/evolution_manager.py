@@ -16,15 +16,14 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 
 from dawei.core.datetime_compat import UTC
+from dawei.entity.task_types import TaskStatus
 from dawei.evolution.evolution_lock import EvolutionLock
 from dawei.evolution.evolution_storage import EvolutionStorage
 from dawei.evolution.exceptions import EvolutionError, EvolutionPhaseError, EvolutionStateError
 from dawei.evolution.prompts import EvolutionPromptBuilder
-from dawei.entity.task_types import TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +34,47 @@ PHASE_MODE_MAP = {
     "check": "check",
     "act": "act",
 }
+
+
+def _extract_agent_output(agent) -> str:
+    """从Agent实例中提取最后一条assistant消息内容
+
+    封装对Agent内部结构的遍历，避免在业务逻辑中写深层hasattr链。
+
+    Args:
+        agent: Agent实例
+
+    Returns:
+        str: 提取到的内容，如果未找到返回空字符串
+
+    """
+    try:
+        workspace = getattr(agent, "user_workspace", None)
+        if workspace is None:
+            return ""
+
+        conversation = getattr(workspace, "current_conversation", None)
+        if conversation is None:
+            return ""
+
+        messages = getattr(conversation, "messages", None)
+        if not messages:
+            return ""
+
+        for msg in reversed(messages):
+            role = getattr(msg, "role", None)
+            if role != "assistant":
+                continue
+            content = getattr(msg, "content", None)
+            if content is None:
+                content = getattr(msg, "text", None)
+            if content:
+                return content
+
+    except Exception as e:
+        logger.warning(f"[EVOLUTION_MANAGER] Error extracting agent output: {e}")
+
+    return ""
 
 
 class EvolutionCycleManager:
@@ -53,6 +93,7 @@ class EvolutionCycleManager:
         lock: EvolutionLock实例
         storage: EvolutionStorage实例
         _abort_event: asyncio.Event用于abort信号
+        _resume_event: asyncio.Event用于resume信号（避免磁盘轮询）
         _task_graphs: cycle_id → TaskGraph映射
 
     """
@@ -78,6 +119,7 @@ class EvolutionCycleManager:
         self.lock = EvolutionLock(workspace)
         self.storage = EvolutionStorage(workspace)
         self._abort_event = asyncio.Event()
+        self._resume_event = asyncio.Event()
         self._task_graphs: dict[str, object] = {}
 
         logger.debug(f"[EVOLUTION_MANAGER] Initialized for workspace {workspace.workspace_id}")
@@ -121,6 +163,10 @@ class EvolutionCycleManager:
             metadata["context"]["task_graph_id"] = f"evolution-{cycle_id}"
             await self.storage.save_metadata(cycle_id, metadata)
 
+            # 重置事件
+            self._abort_event.clear()
+            self._resume_event.set()
+
             # 异步执行phases（不阻塞API响应）
             asyncio.create_task(self._run_phases(cycle_id, prev_cycle_id, task_graph), name=f"evolution-{cycle_id}")
 
@@ -129,7 +175,8 @@ class EvolutionCycleManager:
             return cycle_id
 
         except Exception as e:
-            # 启动失败，释放锁
+            # 启动失败，释放锁并清理 TaskGraph 引用
+            self._task_graphs.pop(cycle_id if "cycle_id" in dir() else "", None)
             await self.lock.release()
             logger.error(f"[EVOLUTION_MANAGER] Failed to start cycle: {e}", exc_info=True)
             raise EvolutionError(f"Failed to start evolution cycle: {e}") from e
@@ -213,7 +260,7 @@ class EvolutionCycleManager:
                     logger.info(f"[EVOLUTION_MANAGER] Abort signal received, stopping cycle {cycle_id}")
                     break
 
-                # 检查是否被暂停（等待resume）
+                # 检查是否被暂停（等待resume）— 使用 asyncio.Event 避免磁盘轮询
                 await self._wait_if_paused(cycle_id)
 
                 # 再次检查abort信号（可能在暂停期间被设置）
@@ -313,8 +360,7 @@ class EvolutionCycleManager:
         self.workspace.mode = agent_mode
 
         # 4. 构建evolution上下文（轻量注入，内置mode的roleDefinition处理行为定义）
-        prompt_builder = EvolutionPromptBuilder()
-        context = prompt_builder.build(phase, inputs, cycle_id, prev_cycle_id)
+        context = EvolutionPromptBuilder.build(phase, inputs, cycle_id, prev_cycle_id)
 
         # 5. 运行Agent（create_with_default_engine已经完成初始化）
         from dawei.agentic.agent import Agent
@@ -325,23 +371,8 @@ class EvolutionCycleManager:
         agent = await Agent.create_with_default_engine(self.workspace)
         await agent.process_message(user_input)
 
-        # 6. 获取输出（从 conversation 中提取 assistant 的最后回复）
-        output_content = ""
-        if (
-            hasattr(agent, "user_workspace")
-            and hasattr(agent.user_workspace, "current_conversation")
-            and agent.user_workspace.current_conversation
-            and hasattr(agent.user_workspace.current_conversation, "messages")
-        ):
-            messages = agent.user_workspace.current_conversation.messages
-            # 获取最后一条 assistant 消息的内容
-            for msg in reversed(messages):
-                if hasattr(msg, "role") and msg.role == "assistant":
-                    if hasattr(msg, "content"):
-                        output_content = msg.content
-                    elif hasattr(msg, "text"):
-                        output_content = msg.text
-                    break
+        # 6. 获取输出 — 使用封装的提取函数
+        output_content = _extract_agent_output(agent)
 
         # 如果没有找到内容，使用默认提示
         if not output_content:
@@ -355,9 +386,9 @@ class EvolutionCycleManager:
         try:
             # 清理agent内部资源，但保留workspace
             await agent.execution_engine.cleanup()
-            task_graph = getattr(agent.execution_engine, "task_graph", None)
-            if task_graph and hasattr(task_graph, "cleanup"):
-                await task_graph.cleanup()
+            agent_task_graph = getattr(agent.execution_engine, "task_graph", None)
+            if agent_task_graph and hasattr(agent_task_graph, "cleanup"):
+                await agent_task_graph.cleanup()
             agent._initialized = False
         except Exception:
             pass  # cleanup失败不影响主流程
@@ -374,17 +405,16 @@ class EvolutionCycleManager:
             EvolutionStateError: 当cycle状态不允许暂停时
 
         """
-        metadata = await self.storage.load_metadata(cycle_id)
+        async with self._metadata_update(cycle_id) as metadata:
+            if metadata["status"] != "running":
+                raise EvolutionStateError(f"Cannot pause cycle {cycle_id}: current status is {metadata['status']}, not 'running'")
 
-        if metadata["status"] != "running":
-            raise EvolutionStateError(f"Cannot pause cycle {cycle_id}: current status is {metadata['status']}, not 'running'")
+            metadata["status"] = "paused"
+            metadata["paused_at"] = datetime.now(UTC).isoformat()
+            metadata["context"]["pause_count"] = metadata["context"].get("pause_count", 0) + 1
 
-        # 更新metadata状态
-        metadata["status"] = "paused"
-        metadata["paused_at"] = datetime.now(UTC).isoformat()
-        metadata["context"]["pause_count"] = metadata["context"].get("pause_count", 0) + 1
-
-        await self.storage.save_metadata(cycle_id, metadata)
+        # 通知 _wait_if_paused 进入等待状态
+        self._resume_event.clear()
 
         logger.info(f"[EVOLUTION_MANAGER] Cycle {cycle_id} pause requested (will take effect at phase boundary)")
 
@@ -398,16 +428,15 @@ class EvolutionCycleManager:
             EvolutionStateError: 当cycle状态不允许恢复时
 
         """
-        metadata = await self.storage.load_metadata(cycle_id)
+        async with self._metadata_update(cycle_id) as metadata:
+            if metadata["status"] != "paused":
+                raise EvolutionStateError(f"Cannot resume cycle {cycle_id}: current status is {metadata['status']}, not 'paused'")
 
-        if metadata["status"] != "paused":
-            raise EvolutionStateError(f"Cannot resume cycle {cycle_id}: current status is {metadata['status']}, not 'paused'")
+            metadata["status"] = "running"
+            metadata["context"]["resume_count"] = metadata["context"].get("resume_count", 0) + 1
 
-        # 更新metadata状态
-        metadata["status"] = "running"
-        metadata["context"]["resume_count"] = metadata["context"].get("resume_count", 0) + 1
-
-        await self.storage.save_metadata(cycle_id, metadata)
+        # 唤醒 _wait_if_paused
+        self._resume_event.set()
 
         logger.info(f"[EVOLUTION_MANAGER] Cycle {cycle_id} resumed")
 
@@ -429,6 +458,8 @@ class EvolutionCycleManager:
 
         # 设置abort事件
         self._abort_event.set()
+        # 同时唤醒 resume 事件，避免卡在 _wait_if_paused
+        self._resume_event.set()
 
         logger.info(f"[EVOLUTION_MANAGER] Abort signal set for cycle {cycle_id}" + (f": {reason}" if reason else ""))
 
@@ -447,11 +478,14 @@ class EvolutionCycleManager:
     async def _wait_if_paused(self, cycle_id: str):
         """在phase边界等待，直到resume或abort
 
+        使用 asyncio.Event 避免磁盘轮询。resume_cycle() 会 set _resume_event。
+
         Args:
             cycle_id: Cycle ID
 
         """
         while True:
+            # 检查 metadata 状态（仅在首次和事件唤醒后）
             metadata = await self.storage.load_metadata(cycle_id)
 
             # 检查是否被暂停
@@ -462,8 +496,11 @@ class EvolutionCycleManager:
             if self._abort_event.is_set():
                 return
 
-            # 等待2秒后重新检查
-            await asyncio.sleep(2)
+            # 等待 resume 或 abort 事件（最多 30 秒超时，作为 fallback）
+            try:
+                await asyncio.wait_for(self._resume_event.wait(), timeout=30.0)
+            except TimeoutError:
+                pass  # 超时后重新检查状态
 
     async def _load_phase_inputs(self, cycle_id: str, prev_cycle_id: str | None, phase: str) -> dict:
         """加载phase输入文件
@@ -508,6 +545,38 @@ class EvolutionCycleManager:
 
         return inputs
 
+    # =========================================================================
+    # Metadata helpers — read-modify-write with single save
+    # =========================================================================
+
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _metadata_update(self, cycle_id: str):
+        """原子性metadata更新上下文管理器
+
+        加载metadata → yield供调用方修改 → 保存。
+        保证 save 只在正常退出时执行。
+
+        Usage:
+            async with self._metadata_update(cycle_id) as metadata:
+                metadata["status"] = "paused"
+
+        Args:
+            cycle_id: Cycle ID
+
+        Yields:
+            dict: metadata（可修改）
+
+        """
+        metadata = await self.storage.load_metadata(cycle_id)
+        try:
+            yield metadata
+        except Exception:
+            # 调用方异常时不保存
+            raise
+        await self.storage.save_metadata(cycle_id, metadata)
+
     async def _update_phase_status(self, cycle_id: str, phase: str, status: str, conversation_id: str | None = None):
         """更新metadata中phase的状态
 
@@ -518,21 +587,18 @@ class EvolutionCycleManager:
             conversation_id: Conversation ID（可选）
 
         """
-        metadata = await self.storage.load_metadata(cycle_id)
+        async with self._metadata_update(cycle_id) as metadata:
+            now = datetime.now(UTC).isoformat()
 
-        now = datetime.now(UTC).isoformat()
-
-        if status == "in_progress":
-            metadata["current_phase"] = phase
-            metadata["phases"][phase]["status"] = "in_progress"
-            metadata["phases"][phase]["started_at"] = now
-        elif status == "completed":
-            metadata["phases"][phase]["status"] = "completed"
-            metadata["phases"][phase]["completed_at"] = now
-            if conversation_id:
-                metadata["phases"][phase]["conversation_id"] = conversation_id
-
-        await self.storage.save_metadata(cycle_id, metadata)
+            if status == "in_progress":
+                metadata["current_phase"] = phase
+                metadata["phases"][phase]["status"] = "in_progress"
+                metadata["phases"][phase]["started_at"] = now
+            elif status == "completed":
+                metadata["phases"][phase]["status"] = "completed"
+                metadata["phases"][phase]["completed_at"] = now
+                if conversation_id:
+                    metadata["phases"][phase]["conversation_id"] = conversation_id
 
     async def _complete_cycle(self, cycle_id: str):
         """标记cycle为完成
@@ -541,13 +607,10 @@ class EvolutionCycleManager:
             cycle_id: Cycle ID
 
         """
-        metadata = await self.storage.load_metadata(cycle_id)
-
-        metadata["status"] = "completed"
-        metadata["completed_at"] = datetime.now(UTC).isoformat()
-        metadata["current_phase"] = None
-
-        await self.storage.save_metadata(cycle_id, metadata)
+        async with self._metadata_update(cycle_id) as metadata:
+            metadata["status"] = "completed"
+            metadata["completed_at"] = datetime.now(UTC).isoformat()
+            metadata["current_phase"] = None
 
         logger.info(f"[EVOLUTION_MANAGER] Cycle {cycle_id} completed successfully")
 
@@ -558,13 +621,10 @@ class EvolutionCycleManager:
             cycle_id: Cycle ID
 
         """
-        metadata = await self.storage.load_metadata(cycle_id)
-
-        metadata["status"] = "aborted"
-        metadata["aborted_at"] = datetime.now(UTC).isoformat()
-        metadata["current_phase"] = None
-
-        await self.storage.save_metadata(cycle_id, metadata)
+        async with self._metadata_update(cycle_id) as metadata:
+            metadata["status"] = "aborted"
+            metadata["aborted_at"] = datetime.now(UTC).isoformat()
+            metadata["current_phase"] = None
 
         logger.info(f"[EVOLUTION_MANAGER] Cycle {cycle_id} aborted")
 
@@ -576,14 +636,11 @@ class EvolutionCycleManager:
             error_message: 错误信息
 
         """
-        metadata = await self.storage.load_metadata(cycle_id)
-
-        metadata["status"] = "failed"
-        metadata["completed_at"] = datetime.now(UTC).isoformat()
-        metadata["current_phase"] = None
-        metadata["abort_reason"] = error_message
-
-        await self.storage.save_metadata(cycle_id, metadata)
+        async with self._metadata_update(cycle_id) as metadata:
+            metadata["status"] = "failed"
+            metadata["completed_at"] = datetime.now(UTC).isoformat()
+            metadata["current_phase"] = None
+            metadata["abort_reason"] = error_message
 
         logger.error(f"[EVOLUTION_MANAGER] Cycle {cycle_id} failed: {error_message}")
 

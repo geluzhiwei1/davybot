@@ -265,6 +265,11 @@ class LLMProviderConfig(BaseSettings):
     ollama_base_url: str = Field(default="http://localhost:11434")
     ollama_api_key: str = Field(default="ollama")
 
+    # Embedding API 配置
+    llm_embedding_base_url: str = Field(default="http://localhost:11434", alias="LLM_EMBEDDING_BASE_URL")
+    llm_embedding_api_key: str = Field(default="ollama", alias="LLM_EMBEDDING_API_KEY")
+    llm_embedding_model: str = Field(default="qwen3-embedding:8b", alias="LLM_EMBEDDING_MODEL")
+
     # 通用配置
     timeout: int = Field(default=300)
     max_retries: int = Field(default=3)
@@ -460,8 +465,8 @@ class KnowledgeConfig(BaseSettings):
 
     enabled: bool = Field(default=False)
     vector_store_type: str = Field(default="sqlite-vec")
-    embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
-    dimension: int = Field(default=384)
+    embedding_model: str = Field(default="Qwen/Qwen3-Embedding-0.6B")
+    dimension: int = Field(default=1024)
 
     # 分块配置
     chunk_size: int = Field(default=500)

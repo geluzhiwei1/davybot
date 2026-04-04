@@ -123,7 +123,7 @@ class KnowledgeSearchTool(CustomBaseTool):
             for kb_id in knowledge_base_ids:
                 try:
                     # Get embedding manager
-                    embedding_service = manager.get_embedding_manager(kb_id, "MINILM")
+                    embedding_service = manager.get_embedding_manager(kb_id)
 
                     # Get vector store
                     base_storage_path = manager.get_base_storage_path(kb_id)
@@ -214,6 +214,8 @@ class KnowledgeSearchTool(CustomBaseTool):
             # Add metadata
             if "file_name" in metadata:
                 lines.append(f"**File:** {metadata['file_name']}")
+            if "page_number" in metadata:
+                lines.append(f"**Page:** {metadata['page_number']}")
             if "chunk_index" in metadata:
                 lines.append(f"**Chunk:** {metadata['chunk_index']}")
             if "file_type" in metadata:
@@ -327,7 +329,7 @@ class KnowledgeRAGTool(CustomBaseTool):
             manager = get_knowledge_base_manager()
 
             # Get embedding manager and vector store
-            embedding_service = manager.get_embedding_manager(knowledge_base_id, "MINILM")
+            embedding_service = manager.get_embedding_manager(knowledge_base_id)
             base_storage_path = manager.get_base_storage_path(knowledge_base_id)
 
             from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore

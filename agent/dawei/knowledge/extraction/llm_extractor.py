@@ -59,13 +59,19 @@ class LLMExtractor(ExtractionStrategy):
 
     def __init__(self, config: Dict[str, Any] | None = None):
         super().__init__(config)
-
         self.max_text_length = self.config.get("max_text_length", 4000)
+
+        # Load domain profile
+        profile = config.get("domain_profile")
+        if profile and profile.extraction_prompt:
+            self.prompt_template = profile.extraction_prompt
+        else:
+            self.prompt_template = self.DEFAULT_PROMPT
 
         # Lazy init LLM service
         self._llm_service = None
-
-        logger.info(f"LLMExtractor initialized")
+        self._domain_profile = profile
+        logger.info(f"LLMExtractor initialized, domain={profile.name if profile else 'general'}")
 
     @property
     def llm_service(self):
@@ -80,6 +86,14 @@ class LLMExtractor(ExtractionStrategy):
                 logger.error(f"Failed to import LLM service: {e}")
                 raise
         return self._llm_service
+
+    def _get_entity_types_str(self) -> str:
+        profile = self.config.get("domain_profile")
+        return profile.get_entity_types_prompt() if profile else ""
+
+    def _get_relation_types_str(self) -> str:
+        profile = self.config.get("domain_profile")
+        return profile.get_relation_types_prompt() if profile else ""
 
     async def extract(self, text: str, **kwargs) -> ExtractionResult:
         """Extract entities and relations using LLM
@@ -97,7 +111,11 @@ class LLMExtractor(ExtractionStrategy):
             logger.warning(f"Text truncated to {self.max_text_length} chars for LLM extraction")
 
         # Prepare prompt
-        prompt = self.DEFAULT_PROMPT.format(text=text)
+        prompt = self.prompt_template.format(
+            text=text,
+            entity_types=self._get_entity_types_str() or "",
+            relation_types=self._get_relation_types_str() or "",
+        )
 
         try:
             # Import message types
@@ -123,12 +141,33 @@ class LLMExtractor(ExtractionStrategy):
             # Parse response
             result = self._parse_llm_response(content)
 
+            # Attach source provenance from kwargs
+            chunk_id = kwargs.get("chunk_id")
+            document_id = kwargs.get("document_id")
+            page_number = kwargs.get("page_number")
+
+            for entity in result.entities:
+                if entity.source_chunk_id is None and chunk_id:
+                    entity.source_chunk_id = chunk_id
+                if entity.source_document_id is None and document_id:
+                    entity.source_document_id = document_id
+                if entity.source_page_number is None and page_number is not None:
+                    entity.source_page_number = page_number
+
+            for relation in result.relations:
+                if relation.source_chunk_id is None and chunk_id:
+                    relation.source_chunk_id = chunk_id
+                if relation.source_document_id is None and document_id:
+                    relation.source_document_id = document_id
+                if relation.source_page_number is None and page_number is not None:
+                    relation.source_page_number = page_number
+
             # Add metadata
             result.metadata.update(
                 {
                     "strategy": self.strategy_name,
                     "text_length": len(text),
-                    "chunk_id": kwargs.get("chunk_id"),
+                    "chunk_id": chunk_id,
                 }
             )
 

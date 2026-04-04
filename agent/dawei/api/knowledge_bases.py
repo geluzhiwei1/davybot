@@ -108,6 +108,73 @@ async def get_default_knowledge_base():
     return kb
 
 
+@router.get("/scan-dir")
+async def scan_directory(
+    dir_path: str = Query(..., min_length=1, description="Directory path to scan"),
+    recursive: bool = Query(True, description="Scan subdirectories recursively"),
+):
+    """Scan a directory for supported files (no knowledge base required)
+
+    Used during knowledge base creation to preview files before saving.
+
+    Args:
+        dir_path: Directory path to scan
+        recursive: Whether to scan subdirectories
+
+    Returns:
+        List of supported files found in the directory
+    """
+    scan_path = dir_path
+    directory = Path(scan_path).expanduser().resolve()
+    if not directory.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Directory does not exist: {scan_path}",
+        )
+
+    if not directory.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Path is not a directory: {scan_path}",
+        )
+
+    supported = {".md", ".markdown"}
+
+    files = []
+    try:
+        glob_iter = directory.rglob("*") if recursive else directory.glob("*")
+        for file_path in glob_iter:
+            if file_path.is_file() and file_path.suffix.lower() in supported:
+                stat = file_path.stat()
+                rel_path = str(file_path.relative_to(directory))
+                files.append({
+                    "name": file_path.name,
+                    "path": str(file_path),
+                    "relative_path": rel_path,
+                    "size": stat.st_size,
+                    "extension": file_path.suffix.lower(),
+                    "modified_at": stat.st_mtime,
+                    "exists_in_kb": False,
+                })
+    except PermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: {scan_path}",
+        )
+
+    files.sort(key=lambda f: f["name"].lower())
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "files": files,
+            "total": len(files),
+            "dir_path": str(directory),
+            "existing_count": 0,
+            "new_count": len(files),
+        },
+    )
+
 @router.get("/{base_id}", response_model=KnowledgeBase)
 async def get_knowledge_base(base_id: str):
     """Get knowledge base by ID
@@ -126,11 +193,24 @@ async def update_knowledge_base(base_id: str, update_data: KnowledgeBaseUpdate):
     """Update knowledge base
 
     Updates configuration and metadata of a knowledge base.
+    Cannot change embedding_model if the knowledge base already has indexed documents.
     """
     manager = get_base_manager()
-    kb = manager.update_base(base_id, update_data)
-    if not kb:
+    existing = manager.get_base(base_id)
+    if not existing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
+
+    # Prevent embedding_model change when documents exist
+    if update_data.settings is not None and existing.stats.total_documents > 0:
+        if update_data.settings.embedding_model != existing.settings.embedding_model:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot change embedding_model from '{existing.settings.embedding_model}' to "
+                f"'{update_data.settings.embedding_model}': knowledge base already has "
+                f"{existing.stats.total_documents} document(s). Delete all documents first or create a new knowledge base.",
+            )
+
+    kb = manager.update_base(base_id, update_data)
     return kb
 
 
@@ -228,10 +308,10 @@ async def upload_document_to_base(
 
     # Get file extension
     file_extension = Path(file.filename).suffix.lower() if file.filename else ""
-    supported_extensions = {".pdf", ".docx", ".txt", ".md", ".markdown"}
+    supported_extensions = {".md", ".markdown"}
 
     if file_extension not in supported_extensions:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported file type: {file_extension}. Supported types: {', '.join(supported_extensions)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported file type: {file_extension}. Supported types: {', '.join(sorted(supported_extensions))}")
 
     # Create uploads directory for this knowledge base
     base_storage_path = manager._get_storage_path(base_id)
@@ -247,22 +327,9 @@ async def upload_document_to_base(
     # Import document processing components
     from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
     from dawei.knowledge.models import VectorDocument
-    from dawei.knowledge.parsers.docx_parser import DocxParser
     from dawei.knowledge.parsers.markdown_parser import MarkdownParser
-    from dawei.knowledge.parsers.pdf_parser import PDFParser
-    from dawei.knowledge.parsers.text_parser import TextParser
 
-    # Select appropriate parser based on file type
-    parser_map = {
-        ".pdf": PDFParser,
-        ".docx": DocxParser,
-        ".txt": TextParser,
-        ".md": MarkdownParser,
-        ".markdown": MarkdownParser,
-    }
-
-    parser_class = parser_map.get(file_extension, TextParser)
-    parser = parser_class()
+    parser = MarkdownParser()
 
     # Parse document
     document = await parser.parse(file_path)
@@ -304,7 +371,7 @@ async def upload_document_to_base(
 
     # Get or create embedding manager (cached to avoid HTTP client issues)
     try:
-        embedding_service = manager.get_embedding_manager(base_id, model_type="MINILM")
+        embedding_service = manager.get_embedding_manager(base_id)
     except Exception as e:
         logger.error(f"Failed to initialize embedding service: {e}")
         # Clean up uploaded file
@@ -392,16 +459,22 @@ async def upload_document_to_base(
 
         # Get extraction strategy from knowledge base settings
         extraction_strategy = kb.settings.extraction_strategy or "rule_based"
+        domain = getattr(kb.settings, "domain", "general")
 
-        # Create extractor
-        extractor = ExtractionFactory.create(extraction_strategy)
+        # Create extractor with domain profile
+        extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
 
         # Extract entities and relations from each chunk
         total_entities = 1  # Start with document entity
         total_relations = 0
         entity_id_map = {}  # Map entity names to graph IDs
+        # Track which documents/pages each entity appears in
+        entity_source_map: Dict[str, dict] = {}  # entity_name -> {doc_ids, chunk_ids, pages}
 
         for i, chunk in enumerate(chunks):
+            # Extract page number from chunk metadata
+            page_number = chunk.metadata.get("page_number")
+
             # Create chunk entity
             chunk_entity = GraphEntity(
                 id=chunk.id,
@@ -411,6 +484,7 @@ async def upload_document_to_base(
                 properties={
                     "chunk_index": i,
                     "document_id": chunk.document_id,
+                    "page_number": page_number,
                     "content": chunk.content,
                 },
                 base_id=base_id,
@@ -436,7 +510,31 @@ async def upload_document_to_base(
                     chunk.content,
                     chunk_id=chunk.id,
                     document_id=document.id,
+                    page_number=page_number,
                 )
+
+                # Attach source provenance to extracted entities
+                for entity in extraction_result.entities:
+                    if entity.source_document_id is None:
+                        entity.source_document_id = document.id
+                    if entity.source_chunk_id is None:
+                        entity.source_chunk_id = chunk.id
+                    if entity.source_page_number is None and page_number is not None:
+                        entity.source_page_number = page_number
+
+                # Track source provenance per entity name
+                if entity.name not in entity_source_map:
+                    entity_source_map[entity.name] = {
+                        "document_ids": set(),
+                        "chunk_ids": set(),
+                        "pages": set(),
+                    }
+                if entity.source_document_id:
+                    entity_source_map[entity.name]["document_ids"].add(entity.source_document_id)
+                if entity.source_chunk_id:
+                    entity_source_map[entity.name]["chunk_ids"].add(entity.source_chunk_id)
+                if entity.source_page_number is not None:
+                    entity_source_map[entity.name]["pages"].add(entity.source_page_number)
 
                 # Add extracted entities
                 for entity in extraction_result.entities:
@@ -446,6 +544,12 @@ async def upload_document_to_base(
                     # Store mapping for relations
                     if entity.name not in entity_id_map:
                         entity_id_map[entity.name] = entity_id
+
+                        # Get accumulated source info
+                        source_info = entity_source_map.get(entity.name, {})
+                        doc_ids = list(source_info.get("document_ids", set()))
+                        chunk_ids = list(source_info.get("chunk_ids", set()))
+                        pages = sorted(p for p in source_info.get("pages", set()) if p is not None)
 
                         # Create graph entity
                         graph_entity = GraphEntity(
@@ -457,6 +561,9 @@ async def upload_document_to_base(
                                 **entity.properties,
                                 "confidence": entity.confidence,
                                 "source": "extraction",
+                                "source_documents": doc_ids,
+                                "source_chunks": chunk_ids,
+                                "source_pages": pages,
                             },
                             base_id=base_id,
                         )
@@ -756,25 +863,13 @@ async def reindex_knowledge_base(base_id: str):
     # Import required modules
     from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
     from dawei.knowledge.models import VectorDocument
-    from dawei.knowledge.parsers.docx_parser import DocxParser
     from dawei.knowledge.parsers.markdown_parser import MarkdownParser
-    from dawei.knowledge.parsers.pdf_parser import PDFParser
-    from dawei.knowledge.parsers.text_parser import TextParser
     from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
     from dawei.knowledge.models import GraphEntity, GraphRelation
     from dawei.knowledge.extraction import (
         ExtractionFactory,
         ExtractionStrategyType,
     )
-
-    # Select appropriate parser based on file type
-    parser_map = {
-        ".pdf": PDFParser,
-        ".docx": DocxParser,
-        ".txt": TextParser,
-        ".md": MarkdownParser,
-        ".markdown": MarkdownParser,
-    }
 
     # Initialize stores
     vector_db_path = base_storage_path / "vectors.db"
@@ -795,7 +890,7 @@ async def reindex_knowledge_base(base_id: str):
     logger.info("Cleared old graph data")
 
     # Get embedding manager
-    embedding_service = manager.get_embedding_manager(base_id, model_type="MINILM")
+    embedding_service = manager.get_embedding_manager(base_id)
 
     # Determine chunk size from knowledge base settings
     chunk_size = kb.settings.chunk_size
@@ -818,7 +913,8 @@ async def reindex_knowledge_base(base_id: str):
 
     # Get extraction strategy
     extraction_strategy = kb.settings.extraction_strategy or "rule_based"
-    extractor = ExtractionFactory.create(extraction_strategy)
+    domain = getattr(kb.settings, "domain", "general")
+    extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
 
     # Statistics
     total_documents = 0
@@ -831,13 +927,12 @@ async def reindex_knowledge_base(base_id: str):
     for file_path in uploaded_files:
         try:
             file_extension = file_path.suffix.lower()
-            if file_extension not in parser_map:
+            if file_extension not in {".md", ".markdown"}:
                 logger.warning(f"Unsupported file type: {file_extension}, skipping {file_path.name}")
                 errors.append(f"Skipped {file_path.name}: unsupported file type")
                 continue
 
-            parser_class = parser_map.get(file_extension, TextParser)
-            parser = parser_class()
+            parser = MarkdownParser()
 
             # Parse document
             document = await parser.parse(file_path)
@@ -899,6 +994,8 @@ async def reindex_knowledge_base(base_id: str):
             entity_id_map = {}
 
             for i, chunk in enumerate(chunks):
+                page_number = chunk.metadata.get("page_number") if chunk.metadata else None
+
                 # Create chunk entity
                 chunk_entity = GraphEntity(
                     id=chunk.id,
@@ -908,6 +1005,7 @@ async def reindex_knowledge_base(base_id: str):
                     properties={
                         "chunk_index": i,
                         "document_id": chunk.document_id,
+                        "page_number": page_number,
                         "content": chunk.content,
                     },
                     base_id=base_id,
@@ -933,7 +1031,17 @@ async def reindex_knowledge_base(base_id: str):
                         chunk.content,
                         chunk_id=chunk.id,
                         document_id=document.id,
+                        page_number=page_number,
                     )
+
+                    # Track source provenance per entity name
+                    for entity in extraction_result.entities:
+                        if entity.source_document_id is None:
+                            entity.source_document_id = document.id
+                        if entity.source_chunk_id is None:
+                            entity.source_chunk_id = chunk.id
+                        if entity.source_page_number is None and page_number is not None:
+                            entity.source_page_number = page_number
 
                     # Add extracted entities
                     for entity in extraction_result.entities:
@@ -951,6 +1059,9 @@ async def reindex_knowledge_base(base_id: str):
                                     **entity.properties,
                                     "confidence": entity.confidence,
                                     "source": "extraction",
+                                    "source_documents": [entity.source_document_id] if entity.source_document_id else [],
+                                    "source_chunks": [entity.source_chunk_id] if entity.source_chunk_id else [],
+                                    "source_pages": [entity.source_page_number] if entity.source_page_number is not None else [],
                                 },
                                 base_id=base_id,
                             )
@@ -1056,6 +1167,505 @@ async def reindex_document_in_base(base_id: str, document_id: str):
 
 
 # ============================================================================
+# File Directory Endpoints
+# ============================================================================
+
+
+
+
+@router.get("/{base_id}/scan-dir")
+async def scan_watch_directory(
+    base_id: str,
+    dir_path: str = Query("", description="Directory path to scan (empty = use watch_dir from settings)"),
+):
+    """Scan a directory for supported files
+
+    Args:
+        base_id: Knowledge base ID
+        dir_path: Optional directory path override (uses watch_dir setting if empty)
+
+    Returns:
+        List of supported files found in the directory
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
+
+    # Determine directory path
+    scan_path = dir_path or kb.settings.watch_dir
+    if not scan_path:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"files": [], "total": 0, "dir_path": "", "message": "No directory path configured"},
+        )
+
+    directory = Path(scan_path).expanduser().resolve()
+    if not directory.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Directory does not exist: {scan_path}",
+        )
+
+    if not directory.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Path is not a directory: {scan_path}",
+        )
+
+    # Supported extensions
+    supported = {".md", ".markdown"}
+
+    # Get existing file names in knowledge base for comparison
+    existing_docs = manager.list_base_documents(base_id, skip=0, limit=10000)
+    existing_names = set()
+    for doc in existing_docs.get("documents", []):
+        existing_names.add(doc.get("file_name", ""))
+
+    # Scan directory
+    files = []
+    try:
+        if kb.settings.watch_recursive:
+            glob_iter = directory.rglob("*")
+        else:
+            glob_iter = directory.glob("*")
+
+        for file_path in glob_iter:
+            if file_path.is_file() and file_path.suffix.lower() in supported:
+                stat = file_path.stat()
+                rel_path = str(file_path.relative_to(directory))
+                files.append({
+                    "name": file_path.name,
+                    "path": str(file_path),
+                    "relative_path": rel_path,
+                    "size": stat.st_size,
+                    "extension": file_path.suffix.lower(),
+                    "modified_at": stat.st_mtime,
+                    "exists_in_kb": file_path.name in existing_names,
+                })
+    except PermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: {scan_path}",
+        )
+
+    # Sort by name
+    files.sort(key=lambda f: f["name"].lower())
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "files": files,
+            "total": len(files),
+            "dir_path": str(directory),
+            "existing_count": sum(1 for f in files if f["exists_in_kb"]),
+            "new_count": sum(1 for f in files if not f["exists_in_kb"]),
+        },
+    )
+
+
+@router.post("/{base_id}/sync-from-dir")
+async def sync_from_directory(
+    base_id: str,
+    dir_path: str = Query("", description="Directory path (empty = use watch_dir from settings)"),
+    force_rebuild: bool = Query(False, description="Force rebuild all files, not just new ones"),
+):
+    """Sync files from a directory into the knowledge base
+
+    Imports all supported files from the specified directory (or watch_dir setting)
+    into the knowledge base. If force_rebuild is False, only imports files not already
+    in the knowledge base.
+
+    Args:
+        base_id: Knowledge base ID
+        dir_path: Optional directory path override
+        force_rebuild: Whether to rebuild all files
+
+    Returns:
+        Sync results with statistics
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
+
+    # Determine directory path
+    scan_path = dir_path or kb.settings.watch_dir
+    if not scan_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No directory path configured. Set watch_dir in knowledge base settings or provide dir_path parameter.",
+        )
+
+    directory = Path(scan_path).expanduser().resolve()
+    if not directory.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Directory does not exist: {scan_path}",
+        )
+
+    # Supported extensions
+    supported = {".md", ".markdown"}
+
+    # Get existing file names
+    existing_docs = manager.list_base_documents(base_id, skip=0, limit=10000)
+    existing_names = set()
+    for doc in existing_docs.get("documents", []):
+        existing_names.add(doc.get("file_name", ""))
+
+    # If force_rebuild, clear existing data first
+    if force_rebuild:
+        # Delete vector store and recreate
+        base_storage_path = manager._get_storage_path(base_id)
+        vector_db_path = base_storage_path / "vectors.db"
+        if vector_db_path.exists():
+            vector_db_path.unlink()
+        fulltext_db_path = base_storage_path / "fulltext.db"
+        if fulltext_db_path.exists():
+            fulltext_db_path.unlink()
+        graph_db_path = base_storage_path / "graph.db"
+        if graph_db_path.exists():
+            graph_db_path.unlink()
+        existing_names.clear()
+
+    # Find all supported files
+    files_to_import = []
+    try:
+        if kb.settings.watch_recursive:
+            glob_iter = directory.rglob("*")
+        else:
+            glob_iter = directory.glob("*")
+
+        for file_path in glob_iter:
+            if file_path.is_file() and file_path.suffix.lower() in supported:
+                if not force_rebuild and file_path.name in existing_names:
+                    continue  # Skip existing files
+                files_to_import.append(file_path)
+    except PermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: {scan_path}",
+        )
+
+    if not files_to_import:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "base_id": base_id,
+                "message": "No new files to import",
+                "imported": 0,
+                "skipped": 0,
+                "errors": [],
+            },
+        )
+
+    # Import files using existing upload logic
+    from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
+    from dawei.knowledge.models import VectorDocument, GraphEntity, GraphRelation
+    from dawei.knowledge.parsers.markdown_parser import MarkdownParser
+    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+    from dawei.knowledge.fulltext.sqlite_fts_store import SQLiteFTSStore
+    from dawei.knowledge.graph.sqlite_graph_store import SQLiteGraphStore
+    from dawei.knowledge.extraction import ExtractionFactory
+
+    # Initialize stores directly (avoid manager.get_fulltext_store / get_graph_store
+    # which call asyncio.run() inside a running event loop)
+    base_storage_path = manager._get_storage_path(base_id)
+    vector_db_path = base_storage_path / "vectors.db"
+    vector_store = SQLiteVecVectorStore(
+        db_path=str(vector_db_path),
+        dimension=kb.settings.embedding_dimension,
+    )
+    await vector_store.initialize()
+
+    fulltext_db_path = base_storage_path / "fulltext.db"
+    fulltext_store = SQLiteFTSStore(db_path=str(fulltext_db_path))
+    await fulltext_store.initialize()
+
+    graph_db_path = base_storage_path / "graph.db"
+    graph_store = SQLiteGraphStore(db_path=str(graph_db_path))
+    await graph_store.initialize()
+
+    if force_rebuild:
+        await graph_store.clear()
+
+    embedding_service = manager.get_embedding_manager(base_id)
+
+    # Chunking config
+    strategy_map = {
+        "recursive": ChunkingStrategy.RECURSIVE,
+        "semantic": ChunkingStrategy.SEMANTIC,
+    }
+    chunk_strategy = strategy_map.get(kb.settings.chunk_strategy, ChunkingStrategy.RECURSIVE)
+    chunker = TextChunker(
+        config=ChunkingConfig(
+            strategy=chunk_strategy,
+            chunk_size=kb.settings.chunk_size,
+            chunk_overlap=kb.settings.chunk_overlap,
+        ),
+    )
+
+    extraction_strategy = kb.settings.extraction_strategy or "rule_based"
+    domain = getattr(kb.settings, "domain", "general")
+    extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
+
+    # Stats
+    total_documents = 0
+    total_chunks = 0
+    total_entities = 0
+    total_relations = 0
+    errors = []
+
+    for file_path in files_to_import:
+        try:
+            file_extension = file_path.suffix.lower()
+            if file_extension not in {".md", ".markdown"}:
+                errors.append(f"Skipped {file_path.name}: unsupported file type {file_extension}")
+                continue
+
+            parser = MarkdownParser()
+
+            # Parse
+            document = await parser.parse(file_path)
+            chunks = await chunker.chunk(document)
+
+            # Generate embeddings
+            chunk_texts = [chunk.content for chunk in chunks]
+            embeddings = await embedding_service.embed_documents(chunk_texts)
+
+            # Add to vector store
+            vector_docs = []
+            for chunk, embedding in zip(chunks, embeddings, strict=True):
+                metadata_copy = dict(chunk.metadata)
+                for key, value in metadata_copy.items():
+                    if hasattr(value, "isoformat"):
+                        metadata_copy[key] = value.isoformat()
+
+                vector_doc = VectorDocument(
+                    id=chunk.id,
+                    embedding=embedding,
+                    content=chunk.content,
+                    metadata={
+                        **metadata_copy,
+                        "document_id": chunk.document_id,
+                        "chunk_index": chunk.chunk_index,
+                        "base_id": base_id,
+                        "file_name": file_path.name,
+                        "source_path": str(file_path),
+                    },
+                )
+                vector_docs.append(vector_doc)
+
+            await vector_store.add(vector_docs)
+
+            # Fulltext index
+            try:
+                await fulltext_store.add_documents(chunks)
+            except Exception as e:
+                logger.warning(f"Failed to index fulltext for {file_path.name}: {e}")
+
+            # Graph index
+            try:
+                doc_entity = GraphEntity(
+                    id=f"doc_{document.id}",
+                    type="document",
+                    name=file_path.name,
+                    description=f"Document: {file_path.name}",
+                    properties={"file_size": document.metadata.file_size, "file_type": document.metadata.file_type, "source_path": str(file_path)},
+                    base_id=base_id,
+                )
+                await graph_store.add_entity(doc_entity)
+                total_entities += 1
+
+                entity_id_map = {}
+                for i, chunk in enumerate(chunks):
+                    chunk_entity = GraphEntity(
+                        id=chunk.id,
+                        type="chunk",
+                        name=f"Chunk {i}",
+                        description=chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content,
+                        properties={"chunk_index": i, "document_id": chunk.document_id, "content": chunk.content},
+                        base_id=base_id,
+                    )
+                    await graph_store.add_entity(chunk_entity)
+                    total_entities += 1
+
+                    doc_chunk_relation = GraphRelation(
+                        id=f"rel_{doc_entity.id}_{chunk.id}",
+                        from_entity=doc_entity.id,
+                        to_entity=chunk.id,
+                        relation_type="contains",
+                        properties={"order": i},
+                        base_id=base_id,
+                    )
+                    await graph_store.add_relation(doc_chunk_relation)
+                    total_relations += 1
+
+                    try:
+                        page_number = chunk.metadata.get("page_number") if chunk.metadata else None
+                        extraction_result = await extractor.extract(chunk.content, chunk_id=chunk.id, document_id=document.id, page_number=page_number)
+                        for entity in extraction_result.entities:
+                            if entity.source_document_id is None:
+                                entity.source_document_id = document.id
+                            if entity.source_chunk_id is None:
+                                entity.source_chunk_id = chunk.id
+                            if entity.source_page_number is None and page_number is not None:
+                                entity.source_page_number = page_number
+
+                            entity_id = f"entity_{hash(entity.name)}_{base_id}"
+                            if entity.name not in entity_id_map:
+                                entity_id_map[entity.name] = entity_id
+                                graph_entity = GraphEntity(
+                                    id=entity_id,
+                                    type=entity.type,
+                                    name=entity.name,
+                                    description=entity.properties.get("description", ""),
+                                    properties={
+                                        **entity.properties,
+                                        "confidence": entity.confidence,
+                                        "source": "extraction",
+                                        "source_documents": [entity.source_document_id] if entity.source_document_id else [],
+                                        "source_chunks": [entity.source_chunk_id] if entity.source_chunk_id else [],
+                                        "source_pages": [entity.source_page_number] if entity.source_page_number is not None else [],
+                                    },
+                                    base_id=base_id,
+                                )
+                                await graph_store.add_entity(graph_entity)
+                                total_entities += 1
+
+                            chunk_entity_relation = GraphRelation(
+                                id=f"rel_{chunk.id}_{entity_id_map[entity.name]}",
+                                from_entity=chunk.id,
+                                to_entity=entity_id_map[entity.name],
+                                relation_type="mentions",
+                                properties={"confidence": entity.confidence, "strategy": extraction_strategy},
+                                base_id=base_id,
+                            )
+                            await graph_store.add_relation(chunk_entity_relation)
+                            total_relations += 1
+
+                        for relation in extraction_result.relations:
+                            from_id = entity_id_map.get(relation.from_entity)
+                            to_id = entity_id_map.get(relation.to_entity)
+                            if from_id and to_id:
+                                graph_relation = GraphRelation(
+                                    id=f"rel_{from_id}_{to_id}_{relation.relation_type}",
+                                    from_entity=from_id,
+                                    to_entity=to_id,
+                                    relation_type=relation.relation_type,
+                                    properties={**relation.properties, "confidence": relation.confidence, "strategy": extraction_strategy},
+                                    base_id=base_id,
+                                )
+                                await graph_store.add_relation(graph_relation)
+                                total_relations += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to extract knowledge from chunk {i}: {e}")
+
+            except Exception as e:
+                logger.warning(f"Failed to index graph for {file_path.name}: {e}")
+
+            total_documents += 1
+            total_chunks += len(chunks)
+            logger.info(f"Synced file: {file_path.name} ({len(chunks)} chunks)")
+
+        except Exception as e:
+            error_msg = f"Failed to import {file_path.name}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            errors.append(error_msg)
+
+    # Update stats
+    if force_rebuild:
+        kb.stats.total_documents = total_documents
+        kb.stats.total_chunks = total_chunks
+        kb.stats.total_entities = total_entities
+        kb.stats.total_relations = total_relations
+        kb.stats.indexed_documents = total_documents
+    else:
+        kb.stats.total_documents += total_documents
+        kb.stats.total_chunks += total_chunks
+        kb.stats.total_entities += total_entities
+        kb.stats.total_relations += total_relations
+        kb.stats.indexed_documents += total_documents
+
+    from datetime import datetime
+    kb.stats.last_indexed_at = datetime.now()
+    kb.stats.last_updated_at = datetime.now()
+    kb.updated_at = datetime.now()
+    manager._save_metadata()
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "base_id": base_id,
+            "message": f"Synced {total_documents} files from directory",
+            "stats": {
+                "total_documents": total_documents,
+                "total_chunks": total_chunks,
+                "total_entities": total_entities,
+                "total_relations": total_relations,
+            },
+            "skipped": len(files_to_import) - total_documents - len(errors),
+            "errors": errors if errors else None,
+        },
+    )
+
+
+@router.post("/{base_id}/auto-sync")
+async def trigger_auto_sync(base_id: str):
+    """Manually trigger auto-sync for a knowledge base
+
+    Checks for new files in the watch directory and syncs them.
+    This is the same operation the background scheduler performs.
+
+    Args:
+        base_id: Knowledge base ID
+
+    Returns:
+        Sync results
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
+
+    if not kb.settings.watch_dir:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No watch directory configured for this knowledge base.",
+        )
+
+    try:
+        from dawei.knowledge.sync_scheduler import sync_scheduler
+        result = await sync_scheduler.sync_base(base_id)
+    except Exception as e:
+        logger.error(f"Auto-sync failed for {base_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Auto-sync failed: {str(e)}",
+        )
+
+    if result is None:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"success": True, "message": "No sync needed", "imported": 0},
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "base_id": base_id,
+            "message": f"Auto-synced {result.get('imported', 0)} files",
+            "imported": result.get("imported", 0),
+            "chunks": result.get("chunks", 0),
+            "errors": result.get("errors"),
+        },
+    )
+
+
+# ============================================================================
 # Search Endpoints
 # ============================================================================
 
@@ -1148,7 +1758,7 @@ async def search_in_base(
         vector_store=vector_store,
         fulltext_store=fulltext_store,
         graph_store=graph_store,
-        embedding_manager=manager.get_embedding_manager(base_id, model_type="MINILM"),
+        embedding_manager=manager.get_embedding_manager(base_id),
     )
 
     # Create retrieval query
@@ -1455,3 +2065,114 @@ async def get_graph_relations(
     except Exception as e:
         logger.error(f"Failed to get graph relations: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get graph relations: {str(e)}")
+
+
+@router.get("/{base_id}/graph/entities/{entity_id}/sources")
+async def get_entity_sources(
+    base_id: str,
+    entity_id: str,
+):
+    """Get source provenance for a graph entity — trace back to original document title and page number
+
+    Args:
+        base_id: Knowledge base ID
+        entity_id: Graph entity ID
+
+    Returns:
+        Entity with list of source documents and page numbers
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+
+    try:
+        import aiosqlite
+
+        base_storage_path = manager._get_storage_path(base_id)
+        graph_db_path = base_storage_path / "graph.db"
+
+        if not graph_db_path.exists():
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"entity": None, "sources": []},
+            )
+
+        # Query entity
+        async with aiosqlite.connect(graph_db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute("SELECT * FROM entities WHERE id = ?", (entity_id,))
+            row = await cursor.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entity not found")
+
+        properties = json.loads(row["properties"]) if row["properties"] else {}
+        source_doc_ids = properties.get("source_documents", [])
+        source_chunk_ids = properties.get("source_chunks", [])
+        source_pages = sorted(p for p in properties.get("source_pages", []) if p is not None)
+
+        # Build source list: for each doc_id, look up document title
+        sources = []
+        if source_doc_ids or source_chunk_ids:
+            # Try to get document titles from vector store metadata
+            vector_db_path = base_storage_path / "vectors.db"
+            if vector_db_path.exists():
+                async with aiosqlite.connect(vector_db_path) as vdb:
+                    vdb.row_factory = aiosqlite.Row
+                    for chunk_id in source_chunk_ids:
+                        try:
+                            cursor = await vdb.execute(
+                                "SELECT metadata, content FROM vectors WHERE id = ?",
+                                (chunk_id,),
+                            )
+                            vrow = await cursor.fetchone()
+                            if vrow:
+                                meta = json.loads(vrow["metadata"]) if vrow["metadata"] else {}
+                                sources.append(
+                                    {
+                                        "document_id": meta.get("document_id", ""),
+                                        "document_title": meta.get("file_name", ""),
+                                        "chunk_id": chunk_id,
+                                        "chunk_index": meta.get("chunk_index"),
+                                        "page_number": meta.get("page_number"),
+                                        "content": (vrow["content"] or "")[:200],
+                                    }
+                                )
+                        except Exception:
+                            pass
+
+        # Deduplicate sources by chunk_id
+        seen_chunks = set()
+        deduped_sources = []
+        for s in sources:
+            if s["chunk_id"] not in seen_chunks:
+                seen_chunks.add(s["chunk_id"])
+                deduped_sources.append(s)
+
+        entity_data = {
+            "id": row["id"],
+            "type": row["type"],
+            "name": row["name"],
+            "description": row["description"],
+            "properties": properties,
+        }
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "entity": entity_data,
+                "sources": deduped_sources,
+                "source_documents": source_doc_ids,
+                "source_pages": source_pages,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get entity sources: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get entity sources: {str(e)}",
+        )

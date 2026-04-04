@@ -5,23 +5,19 @@
 
 <template>
   <div class="knowledge-settings">
+    <!-- 知识库管理 (含上传) -->
+    <div class="knowledge-manager-section">
+      知识库管理
+      <KnowledgeBaseManager @documents-changed="loadDocuments" />
+    </div>
+
     <!-- 操作按钮 -->
     <div class="knowledge-actions">
-      <!-- 知识库选择器 -->
       <KnowledgeBaseSelector v-model="selectedBaseId" @update:modelValue="handleBaseIdChange" @change="handleBaseChange"
         style="width: 300px;" />
 
-      <el-button type="primary" :icon="Upload" @click="showUploadDialog">
-        {{ t('knowledge.uploadDocument') }}
-      </el-button>
-      <el-button :icon="Setting" @click="showSettings">
-        {{ t('knowledge.settings') }}
-      </el-button>
       <el-button :icon="Refresh" @click="loadDocuments" :loading="isLoading">
         {{ t('knowledge.refresh') }}
-      </el-button>
-      <el-button :icon="Grid" @click="showBaseManager">
-        管理知识库
       </el-button>
     </div>
 
@@ -35,9 +31,6 @@
             clearable style="width: 300px;" />
           <el-select v-model="filterType" :placeholder="t('knowledge.filterType')" style="width: 150px;">
             <el-option label="全部" value="all" />
-            <el-option label="PDF" value="pdf" />
-            <el-option label="DOCX" value="docx" />
-            <el-option label="Text" value="text" />
             <el-option label="Markdown" value="markdown" />
           </el-select>
         </div>
@@ -165,24 +158,6 @@
       </el-tab-pane>
     </el-tabs>
 
-    <!-- 上传文档对话框 -->
-    <el-dialog v-model="uploadDialogVisible" :title="t('knowledge.uploadDocument')" width="600px">
-      <el-upload ref="uploadRef" class="upload-demo" drag :action="uploadActionUrl" :on-success="handleUploadSuccess"
-        :on-error="handleUploadError" :before-upload="beforeUpload" :file-list="uploadFileList" multiple>
-        <el-icon class="el-icon--upload">
-          <UploadFilled />
-        </el-icon>
-        <div class="el-upload__text">
-          {{ t('knowledge.uploadText') }}
-        </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            {{ t('knowledge.uploadTip') }}
-          </div>
-        </template>
-      </el-upload>
-    </el-dialog>
-
     <!-- 文档预览对话框 -->
     <el-dialog v-model="previewDialogVisible" :title="previewDocument?.file_name" width="700px">
       <div v-if="previewDocument" class="document-preview">
@@ -207,77 +182,6 @@
       </div>
     </el-dialog>
 
-    <!-- 设置对话框 -->
-    <el-dialog v-model="settingsDialogVisible" :title="t('knowledge.settings')" width="500px">
-      <el-form :model="settings" label-width="160px">
-        <el-form-item :label="t('knowledge.chunkSize')">
-          <el-input-number v-model="settings.chunkSize" :min="100" :max="2000" :step="50" />
-        </el-form-item>
-        <el-form-item :label="t('knowledge.chunkOverlap')">
-          <el-input-number v-model="settings.chunkOverlap" :min="0" :max="500" :step="10" />
-        </el-form-item>
-        <el-form-item :label="t('knowledge.chunkStrategy')">
-          <el-select v-model="settings.chunkStrategy" style="width: 100%;">
-            <el-option label="Fixed Size" value="fixed_size" />
-            <el-option label="Recursive" value="recursive" />
-            <el-option label="Semantic" value="semantic" />
-            <el-option label="Markdown" value="markdown" />
-          </el-select>
-        </el-form-item>
-        <el-divider />
-        <el-form-item :label="t('knowledge.extractionStrategy')">
-          <el-select v-model="settings.extractionStrategy" style="width: 100%;">
-            <el-option :label="t('knowledge.ruleBased')" value="rule_based">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>{{ t('knowledge.ruleBased') }}</span>
-                <el-tag size="small" type="success">⚡⚡⚡</el-tag>
-              </div>
-            </el-option>
-            <el-option :label="t('knowledge.llm')" value="llm">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>{{ t('knowledge.llm') }}</span>
-                <el-tag size="small" type="warning">⚡ ⭐⭐⭐⭐</el-tag>
-              </div>
-            </el-option>
-            <el-option :label="t('knowledge.nerModel')" value="ner_model">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>{{ t('knowledge.nerModel') }}</span>
-                <el-tag size="small" type="info">⚡⚡ ⭐⭐⭐⭐</el-tag>
-              </div>
-            </el-option>
-            <el-option :label="t('knowledge.auto')" value="auto">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>{{ t('knowledge.auto') }}</span>
-                <el-tag size="small" type="primary">🔮</el-tag>
-              </div>
-            </el-option>
-          </el-select>
-          <div style="margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary);">
-            {{ t('knowledge.extractionStrategyHint') }}
-          </div>
-        </el-form-item>
-        <el-form-item :label="t('knowledge.embeddingModel')">
-          <el-select v-model="settings.embeddingModel" style="width: 100%;">
-            <el-option label="all-MiniLM-L6-v2 (384维)" value="minilm" />
-            <el-option label="BGE-M3 (1024维)" value="bge-m3" />
-            <el-option label="jina-embeddings-v4 (768维)" value="jina-v4" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="settingsDialogVisible = false">
-          {{ t('common.cancel') }}
-        </el-button>
-        <el-button type="primary" @click="saveSettings">
-          {{ t('common.save') }}
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 知识库管理对话框 -->
-    <el-dialog v-model="baseManagerDialogVisible" title="知识库管理" width="90%" :close-on-click-modal="false">
-      <KnowledgeBaseManager @close="baseManagerDialogVisible = false" />
-    </el-dialog>
   </div>
 </template>
 
@@ -286,21 +190,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Upload,
-  Setting,
   Refresh,
   Search,
   View,
   Delete,
-  DocumentCopy,
-  Document,
-  Grid,
-  DataLine,
-  Clock,
-  UploadFilled
+  DocumentCopy
 } from '@element-plus/icons-vue'
 import { knowledgeApi, knowledgeBasesApi } from '@/services/api/knowledge'
-import type { DocumentInfo, SearchResult, Stats, KnowledgeBase, ExtractionStrategy } from '@/types/knowledge'
+import type { DocumentInfo, SearchResult, KnowledgeBase } from '@/types/knowledge'
 import { logger } from '@/utils/logger'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import KnowledgeBaseManager from './KnowledgeBaseManager.vue'
@@ -326,7 +223,6 @@ const documents = ref<DocumentInfo[]>([])
 // 知识库状态
 const selectedBaseId = ref<string>('')
 const currentBase = ref<KnowledgeBase | null>(null)
-const uploadBaseId = ref<string>('')
 
 // RAG搜索
 const ragQuery = ref('')
@@ -340,32 +236,10 @@ const fulltextCount = ref(0)
 const latency = ref(0)
 const ragContext = ref('')
 
-// 统计
-const stats = ref<Stats>({
-  totalDocuments: 0,
-  totalChunks: 0,
-  totalEntities: 0,
-  avgRelevance: 0,
-  lastIndexed: '-'
-})
-
 // 对话框
-const uploadDialogVisible = ref(false)
 const previewDialogVisible = ref(false)
-const settingsDialogVisible = ref(false)
-const baseManagerDialogVisible = ref(false)
 const previewDocument = ref<DocumentInfo | null>(null)
 const previewContent = ref('')
-const uploadFileList = ref([])
-
-// 设置
-const settings = ref({
-  chunkSize: 1000,
-  chunkOverlap: 200,
-  embeddingModel: 'minilm',
-  chunkStrategy: 'recursive',
-  extractionStrategy: 'rule_based' as ExtractionStrategy
-})
 
 // 计算属性
 const filteredDocuments = computed(() => {
@@ -383,14 +257,6 @@ const filteredDocuments = computed(() => {
   }
 
   return filtered
-})
-
-// 上传URL (根据选择的知识库动态变化)
-const uploadActionUrl = computed(() => {
-  if (uploadBaseId.value) {
-    return `/api/knowledge/bases/${uploadBaseId.value}/documents/upload`
-  }
-  return '/api/knowledge/documents/upload'
 })
 
 // 方法
@@ -424,61 +290,6 @@ const handleSizeChange = () => {
 
 const handlePageChange = () => {
   loadDocuments()
-}
-
-const showUploadDialog = () => {
-  // 初始化上传知识库ID为当前选择的知识库
-  uploadBaseId.value = selectedBaseId.value
-  uploadDialogVisible.value = true
-}
-
-const showSettings = () => {
-  // 从当前知识库加载设置
-  if (currentBase.value?.settings) {
-    settings.value = {
-      chunkSize: currentBase.value.settings.chunk_size,
-      chunkOverlap: currentBase.value.settings.chunk_overlap,
-      embeddingModel: currentBase.value.settings.embedding_model,
-      chunkStrategy: currentBase.value.settings.chunk_strategy,
-      extractionStrategy: currentBase.value.settings.extraction_strategy || 'rule_based'
-    }
-  }
-  settingsDialogVisible.value = true
-}
-
-const showBaseManager = () => {
-  baseManagerDialogVisible.value = true
-}
-
-const beforeUpload = (file: File) => {
-  const isValidType = [
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain',
-    'text/markdown'
-  ].includes(file.type)
-
-  if (!isValidType) {
-    ElMessage.error(t('knowledge.invalidFileType'))
-    return false
-  }
-
-  const isValidSize = file.size / 1024 / 1024 < 100
-  if (!isValidSize) {
-    ElMessage.error(t('knowledge.fileTooLarge'))
-    return false
-  }
-
-  return true
-}
-
-const handleUploadSuccess = () => {
-  ElMessage.success(t('knowledge.uploadSuccess'))
-  loadDocuments()
-}
-
-const handleUploadError = () => {
-  ElMessage.error(t('knowledge.uploadFailed'))
 }
 
 const viewDocument = async (doc: DocumentInfo) => {
@@ -586,49 +397,6 @@ const copyContext = async () => {
   }
 }
 
-const saveSettings = async () => {
-  try {
-    // 更新知识库设置
-    if (selectedBaseId.value && currentBase.value) {
-      await knowledgeBasesApi.updateBase(selectedBaseId.value, {
-        settings: {
-          chunk_size: settings.value.chunkSize,
-          chunk_overlap: settings.value.chunkOverlap,
-          chunk_strategy: settings.value.chunkStrategy,
-          embedding_model: settings.value.embeddingModel,
-          embedding_dimension: settings.value.embeddingModel === 'bge-m3' ? 1024 :
-            settings.value.embeddingModel === 'jina-v4' ? 768 : 384,
-          extraction_strategy: settings.value.extractionStrategy,
-          default_top_k: 5,
-          default_mode: 'hybrid',
-          vector_weight: 0.5,
-          graph_weight: 0.3,
-          fulltext_weight: 0.2,
-          enable_graph: true,
-          enable_fulltext: true,
-          auto_reindex: false
-        }
-      })
-
-      // 更新本地currentBase
-      currentBase.value.settings = {
-        ...currentBase.value.settings,
-        chunk_size: settings.value.chunkSize,
-        chunk_overlap: settings.value.chunkOverlap,
-        chunk_strategy: settings.value.chunkStrategy,
-        embedding_model: settings.value.embeddingModel,
-        extraction_strategy: settings.value.extractionStrategy
-      }
-    }
-
-    ElMessage.success(t('knowledge.settingsSaved'))
-    settingsDialogVisible.value = false
-  } catch (error) {
-    logger.error('Failed to save settings:', error)
-    ElMessage.error(t('knowledge.saveSettingsFailed'))
-  }
-}
-
 // 工具函数
 const formatFileSize = (bytes: number) => {
   if (bytes < 1024) return bytes + ' B'
@@ -643,9 +411,6 @@ const formatDate = (date: string | null) => {
 
 const getFileTypeColor = (type: string) => {
   const colors: Record<string, string> = {
-    pdf: 'danger',
-    docx: 'warning',
-    text: 'success',
     markdown: 'info'
   }
   return colors[type] || ''
@@ -696,41 +461,17 @@ onMounted(() => {
   padding: 20px;
 }
 
+.knowledge-manager-section {
+  margin-bottom: 20px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .knowledge-actions {
   display: flex;
   gap: 12px;
   margin-bottom: 20px;
-}
-
-.stat-card {
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-}
-
-.stat-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-info {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-color-primary);
-}
-
-.stat-label {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  margin-top: 4px;
 }
 
 .search-bar {

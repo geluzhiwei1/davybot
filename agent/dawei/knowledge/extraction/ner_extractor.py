@@ -62,8 +62,13 @@ class NERModelExtractor(ExtractionStrategy):
 
     def __init__(self, config: Dict[str, Any] | None = None):
         super().__init__(config)
-
-        self.model_name = self.config.get("model_name", None)
+        # Load domain profile: use domain-specific model if configured
+        profile = config.get("domain_profile")
+        if profile and profile.ner_model:
+            self.model_name = profile.ner_model
+            logger.info(f"NERModelExtractor using domain NER model: {self.model_name}")
+        else:
+            self.model_name = self.config.get("model_name", None)
         self.library = self.config.get("library", "spacy")
         self.device = self.config.get("device", "cpu")
         self.extract_relations = self.config.get("relation_extraction", True)
@@ -170,6 +175,27 @@ class NERModelExtractor(ExtractionStrategy):
             if self.extract_relations:
                 relations = self._extract_dependency_relations(doc, entities)
 
+            # Attach source provenance from kwargs
+            chunk_id = kwargs.get("chunk_id")
+            document_id = kwargs.get("document_id")
+            page_number = kwargs.get("page_number")
+
+            for entity in entities:
+                if entity.source_chunk_id is None and chunk_id:
+                    entity.source_chunk_id = chunk_id
+                if entity.source_document_id is None and document_id:
+                    entity.source_document_id = document_id
+                if entity.source_page_number is None and page_number is not None:
+                    entity.source_page_number = page_number
+
+            for relation in relations:
+                if relation.source_chunk_id is None and chunk_id:
+                    relation.source_chunk_id = chunk_id
+                if relation.source_document_id is None and document_id:
+                    relation.source_document_id = document_id
+                if relation.source_page_number is None and page_number is not None:
+                    relation.source_page_number = page_number
+
             result = ExtractionResult(
                 entities=entities,
                 relations=relations,
@@ -181,7 +207,6 @@ class NERModelExtractor(ExtractionStrategy):
                     "relation_count": len(relations),
                 },
             )
-
             logger.debug(f"NER extraction: {len(entities)} entities, {len(relations)} relations")
             return result
 

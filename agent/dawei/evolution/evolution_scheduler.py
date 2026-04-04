@@ -9,7 +9,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from croniter import croniter
@@ -22,6 +22,9 @@ from dawei.workspace.workspace_manager import workspace_manager
 
 logger = logging.getLogger(__name__)
 
+# 合理默认调度：每天凌晨3点
+DEFAULT_CRON_SCHEDULE = "0 3 * * *"
+
 
 class EvolutionScheduler:
     """Evolution调度器
@@ -33,11 +36,13 @@ class EvolutionScheduler:
     - 全局单例，每60秒检查一次所有workspace
     - 每个workspace独立判断是否触发
     - 使用EvolutionLock防止并发启动
+    - 缓存已初始化的UserWorkspace实例避免重复初始化
 
     Attributes:
         CHECK_INTERVAL: 检查间隔（秒）
         _task: 后台检查任务
         _running: 是否正在运行
+        _workspace_cache: workspace_id → UserWorkspace 缓存
 
     """
 
@@ -47,6 +52,7 @@ class EvolutionScheduler:
         """初始化EvolutionScheduler"""
         self._task: asyncio.Task | None = None
         self._running = False
+        self._workspace_cache: dict[str, object] = {}
 
         logger.debug("[EVOLUTION_SCHEDULER] EvolutionScheduler initialized")
 
@@ -75,6 +81,7 @@ class EvolutionScheduler:
             return
 
         self._running = False
+        self._workspace_cache.clear()
 
         if self._task:
             self._task.cancel()
@@ -84,6 +91,34 @@ class EvolutionScheduler:
                 pass
 
         logger.info("[EVOLUTION_SCHEDULER] Stopped")
+
+    async def _get_or_init_workspace(self, workspace_path: str):
+        """获取或初始化UserWorkspace（带缓存）
+
+        避免每60秒重新创建和初始化UserWorkspace。
+
+        Args:
+            workspace_path: workspace路径
+
+        Returns:
+            UserWorkspace实例，如果初始化失败返回None
+
+        """
+        if workspace_path in self._workspace_cache:
+            return self._workspace_cache[workspace_path]
+
+        from dawei.workspace.user_workspace import UserWorkspace
+
+        workspace = UserWorkspace(workspace_path)
+        if not workspace.is_initialized():
+            try:
+                await workspace.initialize()
+            except Exception as e:
+                logger.warning(f"[EVOLUTION_SCHEDULER] Failed to initialize workspace {workspace_path}: {e}")
+                return None
+
+        self._workspace_cache[workspace_path] = workspace
+        return workspace
 
     async def _loop(self):
         """主检查循环
@@ -134,16 +169,9 @@ class EvolutionScheduler:
             if not workspace_path:
                 continue
 
-            # 加载workspace
-            from dawei.workspace.user_workspace import UserWorkspace
-
-            workspace = UserWorkspace(workspace_path)
-            if not workspace.is_initialized():
-                try:
-                    await workspace.initialize()
-                except Exception as e:
-                    logger.warning(f"[EVOLUTION_SCHEDULER] Failed to initialize workspace {workspace_path}: {e}")
-                    continue
+            workspace = await self._get_or_init_workspace(workspace_path)
+            if workspace is None:
+                continue
 
             # 检查evolution配置
             workspace_config = workspace.workspace_config
@@ -213,7 +241,7 @@ class EvolutionScheduler:
             return False
 
         # 3. 检查cron调度时间
-        schedule = evolution_config.get("schedule", "* * * * *")  # 默认每分钟
+        schedule = evolution_config.get("schedule", DEFAULT_CRON_SCHEDULE)
         last_cycle_time = None
 
         if last_cycle:
@@ -231,8 +259,14 @@ class EvolutionScheduler:
 def _is_cron_due(cron_expression: str, last_run: datetime | None) -> bool:
     """判断是否到达cron触发时间
 
+    当 last_run 为 None（首次运行）时，使用 get_prev() 检查当前时间
+    是否已过了最近一个cron触发点。
+
+    当 last_run 有值时，从 last_run 开始计算下次运行时间，
+    如果当前时间已过则触发。
+
     Args:
-        cron_expression: Cron表达式（如 "0 * * * *" 表示每小时）
+        cron_expression: Cron表达式（如 "0 3 * * *" 表示每天凌晨3点）
         last_run: 上次运行时间
 
     Returns:
@@ -242,18 +276,16 @@ def _is_cron_due(cron_expression: str, last_run: datetime | None) -> bool:
     now = datetime.now(UTC)
 
     try:
-        # 创建croniter实例
-        cron = croniter(cron_expression, last_run or now)
-
-        # 获取下次应该运行的时间
+        if last_run is None:
+            # 首次运行：检查当前是否已过了最近一个cron触发点
+            cron = croniter(cron_expression, now)
+            prev_run = cron.get_prev(datetime)
+            # 如果最近一个触发点在当前时间之前（或同时），说明到了触发时间
+            return now >= prev_run
+        # 非首次：从上次运行时间计算下次触发时间
+        cron = croniter(cron_expression, last_run)
         next_run = cron.get_next(datetime)
-
-        # 如果当前时间已过下次运行时间，则应该触发
-        if now >= next_run:
-            logger.debug(f"[EVOLUTION_SCHEDULER] Cron due: now={now.isoformat()}, next_run={next_run.isoformat()}, cron={cron_expression}")
-            return True
-
-        return False
+        return now >= next_run
 
     except Exception as e:
         logger.error(f"[EVOLUTION_SCHEDULER] Error checking cron due: {e}", exc_info=True)

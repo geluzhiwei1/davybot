@@ -17,6 +17,9 @@ import type {
   KnowledgeBaseCreate,
   KnowledgeBaseUpdate,
   KnowledgeBaseListResponse,
+  DomainSchema,
+  EntitySource,
+  DomainOption,
 } from '@/types/knowledge'
 import { getApiBaseUrl } from '@/utils/platform'
 
@@ -81,6 +84,7 @@ export const knowledgeBasesApi = {
   /**
    * 获取知识库统计
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getBaseStats: async (baseId: string): Promise<any> => {
     const response = await axios.get(`${API_BASE}/bases/${baseId}/stats`)
     return response.data
@@ -107,6 +111,44 @@ export const knowledgeBasesApi = {
     relation_type?: string
   }) => {
     const response = await axios.get(`${API_BASE}/bases/${baseId}/graph/relations`, { params })
+    return response.data
+  },
+
+  /**
+   * 获取实体来源信息
+   */
+  getEntitySources: async (baseId: string, entityId: string) => {
+    const response = await axios.get(`${API_BASE}/bases/${baseId}/graph/entities/${entityId}/sources`)
+    return response.data
+  },
+
+  /**
+   * 扫描目录文件
+   */
+  scanDir: async (baseId: string, dirPath?: string) => {
+    const params: Record<string, string> = {}
+    if (dirPath) params.dir_path = dirPath
+    const response = await axios.get(`${API_BASE}/bases/${baseId}/scan-dir`, { params })
+    return response.data
+  },
+
+  /**
+   * 磨扫描目录（不需要知识库ID，用于创建前预览）
+   */
+  scanDirStandalone: async (dirPath: string, recursive: boolean = true) => {
+    const params: Record<string, unknown> = { dir_path: dirPath, recursive }
+    const response = await axios.get(`${API_BASE}/bases/scan-dir`, { params })
+    return response.data
+  },
+
+  /**
+   * 从目录同步文件到知识库
+   */
+  syncFromDir: async (baseId: string, params?: { dir_path?: string; force_rebuild?: boolean }) => {
+    const response = await axios.post(`${API_BASE}/bases/${baseId}/sync-from-dir`, null, {
+      params,
+      timeout: 600000, // 10 minutes timeout for large directory sync
+    })
     return response.data
   },
 }
@@ -225,6 +267,36 @@ export const knowledgeApi = {
    */
   healthCheck: async () => {
     const response = await axios.get(`${API_BASE}/health`)
+    return response.data
+  },
+
+  /**
+   * List available domains
+   */
+  listDomains: async (): Promise<DomainOption[]> => {
+    const response = await axios.get(`${API_BASE}/domains`)
+    const data = response.data
+    const raw = Array.isArray(data) ? data : data.domains ?? []
+    return raw.map((d: { name: string; display_name?: string; description?: string }) => ({
+      value: d.name,
+      label: d.display_name ?? d.name,
+      description: d.description,
+    }))
+  },
+
+  /**
+   * Get domain schema
+   */
+  getDomainSchema: async (domain: string): Promise<DomainSchema> => {
+    const response = await axios.get(`${API_BASE}/domains/${domain}/schema`)
+    return response.data
+  },
+
+  /**
+   * Get entity sources for a domain
+   */
+  getEntitySources: async (domain: string): Promise<EntitySource[]> => {
+    const response = await axios.get(`${API_BASE}/domains/${domain}/entity-sources`)
     return response.data
   }
 }

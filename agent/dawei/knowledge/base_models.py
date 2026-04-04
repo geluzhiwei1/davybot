@@ -21,14 +21,23 @@ class KnowledgeBaseStatus(str, Enum):
 class KnowledgeBaseSettings(BaseModel):
     """Knowledge base configuration settings"""
 
+    # File directory watching
+    watch_dir: str = Field(default="", description="Directory path to watch for file changes, auto-sync to knowledge base")
+    watch_enabled: bool = Field(default=False, description="Enable file directory watching")
+    watch_recursive: bool = Field(default=True, description="Watch subdirectories recursively")
+    watch_extensions: List[str] = Field(
+        default_factory=lambda: [".pdf", ".docx", ".txt", ".md", ".markdown"],
+        description="File extensions to watch",
+    )
+
     # Chunking settings
     chunk_size: int = Field(default=1000, ge=100, le=10000)
     chunk_overlap: int = Field(default=200, ge=0, le=1000)
     chunk_strategy: str = Field(default="recursive")
 
     # Embedding settings
-    embedding_model: str = Field(default="minilm")
-    embedding_dimension: int = Field(default=384)
+    embedding_model: str = Field(default="qwen3-embedding")
+    embedding_dimension: int = Field(default=1024)
 
     # Retrieval settings
     default_top_k: int = Field(default=5, ge=1, le=50)
@@ -40,7 +49,21 @@ class KnowledgeBaseSettings(BaseModel):
     fulltext_weight: float = Field(default=0.2, ge=0.0, le=1.0)
 
     # Knowledge extraction settings
-    extraction_strategy: str = Field(default="rule_based", description="Entity/relation extraction strategy: rule_based, llm, ner_model, auto")
+    extraction_strategy: str = Field(default="llm", description="Entity/relation extraction strategy: rule_based, llm, ner_model, auto")
+
+    # Domain settings
+    domain: str = Field(default="general", description="领域标识: general, legal, medical, research")
+    domain_config: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="自定义领域配置（覆盖内置 Profile）",
+    )
+
+    # Domain configuration
+    domain: str = Field(default="general", description="领域标识: general, legal, medical, research")
+    domain_config: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="自定义领域配置（覆盖内置 Profile）",
+    )
 
     # Advanced settings
     enable_graph: bool = True

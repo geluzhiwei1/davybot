@@ -335,16 +335,20 @@ class KnowledgeBaseManager:
         # Save to disk
         self._save_metadata()
 
-    def get_embedding_manager(self, base_id: str, model_type: str = "MINILM"):
+    def get_embedding_manager(self, base_id: str, model_type: str | None = None):
         """Get or create embedding manager for a knowledge base
 
         Args:
             base_id: Knowledge base ID
-            model_type: Embedding model type (MINILM, BGE_M3, etc.)
+            model_type: Embedding model type (QWEN3_EMBEDDING, MINILM, BGE_M3, etc.)
 
         Returns:
             EmbeddingService instance
         """
+        # Default to QWEN3_EMBEDDING
+        if model_type is None:
+            model_type = "QWEN3_EMBEDDING"
+
         # Create cache key
         cache_key = f"{base_id}_{model_type}"
 
@@ -361,13 +365,14 @@ class KnowledgeBaseManager:
 
         # Map string to enum
         model_type_map = {
+            "QWEN3_EMBEDDING": EmbeddingModelType.QWEN3_EMBEDDING,
             "MINILM": EmbeddingModelType.MINILM,
             "BGE_M3": EmbeddingModelType.BGE_M3,
             "BGE_LARGE": EmbeddingModelType.BGE_LARGE,
             "JINA_V4": EmbeddingModelType.JINA_V4,
         }
 
-        embedding_model_type = model_type_map.get(model_type, EmbeddingModelType.MINILM)
+        embedding_model_type = model_type_map.get(model_type, EmbeddingModelType.QWEN3_EMBEDDING)
 
         # Get storage path for this knowledge base
         storage_path = self._get_storage_path(base_id)

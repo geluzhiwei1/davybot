@@ -23,13 +23,13 @@
 └── evolution-current -> evolution-002  # Symlink to current cycle
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
-from dawei.core.datetime_compat import UTC
 from dawei.evolution.exceptions import EvolutionStorageError
 from dawei.workspace.persistence_manager import WorkspacePersistenceManager
 
@@ -120,7 +120,7 @@ class EvolutionStorage:
             return cycle_dir
 
         except OSError as e:
-            logger.error(f"[EVOLUTION_STORAGE] Failed to create cycle directory for {cycle_id}: {e}")
+            logger.exception(f"[EVOLUTION_STORAGE] Failed to create cycle directory for {cycle_id}: {e}")
             raise EvolutionStorageError(f"Failed to create cycle directory for {cycle_id}: {e}")
 
     async def save_metadata(self, cycle_id: str, metadata: dict[str, Any]) -> bool:
@@ -149,7 +149,7 @@ class EvolutionStorage:
             return success
 
         except Exception as e:
-            logger.error(f"[EVOLUTION_STORAGE] Error saving metadata for cycle {cycle_id}: {e}")
+            logger.exception(f"[EVOLUTION_STORAGE] Error saving metadata for cycle {cycle_id}: {e}")
             raise EvolutionStorageError(f"Error saving metadata for cycle {cycle_id}: {e}")
 
     async def load_metadata(self, cycle_id: str) -> dict[str, Any]:
@@ -177,7 +177,7 @@ class EvolutionStorage:
         except EvolutionStorageError:
             raise
         except Exception as e:
-            logger.error(f"[EVOLUTION_STORAGE] Error loading metadata for cycle {cycle_id}: {e}")
+            logger.exception(f"[EVOLUTION_STORAGE] Error loading metadata for cycle {cycle_id}: {e}")
             raise EvolutionStorageError(f"Error loading metadata for cycle {cycle_id}: {e}")
 
     async def save_phase_output(self, cycle_id: str, phase: str, content: str) -> bool:
@@ -238,7 +238,7 @@ class EvolutionStorage:
         except EvolutionStorageError:
             raise
         except Exception as e:
-            logger.error(f"[EVOLUTION_STORAGE] Error loading {phase}.md for cycle {cycle_id}: {e}")
+            logger.exception(f"[EVOLUTION_STORAGE] Error loading {phase}.md for cycle {cycle_id}: {e}")
             raise EvolutionStorageError(f"Error loading {phase}.md for cycle {cycle_id}: {e}")
 
     async def load_workspace_md(self, dao_path: str | None = None) -> str:
@@ -262,41 +262,44 @@ class EvolutionStorage:
             workspace_md_path = self.base / self.WORKSPACE_MD
 
         if workspace_md_path.exists():
-            content = workspace_md_path.read_text(encoding="utf-8")
+            content = await asyncio.to_thread(workspace_md_path.read_text, "utf-8")
             logger.debug(f"[EVOLUTION_STORAGE] Loaded dao.md from {workspace_md_path} ({len(content)} chars)")
             return content
-        else:
-            raise EvolutionStorageError(
-                f"dao.md not found at {workspace_md_path}. "
-                "Please create a dao.md file with workspace goals and success criteria."
-            )
-
+        raise EvolutionStorageError(
+            f"dao.md not found at {workspace_md_path}. "
+            "Please create a dao.md file with workspace goals and success criteria."
+        )
 
     async def get_all_cycles(self) -> list[dict[str, Any]]:
         """获取所有cycles的metadata列表
+
+        使用 asyncio.to_thread 将同步文件I/O移出事件循环。
 
         Returns:
             List[Dict[str, Any]]: 按cycle_id排序的metadata列表
 
         """
         try:
-            cycles = []
-            for cycle_dir in sorted(self.base.glob(f"{self.PREFIX}*")):
-                if cycle_dir.is_dir() and not cycle_dir.is_symlink():
-                    metadata_file = cycle_dir / "metadata.json"
-                    if metadata_file.exists():
-                        try:
-                            metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
-                            cycles.append(metadata)
-                        except (json.JSONDecodeError, OSError) as e:
-                            logger.warning(f"[EVOLUTION_STORAGE] Failed to load metadata from {metadata_file}: {e}")
-                            continue
+            # 同步部分：遍历目录、读文件
+            def _read_cycles_sync() -> list[dict[str, Any]]:
+                cycles = []
+                for cycle_dir in sorted(self.base.glob(f"{self.PREFIX}*")):
+                    if cycle_dir.is_dir() and not cycle_dir.is_symlink():
+                        metadata_file = cycle_dir / "metadata.json"
+                        if metadata_file.exists():
+                            try:
+                                metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+                                cycles.append(metadata)
+                            except (json.JSONDecodeError, OSError) as e:
+                                logger.warning(f"[EVOLUTION_STORAGE] Failed to load metadata from {metadata_file}: {e}")
+                return cycles
 
+            cycles = await asyncio.to_thread(_read_cycles_sync)
             logger.debug(f"[EVOLUTION_STORAGE] Found {len(cycles)} cycles")
             return cycles
 
         except Exception as e:
-            logger.error(f"[EVOLUTION_STORAGE] Error getting all cycles: {e}")
+            logger.exception(f"[EVOLUTION_STORAGE] Error getting all cycles: {e}")
             return []
 
     async def get_latest_cycle(self) -> dict[str, Any] | None:
@@ -346,6 +349,8 @@ class EvolutionStorage:
     async def delete_cycle(self, cycle_id: str) -> bool:
         """删除cycle目录（谨慎使用！）
 
+        删除后如果 current symlink 指向被删除的cycle，则更新 symlink 指向最新剩余的 cycle。
+
         Args:
             cycle_id: Cycle ID
 
@@ -355,15 +360,40 @@ class EvolutionStorage:
         """
         try:
             cycle_dir = self._cycle_dir(cycle_id)
-            if cycle_dir.exists():
-                import shutil
+            if not cycle_dir.exists():
+                logger.debug(f"[EVOLUTION_STORAGE] Cycle directory not found: {cycle_dir}")
+                return False
 
-                shutil.rmtree(cycle_dir)
-                logger.info(f"[EVOLUTION_STORAGE] Deleted cycle directory: {cycle_dir}")
-                return True
-            logger.debug(f"[EVOLUTION_STORAGE] Cycle directory not found: {cycle_dir}")
-            return False
+            # 检查 current symlink 是否指向此 cycle
+            link = self.base / self.CURRENT_LINK
+            needs_symlink_update = False
+            if link.is_symlink():
+                target = link.resolve()
+                if target == cycle_dir.resolve():
+                    needs_symlink_update = True
+
+            # 删除目录
+            import shutil
+            shutil.rmtree(cycle_dir)
+            logger.info(f"[EVOLUTION_STORAGE] Deleted cycle directory: {cycle_dir}")
+
+            # 修复悬挂的符号链接
+            if needs_symlink_update:
+                try:
+                    link.unlink(missing_ok=True)
+                    # 指向最新的剩余 cycle
+                    remaining = await self.get_latest_cycle()
+                    if remaining and remaining.get("cycle_id"):
+                        latest_dir_name = f"{self.PREFIX}{remaining['cycle_id']}"
+                        link.symlink_to(latest_dir_name)
+                        logger.info(f"[EVOLUTION_STORAGE] Updated current symlink to {latest_dir_name}")
+                    else:
+                        logger.info("[EVOLUTION_STORAGE] No remaining cycles, removed current symlink")
+                except OSError as e:
+                    logger.warning(f"[EVOLUTION_STORAGE] Failed to update current symlink after delete: {e}")
+
+            return True
 
         except Exception as e:
-            logger.error(f"[EVOLUTION_STORAGE] Error deleting cycle {cycle_id}: {e}")
+            logger.exception(f"[EVOLUTION_STORAGE] Error deleting cycle {cycle_id}: {e}")
             raise EvolutionStorageError(f"Error deleting cycle {cycle_id}: {e}")

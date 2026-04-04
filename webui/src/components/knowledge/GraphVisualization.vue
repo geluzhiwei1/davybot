@@ -37,12 +37,12 @@
           style="width: 150px;"
         >
           <el-option label="All" value="" />
-          <el-option label="PERSON" value="PERSON" />
-          <el-option label="ORG" value="ORG" />
-          <el-option label="TECH" value="TECH" />
-          <el-option label="CONCEPT" value="CONCEPT" />
-          <el-option label="chunk" value="chunk" />
-          <el-option label="document" value="document" />
+          <el-option
+            v-for="(label, type) in domainEntityTypes"
+            :key="type"
+            :label="label"
+            :value="type"
+          />
         </el-select>
 
         <el-select
@@ -113,6 +113,28 @@
           <el-table-column prop="key" label="Key" width="150" />
           <el-table-column prop="value" label="Value" />
         </el-table>
+
+        <el-divider />
+
+        <h4>{{ t('knowledge.sources') }}</h4>
+        <div v-if="loadingEntitySources" class="sources-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>{{ t('knowledge.loading') }}</span>
+        </div>
+        <div v-else-if="entitySources.length === 0" class="sources-empty">
+          <el-empty :description="t('knowledge.noSources')" :image-size="80" />
+        </div>
+        <el-table v-else :data="entitySources" size="small" max-height="300">
+          <el-table-column prop="document_title" :label="t('knowledge.documentTitle')" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="page_number" :label="t('knowledge.pageNumber')" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.page_number" size="small">P{{ row.page_number }}</el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="chunk_index" :label="t('knowledge.chunkIndex')" width="100" align="center" />
+          <el-table-column prop="content" :label="t('knowledge.contentPreview')" min-width="200" show-overflow-tooltip />
+        </el-table>
       </div>
     </el-drawer>
   </div>
@@ -140,9 +162,17 @@ import {
   TitleComponent
 } from 'echarts/components'
 import type { EChartsOption } from 'echarts'
-import { knowledgeBasesApi } from '@/services/api/knowledge'
+import { knowledgeBasesApi, knowledgeApi } from '@/services/api/knowledge'
 import type { GraphEntity, GraphRelation } from '@/types/knowledge'
 import { logger } from '@/utils/logger'
+
+// Entity source response from knowledge base
+interface BaseEntitySource {
+  document_title: string
+  page_number?: number
+  chunk_index?: number
+  content: string
+}
 
 // 注册 ECharts 组件
 use([
@@ -169,10 +199,19 @@ const layoutType = ref<'force' | 'circular' | 'radial'>('force')
 const isFullscreen = ref(false)
 const detailsDrawerVisible = ref(false)
 const selectedEntity = ref<GraphEntity | null>(null)
+const loadingEntitySources = ref(false)
 
 // 图谱数据
 const entities = ref<GraphEntity[]>([])
 const relations = ref<GraphRelation[]>([])
+
+// Domain profile data
+const domainEntityTypes = ref<Record<string, string>>({})
+const domainEntityColors = ref<Record<string, string>>({})
+const currentDomain = ref<string>('general')
+
+// Entity sources data
+const entitySources = ref<BaseEntitySource[]>([])
 
 // ECharts 实例
 const chartRef = ref<InstanceType<typeof VChart> | null>(null)
@@ -220,6 +259,7 @@ const chartOption = computed<EChartsOption>(() => {
     label: {
       show: true,
       position: 'right',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       formatter: (params: any) => {
         const name = params.data.name as string
         return name.length > 10 ? name.substring(0, 10) + '...' : name
@@ -243,6 +283,7 @@ const chartOption = computed<EChartsOption>(() => {
 
   return {
     tooltip: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       formatter: (params: any) => {
         if (params.dataType === 'node') {
           return `
@@ -330,6 +371,11 @@ const getEntitySymbolSize = (type: string) => {
 
 // 获取实体颜色
 const getEntityColor = (type: string) => {
+  // Use domain-specific colors if available, otherwise fallback to defaults
+  if (domainEntityColors.value[type]) {
+    return domainEntityColors.value[type]
+  }
+
   const colors: Record<string, string> = {
     'document': '#409EFF',
     'chunk': '#67C23A',
@@ -371,10 +417,29 @@ const getPropertiesList = (entity: GraphEntity) => {
 }
 
 // 显示实体详情
-const showEntityDetails = (entityId: string) => {
+const showEntityDetails = async (entityId: string) => {
   selectedEntity.value = entities.value.find(e => e.id === entityId) || null
   if (selectedEntity.value) {
     detailsDrawerVisible.value = true
+    // Load entity sources
+    await loadEntitySources(entityId)
+  }
+}
+
+// 加载实体来源信息
+const loadEntitySources = async (entityId: string) => {
+  try {
+    loadingEntitySources.value = true
+    const response = await knowledgeBasesApi.getEntitySources(props.baseId, entityId)
+    entitySources.value = response.sources || []
+    logger.info(`Loaded ${entitySources.value.length} sources for entity ${entityId}`)
+  } catch (err: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const error = err as any
+    logger.error('Failed to load entity sources:', error)
+    entitySources.value = []
+  } finally {
+    loadingEntitySources.value = false
   }
 }
 
@@ -385,6 +450,14 @@ const loadGraphData = async () => {
     error.value = ''
 
     logger.info(`Loading graph data for base: ${props.baseId}`)
+
+    // First, load knowledge base to get domain
+    const kb = await knowledgeBasesApi.getBase(props.baseId)
+    currentDomain.value = kb.settings?.domain || 'general'
+    logger.info(`Knowledge base domain: ${currentDomain.value}`)
+
+    // Load domain schema for entity types and colors
+    await loadDomainSchema(currentDomain.value)
 
     // 并行获取实体和关系数据
     const [entitiesResponse, relationsResponse] = await Promise.all([
@@ -409,15 +482,69 @@ const loadGraphData = async () => {
     }
 
     ElMessage.success(t('knowledge.graphLoaded', { count: entities.value.length }))
-  } catch (err: any) {
-    logger.error('Failed to load graph data:', err)
-    error.value = `${t('knowledge.loadGraphFailed')}: ${err.message || err}`
+  } catch (err: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const error = err as any
+    logger.error('Failed to load graph data:', error)
+    error.value = `${t('knowledge.loadGraphFailed')}: ${error.message || error}`
   } finally {
     loading.value = false
   }
 }
 
+// 加载领域配置
+const loadDomainSchema = async (domain: string) => {
+  try {
+    logger.info(`Loading domain schema for: ${domain}`)
+    const schema = await knowledgeApi.getDomainSchema(domain)
+
+    // Load entity types for filtering
+    domainEntityTypes.value = schema.entity_types || {}
+
+    // Generate colors for entity types (use a color palette)
+    const colorPalette = [
+      '#E6A23C', // PERSON - orange
+      '#F56C6C', // ORG - red
+      '#409EFF', // TECH - blue
+      '#67C23A', // CONCEPT - green
+      '#909399', // grey
+      '#606266', // dark grey
+      '#F56C6C', // red
+      '#E6A23C', // orange
+      '#409EFF', // blue
+      '#67C23A', // green
+    ]
+
+    let colorIndex = 0
+    const colors: Record<string, string> = {}
+    for (const entityType of Object.keys(schema.entity_types || {})) {
+      colors[entityType] = colorPalette[colorIndex % colorPalette.length]
+      colorIndex++
+    }
+
+    domainEntityColors.value = colors
+
+    logger.info(`Loaded ${Object.keys(domainEntityTypes.value).length} entity types for domain ${domain}`)
+  } catch (err: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const error = err as any
+    logger.error('Failed to load domain schema:', error)
+    // Fallback to general domain
+    domainEntityTypes.value = {
+      'PERSON': '人物',
+      'ORG': '组织',
+      'TECH': '技术',
+      'CONCEPT': '概念',
+      'LOCATION': '地点',
+      'TIME': '时间',
+      'OTHER': '其他',
+    }
+    domainEntityColors.value = {}
+  }
+}
+
 // 处理图表点击
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleChartClick = (params: any) => {
   if (params.dataType === 'node' && params.data?.id) {
     showEntityDetails(params.data.id)
@@ -542,5 +669,17 @@ export default {
 .entity-details h4 {
   margin-bottom: 16px;
   color: var(--el-text-color-primary);
+}
+
+.sources-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--el-text-color-secondary);
+}
+
+.sources-empty {
+  padding: 20px 0;
 }
 </style>
