@@ -62,7 +62,7 @@ class LLMExtractor(ExtractionStrategy):
         self.max_text_length = self.config.get("max_text_length", 4000)
 
         # Load domain profile
-        profile = config.get("domain_profile")
+        profile = self.config.get("domain_profile")
         if profile and profile.extraction_prompt:
             self.prompt_template = profile.extraction_prompt
         else:
@@ -78,12 +78,12 @@ class LLMExtractor(ExtractionStrategy):
         """Lazy load LLM service"""
         if self._llm_service is None:
             try:
-                from dawei.llm_api.llm_provider import LLMProviderManager
+                from dawei.llm_api.llm_provider import LLMProvider
 
-                self._llm_service = LLMProviderManager()
+                self._llm_service = LLMProvider()
                 logger.info("LLM service loaded successfully")
-            except ImportError as e:
-                logger.error(f"Failed to import LLM service: {e}")
+            except Exception as e:
+                logger.error(f"Failed to load LLM service: {e}")
                 raise
         return self._llm_service
 
@@ -126,15 +126,10 @@ class LLMExtractor(ExtractionStrategy):
 
             # Call LLM service
             logger.info("Calling LLM for knowledge extraction...")
-            response = await self.llm_service.create_message(messages)
+            llm_result = await self.llm_service.process_message(messages)
 
             # Extract response content
-            if hasattr(response, "content"):
-                content = response.content
-            elif isinstance(response, dict):
-                content = response.get("content", "")
-            else:
-                content = str(response)
+            content = llm_result.get("content") or ""
 
             logger.info(f"LLM response received: {len(content)} chars")
 

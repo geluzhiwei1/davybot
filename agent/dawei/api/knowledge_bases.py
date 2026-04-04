@@ -225,7 +225,6 @@ async def delete_knowledge_base(base_id: str, force: bool = Query(False, descrip
     success = manager.delete_base(base_id, force=force)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
-    return
 
 
 @router.post("/{base_id}/set-default", response_model=KnowledgeBase)
@@ -432,185 +431,27 @@ async def upload_document_to_base(
         logger.warning(f"Failed to index full-text search: {e}")
         # Non-fatal, continue with graph indexing
 
-    # Index in graph store with knowledge extraction
+    # Index in graph store — extract from FULL document, not per-chunk
     try:
         graph_store = manager.get_graph_store(base_id)
         await graph_store.initialize()
 
-        from dawei.knowledge.models import GraphEntity, GraphRelation
-        from dawei.knowledge.extraction import (
-            ExtractionFactory,
-            ExtractionStrategyType,
-        )
+        from dawei.knowledge._graph_builder import build_document_graph
+        from dawei.knowledge.extraction import ExtractionFactory
 
-        # Create document entity
-        doc_entity = GraphEntity(
-            id=f"doc_{document.id}",
-            type="document",
-            name=file.filename,
-            description=f"Document: {file.filename}",
-            properties={
-                "file_size": document.metadata.file_size,
-                "file_type": document.metadata.file_type,
-            },
-            base_id=base_id,
-        )
-        await graph_store.add_entity(doc_entity)
-
-        # Get extraction strategy from knowledge base settings
         extraction_strategy = kb.settings.extraction_strategy or "rule_based"
         domain = getattr(kb.settings, "domain", "general")
-
-        # Create extractor with domain profile
         extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
 
-        # Extract entities and relations from each chunk
-        total_entities = 1  # Start with document entity
-        total_relations = 0
-        entity_id_map = {}  # Map entity names to graph IDs
-        # Track which documents/pages each entity appears in
-        entity_source_map: Dict[str, dict] = {}  # entity_name -> {doc_ids, chunk_ids, pages}
-
-        for i, chunk in enumerate(chunks):
-            # Extract page number from chunk metadata
-            page_number = chunk.metadata.get("page_number")
-
-            # Create chunk entity
-            chunk_entity = GraphEntity(
-                id=chunk.id,
-                type="chunk",
-                name=f"Chunk {i}",
-                description=chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content,
-                properties={
-                    "chunk_index": i,
-                    "document_id": chunk.document_id,
-                    "page_number": page_number,
-                    "content": chunk.content,
-                },
-                base_id=base_id,
-            )
-            await graph_store.add_entity(chunk_entity)
-            total_entities += 1
-
-            # Document -> chunk relation
-            doc_chunk_relation = GraphRelation(
-                id=f"rel_{doc_entity.id}_{chunk.id}",
-                from_entity=doc_entity.id,
-                to_entity=chunk.id,
-                relation_type="contains",
-                properties={"order": i},
-                base_id=base_id,
-            )
-            await graph_store.add_relation(doc_chunk_relation)
-            total_relations += 1
-
-            # Knowledge extraction from chunk content
-            try:
-                extraction_result = await extractor.extract(
-                    chunk.content,
-                    chunk_id=chunk.id,
-                    document_id=document.id,
-                    page_number=page_number,
-                )
-
-                # Attach source provenance to extracted entities
-                for entity in extraction_result.entities:
-                    if entity.source_document_id is None:
-                        entity.source_document_id = document.id
-                    if entity.source_chunk_id is None:
-                        entity.source_chunk_id = chunk.id
-                    if entity.source_page_number is None and page_number is not None:
-                        entity.source_page_number = page_number
-
-                # Track source provenance per entity name
-                if entity.name not in entity_source_map:
-                    entity_source_map[entity.name] = {
-                        "document_ids": set(),
-                        "chunk_ids": set(),
-                        "pages": set(),
-                    }
-                if entity.source_document_id:
-                    entity_source_map[entity.name]["document_ids"].add(entity.source_document_id)
-                if entity.source_chunk_id:
-                    entity_source_map[entity.name]["chunk_ids"].add(entity.source_chunk_id)
-                if entity.source_page_number is not None:
-                    entity_source_map[entity.name]["pages"].add(entity.source_page_number)
-
-                # Add extracted entities
-                for entity in extraction_result.entities:
-                    # Create unique ID for entity (based on name)
-                    entity_id = f"entity_{hash(entity.name)}_{base_id}"
-
-                    # Store mapping for relations
-                    if entity.name not in entity_id_map:
-                        entity_id_map[entity.name] = entity_id
-
-                        # Get accumulated source info
-                        source_info = entity_source_map.get(entity.name, {})
-                        doc_ids = list(source_info.get("document_ids", set()))
-                        chunk_ids = list(source_info.get("chunk_ids", set()))
-                        pages = sorted(p for p in source_info.get("pages", set()) if p is not None)
-
-                        # Create graph entity
-                        graph_entity = GraphEntity(
-                            id=entity_id,
-                            type=entity.type,
-                            name=entity.name,
-                            description=entity.properties.get("description", ""),
-                            properties={
-                                **entity.properties,
-                                "confidence": entity.confidence,
-                                "source": "extraction",
-                                "source_documents": doc_ids,
-                                "source_chunks": chunk_ids,
-                                "source_pages": pages,
-                            },
-                            base_id=base_id,
-                        )
-                        await graph_store.add_entity(graph_entity)
-                        total_entities += 1
-
-                    # Chunk -> entity relation (mentions)
-                    chunk_entity_relation = GraphRelation(
-                        id=f"rel_{chunk.id}_{entity_id_map[entity.name]}",
-                        from_entity=chunk.id,
-                        to_entity=entity_id_map[entity.name],
-                        relation_type="mentions",
-                        properties={
-                            "confidence": entity.confidence,
-                            "strategy": extraction_strategy,
-                        },
-                        base_id=base_id,
-                    )
-                    await graph_store.add_relation(chunk_entity_relation)
-                    total_relations += 1
-
-                # Add extracted relations
-                for relation in extraction_result.relations:
-                    from_id = entity_id_map.get(relation.from_entity)
-                    to_id = entity_id_map.get(relation.to_entity)
-
-                    if from_id and to_id:
-                        graph_relation = GraphRelation(
-                            id=f"rel_{from_id}_{to_id}_{relation.relation_type}",
-                            from_entity=from_id,
-                            to_entity=to_id,
-                            relation_type=relation.relation_type,
-                            properties={
-                                **relation.properties,
-                                "confidence": relation.confidence,
-                                "strategy": extraction_strategy,
-                            },
-                            base_id=base_id,
-                        )
-                        await graph_store.add_relation(graph_relation)
-                        total_relations += 1
-
-            except Exception as e:
-                logger.warning(f"Failed to extract knowledge from chunk {i}: {e}")
-                # Non-fatal, continue with next chunk
-
-        logger.info(f"Graph indexing complete: {total_entities} entities, {total_relations} relations (strategy: {extraction_strategy})")
+        total_entities, total_relations = await build_document_graph(
+            graph_store=graph_store,
+            document=document,
+            chunks=chunks,
+            extractor=extractor,
+            base_id=base_id,
+            extraction_strategy=extraction_strategy,
+            file_name=file.filename,
+        )
     except Exception as e:
         logger.warning(f"Failed to index graph: {e}")
         # Non-fatal, continue
@@ -702,7 +543,6 @@ async def delete_document_from_base(base_id: str, document_id: str):
 
     logger.info(f"Document deleted from knowledge base {base_id}: {document_id} ({deleted_count} chunks)")
 
-    return
 
 
 @router.get("/{base_id}/documents/{document_id}", response_model=dict)
@@ -862,14 +702,13 @@ async def reindex_knowledge_base(base_id: str):
 
     # Import required modules
     from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
-    from dawei.knowledge.models import VectorDocument
-    from dawei.knowledge.parsers.markdown_parser import MarkdownParser
-    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
-    from dawei.knowledge.models import GraphEntity, GraphRelation
     from dawei.knowledge.extraction import (
         ExtractionFactory,
         ExtractionStrategyType,
     )
+    from dawei.knowledge.models import GraphEntity, GraphRelation, VectorDocument
+    from dawei.knowledge.parsers.markdown_parser import MarkdownParser
+    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
 
     # Initialize stores
     vector_db_path = base_storage_path / "vectors.db"
@@ -975,137 +814,23 @@ async def reindex_knowledge_base(base_id: str):
             await fulltext_store.add_documents(chunks)
             logger.info(f"Added {len(chunks)} chunks to full-text index")
 
-            # Create document entity
-            doc_entity = GraphEntity(
-                id=f"doc_{document.id}",
-                type="document",
-                name=file_path.name,
-                description=f"Document: {file_path.name}",
-                properties={
-                    "file_size": document.metadata.file_size,
-                    "file_type": document.metadata.file_type,
-                },
-                base_id=base_id,
-            )
-            await graph_store.add_entity(doc_entity)
-            total_entities += 1
+            # Build graph — extract from FULL document
+            try:
+                from dawei.knowledge._graph_builder import build_document_graph
 
-            # Create chunk entities and extract knowledge
-            entity_id_map = {}
-
-            for i, chunk in enumerate(chunks):
-                page_number = chunk.metadata.get("page_number") if chunk.metadata else None
-
-                # Create chunk entity
-                chunk_entity = GraphEntity(
-                    id=chunk.id,
-                    type="chunk",
-                    name=f"Chunk {i}",
-                    description=chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content,
-                    properties={
-                        "chunk_index": i,
-                        "document_id": chunk.document_id,
-                        "page_number": page_number,
-                        "content": chunk.content,
-                    },
+                doc_entities, doc_relations = await build_document_graph(
+                    graph_store=graph_store,
+                    document=document,
+                    chunks=chunks,
+                    extractor=extractor,
                     base_id=base_id,
+                    extraction_strategy=extraction_strategy,
+                    file_name=file_path.name,
                 )
-                await graph_store.add_entity(chunk_entity)
-                total_entities += 1
-
-                # Document -> chunk relation
-                doc_chunk_relation = GraphRelation(
-                    id=f"rel_{doc_entity.id}_{chunk.id}",
-                    from_entity=doc_entity.id,
-                    to_entity=chunk.id,
-                    relation_type="contains",
-                    properties={"order": i},
-                    base_id=base_id,
-                )
-                await graph_store.add_relation(doc_chunk_relation)
-                total_relations += 1
-
-                # Knowledge extraction from chunk content
-                try:
-                    extraction_result = await extractor.extract(
-                        chunk.content,
-                        chunk_id=chunk.id,
-                        document_id=document.id,
-                        page_number=page_number,
-                    )
-
-                    # Track source provenance per entity name
-                    for entity in extraction_result.entities:
-                        if entity.source_document_id is None:
-                            entity.source_document_id = document.id
-                        if entity.source_chunk_id is None:
-                            entity.source_chunk_id = chunk.id
-                        if entity.source_page_number is None and page_number is not None:
-                            entity.source_page_number = page_number
-
-                    # Add extracted entities
-                    for entity in extraction_result.entities:
-                        entity_id = f"entity_{hash(entity.name)}_{base_id}"
-
-                        if entity.name not in entity_id_map:
-                            entity_id_map[entity.name] = entity_id
-
-                            graph_entity = GraphEntity(
-                                id=entity_id,
-                                type=entity.type,
-                                name=entity.name,
-                                description=entity.properties.get("description", ""),
-                                properties={
-                                    **entity.properties,
-                                    "confidence": entity.confidence,
-                                    "source": "extraction",
-                                    "source_documents": [entity.source_document_id] if entity.source_document_id else [],
-                                    "source_chunks": [entity.source_chunk_id] if entity.source_chunk_id else [],
-                                    "source_pages": [entity.source_page_number] if entity.source_page_number is not None else [],
-                                },
-                                base_id=base_id,
-                            )
-                            await graph_store.add_entity(graph_entity)
-                            total_entities += 1
-
-                        # Chunk -> entity relation
-                        chunk_entity_relation = GraphRelation(
-                            id=f"rel_{chunk.id}_{entity_id_map[entity.name]}",
-                            from_entity=chunk.id,
-                            to_entity=entity_id_map[entity.name],
-                            relation_type="mentions",
-                            properties={
-                                "confidence": entity.confidence,
-                                "strategy": extraction_strategy,
-                            },
-                            base_id=base_id,
-                        )
-                        await graph_store.add_relation(chunk_entity_relation)
-                        total_relations += 1
-
-                    # Add extracted relations
-                    for relation in extraction_result.relations:
-                        from_id = entity_id_map.get(relation.from_entity)
-                        to_id = entity_id_map.get(relation.to_entity)
-
-                        if from_id and to_id:
-                            graph_relation = GraphRelation(
-                                id=f"rel_{from_id}_{to_id}_{relation.relation_type}",
-                                from_entity=from_id,
-                                to_entity=to_id,
-                                relation_type=relation.relation_type,
-                                properties={
-                                    **relation.properties,
-                                    "confidence": relation.confidence,
-                                    "strategy": extraction_strategy,
-                                },
-                                base_id=base_id,
-                            )
-                            await graph_store.add_relation(graph_relation)
-                            total_relations += 1
-
-                except Exception as e:
-                    logger.warning(f"Failed to extract knowledge from chunk {i}: {e}")
+                total_entities += doc_entities
+                total_relations += doc_relations
+            except Exception as e:
+                logger.warning(f"Failed to build graph for {file_path.name}: {e}")
 
             total_documents += 1
             total_chunks += len(chunks)
@@ -1362,12 +1087,12 @@ async def sync_from_directory(
 
     # Import files using existing upload logic
     from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
-    from dawei.knowledge.models import VectorDocument, GraphEntity, GraphRelation
-    from dawei.knowledge.parsers.markdown_parser import MarkdownParser
-    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+    from dawei.knowledge.extraction import ExtractionFactory
     from dawei.knowledge.fulltext.sqlite_fts_store import SQLiteFTSStore
     from dawei.knowledge.graph.sqlite_graph_store import SQLiteGraphStore
-    from dawei.knowledge.extraction import ExtractionFactory
+    from dawei.knowledge.models import GraphEntity, GraphRelation, VectorDocument
+    from dawei.knowledge.parsers.markdown_parser import MarkdownParser
+    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
 
     # Initialize stores directly (avoid manager.get_fulltext_store / get_graph_store
     # which call asyncio.run() inside a running event loop)
@@ -1465,103 +1190,21 @@ async def sync_from_directory(
             except Exception as e:
                 logger.warning(f"Failed to index fulltext for {file_path.name}: {e}")
 
-            # Graph index
+            # Graph index — extract from FULL document
             try:
-                doc_entity = GraphEntity(
-                    id=f"doc_{document.id}",
-                    type="document",
-                    name=file_path.name,
-                    description=f"Document: {file_path.name}",
-                    properties={"file_size": document.metadata.file_size, "file_type": document.metadata.file_type, "source_path": str(file_path)},
+                from dawei.knowledge._graph_builder import build_document_graph
+
+                doc_entities, doc_relations = await build_document_graph(
+                    graph_store=graph_store,
+                    document=document,
+                    chunks=chunks,
+                    extractor=extractor,
                     base_id=base_id,
+                    extraction_strategy=extraction_strategy,
+                    file_name=file_path.name,
                 )
-                await graph_store.add_entity(doc_entity)
-                total_entities += 1
-
-                entity_id_map = {}
-                for i, chunk in enumerate(chunks):
-                    chunk_entity = GraphEntity(
-                        id=chunk.id,
-                        type="chunk",
-                        name=f"Chunk {i}",
-                        description=chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content,
-                        properties={"chunk_index": i, "document_id": chunk.document_id, "content": chunk.content},
-                        base_id=base_id,
-                    )
-                    await graph_store.add_entity(chunk_entity)
-                    total_entities += 1
-
-                    doc_chunk_relation = GraphRelation(
-                        id=f"rel_{doc_entity.id}_{chunk.id}",
-                        from_entity=doc_entity.id,
-                        to_entity=chunk.id,
-                        relation_type="contains",
-                        properties={"order": i},
-                        base_id=base_id,
-                    )
-                    await graph_store.add_relation(doc_chunk_relation)
-                    total_relations += 1
-
-                    try:
-                        page_number = chunk.metadata.get("page_number") if chunk.metadata else None
-                        extraction_result = await extractor.extract(chunk.content, chunk_id=chunk.id, document_id=document.id, page_number=page_number)
-                        for entity in extraction_result.entities:
-                            if entity.source_document_id is None:
-                                entity.source_document_id = document.id
-                            if entity.source_chunk_id is None:
-                                entity.source_chunk_id = chunk.id
-                            if entity.source_page_number is None and page_number is not None:
-                                entity.source_page_number = page_number
-
-                            entity_id = f"entity_{hash(entity.name)}_{base_id}"
-                            if entity.name not in entity_id_map:
-                                entity_id_map[entity.name] = entity_id
-                                graph_entity = GraphEntity(
-                                    id=entity_id,
-                                    type=entity.type,
-                                    name=entity.name,
-                                    description=entity.properties.get("description", ""),
-                                    properties={
-                                        **entity.properties,
-                                        "confidence": entity.confidence,
-                                        "source": "extraction",
-                                        "source_documents": [entity.source_document_id] if entity.source_document_id else [],
-                                        "source_chunks": [entity.source_chunk_id] if entity.source_chunk_id else [],
-                                        "source_pages": [entity.source_page_number] if entity.source_page_number is not None else [],
-                                    },
-                                    base_id=base_id,
-                                )
-                                await graph_store.add_entity(graph_entity)
-                                total_entities += 1
-
-                            chunk_entity_relation = GraphRelation(
-                                id=f"rel_{chunk.id}_{entity_id_map[entity.name]}",
-                                from_entity=chunk.id,
-                                to_entity=entity_id_map[entity.name],
-                                relation_type="mentions",
-                                properties={"confidence": entity.confidence, "strategy": extraction_strategy},
-                                base_id=base_id,
-                            )
-                            await graph_store.add_relation(chunk_entity_relation)
-                            total_relations += 1
-
-                        for relation in extraction_result.relations:
-                            from_id = entity_id_map.get(relation.from_entity)
-                            to_id = entity_id_map.get(relation.to_entity)
-                            if from_id and to_id:
-                                graph_relation = GraphRelation(
-                                    id=f"rel_{from_id}_{to_id}_{relation.relation_type}",
-                                    from_entity=from_id,
-                                    to_entity=to_id,
-                                    relation_type=relation.relation_type,
-                                    properties={**relation.properties, "confidence": relation.confidence, "strategy": extraction_strategy},
-                                    base_id=base_id,
-                                )
-                                await graph_store.add_relation(graph_relation)
-                                total_relations += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to extract knowledge from chunk {i}: {e}")
-
+                total_entities += doc_entities
+                total_relations += doc_relations
             except Exception as e:
                 logger.warning(f"Failed to index graph for {file_path.name}: {e}")
 
@@ -1751,8 +1394,8 @@ async def search_in_base(
         logger.warning(f"Failed to initialize graph store: {e}")
 
     # Use HybridRetriever
-    from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever
     from dawei.knowledge.models import RetrievalQuery
+    from dawei.knowledge.retrieval.hybrid_retriever import HybridRetriever
 
     retriever = HybridRetriever(
         vector_store=vector_store,
