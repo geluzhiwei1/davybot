@@ -61,6 +61,9 @@ class LLMExtractor(ExtractionStrategy):
         super().__init__(config)
         self.max_text_length = self.config.get("max_text_length", 4000)
 
+        # LLM config name (optional: use specific LLM config instead of default)
+        self.llm_config_name: str | None = self.config.get("llm_config_name") or None
+
         # Load domain profile
         profile = self.config.get("domain_profile")
         if profile and profile.extraction_prompt:
@@ -71,17 +74,31 @@ class LLMExtractor(ExtractionStrategy):
         # Lazy init LLM service
         self._llm_service = None
         self._domain_profile = profile
-        logger.info(f"LLMExtractor initialized, domain={profile.name if profile else 'general'}")
+        logger.info(f"LLMExtractor initialized, domain={profile.name if profile else 'general'}, llm_config={self.llm_config_name or 'default'}")
 
     @property
     def llm_service(self):
-        """Lazy load LLM service"""
+        """Lazy load LLM service
+
+        If llm_config_name is specified, creates an LLMProvider and uses
+        the specific config via get_llm_by_name(). Otherwise uses default.
+        """
         if self._llm_service is None:
             try:
                 from dawei.llm_api.llm_provider import LLMProvider
+                from dawei import get_dawei_home
 
-                self._llm_service = LLMProvider()
-                logger.info("LLM service loaded successfully")
+                workspace_root = self.config.get("workspace_root") or str(get_dawei_home())
+                provider = LLMProvider(workspace_root=workspace_root)
+
+                # Use specific LLM config if specified
+                if self.llm_config_name:
+                    logger.info(f"Using specific LLM config: {self.llm_config_name}")
+                    self._llm_service = provider.get_llm_by_name(self.llm_config_name)
+                else:
+                    self._llm_service = provider.get_default_llm_provider()
+
+                logger.info(f"LLM service loaded successfully, workspace_root={workspace_root}, config={self.llm_config_name or 'default'}")
             except Exception as e:
                 logger.error(f"Failed to load LLM service: {e}")
                 raise
@@ -124,9 +141,9 @@ class LLMExtractor(ExtractionStrategy):
             # Create message
             messages = [UserMessage(role=MessageRole.USER, content=prompt)]
 
-            # Call LLM service
-            logger.info("Calling LLM for knowledge extraction...")
-            llm_result = await self.llm_service.process_message(messages)
+            # Call LLM service (non-streaming, suitable for batch processing)
+            logger.info("Calling LLM for knowledge extraction (non-streaming)...")
+            llm_result = await self.llm_service.chat_completion(messages)
 
             # Extract response content
             content = llm_result.get("content") or ""
@@ -202,6 +219,47 @@ class LLMExtractor(ExtractionStrategy):
                         break
                 json_str = "\n".join(lines[start_idx:end_idx])
 
+            # Extract the outermost JSON object {...} to handle
+            # LLM responses with extra text before/after JSON
+            first_brace = json_str.find("{")
+            if first_brace == -1:
+                logger.error(f"No JSON object found in LLM response: {response[:200]}")
+                return ExtractionResult(entities=[], relations=[])
+
+            # Find matching closing brace by tracking brace depth
+            # Skip braces inside JSON strings to avoid false matches
+            depth = 0
+            last_brace = first_brace
+            in_string = False
+            escape_next = False
+            for i in range(first_brace, len(json_str)):
+                ch = json_str[i]
+                if escape_next:
+                    escape_next = False
+                    continue
+                if ch == "\\" and in_string:
+                    escape_next = True
+                    continue
+                if ch == '"':
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        last_brace = i + 1
+                        break
+
+            if depth != 0:
+                logger.error(f"Unbalanced braces in LLM JSON response")
+                logger.error(f"Response content: {response[:500]}")
+                return ExtractionResult(entities=[], relations=[])
+
+            json_str = json_str[first_brace:last_brace]
+
             # Parse JSON
             data = json.loads(json_str)
 
@@ -239,7 +297,7 @@ class LLMExtractor(ExtractionStrategy):
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM JSON response: {e}")
-            logger.debug(f"Response content: {response[:500]}")
+            logger.error(f"Response content: {response[:500]}")
             return ExtractionResult(entities=[], relations=[])
         except Exception as e:
             logger.error(f"Error parsing LLM response: {e}")

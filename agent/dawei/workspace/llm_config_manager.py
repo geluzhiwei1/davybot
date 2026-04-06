@@ -51,7 +51,7 @@ class WorkspaceLLMConfigManager:
         logger.info("Initializing LLM provider...")
 
         # 创建 LLM 提供者，传入工作区路径以支持工作区级配置
-        self.llm_provider = LLMProvider(workspace_path=self.absolute_path)
+        self.llm_provider = LLMProvider(workspace_root=self.absolute_path)
         logger.info("LLMProvider created successfully.")
 
         # 记录 LLM 配置统计信息

@@ -121,18 +121,18 @@ def _load_user_llm_configs() -> tuple[Dict[str, LLMProviderConfig], Dict[str, st
 
 
 def _load_workspace_llm_configs(
-    workspace_path: str,
+    workspace_root: str,
 ) -> tuple[Dict[str, LLMProviderConfig], Dict[str, str]]:
     """加载工作区级LLM配置
 
     Args:
-        workspace_path: 工作区路径
+        workspace_root: 工作区路径
 
     Returns:
         (配置字典, 模式配置字典)
 
     """
-    workspace_dir = Path(workspace_path)
+    workspace_dir = Path(workspace_root)
     settings_file = workspace_dir / ".dawei" / "settings.json"
     configs, mode_configs = _load_settings_file(settings_file, "workspace")
     logger.info(f"Loaded {len(configs)} workspace LLM configs")
@@ -148,17 +148,20 @@ class LLMProvider(ILLMService):
 
     """
 
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self, workspace_root: str | None = None):
         """初始化 LLM 管理器
 
         Args:
-            workspace_path: 工作区路径（可选）
+            workspace_root: 工作区路径（必需）
 
         Raises:
             RuntimeError: 如果必需的配置加载失败
+            ValueError: 如果 workspace_root 未提供
 
         """
-        self.workspace_path = workspace_path
+        if not workspace_root:
+            raise ValueError("workspace_root is required for LLMProvider")
+        self.workspace_root = workspace_root
 
         # 配置字典
         self._configs: Dict[str, LLMProviderConfig] = {}
@@ -190,9 +193,9 @@ class LLMProvider(ILLMService):
             raise RuntimeError(f"Cannot load user LLM configs: {e}")
 
         # 2. 如果有工作区，应用工作区覆盖（简单更新）
-        if self.workspace_path:
+        if self.workspace_root:
             try:
-                workspace_configs, workspace_mode_configs = _load_workspace_llm_configs(self.workspace_path)
+                workspace_configs, workspace_mode_configs = _load_workspace_llm_configs(self.workspace_root)
                 override_count = 0
                 for name, config in workspace_configs.items():
                     if name in self._configs:
@@ -452,6 +455,36 @@ class LLMProvider(ILLMService):
         logger.debug("Message processed successfully")
         return result
 
+    async def complete(self, messages: List[LLMMessage], **kwargs) -> Dict[str, Any]:
+        """非流式处理消息，直接返回完整结果（实现 ILLMService 接口）
+
+        适用于批处理、知识图谱构建等不需要流式输出的场景。
+        不涉及 StreamState，不产生流式拼接开销。
+
+        Args:
+            messages: 消息列表
+            **kwargs: 其他参数（如 tools、temperature 等）
+
+        Returns:
+            包含完整内容和工具调用的字典
+
+        """
+        logger.debug(f"Non-streaming complete with {len(messages)} messages")
+
+        llm_instance = self.get_default_llm_provider()
+        if not llm_instance:
+            raise RuntimeError("No LLM provider available")
+
+        # 优先使用底层客户端的 chat_completion 方法（非流式）
+        if hasattr(llm_instance, "chat_completion"):
+            result = await llm_instance.chat_completion(messages=messages, **kwargs)
+            logger.debug("Non-streaming complete succeeded")
+            return result
+
+        # fallback: 如果底层客户端没有 chat_completion，退化为流式收集
+        logger.warning("LLM client has no chat_completion(), falling back to streaming")
+        return await self.process_message(messages, **kwargs)
+
     async def create_message_with_callback(
         self,
         messages: List[LLMMessage],
@@ -517,14 +550,14 @@ class LLMProvider(ILLMService):
         return result
 
     # 原有的方法保持不变
-    def set_workspace_path(self, workspace_path: str):
+    def set_workspace_root(self, workspace_root: str):
         """设置工作区路径并重新加载配置"""
-        self.workspace_path = workspace_path
+        self.workspace_root = workspace_root
         # 重新加载配置
         self._configs.clear()
         self._mode_llm_configs.clear()
         self._load_all_configs()
-        logger.info(f"Workspace path set to {workspace_path}, LLM configs reloaded")
+        logger.info(f"Workspace root set to {workspace_root}, LLM configs reloaded")
 
     def get_all_configs(self) -> Dict[str, LLMProviderConfig]:
         """获取所有可用的 LLM 配置"""
@@ -790,7 +823,7 @@ class LLMProvider(ILLMService):
         else:
             llm_config = provider_config.config.__dict__
 
-        llm_config["workspace_path"] = self.workspace_path
+        llm_config["workspace_root"] = self.workspace_root
 
         # 使用工厂创建客户端（KISS 原则：委托给专门的工厂）
         client = LLMClientFactory.create_client(llm_config)

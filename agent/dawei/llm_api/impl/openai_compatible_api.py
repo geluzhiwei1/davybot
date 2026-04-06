@@ -138,13 +138,13 @@ class OpenaiCompatibleClient(BaseClient):
     @handle_errors(component="openai_compatible_api", operation="prepare_log_files")
     def _prepare_log_files(
         self,
-        workspace_path: str,
+        workspace_root: str,
         _endpoint: str,
     ) -> tuple[Path | None, Path | None]:
         """准备日志文件路径
 
         Args:
-            workspace_path: 工作空间路径
+            workspace_root: 工作空间路径
             endpoint: API端点
 
         Returns:
@@ -156,10 +156,17 @@ class OpenaiCompatibleClient(BaseClient):
         if not log_config.enable_llm_api_http_logging:
             return None, None
 
-        if not workspace_path:
+        if not workspace_root:
             return None, None
 
-        log_dir = Path(workspace_path) / ".dawei" / "http"
+        ws_path = Path(workspace_root)
+        # workspace_root 可能是工作区路径(如 ~/my_workspace)或用户目录(~/.dawei)
+        # 工作区路径: 在其下创建 .dawei/http/
+        # 用户目录(~/.dawei): 直接在其下创建 http/
+        if ws_path.name == ".dawei":
+            log_dir = ws_path / "http"
+        else:
+            log_dir = ws_path / ".dawei" / "http"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # 生成唯一的日志文件名（基于时间戳）
@@ -198,7 +205,7 @@ class OpenaiCompatibleClient(BaseClient):
     @log_performance("openai_compatible_api.execute_http_request")
     async def _execute_http_request(
         self,
-        workspace_path: str,
+        workspace_root: str,
         response_log_file: Path | None,
         endpoint: str,
         params: Dict[str, Any],
@@ -210,7 +217,7 @@ class OpenaiCompatibleClient(BaseClient):
         集成了速率限制器、断路器和监控指标
 
         Args:
-            workspace_path: 工作空间路径
+            workspace_root: 工作空间路径
             response_log_file: 响应日志文件路径
             endpoint: API端点
             params: 请求参数
@@ -263,7 +270,7 @@ class OpenaiCompatibleClient(BaseClient):
                                 error_text = await response.text()
 
                                 # 记录错误响应日志
-                                if workspace_path and response_log_file:
+                                if workspace_root and response_log_file:
                                     self._log_error_response(
                                         response_log_file,
                                         response_status_local,
@@ -286,7 +293,7 @@ class OpenaiCompatibleClient(BaseClient):
 
                     finally:
                         # 确保响应日志一定被记录，无论流是否完全消费
-                        if workspace_path and response_log_file:
+                        if workspace_root and response_log_file:
                             self._log_response(
                                 response_log_file,
                                 response_chunks_for_logging,
@@ -418,6 +425,27 @@ class OpenaiCompatibleClient(BaseClient):
         with response_log_file.open("w", encoding="utf-8") as f:
             json.dump(response_data, f, indent=2, ensure_ascii=False)
         logger.info(f"Response logged to: {response_log_file}")
+
+    def _log_non_streaming_response(
+        self,
+        response_log_file: Path,
+        response_data: Dict[str, Any],
+    ) -> None:
+        """记录非流式响应日志
+
+        Args:
+            response_log_file: 响应日志文件路径
+            response_data: 完整的响应数据字典
+        """
+        log_data = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "status": "non-streaming",
+            "raw_response": response_data,
+        }
+
+        with response_log_file.open("w", encoding="utf-8") as f:
+            json.dump(log_data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Non-streaming response logged to: {response_log_file}")
 
     def get_num_tokens(self, text: str) -> int:
         """估算文本的令牌数量（不使用tiktoken）"""
@@ -558,8 +586,8 @@ class OpenaiCompatibleClient(BaseClient):
                 self.base_url = self.base_url + url_suffix
 
             # 准备日志目录和文件
-            workspace_path = self.config.get("workspace_path", "")
-            request_log_file, response_log_file = self._prepare_log_files(workspace_path, endpoint)
+            workspace_root = self.config.get("workspace_root", "")
+            request_log_file, response_log_file = self._prepare_log_files(workspace_root, endpoint)
 
             # 记录请求日志
             if request_log_file:
@@ -572,7 +600,7 @@ class OpenaiCompatibleClient(BaseClient):
                 _response_headers,
                 _url,
             ) = await self._execute_http_request(
-                workspace_path,
+                workspace_root,
                 response_log_file,
                 endpoint,
                 params,
@@ -597,6 +625,81 @@ class OpenaiCompatibleClient(BaseClient):
             "openai_compatible_api.messages_created",
             tags={"provider": self.provider, "message_count": len(messages)},
         )
+
+    @handle_errors(component="openai_compatible_api", operation="chat_completion")
+    @log_performance("openai_compatible_api.chat_completion")
+    async def chat_completion(
+        self,
+        messages: List[LLMMessage],
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """非流式聊天完成，直接返回完整 JSON 响应
+
+        适用于批处理、知识图谱构建等不需要流式输出的场景。
+        不会污染 StreamState，不涉及流式拼接开销。
+
+        Args:
+            messages: 消息列表
+            **kwargs: 其他参数
+
+        Returns:
+            包含 content 的字典，格式与 process_message 一致:
+            {"content": str | None, "tool_calls": list | None}
+        """
+        if not messages:
+            raise ValidationError("messages", messages, "must be non-empty list")
+
+        # 准备请求参数（stream=False）
+        params = {**self.default_params, **kwargs}
+        serialized_messages = []
+        for message in messages:
+            if hasattr(message, "to_dict"):
+                serialized_messages.append(message.to_dict())
+            else:
+                serialized_messages.append(message)
+        params["messages"] = serialized_messages
+        params["stream"] = False
+
+        if self.max_output_tokens and self.max_output_tokens > 0:
+            params["max_tokens"] = self.max_output_tokens
+
+        self.logger.info(
+            "Non-streaming chat completion",
+            context={
+                "model": self.model,
+                "message_count": len(messages),
+                "component": "openai_compatible_api",
+            },
+        )
+
+        # 准备日志文件
+        endpoint = "chat/completions"
+        workspace_root = self.config.get("workspace_root", "")
+        request_log_file, response_log_file = self._prepare_log_files(workspace_root, endpoint)
+
+        # 记录请求日志
+        if request_log_file:
+            self._log_request(request_log_file, endpoint, params)
+
+        # 直接调用非流式 HTTP 请求
+        response_data = await self._make_http_request(endpoint, params)
+
+        # 记录响应日志
+        if response_log_file:
+            self._log_non_streaming_response(response_log_file, response_data)
+
+        # 提取内容
+        choices = response_data.get("choices", [])
+        content = None
+        if choices:
+            content = choices[0].get("message", {}).get("content") or None
+
+        increment_counter(
+            "openai_compatible_api.chat_completions",
+            tags={"provider": self.provider, "message_count": len(messages)},
+        )
+
+        return {"content": content, "tool_calls": None}
 
     @handle_errors(component="openai_compatible_api", operation="astream_chat_completion")
     @log_performance("openai_compatible_api.astream_chat_completion")

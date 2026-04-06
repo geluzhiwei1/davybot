@@ -54,7 +54,7 @@ export const knowledgeBasesApi = {
    * 获取知识库详情
    */
   getBase: async (baseId: string): Promise<KnowledgeBase> => {
-    const response = await axios.get(`${API_BASE}/bases/${baseId}`)
+    const response = await axios.get(`${API_BASE}/bases/by-id/${baseId}`)
     return response.data
   },
 
@@ -62,7 +62,7 @@ export const knowledgeBasesApi = {
    * 更新知识库
    */
   updateBase: async (baseId: string, data: KnowledgeBaseUpdate): Promise<KnowledgeBase> => {
-    const response = await axios.put(`${API_BASE}/bases/${baseId}`, data)
+    const response = await axios.put(`${API_BASE}/bases/by-id/${baseId}`, data)
     return response.data
   },
 
@@ -70,14 +70,14 @@ export const knowledgeBasesApi = {
    * 删除知识库
    */
   deleteBase: async (baseId: string, force?: boolean): Promise<void> => {
-    await axios.delete(`${API_BASE}/bases/${baseId}`, { params: { force } })
+    await axios.delete(`${API_BASE}/bases/by-id/${baseId}`, { params: { force } })
   },
 
   /**
    * 设置默认知识库
    */
   setDefaultBase: async (baseId: string): Promise<KnowledgeBase> => {
-    const response = await axios.post(`${API_BASE}/bases/${baseId}/set-default`)
+    const response = await axios.post(`${API_BASE}/bases/by-id/${baseId}/set-default`)
     return response.data
   },
 
@@ -86,7 +86,7 @@ export const knowledgeBasesApi = {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getBaseStats: async (baseId: string): Promise<any> => {
-    const response = await axios.get(`${API_BASE}/bases/${baseId}/stats`)
+    const response = await axios.get(`${API_BASE}/bases/by-id/${baseId}/stats`)
     return response.data
   },
 
@@ -98,7 +98,7 @@ export const knowledgeBasesApi = {
     offset?: number
     entity_type?: string
   }) => {
-    const response = await axios.get(`${API_BASE}/bases/${baseId}/graph/entities`, { params })
+    const response = await axios.get(`${API_BASE}/bases/by-id/${baseId}/graph/entities`, { params })
     return response.data
   },
 
@@ -110,7 +110,7 @@ export const knowledgeBasesApi = {
     offset?: number
     relation_type?: string
   }) => {
-    const response = await axios.get(`${API_BASE}/bases/${baseId}/graph/relations`, { params })
+    const response = await axios.get(`${API_BASE}/bases/by-id/${baseId}/graph/relations`, { params })
     return response.data
   },
 
@@ -118,7 +118,7 @@ export const knowledgeBasesApi = {
    * 获取实体来源信息
    */
   getEntitySources: async (baseId: string, entityId: string) => {
-    const response = await axios.get(`${API_BASE}/bases/${baseId}/graph/entities/${entityId}/sources`)
+    const response = await axios.get(`${API_BASE}/bases/by-id/${baseId}/graph/entities/${entityId}/sources`)
     return response.data
   },
 
@@ -128,7 +128,7 @@ export const knowledgeBasesApi = {
   scanDir: async (baseId: string, dirPath?: string) => {
     const params: Record<string, string> = {}
     if (dirPath) params.dir_path = dirPath
-    const response = await axios.get(`${API_BASE}/bases/${baseId}/scan-dir`, { params })
+    const response = await axios.get(`${API_BASE}/bases/by-id/${baseId}/scan-dir`, { params })
     return response.data
   },
 
@@ -145,7 +145,7 @@ export const knowledgeBasesApi = {
    * 从目录同步文件到知识库
    */
   syncFromDir: async (baseId: string, params?: { dir_path?: string; force_rebuild?: boolean }) => {
-    const response = await axios.post(`${API_BASE}/bases/${baseId}/sync-from-dir`, null, {
+    const response = await axios.post(`${API_BASE}/bases/by-id/${baseId}/sync-from-dir`, null, {
       params,
       timeout: 600000, // 10 minutes timeout for large directory sync
     })
@@ -159,7 +159,7 @@ export const knowledgeApi = {
    */
   listDocuments: async (params?: { skip?: number; limit?: number }, baseId?: string) => {
     // 如果提供了baseId，使用该知识库；否则使用默认知识库
-    const baseUrl = baseId ? `${API_BASE}/bases/${baseId}/documents` : `${API_BASE}/bases/default/documents`
+    const baseUrl = baseId ? `${API_BASE}/bases/by-id/${baseId}/documents` : `${API_BASE}/bases/by-id/default/documents`
     const response = await axios.get(baseUrl, { params })
     return response.data
   },
@@ -184,7 +184,7 @@ export const knowledgeApi = {
    */
   getDocument: async (documentId: string, baseId?: string) => {
     // 如果提供了baseId，使用该知识库；否则使用默认知识库
-    const baseUrl = baseId ? `${API_BASE}/bases/${baseId}/documents/${documentId}` : `${API_BASE}/bases/default/documents/${documentId}`
+    const baseUrl = baseId ? `${API_BASE}/bases/by-id/${baseId}/documents/${documentId}` : `${API_BASE}/bases/by-id/default/documents/${documentId}`
     const response = await axios.get(baseUrl)
     return response.data
   },
@@ -194,7 +194,7 @@ export const knowledgeApi = {
    */
   deleteDocument: async (documentId: string, baseId?: string) => {
     // 如果提供了baseId，使用该知识库；否则使用默认知识库
-    const baseUrl = baseId ? `${API_BASE}/bases/${baseId}/documents/${documentId}` : `${API_BASE}/bases/default/documents/${documentId}`
+    const baseUrl = baseId ? `${API_BASE}/bases/by-id/${baseId}/documents/${documentId}` : `${API_BASE}/bases/by-id/default/documents/${documentId}`
     const response = await axios.delete(baseUrl)
     return response.data
   },
@@ -204,7 +204,7 @@ export const knowledgeApi = {
    */
   reindexDocument: async (documentId: string, baseId?: string) => {
     // 如果提供了baseId，使用该知识库；否则使用默认知识库
-    const baseUrl = baseId ? `${API_BASE}/bases/${baseId}/documents/${documentId}/reindex` : `${API_BASE}/bases/default/documents/${documentId}/reindex`
+    const baseUrl = baseId ? `${API_BASE}/bases/by-id/${baseId}/documents/${documentId}/reindex` : `${API_BASE}/bases/by-id/default/documents/${documentId}/reindex`
     const response = await axios.post(baseUrl)
     return response.data
   },
@@ -214,7 +214,7 @@ export const knowledgeApi = {
    */
   search: async (request: SearchRequest, baseId?: string): Promise<SearchResponse> => {
     // 如果提供了baseId，搜索指定知识库；否则搜索默认知识库
-    const baseUrl = baseId ? `${API_BASE}/bases/${baseId}/search` : `${API_BASE}/bases/default/search`
+    const baseUrl = baseId ? `${API_BASE}/bases/by-id/${baseId}/search` : `${API_BASE}/bases/by-id/default/search`
     const response = await axios.post(baseUrl, null, {
       params: {
         query: request.query,
@@ -297,6 +297,14 @@ export const knowledgeApi = {
    */
   getEntitySources: async (domain: string): Promise<EntitySource[]> => {
     const response = await axios.get(`${API_BASE}/domains/${domain}/entity-sources`)
+    return response.data
+  },
+
+  /**
+   * List available LLM configs for knowledge extraction
+   */
+  listLLMConfigs: async (): Promise<{ success: boolean; configs: Array<{ llm_id: string; model_id: string }> }> => {
+    const response = await axios.get(`${API_BASE}/bases/llm-configs`)
     return response.data
   }
 }

@@ -66,6 +66,7 @@ class ExtractionFactory:
         strategy: ExtractionStrategyType | str = ExtractionStrategyType.RULE_BASED,
         config: Dict[str, Any] | None = None,
         domain: str | None = None,
+        llm_config_name: str | None = None,
     ) -> ExtractionStrategy:
         """Create an extraction strategy instance
 
@@ -96,7 +97,15 @@ class ExtractionFactory:
                 config = dict(config) if config else {}
                 config["domain_profile"] = profile
 
-        logger.info(f"Creating extraction strategy: {strategy.value}, domain={domain or 'general'}")
+        # Inject llm_config_name for LLM strategy
+        if llm_config_name and strategy in (
+            ExtractionStrategyType.LLM,
+            ExtractionStrategyType.AUTO,
+        ):
+            config = dict(config) if config else {}
+            config["llm_config_name"] = llm_config_name
+
+        logger.info(f"Creating extraction strategy: {strategy.value}, domain={domain or 'general'}, llm_config={llm_config_name or 'default'}")
         return strategy_class(config=config or {})
 
     @classmethod

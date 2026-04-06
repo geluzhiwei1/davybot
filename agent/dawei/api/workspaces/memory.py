@@ -671,7 +671,7 @@ async def extract_memories(workspace_id: str, request: ExtractRequest | None = N
         from dawei.entity.lm_messages import UserMessage
         from dawei.llm_api.llm_provider import LLMProvider
 
-        llm_provider = LLMProvider()
+        llm_provider = LLMProvider(workspace_root=str(workspace_path))
 
         extraction_prompt = f"""从以下对话中提取结构化事实。
 

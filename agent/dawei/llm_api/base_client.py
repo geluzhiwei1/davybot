@@ -354,9 +354,9 @@ class BaseClient(LlmApi, ABC):
         provider = self.get_provider_name()
 
         # 1. 断路器状态检查（快速失败）
-        if circuit_breaker.state == CircuitState.OPEN:
+        if circuit_breaker._state == CircuitState.OPEN:
             raise CircuitBreakerError(
-                f"Circuit breaker is open for {provider}. Retry after {circuit_breaker.remaining_time():.1f}s",
+                f"Circuit breaker is open for {provider}.",
             )
 
         # 2. 确保速率限制器已初始化（防御性惰性初始化）
@@ -372,7 +372,7 @@ class BaseClient(LlmApi, ABC):
             result = await self._make_unprotected_http_request(endpoint, params)
             # 成功：记录统计
             BaseClient._global_rate_limiter.record_success()
-            circuit_breaker.record_success()
+            circuit_breaker._record_success()
             return result
 
         except Exception as e:
@@ -381,7 +381,7 @@ class BaseClient(LlmApi, ABC):
             is_rate_limit = "429" in error_str or "rate_limit" in error_str.lower()
 
             BaseClient._global_rate_limiter.record_failure(is_rate_limit=is_rate_limit)
-            circuit_breaker.record_failure()
+            circuit_breaker._record_failure()
             raise
 
     async def _make_unprotected_http_request(
@@ -444,6 +444,12 @@ class BaseClient(LlmApi, ABC):
         ):
             # Re-raise our custom exceptions as-is
             raise
+        except asyncio.TimeoutError as e:
+            # aiohttp raises asyncio.TimeoutError when ClientTimeout is exceeded
+            raise LLMConnectionError(
+                message=f"Request timed out after {self.timeout}s: {e!s}",
+                provider=self.get_provider_name(),
+            )
         except ClientError as e:
             # aiohttp client errors (network, connection, timeout)
             raise LLMConnectionError(
@@ -533,6 +539,12 @@ class BaseClient(LlmApi, ABC):
         ):
             # Re-raise our custom exceptions as-is
             raise
+        except asyncio.TimeoutError as e:
+            # aiohttp raises asyncio.TimeoutError when ClientTimeout is exceeded
+            raise LLMConnectionError(
+                message=f"Stream request timed out after {self.timeout}s: {e!s}",
+                provider=self.get_provider_name(),
+            )
         except ClientError as e:
             # aiohttp client errors (network, connection, timeout)
             raise LLMConnectionError(

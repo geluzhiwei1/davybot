@@ -159,7 +159,8 @@ import { GraphChart } from 'echarts/charts'
 import {
   GridComponent,
   TooltipComponent,
-  TitleComponent
+  TitleComponent,
+  LegendComponent
 } from 'echarts/components'
 import type { EChartsOption } from 'echarts'
 import { knowledgeBasesApi, knowledgeApi } from '@/services/api/knowledge'
@@ -180,7 +181,8 @@ use([
   GraphChart,
   GridComponent,
   TooltipComponent,
-  TitleComponent
+  TitleComponent,
+  LegendComponent
 ])
 
 const { t } = useI18n()

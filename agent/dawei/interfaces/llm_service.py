@@ -115,6 +115,22 @@ class ILLMService(ABC):
         """
 
     @abstractmethod
+    async def complete(self, messages: List[LLMMessage], **kwargs) -> Dict[str, Any]:
+        """非流式处理消息，直接返回完整结果
+
+        适用于批处理、知识图谱构建等不需要流式输出的场景。
+        不涉及 StreamState，不产生流式拼接开销。
+
+        Args:
+            messages: 消息列表
+            **kwargs: 其他参数（如 tools、temperature 等）
+
+        Returns:
+            包含完整内容和工具调用的字典
+
+        """
+
+    @abstractmethod
     async def create_message_with_callback(
         self,
         messages: List[LLMMessage],

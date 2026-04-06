@@ -510,7 +510,7 @@ class ModelRouter:
 # ============================================================================
 
 
-def load_model_router_config(workspace_path: Path | str) -> RouterConfig:
+def load_model_router_config(workspace_root: Path | str) -> RouterConfig:
     """从工作区加载模型路由配置
 
     优先级：
@@ -520,17 +520,17 @@ def load_model_router_config(workspace_path: Path | str) -> RouterConfig:
     4. 默认配置
 
     Args:
-        workspace_path: 工作区路径（Path 或 str）
+        workspace_root: 工作区路径（Path 或 str）
 
     Returns:
         路由配置实例
 
     """
-    # 确保 workspace_path 是 Path 对象
-    workspace_path = Path(workspace_path) if isinstance(workspace_path, str) else workspace_path
+    # 确保 workspace_root 是 Path 对象
+    workspace_root = Path(workspace_root) if isinstance(workspace_root, str) else workspace_root
 
     config_paths = [
-        workspace_path / ".dawei" / "model_router.json",
+        workspace_root / ".dawei" / "model_router.json",
         get_dawei_home() / "model_router.json",
         Path("/etc/dawei/model_router.json"),
     ]

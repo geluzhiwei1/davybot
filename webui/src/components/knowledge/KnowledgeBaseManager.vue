@@ -296,6 +296,15 @@
               <div class="form-item-tip">从文本中抽取实体和关系的策略</div>
             </el-form-item>
 
+            <el-form-item v-if="formData.settings!.extraction_strategy === 'llm'" label="抽取LLM配置">
+              <el-select v-model="formData.settings!.extraction_llm_config" style="width: 100%"
+                :disabled="!formData.settings!.enable_graph" clearable
+                placeholder="使用默认LLM配置">
+                <el-option v-for="cfg in llmConfigOptions" :key="cfg.llm_id" :label="`${cfg.llm_id} (${cfg.model_id})`" :value="cfg.llm_id" />
+              </el-select>
+              <div class="form-item-tip">选择用于知识抽取的LLM配置，留空则使用系统默认配置</div>
+            </el-form-item>
+
             <el-form-item label="图谱检索权重">
               <el-slider v-model="formData.settings!.graph_weight" :min="0" :max="1" :step="0.05"
                 :format-tooltip="(val: number) => (val * 100).toFixed(0) + '%'" show-input :show-input-controls="false"
@@ -387,6 +396,7 @@ const showCreateDialog = ref(false)
 const editingBase = ref<KnowledgeBase | null>(null)
 const settingsTab = ref('general')
 const domainOptions = ref<DomainOption[]>([])
+const llmConfigOptions = ref<Array<{ llm_id: string; model_id: string }>>([])
 
 // 文件目录状态
 const scanning = ref(false)
@@ -402,7 +412,7 @@ const uploadFileList = ref<any[]>([])
 
 const uploadActionUrl = computed(() => {
   if (uploadBaseId.value) {
-    return `/api/knowledge/bases/${uploadBaseId.value}/documents/upload`
+    return `/api/knowledge/bases/by-id/${uploadBaseId.value}/documents/upload`
   }
   return '/api/knowledge/documents/upload'
 })
@@ -442,6 +452,7 @@ const formData = ref<KnowledgeBaseCreate & { settings?: KnowledgeBaseSettings }>
     graph_weight: 0.3,
     fulltext_weight: 0.2,
     extraction_strategy: 'llm',
+    extraction_llm_config: '',
     enable_graph: true,
     enable_fulltext: true,
     auto_reindex: false,
@@ -484,6 +495,16 @@ const loadDomains = async () => {
     domainOptions.value = domains
   } catch (error) {
     console.error('Failed to load domains:', error)
+  }
+}
+
+const loadLLMConfigs = async () => {
+  try {
+    const result = await knowledgeApi.listLLMConfigs()
+    llmConfigOptions.value = result.configs || []
+  } catch (error) {
+    console.error('Failed to load LLM configs:', error)
+    llmConfigOptions.value = []
   }
 }
 
@@ -644,6 +665,7 @@ const handleCreate = () => {
       graph_weight: 0.3,
       fulltext_weight: 0.2,
       extraction_strategy: 'llm',
+      extraction_llm_config: '',
       enable_graph: true,
       enable_fulltext: true,
       auto_reindex: false,
@@ -660,6 +682,10 @@ const handleEdit = (base: KnowledgeBase) => {
   const settings = { ...base.settings }
   // Ensure dimension matches model
   settings.embedding_dimension = MODEL_DIMENSION_MAP[settings.embedding_model] ?? settings.embedding_dimension
+  // Ensure extraction_llm_config exists
+  if (settings.extraction_llm_config === undefined) {
+    settings.extraction_llm_config = ''
+  }
   formData.value = {
     name: base.name,
     description: base.description,
@@ -787,6 +813,7 @@ const formatDate = (dateStr: string) => {
 onMounted(() => {
   loadBases()
   loadDomains()
+  loadLLMConfigs()
 })
 
 defineExpose({

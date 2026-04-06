@@ -175,7 +175,8 @@ async def scan_directory(
         },
     )
 
-@router.get("/{base_id}", response_model=KnowledgeBase)
+
+@router.get("/by-id/{base_id}", response_model=KnowledgeBase)
 async def get_knowledge_base(base_id: str):
     """Get knowledge base by ID
 
@@ -188,7 +189,7 @@ async def get_knowledge_base(base_id: str):
     return kb
 
 
-@router.put("/{base_id}", response_model=KnowledgeBase)
+@router.put("/by-id/{base_id}", response_model=KnowledgeBase)
 async def update_knowledge_base(base_id: str, update_data: KnowledgeBaseUpdate):
     """Update knowledge base
 
@@ -214,7 +215,7 @@ async def update_knowledge_base(base_id: str, update_data: KnowledgeBaseUpdate):
     return kb
 
 
-@router.delete("/{base_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/by-id/{base_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_knowledge_base(base_id: str, force: bool = Query(False, description="Force deletion even if base has documents")):
     """Delete knowledge base
 
@@ -227,7 +228,7 @@ async def delete_knowledge_base(base_id: str, force: bool = Query(False, descrip
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
 
 
-@router.post("/{base_id}/set-default", response_model=KnowledgeBase)
+@router.post("/by-id/{base_id}/set-default", response_model=KnowledgeBase)
 async def set_default_knowledge_base(base_id: str):
     """Set default knowledge base
 
@@ -240,7 +241,7 @@ async def set_default_knowledge_base(base_id: str):
     return kb
 
 
-@router.get("/{base_id}/stats", response_model=dict)
+@router.get("/by-id/{base_id}/stats", response_model=dict)
 async def get_knowledge_base_stats(base_id: str):
     """Get knowledge base statistics
 
@@ -258,7 +259,7 @@ async def get_knowledge_base_stats(base_id: str):
 # ============================================================================
 
 
-@router.get("/{base_id}/documents", response_model=dict)
+@router.get("/by-id/{base_id}/documents", response_model=dict)
 async def list_base_documents(
     base_id: str,
     skip: int = Query(0, ge=0, description="Number of documents to skip"),
@@ -286,7 +287,7 @@ async def list_base_documents(
     return manager.list_base_documents(base_id, skip=skip, limit=limit)
 
 
-@router.post("/{base_id}/documents/upload")
+@router.post("/by-id/{base_id}/documents/upload")
 async def upload_document_to_base(
     base_id: str,
     file: UploadFile = File(..., description="Document file to upload"),
@@ -342,6 +343,7 @@ async def upload_document_to_base(
     strategy_map = {
         "recursive": ChunkingStrategy.RECURSIVE,
         "semantic": ChunkingStrategy.SEMANTIC,
+        "markdown": ChunkingStrategy.MARKDOWN,
     }
     chunk_strategy = strategy_map.get(chunk_strategy_name, ChunkingStrategy.RECURSIVE)
 
@@ -441,7 +443,8 @@ async def upload_document_to_base(
 
         extraction_strategy = kb.settings.extraction_strategy or "rule_based"
         domain = getattr(kb.settings, "domain", "general")
-        extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
+        extraction_llm_config = getattr(kb.settings, "extraction_llm_config", "") or None
+        extractor = ExtractionFactory.create(extraction_strategy, domain=domain, llm_config_name=extraction_llm_config)
 
         total_entities, total_relations = await build_document_graph(
             graph_store=graph_store,
@@ -480,7 +483,7 @@ async def upload_document_to_base(
     )
 
 
-@router.delete("/{base_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/by-id/{base_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document_from_base(base_id: str, document_id: str):
     """Delete a document from a knowledge base
 
@@ -545,7 +548,7 @@ async def delete_document_from_base(base_id: str, document_id: str):
 
 
 
-@router.get("/{base_id}/documents/{document_id}", response_model=dict)
+@router.get("/by-id/{base_id}/documents/{document_id}", response_model=dict)
 async def get_document_from_base(base_id: str, document_id: str):
     """Get a document from a knowledge base
 
@@ -666,7 +669,7 @@ async def get_document_from_base(base_id: str, document_id: str):
     )
 
 
-@router.post("/{base_id}/reindex")
+@router.post("/by-id/{base_id}/reindex")
 async def reindex_knowledge_base(base_id: str):
     """Rebuild all indexes for a knowledge base (vector, fulltext, graph)
 
@@ -739,6 +742,7 @@ async def reindex_knowledge_base(base_id: str):
     strategy_map = {
         "recursive": ChunkingStrategy.RECURSIVE,
         "semantic": ChunkingStrategy.SEMANTIC,
+        "markdown": ChunkingStrategy.MARKDOWN,
     }
     chunk_strategy = strategy_map.get(chunk_strategy_name, ChunkingStrategy.RECURSIVE)
 
@@ -870,7 +874,7 @@ async def reindex_knowledge_base(base_id: str):
     )
 
 
-@router.post("/{base_id}/documents/{document_id}/reindex")
+@router.post("/by-id/{base_id}/documents/{document_id}/reindex")
 async def reindex_document_in_base(base_id: str, document_id: str):
     """Re-index a single document in a knowledge base
 
@@ -898,7 +902,7 @@ async def reindex_document_in_base(base_id: str, document_id: str):
 
 
 
-@router.get("/{base_id}/scan-dir")
+@router.get("/by-id/{base_id}/scan-dir")
 async def scan_watch_directory(
     base_id: str,
     dir_path: str = Query("", description="Directory path to scan (empty = use watch_dir from settings)"),
@@ -989,7 +993,7 @@ async def scan_watch_directory(
     )
 
 
-@router.post("/{base_id}/sync-from-dir")
+@router.post("/by-id/{base_id}/sync-from-dir")
 async def sync_from_directory(
     base_id: str,
     dir_path: str = Query("", description="Directory path (empty = use watch_dir from settings)"),
@@ -1121,6 +1125,7 @@ async def sync_from_directory(
     strategy_map = {
         "recursive": ChunkingStrategy.RECURSIVE,
         "semantic": ChunkingStrategy.SEMANTIC,
+        "markdown": ChunkingStrategy.MARKDOWN,
     }
     chunk_strategy = strategy_map.get(kb.settings.chunk_strategy, ChunkingStrategy.RECURSIVE)
     chunker = TextChunker(
@@ -1255,7 +1260,7 @@ async def sync_from_directory(
     )
 
 
-@router.post("/{base_id}/auto-sync")
+@router.post("/by-id/{base_id}/auto-sync")
 async def trigger_auto_sync(base_id: str):
     """Manually trigger auto-sync for a knowledge base
 
@@ -1313,7 +1318,7 @@ async def trigger_auto_sync(base_id: str):
 # ============================================================================
 
 
-@router.post("/{base_id}/search")
+@router.post("/by-id/{base_id}/search")
 async def search_in_base(
     base_id: str,
     query: str = Query(..., min_length=1, description="Search query"),
@@ -1477,7 +1482,7 @@ async def search_default_base(
     return await search_in_base(default_kb.id, query, mode, top_k)
 
 
-@router.get("/{base_id}/graph/entities")
+@router.get("/by-id/{base_id}/graph/entities")
 async def get_graph_entities(
     base_id: str,
     limit: int = Query(100, ge=1, le=10000, description="Maximum number of entities to return"),
@@ -1595,7 +1600,7 @@ async def get_graph_entities(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get graph entities: {str(e)}")
 
 
-@router.get("/{base_id}/graph/relations")
+@router.get("/by-id/{base_id}/graph/relations")
 async def get_graph_relations(
     base_id: str,
     limit: int = Query(100, ge=1, le=10000, description="Maximum number of relations to return"),
@@ -1710,7 +1715,7 @@ async def get_graph_relations(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get graph relations: {str(e)}")
 
 
-@router.get("/{base_id}/graph/entities/{entity_id}/sources")
+@router.get("/by-id/{base_id}/graph/entities/{entity_id}/sources")
 async def get_entity_sources(
     base_id: str,
     entity_id: str,
@@ -1819,3 +1824,36 @@ async def get_entity_sources(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get entity sources: {str(e)}",
         )
+
+
+# ============================================================================
+# LLM Config Endpoint (for extraction strategy)
+# ============================================================================
+
+
+@router.get("/llm-configs")
+async def list_llm_configs():
+    """List all available LLM configurations for knowledge extraction.
+
+    Returns a list of configured LLM providers that can be used for
+    knowledge extraction when the strategy is set to 'llm'.
+    """
+    try:
+        from dawei.llm_api.llm_provider import LLMProvider
+        from dawei import get_dawei_home
+
+        workspace_root = str(get_dawei_home())
+        provider = LLMProvider(workspace_root=workspace_root)
+        all_configs = provider.get_all_configs()
+
+        configs_list = []
+        for config_name, config_data in all_configs.items():
+            model_id = ""
+            if hasattr(config_data, "config") and hasattr(config_data.config, "model_id"):
+                model_id = config_data.config.model_id
+            configs_list.append({"llm_id": config_name, "model_id": model_id})
+
+        return {"success": True, "configs": sorted(configs_list, key=lambda x: x["llm_id"])}
+    except Exception as e:
+        logger.error(f"Failed to list LLM configs: {e}", exc_info=True)
+        return {"success": True, "configs": []}

@@ -168,50 +168,140 @@ class TextChunker:
         return chunks
 
     # ------------------------------------------------------------------
-    # Markdown chunking
+    # Markdown chunking — hierarchy-aware
     # ------------------------------------------------------------------
 
     def _markdown_chunk(self, document: Document) -> List[DocumentChunk]:
-        """Markdown chunking — respects header structure"""
+        """Markdown chunking — respects header hierarchy
+
+        Improvements over flat splitting:
+        1. Header chain tracking — each chunk knows its full breadcrumb path
+        2. Sibling merging — small sections under the same parent are merged
+        3. Header prefix — parent headers prepended for LLM context
+        """
         content = document.content
-        sections = re.split(r"(^#{1,6}\s.+?$)", content, flags=re.MULTILINE)
+        chunk_size = self.config.chunk_size
 
+        # Step 1: parse into structured sections
+        sections = self._parse_md_sections(content)
+
+        # No headers found — fallback to recursive
+        if not sections or all(s["level"] == 0 for s in sections):
+            return self._recursive_chunk(document)
+
+        # Step 2: merge small siblings under the same parent
+        merged = self._merge_md_siblings(sections, chunk_size)
+
+        # Step 3: build chunks with header context
         chunks: List[DocumentChunk] = []
-        current_content = ""
-        chunk_index = 0
+        for sec in merged:
+            # Prepend header chain for context
+            header_prefix = ""
+            if sec["headers"]:
+                header_prefix = "\n".join(sec["headers"]) + "\n\n"
+            text = (header_prefix + sec["content"]).strip()
 
-        for section in sections:
-            if not section.strip():
+            if not text:
                 continue
 
-            is_header = re.match(r"^#{1,6}\s", section)
+            extra = {"header_chain": sec["headers"], "header_level": sec["level"]}
 
-            if is_header:
-                # Flush previous content
-                if current_content.strip():
-                    for sub in self._split_to_size(current_content.strip()):
-                        chunks.append(self._make_chunk(document, chunk_index, sub))
-                        chunk_index += 1
-                current_content = section + "\n\n"
+            if len(text) <= chunk_size:
+                chunks.append(
+                    self._make_chunk(document, len(chunks), text, extra=extra)
+                )
             else:
-                candidate = current_content + section
-                if len(candidate) <= self.config.chunk_size:
-                    current_content = candidate
-                else:
-                    # Flush current
-                    if current_content.strip():
-                        for sub in self._split_to_size(current_content.strip()):
-                            chunks.append(self._make_chunk(document, chunk_index, sub))
-                            chunk_index += 1
-                    current_content = section
-
-        # Flush remaining
-        if current_content.strip():
-            for sub in self._split_to_size(current_content.strip()):
-                chunks.append(self._make_chunk(document, chunk_index, sub))
-                chunk_index += 1
+                # Oversized section — recursive split, keeping header context
+                for sub in self._split_to_size(text):
+                    chunks.append(
+                        self._make_chunk(document, len(chunks), sub, extra=extra)
+                    )
 
         return chunks
+
+    # ---- Markdown helpers ----
+
+    def _parse_md_sections(self, content: str) -> List[Dict[str, Any]]:
+        """Parse markdown into sections with header-chain tracking.
+
+        Returns list of dicts::
+
+            {
+                "headers": ["# Title", "## Sub"],   # breadcrumb path
+                "level":    2,                       # heading level (0 = pre-header)
+                "content":  "...",                   # body text (excluding heading)
+            }
+        """
+        sections: List[Dict[str, Any]] = []
+        header_stack: List[tuple] = []  # [(level, line), ...]
+        lines_buffer: List[str] = []
+
+        def _flush() -> None:
+            body = "\n".join(lines_buffer).strip()
+            chain = [line for _, line in header_stack]
+            level = header_stack[-1][0] if header_stack else 0
+            sections.append({"headers": chain, "level": level, "content": body})
+            lines_buffer.clear()
+
+        for line in content.split("\n"):
+            m = re.match(r"^(#{1,6})\s+.+$", line)
+            if m:
+                _flush()
+                level = len(m.group(1))
+                # Pop same-level or deeper headers from the stack
+                while header_stack and header_stack[-1][0] >= level:
+                    header_stack.pop()
+                header_stack.append((level, line))
+            else:
+                lines_buffer.append(line)
+
+        _flush()
+
+        # Keep only sections that have actual body content
+        return [s for s in sections if s["content"]]
+
+    def _merge_md_siblings(
+        self, sections: List[Dict[str, Any]], chunk_size: int
+    ) -> List[Dict[str, Any]]:
+        """Merge adjacent small sections sharing the same parent header chain."""
+        if not sections:
+            return sections
+
+        result: List[Dict[str, Any]] = []
+        i = 0
+
+        while i < len(sections):
+            cur: Dict[str, Any] = {**sections[i]}  # shallow copy
+
+            parent_chain = cur["headers"][:-1] if cur["headers"] else []
+            header_prefix = (
+                "\n".join(cur["headers"]) + "\n\n" if cur["headers"] else ""
+            )
+
+            # Greedily merge subsequent siblings that fit
+            j = i + 1
+            while j < len(sections):
+                nxt = sections[j]
+                nxt_parent = nxt["headers"][:-1] if nxt["headers"] else []
+                if nxt_parent != parent_chain:
+                    break
+
+                # Build the addition (include the sibling's own heading)
+                addition = "\n\n"
+                if nxt["headers"]:
+                    addition += nxt["headers"][-1] + "\n\n"
+                addition += nxt["content"]
+
+                if len(header_prefix + cur["content"] + addition) <= chunk_size:
+                    cur["content"] += addition
+                    j += 1
+                else:
+                    break
+
+            result.append(cur)
+            i = j
+
+        return result
 
     # ------------------------------------------------------------------
     # Code chunking

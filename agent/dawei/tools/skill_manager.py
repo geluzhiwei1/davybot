@@ -251,8 +251,8 @@ class SkillManager:
             )
 
             if match:
-                name = match.group(1).strip()
-                description = match.group(2).strip()
+                name = match.group(1).strip().strip('"').strip("'")
+                description = match.group(2).strip().strip('"').strip("'")
                 # 移除description中的换行符，保持单行
                 description = " ".join(description.split())
                 return name, description

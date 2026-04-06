@@ -50,15 +50,9 @@ class KnowledgeBaseSettings(BaseModel):
 
     # Knowledge extraction settings
     extraction_strategy: str = Field(default="llm", description="Entity/relation extraction strategy: rule_based, llm, ner_model, auto")
+    extraction_llm_config: str = Field(default="", description="LLM配置名称（当extraction_strategy为llm时使用，为空则使用当前默认LLM配置）")
 
     # Domain settings
-    domain: str = Field(default="general", description="领域标识: general, legal, medical, research")
-    domain_config: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="自定义领域配置（覆盖内置 Profile）",
-    )
-
-    # Domain configuration
     domain: str = Field(default="general", description="领域标识: general, legal, medical, research")
     domain_config: Dict[str, Any] = Field(
         default_factory=dict,

@@ -39,6 +39,7 @@ export interface KnowledgeBaseSettings {
   graph_weight: number
   fulltext_weight: number
   extraction_strategy: ExtractionStrategy
+  extraction_llm_config: string
   enable_graph: boolean
   enable_fulltext: boolean
   auto_reindex: boolean

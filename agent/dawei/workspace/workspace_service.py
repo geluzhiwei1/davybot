@@ -91,7 +91,7 @@ class WorkspaceContext:
                 logger.info("  ✓ ToolManager initialized")
 
                 # 3. 初始化 LLM 管理器
-                self.llm_manager = LLMProvider(workspace_path=self.absolute_path)
+                self.llm_manager = LLMProvider(workspace_root=self.absolute_path)
                 # LLMProvider 在 __init__ 中自动加载配置
                 logger.info("  ✓ LLMManager initialized")
 

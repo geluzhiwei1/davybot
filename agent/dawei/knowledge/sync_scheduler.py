@@ -153,7 +153,7 @@ class KnowledgeSyncScheduler:
     async def _import_files(self, base_id: str, files: list[Path]) -> dict:
         """Import files into a knowledge base (vector + fulltext + graph)."""
         from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
-        from dawei.knowledge.models import VectorDocument, GraphEntity, GraphRelation
+        from dawei.knowledge.models import VectorDocument
         from dawei.knowledge.parsers.markdown_parser import MarkdownParser
         from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
         from dawei.knowledge.fulltext.sqlite_fts_store import SQLiteFTSStore
@@ -182,7 +182,11 @@ class KnowledgeSyncScheduler:
         embedding_service = self._manager.get_embedding_manager(base_id)
 
         # Chunking
-        strategy_map = {"recursive": ChunkingStrategy.RECURSIVE, "semantic": ChunkingStrategy.SEMANTIC}
+        strategy_map = {
+            "recursive": ChunkingStrategy.RECURSIVE,
+            "semantic": ChunkingStrategy.SEMANTIC,
+            "markdown": ChunkingStrategy.MARKDOWN,
+        }
         chunk_strategy = strategy_map.get(kb.settings.chunk_strategy, ChunkingStrategy.RECURSIVE)
         chunker = TextChunker(
             config=ChunkingConfig(
@@ -194,7 +198,8 @@ class KnowledgeSyncScheduler:
 
         extraction_strategy = kb.settings.extraction_strategy or "rule_based"
         domain = getattr(kb.settings, "domain", "general")
-        extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
+        extraction_llm_config = getattr(kb.settings, "extraction_llm_config", "") or None
+        extractor = ExtractionFactory.create(extraction_strategy, domain=domain, llm_config_name=extraction_llm_config)
 
         total_documents = 0
         total_chunks = 0
@@ -245,99 +250,21 @@ class KnowledgeSyncScheduler:
                 except Exception as e:
                     logger.warning(f"Auto-sync fulltext failed for {file_path.name}: {e}")
 
-                # Graph
+                # Graph — delegate to shared builder (per-chunk extraction + merge)
                 try:
-                    doc_entity = GraphEntity(
-                        id=f"doc_{document.id}",
-                        type="document",
-                        name=file_path.name,
-                        description=f"Document: {file_path.name}",
-                        properties={"file_size": document.metadata.file_size, "file_type": document.metadata.file_type, "source_path": str(file_path)},
+                    from dawei.knowledge._graph_builder import build_document_graph
+
+                    doc_entities, doc_relations = await build_document_graph(
+                        graph_store=graph_store,
+                        document=document,
+                        chunks=chunks,
+                        extractor=extractor,
                         base_id=base_id,
+                        extraction_strategy=extraction_strategy,
+                        file_name=file_path.name,
                     )
-                    await graph_store.add_entity(doc_entity)
-                    total_entities += 1
-
-                    entity_id_map = {}
-                    for i, chunk in enumerate(chunks):
-                        chunk_entity = GraphEntity(
-                            id=chunk.id,
-                            type="chunk",
-                            name=f"Chunk {i}",
-                            description=chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content,
-                            properties={"chunk_index": i, "document_id": chunk.document_id, "content": chunk.content},
-                            base_id=base_id,
-                        )
-                        await graph_store.add_entity(chunk_entity)
-                        total_entities += 1
-
-                        rel = GraphRelation(
-                            id=f"rel_{doc_entity.id}_{chunk.id}",
-                            from_entity=doc_entity.id,
-                            to_entity=chunk.id,
-                            relation_type="contains",
-                            properties={"order": i},
-                            base_id=base_id,
-                        )
-                        await graph_store.add_relation(rel)
-                        total_relations += 1
-
-                        try:
-                            page_number = chunk.metadata.get("page_number") if chunk.metadata else None
-                            extraction_result = await extractor.extract(chunk.content, chunk_id=chunk.id, document_id=document.id, page_number=page_number)
-                            for entity in extraction_result.entities:
-                                if entity.source_document_id is None:
-                                    entity.source_document_id = document.id
-                                if entity.source_chunk_id is None:
-                                    entity.source_chunk_id = chunk.id
-                                entity_id = f"entity_{hash(entity.name)}_{base_id}"
-                                if entity.name not in entity_id_map:
-                                    entity_id_map[entity.name] = entity_id
-                                    ge = GraphEntity(
-                                        id=entity_id,
-                                        type=entity.type,
-                                        name=entity.name,
-                                        description=entity.properties.get("description", ""),
-                                        properties={
-                                            **entity.properties,
-                                            "confidence": entity.confidence,
-                                            "source": "extraction",
-                                            "source_documents": [entity.source_document_id] if entity.source_document_id else [],
-                                            "source_chunks": [entity.source_chunk_id] if entity.source_chunk_id else [],
-                                        },
-                                        base_id=base_id,
-                                    )
-                                    await graph_store.add_entity(ge)
-                                    total_entities += 1
-
-                                ce_rel = GraphRelation(
-                                    id=f"rel_{chunk.id}_{entity_id_map[entity.name]}",
-                                    from_entity=chunk.id,
-                                    to_entity=entity_id_map[entity.name],
-                                    relation_type="mentions",
-                                    properties={"confidence": entity.confidence, "strategy": extraction_strategy},
-                                    base_id=base_id,
-                                )
-                                await graph_store.add_relation(ce_rel)
-                                total_relations += 1
-
-                            for relation in extraction_result.relations:
-                                from_id = entity_id_map.get(relation.from_entity)
-                                to_id = entity_id_map.get(relation.to_entity)
-                                if from_id and to_id:
-                                    gr = GraphRelation(
-                                        id=f"rel_{from_id}_{to_id}_{relation.relation_type}",
-                                        from_entity=from_id,
-                                        to_entity=to_id,
-                                        relation_type=relation.relation_type,
-                                        properties={**relation.properties, "confidence": relation.confidence, "strategy": extraction_strategy},
-                                        base_id=base_id,
-                                    )
-                                    await graph_store.add_relation(gr)
-                                    total_relations += 1
-                        except Exception as e:
-                            logger.warning(f"Auto-sync extraction failed for chunk {i}: {e}")
-
+                    total_entities += doc_entities
+                    total_relations += doc_relations
                 except Exception as e:
                     logger.warning(f"Auto-sync graph failed for {file_path.name}: {e}")
 

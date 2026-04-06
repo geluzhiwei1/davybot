@@ -474,12 +474,9 @@ def validate_dawei_on_startup(dawei_home: Path | None = None) -> None:
 
         # Log errors if any
         if result["errors"]:
-            logger.error(f"Found {len(result['errors'])} validation error(s):")
+            logger.warning(f"Found {len(result['errors'])} validation error(s) (skipped, not blocking startup):")
             for error in result["errors"]:
-                logger.error(f"  - {error['workspace']}: {error['error']}")
-
-            # Fast Fail: Raise exception if there are critical errors
-            raise DaweiStructureValidationError(f"Found {result['invalid']} invalid workspace(s). Check logs for details.")
+                logger.warning(f"  - {error['workspace']}: {error['error']}")
 
         # Log warnings if any
         total_warnings = sum(len(detail.get("warnings", [])) for detail in result["workspace_details"])
