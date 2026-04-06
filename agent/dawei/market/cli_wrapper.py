@@ -23,16 +23,24 @@ class CliNotFoundError(Exception):
     """Raised when davybot-market-cli SDK is not found."""
 
 
-# Try to import the SDK client - fail immediately if not available
-from davybot_market_cli.client import DavybotMarketClient
-from davybot_market_cli.exceptions import (
-    AuthenticationError,
-    NotFoundError,
-    ValidationError,
-    APIError,
-)
+# Try to import the SDK client - graceful degradation if not installed
+try:
+    from davybot_market_cli.client import DavybotMarketClient
+    from davybot_market_cli.exceptions import (
+        AuthenticationError,
+        NotFoundError,
+        ValidationError,
+        APIError,
+    )
 
-SDK_AVAILABLE = True
+    SDK_AVAILABLE = True
+except ImportError:
+    SDK_AVAILABLE = False
+    DavybotMarketClient = None  # type: ignore[assignment, misc]
+    AuthenticationError = None  # type: ignore[assignment, misc]
+    NotFoundError = None  # type: ignore[assignment, misc]
+    ValidationError = None  # type: ignore[assignment, misc]
+    APIError = None  # type: ignore[assignment, misc]
 
 
 class CliWrapper:
@@ -62,9 +70,14 @@ class CliWrapper:
             timeout: Request timeout in seconds
 
         Raises:
-            ImportError: If SDK cannot be imported (fails at module load)
+            CliNotFoundError: If SDK is not installed
 
         """
+        if not SDK_AVAILABLE:
+            raise CliNotFoundError(
+                "davybot-market-cli SDK is not installed. "
+                "Install it with: pip install davybot-market-cli"
+            )
         self.api_url = api_url or self.DEFAULT_API_URL
         self.timeout = timeout
         self._client: DavybotMarketClient | None = None

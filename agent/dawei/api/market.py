@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from dawei.market import (
+    MARKET_AVAILABLE,
     CliExecutionError,
     CliNotFoundError,
     InstallationError,
@@ -93,6 +94,11 @@ class UninstallRequest(BaseModel):
 
 def get_cli_wrapper() -> CliWrapper:
     """Get or create global CLI wrapper instance."""
+    if not MARKET_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Market SDK is not installed. Install with: pip install davybot-market-cli",
+        )
     global _cli_wrapper
     if _cli_wrapper is None:
         _cli_wrapper = CliWrapper()

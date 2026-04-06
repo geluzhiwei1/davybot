@@ -35,16 +35,11 @@ from .models import (
     SearchResult,
 )
 
-# Check if davybot-market-cli is available
-try:
-    import shutil
+# Check if davybot-market-cli SDK is available
+from .cli_wrapper import SDK_AVAILABLE as _SDK_AVAILABLE
 
-    MARKET_AVAILABLE_CLI = shutil.which("davy") is not None
-except Exception:
-    MARKET_AVAILABLE_CLI = False
-
-# Always export MARKET_AVAILABLE flag - set to True if module can be imported
-MARKET_AVAILABLE = True  # Set to True since module exists
+# Always export MARKET_AVAILABLE flag based on SDK availability
+MARKET_AVAILABLE = _SDK_AVAILABLE
 
 __all__ = [
     "MARKET_AVAILABLE",
