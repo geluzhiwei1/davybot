@@ -197,37 +197,68 @@ class EmbeddingManager:
             logger.error(f"Failed to load embedding model: {e}")
             raise
 
-    async def _embed_via_api(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
-        """Generate embeddings via OpenAI-compatible API (e.g. Ollama)"""
+    async def _embed_via_api(
+        self,
+        texts: List[str],
+        batch_size: int = 64,
+        max_concurrency: int = 4,
+    ) -> List[List[float]]:
+        """Generate embeddings via OpenAI-compatible API (e.g. Ollama)
+
+        Optimized: reuses one HTTP session and sends batches concurrently.
+        """
         import aiohttp
 
         base_url, api_key, model_name = _get_embedding_api_config()
         url = f"{base_url.rstrip('/')}/v1/embeddings"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
 
-        all_embeddings: List[List[float]] = []
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
+        # Build all batches upfront
+        batches = [
+            texts[i : i + batch_size] for i in range(0, len(texts), batch_size)
+        ]
+        # results[i] corresponds to batches[i]
+        results: list[list[list[float]] | None] = [None] * len(batches)
+
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def _send_batch(
+            session: aiohttp.ClientSession,
+            idx: int,
+            batch: list[str],
+        ) -> None:
             payload = {"model": model_name, "input": batch}
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            }
-
-            async with aiohttp.ClientSession() as session:
+            async with semaphore:
                 async with session.post(url, json=payload, headers=headers) as resp:
                     if resp.status != 200:
                         body = await resp.text()
-                        raise RuntimeError(f"Embedding API error {resp.status}: {body}")
+                        raise RuntimeError(
+                            f"Embedding API error {resp.status}: {body}"
+                        )
                     result = await resp.json()
 
-            # OpenAI-compatible response: data[].embedding
             data = result.get("data", [])
             if len(data) != len(batch):
                 raise RuntimeError(
                     f"Embedding API returned {len(data)} results, expected {len(batch)}"
                 )
-            all_embeddings.extend([item["embedding"] for item in data])
+            results[idx] = [item["embedding"] for item in data]
 
+        async with aiohttp.ClientSession() as session:
+            tasks = [
+                _send_batch(session, idx, batch)
+                for idx, batch in enumerate(batches)
+            ]
+            await asyncio.gather(*tasks)
+
+        # Flatten in order
+        all_embeddings: list[list[float]] = []
+        for r in results:
+            if r is not None:
+                all_embeddings.extend(r)
         return all_embeddings
 
     async def embed(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:

@@ -4,8 +4,9 @@
 """Hybrid retrieval combining vector, graph, and full-text search"""
 
 import logging
+import math
 import time
-from typing import List, Dict, Any
+from typing import List, Dict
 
 from dawei.knowledge.base.fulltext_store import FullTextStore
 from dawei.knowledge.base.graph_store import GraphStore
@@ -14,7 +15,6 @@ from dawei.knowledge.embeddings.manager import EmbeddingManager
 from dawei.knowledge.models import (
     GraphEntity,
     GraphRelation,
-    GraphPath,
     RetrievalMode,
     RetrievalQuery,
     RetrievalResult,
@@ -22,6 +22,16 @@ from dawei.knowledge.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    """Compute cosine similarity between two vectors"""
+    dot = sum(a * b for a, b in zip(vec1, vec2))
+    norm1 = math.sqrt(sum(a * a for a in vec1))
+    norm2 = math.sqrt(sum(b * b for b in vec2))
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
 
 
 class HybridRetriever:
@@ -165,7 +175,13 @@ class HybridRetriever:
             return []
 
     async def _graph_search(self, query: RetrievalQuery) -> List[RetrievalResult]:
-        """Perform knowledge graph search
+        """Perform knowledge graph search with full traversal
+
+        Strategy:
+        1. Find seed entities via embedding-enhanced search
+        2. Expand to neighbors with hop-distance decay
+        3. Collect relation context for each entity
+        4. Apply filters and scoring
 
         Args:
             query: Retrieval query
@@ -178,86 +194,115 @@ class HybridRetriever:
             return []
 
         try:
-            # Extract entities from query
-            entities = await self._extract_entities(query.query)
+            # 1. Find seed entities
+            entity_ids = await self._extract_entities(query)
+            if not entity_ids:
+                logger.debug(f"No entities found for query: {query.query}")
+                return []
 
-            if not entities:
-                logger.debug(f"No entities extracted from query: {query.query}")
-                # Fallback: search entities by name/description
-                entity_matches = await self.graph_store.search_entities(
-                    query=query.query,
-                    limit=query.top_k,
-                )
+            entity_type_filter = query.filters.get("entity_type") if query.filters else None
+            base_id_filter = query.filters.get("base_id") if query.filters else None
+            max_hops = query.filters.get("max_hops", 2) if query.filters else 2
 
-                if not entity_matches:
-                    logger.info("No matching entities found in graph, falling back to vector search")
-                    return []
+            results: List[RetrievalResult] = []
+            seen_ids: set[str] = set()
 
-                entities = [entity_id for entity_id, score in entity_matches]
-                logger.info(f"Found {len(entities)} matching entities via search_entities")
-
-            results = []
-
-            for entity_id in entities:
-                # Get the entity itself
+            for entity_id in entity_ids:
                 entity = await self.graph_store.get_entity(entity_id)
                 if not entity:
                     continue
 
-                # Get content from entity (try multiple fields)
-                content = entity.properties.get("content") or entity.description or entity.name
+                # Apply filters
+                if entity_type_filter and entity.type != entity_type_filter:
+                    continue
+                if base_id_filter and entity.base_id != base_id_filter:
+                    continue
 
-                # Always add entity as a result
-                score = self._calculate_graph_relevance(entity, query.query)
-                results.append(
-                    RetrievalResult(
-                        id=entity.id,
-                        content=content,
-                        score=score,
-                        source="graph",
-                        metadata={"entity_id": entity.id, "entity_type": entity.type, "entity_name": entity.name, **entity.properties},
-                    )
+                # Get all relations for this seed entity (once, reused below)
+                seed_relations = await self.graph_store.get_relations(
+                    entity_id=entity_id, direction="both"
                 )
 
-                # Find neighbors for broader context
-                neighbors = await self.graph_store.find_neighbors(
-                    entity_id=entity_id,
-                    hops=2,
-                )
-
-                for neighbor in neighbors:
-                    # Skip if neighbor doesn't have any meaningful content
-                    neighbor_content = neighbor.properties.get("content") or neighbor.description or neighbor.name
-
-                    if not neighbor_content or neighbor_content == neighbor.name:
-                        continue
-
-                    # Score based on proximity and relevance
-                    score = self._calculate_graph_relevance(neighbor, query.query) * 0.9  # Slightly lower score for neighbors
-
+                # 2. Add the entity itself as result (distance=0)
+                if entity.id not in seen_ids:
+                    seen_ids.add(entity.id)
+                    score = await self._calculate_graph_relevance(entity, query.query)
+                    content = self._build_entity_content(entity, seed_relations)
                     results.append(
                         RetrievalResult(
-                            id=neighbor.id,
-                            content=neighbor_content,
+                            id=entity.id,
+                            content=content,
                             score=score,
                             source="graph",
-                            metadata={"entity_id": neighbor.id, "entity_type": neighbor.type, "entity_name": neighbor.name, **neighbor.properties},
+                            metadata={
+                                "entity_id": entity.id,
+                                "entity_type": entity.type,
+                                "entity_name": entity.name,
+                                "hop_distance": 0,
+                                **entity.properties,
+                            },
                         )
                     )
 
-            # Sort by score and deduplicate
+                # 3. Get 1-hop and 2-hop neighbors separately for accurate hop tracking
+                hop1_neighbors = await self.graph_store.find_neighbors(
+                    entity_id=entity_id, hops=1,
+                )
+                hop2_neighbors = (
+                    await self.graph_store.find_neighbors(entity_id=entity_id, hops=2)
+                    if max_hops >= 2 else []
+                )
+                # Diff: 2-hop minus 1-hop = pure 2-hop entities
+                hop1_ids = {n.id for n in hop1_neighbors}
+                hop2_only = [n for n in hop2_neighbors if n.id not in hop1_ids]
+
+                for hop, neighbor_group in [(1, hop1_neighbors), (2, hop2_only)]:
+                    for neighbor in neighbor_group:
+                        if neighbor.id in seen_ids:
+                            continue
+
+                        # Apply filters
+                        if entity_type_filter and neighbor.type != entity_type_filter:
+                            continue
+                        if base_id_filter and neighbor.base_id != base_id_filter:
+                            continue
+
+                        seen_ids.add(neighbor.id)
+
+                        # Filter relations involving this neighbor
+                        related_rels = [
+                            r for r in seed_relations
+                            if r.from_entity == neighbor.id or r.to_entity == neighbor.id
+                        ]
+                        content = self._build_entity_content(neighbor, related_rels)
+
+                        # Score with hop-distance decay
+                        relevance = await self._calculate_graph_relevance(neighbor, query.query)
+                        score = relevance * (0.9 ** hop)
+
+                        results.append(
+                            RetrievalResult(
+                                id=neighbor.id,
+                                content=content,
+                                score=score,
+                                source="graph",
+                                metadata={
+                                    "entity_id": neighbor.id,
+                                    "entity_type": neighbor.type,
+                                    "entity_name": neighbor.name,
+                                    "hop_distance": hop,
+                                    **neighbor.properties,
+                                },
+                            )
+                        )
+
+            # Sort by score and limit
             results.sort(key=lambda x: x.score, reverse=True)
 
-            # Remove duplicates (by ID)
-            seen = set()
-            unique_results = []
-            for result in results:
-                if result.id not in seen:
-                    seen.add(result.id)
-                    unique_results.append(result)
-
-            logger.info(f"Graph search returned {len(unique_results)} results from {len(entities)} entities")
-            return unique_results[: query.top_k]
+            logger.info(
+                f"Graph search: {len(entity_ids)} seeds → {len(results)} results"
+            )
+            return results[: query.top_k]
 
         except Exception as e:
             logger.error(f"Graph search failed: {e}", exc_info=True)
@@ -368,48 +413,179 @@ class HybridRetriever:
         ]
 
     async def _extract_entities(self, query: str) -> List[str]:
-        """Extract entities from query (simplified)
+        """Find relevant entity IDs from graph using text search + embedding ranking
 
-        In production, use NER model or regex patterns.
+        Strategy:
+        1. search_entities by LIKE matching (fast, broad recall)
+        2. Re-rank candidates by embedding cosine similarity (precision)
+        3. Return top entity IDs
 
         Args:
             query: Search query text
 
         Returns:
-            List of potential entity IDs
+            List of entity IDs ranked by relevance
         """
-        # For now, return empty list to trigger fallback to search_entities
-        # This method can be enhanced later with NER
-        return []
+        if not self.graph_store:
+            return []
 
-    def _calculate_graph_relevance(self, entity: GraphEntity, query: str) -> float:
-        """Calculate relevance score for graph entity
+        # Step 1: broad text search
+        entity_matches = await self.graph_store.search_entities(
+            query=query,
+            limit=20,  # over-fetch for re-ranking
+        )
+
+        if not entity_matches:
+            return []
+
+        # Step 2: re-rank by embedding similarity if available
+        if self.embedding_manager:
+            try:
+                query_embedding = await self.embedding_manager.embed_single(query)
+
+                scored: list[tuple[str, float]] = []
+                for entity_id, _like_score in entity_matches:
+                    entity = await self.graph_store.get_entity(entity_id)
+                    if not entity:
+                        continue
+
+                    # Embed entity text (name + description)
+                    entity_text = f"{entity.name}. {entity.description or ''}"
+                    entity_embedding = await self.embedding_manager.embed_single(entity_text)
+                    sim = _cosine_similarity(query_embedding, entity_embedding)
+
+                    # Blend: 40% LIKE match + 60% embedding similarity
+                    blended = 0.4 * _like_score + 0.6 * max(sim, 0.0)
+                    scored.append((entity_id, blended))
+
+                scored.sort(key=lambda x: x[1], reverse=True)
+                return [eid for eid, _s in scored[:10]]
+
+            except Exception as e:
+                logger.warning(f"Embedding re-ranking failed, using LIKE order: {e}")
+
+        # Fallback: use LIKE order
+        return [eid for eid, _s in entity_matches[:10]]
+
+    async def _calculate_graph_relevance(self, entity: GraphEntity, query: str) -> float:
+        """Calculate relevance score combining text matching and embedding similarity
 
         Args:
             entity: Graph entity
             query: Search query
 
         Returns:
-            Relevance score
+            Relevance score in [0, 1]
         """
-        # Simplified: calculate overlap between query and entity name
-        query_lower = query.lower()
-        entity_lower = entity.name.lower()
+        text_score = self._text_relevance(entity, query)
 
-        # Exact match
-        if query_lower == entity_lower:
+        # Boost with embedding similarity if available
+        if self.embedding_manager:
+            try:
+                query_emb = await self.embedding_manager.embed_single(query)
+                entity_text = f"{entity.name}. {entity.description or ''}"
+                entity_emb = await self.embedding_manager.embed_single(entity_text)
+                sim = _cosine_similarity(query_emb, entity_emb)
+                # Blend: 50% text + 50% embedding
+                return 0.5 * text_score + 0.5 * max(sim, 0.0)
+            except Exception:
+                pass
+
+        return text_score
+
+    def _text_relevance(self, entity: GraphEntity, query: str) -> float:
+        """Pure text-based relevance: exact/contains/overlap matching
+
+        Supports both space-separated (English) and character-level (CJK) matching.
+
+        Args:
+            entity: Graph entity
+            query: Search query
+
+        Returns:
+            Text relevance score in [0, 1]
+        """
+        query_lower = query.lower().strip()
+        name_lower = (entity.name or "").lower().strip()
+        desc_lower = (entity.description or "").lower().strip()
+
+        # Exact name match
+        if query_lower == name_lower:
             return 1.0
 
-        # Contains match
-        if entity_lower in query_lower or query_lower in entity_lower:
-            return 0.8
+        # Name contains query or vice versa
+        if name_lower and (query_lower in name_lower or name_lower in query_lower):
+            return 0.85
 
-        # Token overlap
+        # Description contains query
+        if desc_lower and query_lower in desc_lower:
+            return 0.75
+
+        # Token overlap (space-separated words)
         query_words = set(query_lower.split())
-        entity_words = set(entity_lower.split())
+        name_words = set(name_lower.split()) if name_lower else set()
+        desc_words = set(desc_lower.split()) if desc_lower else set()
+        all_entity_words = name_words | desc_words
 
-        overlap = len(query_words & entity_words)
-        if overlap > 0:
-            return overlap / max(len(query_words), len(entity_words))
+        if query_words and all_entity_words:
+            overlap = len(query_words & all_entity_words)
+            if overlap > 0:
+                return 0.3 + 0.5 * (overlap / max(len(query_words), len(all_entity_words)))
 
-        return 0.3  # Base score for graph entities
+        # CJK: character-level n-gram overlap for Chinese/Japanese/Korean
+        if any('\u4e00' <= c <= '\u9fff' for c in query_lower):
+            query_chars = set(query_lower)
+            entity_chars = set(name_lower + desc_lower)
+            char_overlap = len(query_chars & entity_chars)
+            if char_overlap > 0:
+                return 0.2 + 0.4 * (char_overlap / max(len(query_chars), len(entity_chars)))
+
+        # Base score for entities found via search_entities (they already matched LIKE)
+        return 0.3
+
+    def _build_entity_content(self, entity: GraphEntity, relations: List[GraphRelation]) -> str:
+        """Build human-readable content string for an entity with relation context
+
+        Args:
+            entity: Graph entity
+            relations: Relations involving this entity
+
+        Returns:
+            Formatted content string
+        """
+        parts: list[str] = []
+
+        # Entity header
+        header = f"[{entity.type}] {entity.name}"
+        if entity.description:
+            header += f": {entity.description}"
+        parts.append(header)
+
+        # Key properties (skip internal ones)
+        _skip_keys = {"content", "description", "confidence", "source", "source_documents", "source_chunks", "source_pages"}
+        props = {k: v for k, v in entity.properties.items() if k not in _skip_keys and v}
+        if props:
+            prop_str = ", ".join(f"{k}={v}" for k, v in list(props.items())[:5])
+            parts.append(f"  Properties: {prop_str}")
+
+        # Relation context
+        if relations:
+            rel_lines = []
+            for r in relations[:8]:  # limit to keep concise
+                if r.from_entity == entity.id:
+                    rel_lines.append(f"  → [{r.relation_type}] → {r.to_entity}")
+                else:
+                    rel_lines.append(f"  ← [{r.relation_type}] ← {r.from_entity}")
+            if rel_lines:
+                parts.append("Relations:\n" + "\n".join(rel_lines))
+
+        # Source document provenance
+        source_docs = entity.properties.get("source_documents", [])
+        source_pages = entity.properties.get("source_pages", [])
+        if source_docs:
+            source_info = f"Source: doc_id={source_docs[0]}"
+            if source_pages:
+                source_info += f", page={source_pages[0]}"
+            parts.append(source_info)
+
+        return "\n".join(parts)

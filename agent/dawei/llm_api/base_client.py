@@ -448,13 +448,13 @@ class BaseClient(LlmApi, ABC):
             # aiohttp raises asyncio.TimeoutError when ClientTimeout is exceeded
             raise LLMConnectionError(
                 message=f"Request timed out after {self.timeout}s: {e!s}",
-                provider=self.get_provider_name(),
+                details={"provider": self.get_provider_name()},
             )
         except ClientError as e:
             # aiohttp client errors (network, connection, timeout)
             raise LLMConnectionError(
                 message=f"HTTP client error: {e!s}",
-                provider=self.get_provider_name(),
+                details={"provider": self.get_provider_name()},
             )
 
     async def _make_stream_request(
@@ -543,13 +543,13 @@ class BaseClient(LlmApi, ABC):
             # aiohttp raises asyncio.TimeoutError when ClientTimeout is exceeded
             raise LLMConnectionError(
                 message=f"Stream request timed out after {self.timeout}s: {e!s}",
-                provider=self.get_provider_name(),
+                details={"provider": self.get_provider_name()},
             )
         except ClientError as e:
             # aiohttp client errors (network, connection, timeout)
             raise LLMConnectionError(
                 message=f"HTTP streaming error: {e!s}",
-                provider=self.get_provider_name(),
+                details={"provider": self.get_provider_name()},
             )
         except Exception as e:
             # 记录失败

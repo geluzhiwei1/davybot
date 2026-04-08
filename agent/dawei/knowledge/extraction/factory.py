@@ -28,6 +28,7 @@ class ExtractionStrategyType(str, Enum):
     RULE_BASED = "rule_based"  # Fast, simple, pattern-based
     LLM = "llm"  # Accurate, flexible, LLM-based
     NER_MODEL = "ner_model"  # Professional NER models
+    SANCTIONS_HYBRID = "sanctions_hybrid"  # Rule-based + optional LLM for sanctions
     AUTO = "auto"  # Auto-select based on availability
 
 
@@ -61,6 +62,13 @@ class ExtractionFactory:
     }
 
     @classmethod
+    def _ensure_sanctions_hybrid(cls):
+        """Lazy-load sanctions_hybrid to avoid import issues when dependencies are missing."""
+        if ExtractionStrategyType.SANCTIONS_HYBRID not in cls._strategies:
+            from dawei.knowledge.extraction.sanctions_hybrid import SanctionsHybridExtractor
+            cls._strategies[ExtractionStrategyType.SANCTIONS_HYBRID] = SanctionsHybridExtractor
+
+    @classmethod
     def create(
         cls,
         strategy: ExtractionStrategyType | str = ExtractionStrategyType.RULE_BASED,
@@ -82,7 +90,10 @@ class ExtractionFactory:
             strategy = ExtractionStrategyType(strategy)
 
         if strategy == ExtractionStrategyType.AUTO:
-            strategy = cls._auto_select_strategy()
+            strategy = cls._auto_select_strategy(domain=domain)
+
+        # Lazy-load sanctions_hybrid
+        cls._ensure_sanctions_hybrid()
 
         strategy_class = cls._strategies.get(strategy)
         if strategy_class is None:
@@ -120,7 +131,11 @@ class ExtractionFactory:
         logger.info(f"Registered custom strategy: {strategy_type.value}")
 
     @classmethod
-    def _auto_select_strategy(cls) -> ExtractionStrategyType:
+    def _auto_select_strategy(cls, domain: str | None = None) -> ExtractionStrategyType:
+        # Domain-specific auto-selection
+        if domain == "sanctions":
+            cls._ensure_sanctions_hybrid()
+            return ExtractionStrategyType.SANCTIONS_HYBRID
         try:
             from dawei.llm_api.client import LLMClient
             client = LLMClient.get_instance()

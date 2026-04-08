@@ -275,46 +275,70 @@ class SQLiteGraphStore(GraphStore):
         from_entity: str,
         to_entity: str,
         max_depth: int = 3,
-    ) -> GraphPath | None:
-        """Find shortest path between two entities using BFS
+        relation_types: list[str] | None = None,
+    ) -> list[GraphPath]:
+        """Find shortest paths between two entities using bidirectional BFS
 
         Args:
             from_entity: Start entity ID
             to_entity: Target entity ID
             max_depth: Maximum path length
+            relation_types: Optional relation type filters
 
         Returns:
-            Path if found, None otherwise
+            List of paths (at most 1 for BFS shortest path)
         """
         from collections import deque
 
-        # BFS queue: (current_entity, path_so_far)
-        queue = deque([(from_entity, [])])
+        if from_entity == to_entity:
+            entity = await self.get_entity(from_entity)
+            if entity:
+                return [GraphPath(entities=[entity], relations=[], score=1.0)]
+            return []
+
+        # BFS: (current_id, [(edge_entity_id, relation), ...])
+        queue: deque[tuple[str, list[tuple[str, GraphRelation]]]] = deque(
+            [(from_entity, [])]
+        )
         visited = {from_entity}
 
         while queue:
-            current, path = queue.popleft()
+            current_id, path_rels = queue.popleft()
 
-            if len(path) > max_depth:
+            if len(path_rels) >= max_depth:
                 continue
 
-            if current == to_entity:
-                return GraphPath(
-                    entities=[from_entity] + path + [to_entity],
-                    relations=[],
-                    length=len(path) + 1,
-                )
+            if current_id == to_entity:
+                # Reconstruct path with entity and relation objects
+                entity_ids = [from_entity] + [rid for rid, _ in path_rels]
+                entities = []
+                for eid in entity_ids:
+                    e = await self.get_entity(eid)
+                    if e:
+                        entities.append(e)
+                relations = [r for _, r in path_rels]
+                score = 1.0 / (len(path_rels) + 1)  # shorter = higher score
+                return [GraphPath(entities=entities, relations=relations, score=score)]
 
-            # Get neighbors
-            relations = await self.get_entity_relations(current, direction="out")
+            # Traverse both directions
+            out_rels = await self.get_entity_relations(current_id, direction="out")
+            in_rels = await self.get_entity_relations(current_id, direction="in")
 
-            for relation in relations:
-                if relation.to_entity not in visited:
-                    visited.add(relation.to_entity)
-                    new_path = path + [relation.to_entity]
-                    queue.append((relation.to_entity, new_path))
+            for rel in out_rels:
+                if relation_types and rel.relation_type not in relation_types:
+                    continue
+                if rel.to_entity not in visited:
+                    visited.add(rel.to_entity)
+                    queue.append((rel.to_entity, path_rels + [(rel.to_entity, rel)]))
 
-        return None
+            for rel in in_rels:
+                if relation_types and rel.relation_type not in relation_types:
+                    continue
+                if rel.from_entity not in visited:
+                    visited.add(rel.from_entity)
+                    queue.append((rel.from_entity, path_rels + [(rel.from_entity, rel)]))
+
+        return []
 
     async def delete_entity(self, entity_id: str) -> int:
         """Delete an entity and all its relations
@@ -393,7 +417,7 @@ class SQLiteGraphStore(GraphStore):
         hops: int = 1,
         relation_types: List[str] | None = None,
     ) -> List[GraphEntity]:
-        """Find neighboring entities within N hops
+        """Find neighboring entities within N hops (bidirectional)
 
         Args:
             entity_id: Center entity ID
@@ -401,57 +425,43 @@ class SQLiteGraphStore(GraphStore):
             relation_types: Optional relation type filters
 
         Returns:
-            List of neighboring entities sorted by proximity
+            List of neighboring entities sorted by proximity (closer first)
         """
         if hops < 1:
             return []
 
-        # Use BFS to find neighbors
         from collections import deque
 
-        visited = set()
-        queue = deque([(entity_id, 0)])  # (entity_id, current_depth)
-        neighbors_map = {}  # entity_id -> GraphEntity
-        entities_to_return = []
+        # BFS: (entity_id, depth)
+        queue: deque[tuple[str, int]] = deque([(entity_id, 0)])
+        visited = {entity_id}
+        ordered: list[GraphEntity] = []
 
         while queue:
             current_id, depth = queue.popleft()
 
-            if current_id in visited or depth > hops:
+            if depth >= hops:
                 continue
 
-            visited.add(current_id)
+            # Traverse both outgoing and incoming relations
+            out_rels = await self.get_entity_relations(current_id, direction="out")
+            in_rels = await self.get_entity_relations(current_id, direction="in")
 
-            # Get outgoing relations
-            relations = await self.get_entity_relations(current_id, direction="out")
-
-            for relation in relations:
-                # Filter by relation type if specified
-                if relation_types and relation.relation_type not in relation_types:
+            for rel in out_rels + in_rels:
+                if relation_types and rel.relation_type not in relation_types:
                     continue
 
-                neighbor_id = relation.to_entity
+                # Determine neighbor ID based on direction
+                neighbor_id = rel.to_entity if rel.from_entity == current_id else rel.from_entity
 
-                if neighbor_id not in visited and neighbor_id != entity_id:
-                    # Get neighbor entity
+                if neighbor_id not in visited:
+                    visited.add(neighbor_id)
                     neighbor = await self.get_entity(neighbor_id)
                     if neighbor:
-                        neighbors_map[neighbor_id] = neighbor
-                        entities_to_return.append(neighbor)
+                        ordered.append(neighbor)
+                        queue.append((neighbor_id, depth + 1))
 
-                        # Continue BFS if within hop limit
-                        if depth + 1 <= hops:
-                            queue.append((neighbor_id, depth + 1))
-
-        # Remove duplicates while preserving order (closer entities first)
-        seen = set()
-        unique_neighbors = []
-        for entity in entities_to_return:
-            if entity.id not in seen:
-                seen.add(entity.id)
-                unique_neighbors.append(entity)
-
-        return unique_neighbors
+        return ordered
 
     async def delete_relation(self, relation_id: str) -> bool:
         """Delete a relation by ID

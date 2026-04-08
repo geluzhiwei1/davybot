@@ -142,13 +142,30 @@ export const knowledgeBasesApi = {
   },
 
   /**
-   * 从目录同步文件到知识库
+   * 从目录同步文件到知识库（后台任务，立即返回 task_id）
    */
-  syncFromDir: async (baseId: string, params?: { dir_path?: string; force_rebuild?: boolean }) => {
+  syncFromDir: async (baseId: string, params?: { dir_path?: string; force_rebuild?: boolean }): Promise<{ task_id: string; base_id: string; status: string; message: string }> => {
     const response = await axios.post(`${API_BASE}/bases/by-id/${baseId}/sync-from-dir`, null, {
       params,
-      timeout: 600000, // 10 minutes timeout for large directory sync
     })
+    return response.data
+  },
+
+  /**
+   * 获取知识库同步任务状态（通过 base_id）
+   */
+  getSyncStatus: async (baseId: string): Promise<{
+    base_id: string
+    status: string
+    task_id: string | null
+    progress?: number
+    current_file?: string
+    total_files?: number
+    processed_files?: number
+    result?: Record<string, unknown>
+    error?: string
+  }> => {
+    const response = await axios.get(`${API_BASE}/bases/by-id/${baseId}/sync-status`)
     return response.data
   },
 }

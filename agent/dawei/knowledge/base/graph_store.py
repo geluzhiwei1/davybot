@@ -115,6 +115,25 @@ class GraphStore(ABC):
         pass
 
     @abstractmethod
+    async def search_entities(
+        self,
+        query: str,
+        entity_type: str | None = None,
+        limit: int = 10,
+    ) -> List[tuple[str, float]]:
+        """Search entities by name/description
+
+        Args:
+            query: Search query text
+            entity_type: Optional entity type filter
+            limit: Maximum results
+
+        Returns:
+            List of (entity_id, score) tuples
+        """
+        pass
+
+    @abstractmethod
     async def delete_entity(self, entity_id: str) -> bool:
         """Delete an entity and its relations
 

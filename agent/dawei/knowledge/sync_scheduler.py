@@ -199,6 +199,11 @@ class KnowledgeSyncScheduler:
         extraction_strategy = kb.settings.extraction_strategy or "rule_based"
         domain = getattr(kb.settings, "domain", "general")
         extraction_llm_config = getattr(kb.settings, "extraction_llm_config", "") or None
+
+        # Auto-upgrade to sanctions_hybrid for sanctions domain
+        if domain == "sanctions" and extraction_strategy == "llm":
+            extraction_strategy = "sanctions_hybrid"
+
         extractor = ExtractionFactory.create(extraction_strategy, domain=domain, llm_config_name=extraction_llm_config)
 
         total_documents = 0

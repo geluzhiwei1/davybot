@@ -194,6 +194,10 @@
                 <el-button type="danger" @click="handleSyncFromDir(true)" :loading="syncing">
                   重建全部
                 </el-button>
+                <span v-if="syncing" class="sync-progress-text" style="margin-left: 12px; font-size: 13px; color: #909399;">
+                  {{ syncProgress.toFixed(0) }}% ({{ syncProcessedFiles }}/{{ syncTotalFiles }})
+                  <span v-if="syncCurrentFile"> - {{ syncCurrentFile }}</span>
+                </span>
               </div>
               <div v-if="scanResult.files.length > 0 && !editingBase" class="scan-actions">
                 <el-tag type="info">创建知识库后将自动同步这些文件</el-tag>
@@ -353,7 +357,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, UploadFilled, Plus, Refresh } from '@element-plus/icons-vue'
 import { knowledgeBasesApi, knowledgeApi } from '@/services/api/knowledge'
@@ -401,6 +405,11 @@ const llmConfigOptions = ref<Array<{ llm_id: string; model_id: string }>>([])
 // 文件目录状态
 const scanning = ref(false)
 const syncing = ref(false)
+const syncProgress = ref(0)
+const syncCurrentFile = ref('')
+const syncTotalFiles = ref(0)
+const syncProcessedFiles = ref(0)
+let syncPollTimer: ReturnType<typeof setInterval> | null = null
 const scanResult = ref<ScanResult | null>(null)
 
 // 上传状态
@@ -573,30 +582,77 @@ const handleSyncFromDir = async (forceRebuild: boolean) => {
   }
 
   syncing.value = true
+  syncProgress.value = 0
+  syncCurrentFile.value = ''
+  syncTotalFiles.value = 0
+  syncProcessedFiles.value = 0
+
   try {
-    const result = await knowledgeBasesApi.syncFromDir(editingBase.value.id, {
+    // Start background task
+    await knowledgeBasesApi.syncFromDir(editingBase.value.id, {
       dir_path: formData.value.settings?.watch_dir,
       force_rebuild: forceRebuild,
     })
-    if (result.success) {
-      ElMessage.success(`${action}完成: ${result.stats.total_documents} 文档, ${result.stats.total_chunks} 文档块`)
-      emit('documents-changed')
-      await loadBases()
-      // 重新扫描以更新状态
-      if (formData.value.settings?.watch_dir) {
-        const newScan = await knowledgeBasesApi.scanDir(editingBase.value.id, formData.value.settings.watch_dir)
-        scanResult.value = newScan
+
+    // Poll for progress
+    const baseId = editingBase.value.id
+    syncPollTimer = setInterval(async () => {
+      try {
+        const status = await knowledgeBasesApi.getSyncStatus(baseId)
+        if (status.status === 'idle') return
+
+        syncProgress.value = status.progress ?? 0
+        syncCurrentFile.value = status.current_file ?? ''
+        syncTotalFiles.value = status.total_files ?? 0
+        syncProcessedFiles.value = status.processed_files ?? 0
+
+        if (status.status === 'completed') {
+          stopPolling()
+          syncing.value = false
+          const result = status.result as { success?: boolean; stats?: { total_documents: number; total_chunks: number }; errors?: unknown[] } | undefined
+          if (result?.success) {
+            ElMessage.success(`${action}完成: ${result.stats?.total_documents ?? 0} 文档, ${result.stats?.total_chunks ?? 0} 文档块`)
+            emit('documents-changed')
+            await loadBases()
+            // 重新扫描以更新状态
+            if (formData.value.settings?.watch_dir) {
+              const newScan = await knowledgeBasesApi.scanDir(baseId, formData.value.settings.watch_dir)
+              scanResult.value = newScan
+            }
+          }
+          if (result?.errors?.length) {
+            ElMessage.warning(`${(result.errors as unknown[]).length} 个文件导入失败`)
+          }
+        } else if (status.status === 'failed') {
+          stopPolling()
+          syncing.value = false
+          ElMessage.error(status.error || `${action}失败`)
+        }
+      } catch {
+        // Poll error — stop polling
+        stopPolling()
+        syncing.value = false
+        ElMessage.error('获取同步状态失败')
       }
-    }
-    if (result.errors?.length) {
-      ElMessage.warning(`${result.errors.length} 个文件导入失败`)
-    }
+    }, 2000)
   } catch (error: unknown) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const err = error as any
+    // 409 = already running, show as info
+    if (err.response?.status === 409) {
+      ElMessage.warning('该知识库已有同步任务正在运行')
+      syncing.value = false
+      return
+    }
     ElMessage.error(err.response?.data?.detail || `${action}失败`)
-  } finally {
     syncing.value = false
+  }
+}
+
+const stopPolling = () => {
+  if (syncPollTimer) {
+    clearInterval(syncPollTimer)
+    syncPollTimer = null
   }
 }
 
@@ -814,6 +870,10 @@ onMounted(() => {
   loadBases()
   loadDomains()
   loadLLMConfigs()
+})
+
+onBeforeUnmount(() => {
+  stopPolling()
 })
 
 defineExpose({

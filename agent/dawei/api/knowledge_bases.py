@@ -3,8 +3,11 @@
 
 """Knowledge Base Management API - Multi-tenancy support"""
 
+import asyncio
 import json
 import logging
+import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -26,6 +29,123 @@ from dawei.knowledge.models import RetrievalMode
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/knowledge/bases", tags=["knowledge-bases"])
+
+
+# ============================================================================
+# Sync Task Manager (in-memory, lightweight)
+# ============================================================================
+
+
+class SyncTaskStatus:
+    """Status of a background sync task."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class SyncTask:
+    """A single background sync task."""
+
+    def __init__(self, task_id: str, base_id: str, force_rebuild: bool):
+        self.task_id = task_id
+        self.base_id = base_id
+        self.force_rebuild = force_rebuild
+        self.status = SyncTaskStatus.PENDING
+        self.progress: float = 0.0  # 0-100
+        self.current_file: str = ""
+        self.total_files: int = 0
+        self.processed_files: int = 0
+        self.result: dict[str, Any] | None = None
+        self.error: str | None = None
+        self.created_at: float = time.time()
+        self.finished_at: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "base_id": self.base_id,
+            "status": self.status,
+            "progress": round(self.progress, 1),
+            "current_file": self.current_file,
+            "total_files": self.total_files,
+            "processed_files": self.processed_files,
+            "result": self.result,
+            "error": self.error,
+            "force_rebuild": self.force_rebuild,
+            "created_at": self.created_at,
+            "finished_at": self.finished_at,
+        }
+
+
+class SyncTaskManager:
+    """Manages background sync tasks with duplicate prevention per knowledge base."""
+
+    def __init__(self) -> None:
+        self._tasks: dict[str, SyncTask] = {}  # task_id -> SyncTask
+        self._base_tasks: dict[str, str] = {}  # base_id -> task_id (active only)
+
+    def create_task(self, base_id: str, force_rebuild: bool) -> SyncTask | None:
+        """Create a new sync task. Returns None if a task already running for this base."""
+        if base_id in self._base_tasks:
+            existing_id = self._base_tasks[base_id]
+            existing = self._tasks.get(existing_id)
+            if existing and existing.status in (SyncTaskStatus.PENDING, SyncTaskStatus.RUNNING):
+                return None  # Duplicate
+        task_id = f"sync_{uuid.uuid4().hex[:12]}"
+        task = SyncTask(task_id, base_id, force_rebuild)
+        self._tasks[task_id] = task
+        self._base_tasks[base_id] = task_id
+        return task
+
+    def get_task(self, task_id: str) -> SyncTask | None:
+        return self._tasks.get(task_id)
+
+    def get_active_task_for_base(self, base_id: str) -> SyncTask | None:
+        """Get the active (pending/running) task for a knowledge base, if any."""
+        task_id = self._base_tasks.get(base_id)
+        if not task_id:
+            return None
+        task = self._tasks.get(task_id)
+        if task and task.status in (SyncTaskStatus.PENDING, SyncTaskStatus.RUNNING):
+            return task
+        # Clean up stale mapping
+        del self._base_tasks[base_id]
+        return None
+
+    def finish_task(self, task: SyncTask) -> None:
+        """Mark task as finished and remove base_id mapping."""
+        task.finished_at = time.time()
+        if task.base_id in self._base_tasks and self._base_tasks[task.base_id] == task.task_id:
+            del self._base_tasks[task.base_id]
+        # Keep completed tasks for a while (last 100) for status polling
+        self._cleanup_old_tasks()
+
+    def cancel_task(self, base_id: str) -> SyncTask | None:
+        """Force-cancel the active task for a knowledge base."""
+        task_id = self._base_tasks.get(base_id)
+        if not task_id:
+            return None
+        task = self._tasks.get(task_id)
+        if task and task.status in (SyncTaskStatus.PENDING, SyncTaskStatus.RUNNING):
+            task.status = SyncTaskStatus.FAILED
+            task.error = "Cancelled by user"
+            self.finish_task(task)
+            return task
+        return None
+
+    def _cleanup_old_tasks(self) -> None:
+        """Keep only the last 100 finished tasks."""
+        finished = [(tid, t) for tid, t in self._tasks.items() if t.status in (SyncTaskStatus.COMPLETED, SyncTaskStatus.FAILED)]
+        if len(finished) > 100:
+            finished.sort(key=lambda x: x[1].finished_at or 0)
+            for tid, _ in finished[:-100]:
+                del self._tasks[tid]
+
+
+# Global singleton
+_sync_task_manager = SyncTaskManager()
 
 
 # ============================================================================
@@ -444,6 +564,11 @@ async def upload_document_to_base(
         extraction_strategy = kb.settings.extraction_strategy or "rule_based"
         domain = getattr(kb.settings, "domain", "general")
         extraction_llm_config = getattr(kb.settings, "extraction_llm_config", "") or None
+
+        # Auto-upgrade to sanctions_hybrid for sanctions domain
+        if domain == "sanctions" and extraction_strategy == "llm":
+            extraction_strategy = "sanctions_hybrid"
+
         extractor = ExtractionFactory.create(extraction_strategy, domain=domain, llm_config_name=extraction_llm_config)
 
         total_entities, total_relations = await build_document_graph(
@@ -757,6 +882,11 @@ async def reindex_knowledge_base(base_id: str):
     # Get extraction strategy
     extraction_strategy = kb.settings.extraction_strategy or "rule_based"
     domain = getattr(kb.settings, "domain", "general")
+
+    # Auto-upgrade to sanctions_hybrid for sanctions domain
+    if domain == "sanctions" and extraction_strategy == "llm":
+        extraction_strategy = "sanctions_hybrid"
+
     extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
 
     # Statistics
@@ -993,258 +1123,237 @@ async def scan_watch_directory(
     )
 
 
-@router.post("/by-id/{base_id}/sync-from-dir")
-async def sync_from_directory(
+async def _run_sync_task(
+    task: SyncTask,
     base_id: str,
-    dir_path: str = Query("", description="Directory path (empty = use watch_dir from settings)"),
-    force_rebuild: bool = Query(False, description="Force rebuild all files, not just new ones"),
-):
-    """Sync files from a directory into the knowledge base
-
-    Imports all supported files from the specified directory (or watch_dir setting)
-    into the knowledge base. If force_rebuild is False, only imports files not already
-    in the knowledge base.
-
-    Args:
-        base_id: Knowledge base ID
-        dir_path: Optional directory path override
-        force_rebuild: Whether to rebuild all files
-
-    Returns:
-        Sync results with statistics
-    """
-    manager = get_base_manager()
-    kb = manager.get_base(base_id)
-    if not kb:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
-
-    # Determine directory path
-    scan_path = dir_path or kb.settings.watch_dir
-    if not scan_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No directory path configured. Set watch_dir in knowledge base settings or provide dir_path parameter.",
-        )
-
-    directory = Path(scan_path).expanduser().resolve()
-    if not directory.exists():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Directory does not exist: {scan_path}",
-        )
-
-    # Supported extensions
-    supported = {".md", ".markdown"}
-
-    # Get existing file names
-    existing_docs = manager.list_base_documents(base_id, skip=0, limit=10000)
-    existing_names = set()
-    for doc in existing_docs.get("documents", []):
-        existing_names.add(doc.get("file_name", ""))
-
-    # If force_rebuild, clear existing data first
-    if force_rebuild:
-        # Delete vector store and recreate
-        base_storage_path = manager._get_storage_path(base_id)
-        vector_db_path = base_storage_path / "vectors.db"
-        if vector_db_path.exists():
-            vector_db_path.unlink()
-        fulltext_db_path = base_storage_path / "fulltext.db"
-        if fulltext_db_path.exists():
-            fulltext_db_path.unlink()
-        graph_db_path = base_storage_path / "graph.db"
-        if graph_db_path.exists():
-            graph_db_path.unlink()
-        existing_names.clear()
-
-    # Find all supported files
-    files_to_import = []
+    dir_path: str,
+    force_rebuild: bool,
+) -> None:
+    """Background worker that performs the actual sync."""
     try:
-        if kb.settings.watch_recursive:
-            glob_iter = directory.rglob("*")
-        else:
-            glob_iter = directory.glob("*")
+        task.status = SyncTaskStatus.RUNNING
 
-        for file_path in glob_iter:
-            if file_path.is_file() and file_path.suffix.lower() in supported:
-                if not force_rebuild and file_path.name in existing_names:
-                    continue  # Skip existing files
-                files_to_import.append(file_path)
-    except PermissionError:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission denied: {scan_path}",
-        )
+        from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
+        from dawei.knowledge.extraction import ExtractionFactory
+        from dawei.knowledge.fulltext.sqlite_fts_store import SQLiteFTSStore
+        from dawei.knowledge.graph.sqlite_graph_store import SQLiteGraphStore
+        from dawei.knowledge.models import GraphEntity, GraphRelation, VectorDocument
+        from dawei.knowledge.parsers.markdown_parser import MarkdownParser
+        from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+        from datetime import datetime
 
-    if not files_to_import:
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
+        manager = get_base_manager()
+        kb = manager.get_base(base_id)
+        if not kb:
+            raise ValueError(f"Knowledge base not found: {base_id}")
+
+        # Determine directory path
+        scan_path = dir_path or kb.settings.watch_dir
+        if not scan_path:
+            raise ValueError("No directory path configured")
+
+        directory = Path(scan_path).expanduser().resolve()
+        if not directory.exists():
+            raise ValueError(f"Directory does not exist: {scan_path}")
+
+        # Supported extensions
+        supported = {".md", ".markdown"}
+
+        # Get existing file names
+        existing_docs = manager.list_base_documents(base_id, skip=0, limit=10000)
+        existing_names = {doc.get("file_name", "") for doc in existing_docs.get("documents", [])}
+
+        # If force_rebuild, clear existing data first
+        if force_rebuild:
+            base_storage_path = manager._get_storage_path(base_id)
+            for db_name in ("vectors.db", "fulltext.db", "graph.db"):
+                db_file = base_storage_path / db_name
+                if db_file.exists():
+                    db_file.unlink()
+            existing_names.clear()
+
+        # Find all supported files
+        files_to_import: list[Path] = []
+        try:
+            glob_iter = directory.rglob("*") if kb.settings.watch_recursive else directory.glob("*")
+            for file_path in glob_iter:
+                if file_path.is_file() and file_path.suffix.lower() in supported:
+                    if not force_rebuild and file_path.name in existing_names:
+                        continue
+                    files_to_import.append(file_path)
+        except PermissionError:
+            raise ValueError(f"Permission denied: {scan_path}")
+
+        task.total_files = len(files_to_import)
+
+        if not files_to_import:
+            task.status = SyncTaskStatus.COMPLETED
+            task.progress = 100.0
+            task.result = {
                 "success": True,
                 "base_id": base_id,
                 "message": "No new files to import",
                 "imported": 0,
                 "skipped": 0,
                 "errors": [],
-            },
+            }
+            _sync_task_manager.finish_task(task)
+            return
+
+        # Initialize stores
+        base_storage_path = manager._get_storage_path(base_id)
+        vector_store = SQLiteVecVectorStore(
+            db_path=str(base_storage_path / "vectors.db"),
+            dimension=kb.settings.embedding_dimension,
+        )
+        await vector_store.initialize()
+
+        fulltext_store = SQLiteFTSStore(db_path=str(base_storage_path / "fulltext.db"))
+        await fulltext_store.initialize()
+
+        graph_store = SQLiteGraphStore(db_path=str(base_storage_path / "graph.db"))
+        await graph_store.initialize()
+
+        if force_rebuild:
+            await graph_store.clear()
+
+        embedding_service = manager.get_embedding_manager(base_id)
+
+        # Chunking config
+        strategy_map = {
+            "recursive": ChunkingStrategy.RECURSIVE,
+            "semantic": ChunkingStrategy.SEMANTIC,
+            "markdown": ChunkingStrategy.MARKDOWN,
+        }
+        chunk_strategy = strategy_map.get(kb.settings.chunk_strategy, ChunkingStrategy.RECURSIVE)
+        chunker = TextChunker(
+            config=ChunkingConfig(
+                strategy=chunk_strategy,
+                chunk_size=kb.settings.chunk_size,
+                chunk_overlap=kb.settings.chunk_overlap,
+            ),
         )
 
-    # Import files using existing upload logic
-    from dawei.knowledge.chunking.chunker import ChunkingConfig, ChunkingStrategy, TextChunker
-    from dawei.knowledge.extraction import ExtractionFactory
-    from dawei.knowledge.fulltext.sqlite_fts_store import SQLiteFTSStore
-    from dawei.knowledge.graph.sqlite_graph_store import SQLiteGraphStore
-    from dawei.knowledge.models import GraphEntity, GraphRelation, VectorDocument
-    from dawei.knowledge.parsers.markdown_parser import MarkdownParser
-    from dawei.knowledge.vector.sqlite_vec_store import SQLiteVecVectorStore
+        extraction_strategy = kb.settings.extraction_strategy or "rule_based"
+        domain = getattr(kb.settings, "domain", "general")
+        extraction_llm_config = getattr(kb.settings, "extraction_llm_config", "") or None
 
-    # Initialize stores directly (avoid manager.get_fulltext_store / get_graph_store
-    # which call asyncio.run() inside a running event loop)
-    base_storage_path = manager._get_storage_path(base_id)
-    vector_db_path = base_storage_path / "vectors.db"
-    vector_store = SQLiteVecVectorStore(
-        db_path=str(vector_db_path),
-        dimension=kb.settings.embedding_dimension,
-    )
-    await vector_store.initialize()
+        # Auto-upgrade to sanctions_hybrid for sanctions domain
+        if domain == "sanctions" and extraction_strategy == "llm":
+            extraction_strategy = "sanctions_hybrid"
+            logger.info(f"Auto-upgraded extraction strategy from 'llm' to 'sanctions_hybrid' for sanctions domain KB {base_id}")
 
-    fulltext_db_path = base_storage_path / "fulltext.db"
-    fulltext_store = SQLiteFTSStore(db_path=str(fulltext_db_path))
-    await fulltext_store.initialize()
+        extractor = ExtractionFactory.create(extraction_strategy, domain=domain, llm_config_name=extraction_llm_config)
 
-    graph_db_path = base_storage_path / "graph.db"
-    graph_store = SQLiteGraphStore(db_path=str(graph_db_path))
-    await graph_store.initialize()
+        # Stats
+        total_documents = 0
+        total_chunks = 0
+        total_entities = 0
+        total_relations = 0
+        errors: list[str] = []
 
-    if force_rebuild:
-        await graph_store.clear()
+        for i, file_path in enumerate(files_to_import):
+            task.current_file = file_path.name
+            task.processed_files = i
+            task.progress = (i / len(files_to_import)) * 100
 
-    embedding_service = manager.get_embedding_manager(base_id)
-
-    # Chunking config
-    strategy_map = {
-        "recursive": ChunkingStrategy.RECURSIVE,
-        "semantic": ChunkingStrategy.SEMANTIC,
-        "markdown": ChunkingStrategy.MARKDOWN,
-    }
-    chunk_strategy = strategy_map.get(kb.settings.chunk_strategy, ChunkingStrategy.RECURSIVE)
-    chunker = TextChunker(
-        config=ChunkingConfig(
-            strategy=chunk_strategy,
-            chunk_size=kb.settings.chunk_size,
-            chunk_overlap=kb.settings.chunk_overlap,
-        ),
-    )
-
-    extraction_strategy = kb.settings.extraction_strategy or "rule_based"
-    domain = getattr(kb.settings, "domain", "general")
-    extractor = ExtractionFactory.create(extraction_strategy, domain=domain)
-
-    # Stats
-    total_documents = 0
-    total_chunks = 0
-    total_entities = 0
-    total_relations = 0
-    errors = []
-
-    for file_path in files_to_import:
-        try:
-            file_extension = file_path.suffix.lower()
-            if file_extension not in {".md", ".markdown"}:
-                errors.append(f"Skipped {file_path.name}: unsupported file type {file_extension}")
-                continue
-
-            parser = MarkdownParser()
-
-            # Parse
-            document = await parser.parse(file_path)
-            chunks = await chunker.chunk(document)
-
-            # Generate embeddings
-            chunk_texts = [chunk.content for chunk in chunks]
-            embeddings = await embedding_service.embed_documents(chunk_texts)
-
-            # Add to vector store
-            vector_docs = []
-            for chunk, embedding in zip(chunks, embeddings, strict=True):
-                metadata_copy = dict(chunk.metadata)
-                for key, value in metadata_copy.items():
-                    if hasattr(value, "isoformat"):
-                        metadata_copy[key] = value.isoformat()
-
-                vector_doc = VectorDocument(
-                    id=chunk.id,
-                    embedding=embedding,
-                    content=chunk.content,
-                    metadata={
-                        **metadata_copy,
-                        "document_id": chunk.document_id,
-                        "chunk_index": chunk.chunk_index,
-                        "base_id": base_id,
-                        "file_name": file_path.name,
-                        "source_path": str(file_path),
-                    },
-                )
-                vector_docs.append(vector_doc)
-
-            await vector_store.add(vector_docs)
-
-            # Fulltext index
             try:
-                await fulltext_store.add_documents(chunks)
+                file_extension = file_path.suffix.lower()
+                if file_extension not in {".md", ".markdown"}:
+                    errors.append(f"Skipped {file_path.name}: unsupported file type {file_extension}")
+                    continue
+
+                parser = MarkdownParser()
+                document = await parser.parse(file_path)
+                chunks = await chunker.chunk(document)
+
+                # Generate embeddings
+                chunk_texts = [chunk.content for chunk in chunks]
+                embeddings = await embedding_service.embed_documents(chunk_texts)
+
+                # Add to vector store
+                vector_docs = []
+                for chunk, embedding in zip(chunks, embeddings, strict=True):
+                    metadata_copy = dict(chunk.metadata)
+                    for key, value in metadata_copy.items():
+                        if hasattr(value, "isoformat"):
+                            metadata_copy[key] = value.isoformat()
+
+                    vector_doc = VectorDocument(
+                        id=chunk.id,
+                        embedding=embedding,
+                        content=chunk.content,
+                        metadata={
+                            **metadata_copy,
+                            "document_id": chunk.document_id,
+                            "chunk_index": chunk.chunk_index,
+                            "base_id": base_id,
+                            "file_name": file_path.name,
+                            "source_path": str(file_path),
+                        },
+                    )
+                    vector_docs.append(vector_doc)
+
+                await vector_store.add(vector_docs)
+
+                # Fulltext index
+                try:
+                    await fulltext_store.add_documents(chunks)
+                except Exception as e:
+                    logger.warning(f"Failed to index fulltext for {file_path.name}: {e}")
+
+                # Graph index
+                try:
+                    from dawei.knowledge._graph_builder import build_document_graph
+
+                    doc_entities, doc_relations = await build_document_graph(
+                        graph_store=graph_store,
+                        document=document,
+                        chunks=chunks,
+                        extractor=extractor,
+                        base_id=base_id,
+                        extraction_strategy=extraction_strategy,
+                        file_name=file_path.name,
+                    )
+                    total_entities += doc_entities
+                    total_relations += doc_relations
+                except Exception as e:
+                    logger.warning(f"Failed to index graph for {file_path.name}: {e}")
+
+                total_documents += 1
+                total_chunks += len(chunks)
+                logger.info(f"Synced file: {file_path.name} ({len(chunks)} chunks)")
+
             except Exception as e:
-                logger.warning(f"Failed to index fulltext for {file_path.name}: {e}")
+                error_msg = f"Failed to import {file_path.name}: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                errors.append(error_msg)
 
-            # Graph index — extract from FULL document
-            try:
-                from dawei.knowledge._graph_builder import build_document_graph
+        # Update progress to 100%
+        task.processed_files = len(files_to_import)
+        task.progress = 100.0
 
-                doc_entities, doc_relations = await build_document_graph(
-                    graph_store=graph_store,
-                    document=document,
-                    chunks=chunks,
-                    extractor=extractor,
-                    base_id=base_id,
-                    extraction_strategy=extraction_strategy,
-                    file_name=file_path.name,
-                )
-                total_entities += doc_entities
-                total_relations += doc_relations
-            except Exception as e:
-                logger.warning(f"Failed to index graph for {file_path.name}: {e}")
+        # Update stats
+        if force_rebuild:
+            kb.stats.total_documents = total_documents
+            kb.stats.total_chunks = total_chunks
+            kb.stats.total_entities = total_entities
+            kb.stats.total_relations = total_relations
+            kb.stats.indexed_documents = total_documents
+        else:
+            kb.stats.total_documents += total_documents
+            kb.stats.total_chunks += total_chunks
+            kb.stats.total_entities += total_entities
+            kb.stats.total_relations += total_relations
+            kb.stats.indexed_documents += total_documents
 
-            total_documents += 1
-            total_chunks += len(chunks)
-            logger.info(f"Synced file: {file_path.name} ({len(chunks)} chunks)")
+        kb.stats.last_indexed_at = datetime.now()
+        kb.stats.last_updated_at = datetime.now()
+        kb.updated_at = datetime.now()
+        manager._save_metadata()
 
-        except Exception as e:
-            error_msg = f"Failed to import {file_path.name}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            errors.append(error_msg)
-
-    # Update stats
-    if force_rebuild:
-        kb.stats.total_documents = total_documents
-        kb.stats.total_chunks = total_chunks
-        kb.stats.total_entities = total_entities
-        kb.stats.total_relations = total_relations
-        kb.stats.indexed_documents = total_documents
-    else:
-        kb.stats.total_documents += total_documents
-        kb.stats.total_chunks += total_chunks
-        kb.stats.total_entities += total_entities
-        kb.stats.total_relations += total_relations
-        kb.stats.indexed_documents += total_documents
-
-    from datetime import datetime
-    kb.stats.last_indexed_at = datetime.now()
-    kb.stats.last_updated_at = datetime.now()
-    kb.updated_at = datetime.now()
-    manager._save_metadata()
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
+        task.status = SyncTaskStatus.COMPLETED
+        task.result = {
             "success": True,
             "base_id": base_id,
             "message": f"Synced {total_documents} files from directory",
@@ -1256,10 +1365,109 @@ async def sync_from_directory(
             },
             "skipped": len(files_to_import) - total_documents - len(errors),
             "errors": errors if errors else None,
+        }
+    except Exception as e:
+        logger.error(f"Sync task {task.task_id} failed: {e}", exc_info=True)
+        task.status = SyncTaskStatus.FAILED
+        task.error = str(e)
+    finally:
+        _sync_task_manager.finish_task(task)
+
+
+@router.post("/by-id/{base_id}/sync-from-dir")
+async def sync_from_directory(
+    base_id: str,
+    dir_path: str = Query("", description="Directory path (empty = use watch_dir from settings)"),
+    force_rebuild: bool = Query(False, description="Force rebuild all files, not just new ones"),
+):
+    """Sync files from a directory into the knowledge base (background task).
+
+    Returns immediately with a task_id. Use GET /by-id/{base_id}/sync-status to poll progress.
+    """
+    manager = get_base_manager()
+    kb = manager.get_base(base_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base not found: {base_id}")
+
+    # Check for already running task
+    existing = _sync_task_manager.get_active_task_for_base(base_id)
+    if existing:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "detail": "A sync task is already running for this knowledge base",
+                "task_id": existing.task_id,
+                "status": existing.to_dict(),
+            },
+        )
+
+    # Validate inputs before creating task
+    scan_path = dir_path or kb.settings.watch_dir
+    if not scan_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No directory path configured. Set watch_dir in knowledge base settings or provide dir_path parameter.",
+        )
+    directory = Path(scan_path).expanduser().resolve()
+    if not directory.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Directory does not exist: {scan_path}",
+        )
+
+    # Create background task
+    task = _sync_task_manager.create_task(base_id, force_rebuild)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A sync task is already running for this knowledge base")
+
+    # Fire-and-forget background coroutine
+    asyncio.create_task(_run_sync_task(task, base_id, dir_path, force_rebuild))
+
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={
+            "task_id": task.task_id,
+            "base_id": base_id,
+            "status": "pending",
+            "message": "Sync task started",
         },
     )
 
 
+@router.get("/by-id/{base_id}/sync-status")
+async def get_sync_status(base_id: str):
+    """Get the sync task status for a knowledge base."""
+    # Check active task first
+    task = _sync_task_manager.get_active_task_for_base(base_id)
+    if not task:
+        # No active task - return idle status
+        return {"base_id": base_id, "status": "idle", "task_id": None}
+    return task.to_dict()
+
+
+@router.get("/sync-task/{task_id}")
+async def get_sync_task_status(task_id: str):
+    """Get a specific sync task status by task_id."""
+    task = _sync_task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task not found: {task_id}")
+    return task.to_dict()
+
+
+@router.post("/by-id/{base_id}/sync-cancel")
+async def cancel_sync(base_id: str):
+    """Cancel the active sync task for a knowledge base.
+
+    Force-cancels any running or pending sync task and marks it as failed.
+    """
+    task = _sync_task_manager.cancel_task(base_id)
+    if not task:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"detail": "No active task for this knowledge base", "base_id": base_id},
+        )
+    return JSONResponse(
+    status_code=status.HTTP_200_OK, content=task.to_dict())
 @router.post("/by-id/{base_id}/auto-sync")
 async def trigger_auto_sync(base_id: str):
     """Manually trigger auto-sync for a knowledge base
