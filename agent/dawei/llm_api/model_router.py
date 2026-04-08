@@ -516,8 +516,7 @@ def load_model_router_config(workspace_root: Path | str) -> RouterConfig:
     优先级：
     1. .dawei/model_router.json (工作区配置)
     2. ~/.dawei/model_router.json (用户配置)
-    3. /etc/dawei/model_router.json (系统配置)
-    4. 默认配置
+    3. 默认配置
 
     Args:
         workspace_root: 工作区路径（Path 或 str）
@@ -532,7 +531,6 @@ def load_model_router_config(workspace_root: Path | str) -> RouterConfig:
     config_paths = [
         workspace_root / ".dawei" / "model_router.json",
         get_dawei_home() / "model_router.json",
-        Path("/etc/dawei/model_router.json"),
     ]
 
     for config_path in config_paths:

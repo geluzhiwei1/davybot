@@ -25,11 +25,10 @@ logger = logging.getLogger(__name__)
 class PluginLoader:
     """Load plugins from filesystem directories.
 
-    Supports 4-tier discovery:
+    Supports 3-tier discovery:
     1. builtin - Built-in plugins (rarely used)
-    2. system - System-wide plugins (/etc/dawei/plugins/)
-    3. user - User-specific plugins (~/.dawei/plugins/)
-    4. workspace - Workspace-specific plugins ({workspace}/.dawei/plugins/)
+    2. user - User-specific plugins (~/.dawei/plugins/)
+    3. workspace - Workspace-specific plugins ({workspace}/.dawei/plugins/)
     """
 
     def __init__(self):

@@ -13,18 +13,6 @@
     </el-alert>
 
     <el-collapse v-model="activeSections" class="security-sections">
-      <!-- 路径安全配置 -->
-      <el-collapse-item
-        name="path-security"
-        :title="t('workspace.settings.security.pathSecurity.title')"
-      >
-        <PathSecuritySection
-          v-model="localSettings"
-          :is-user-level="false"
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
       <!-- 命令执行安全配置 -->
       <el-collapse-item
         name="command-security"
@@ -48,66 +36,6 @@
           @update:model-value="handleUpdate"
         />
       </el-collapse-item>
-
-      <!-- 模式权限配置 -->
-      <el-collapse-item
-        name="mode-permissions"
-        :title="t('workspace.settings.security.modePermissions.title')"
-      >
-        <ModePermissionsSection
-          v-model="localSettings"
-          :is-user-level="false"
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 工具权限配置 -->
-      <el-collapse-item
-        name="tool-permissions"
-        :title="t('workspace.settings.security.toolPermissions.title')"
-      >
-        <ToolPermissionsSection
-          v-model="localSettings"
-          :is-user-level="false"
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 网络安全配置 -->
-      <el-collapse-item
-        name="network-security"
-        :title="t('workspace.settings.security.network.title')"
-      >
-        <NetworkSecuritySection
-          v-model="localSettings"
-          :is-user-level="false"
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 资源限制配置 -->
-      <el-collapse-item
-        name="resource-limits"
-        :title="t('workspace.settings.security.resource.title')"
-      >
-        <ResourceLimitsSection
-          v-model="localSettings"
-          :is-user-level="false"
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 高级安全选项 -->
-      <el-collapse-item
-        name="advanced-security"
-        :title="t('workspace.settings.security.advanced.title')"
-      >
-        <AdvancedSecuritySection
-          v-model="localSettings"
-          :is-user-level="false"
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
     </el-collapse>
 
     <div class="security-actions">
@@ -126,18 +54,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { WorkspaceSecurityApiService } from '@/services/api/security';
-import PathSecuritySection from '@/components/workspace/security/PathSecuritySection.vue';
 import CommandSecuritySection from '@/components/workspace/security/CommandSecuritySection.vue';
 import SandboxConfigSection from '@/components/workspace/security/SandboxConfigSection.vue';
-import ModePermissionsSection from '@/components/workspace/security/ModePermissionsSection.vue';
-import ToolPermissionsSection from '@/components/workspace/security/ToolPermissionsSection.vue';
-import NetworkSecuritySection from '@/components/workspace/security/NetworkSecuritySection.vue';
-import ResourceLimitsSection from '@/components/workspace/security/ResourceLimitsSection.vue';
-import AdvancedSecuritySection from '@/components/workspace/security/AdvancedSecuritySection.vue';
 import type { WorkspaceSecuritySettings } from '@/services/api/types';
 
 const props = defineProps<{
@@ -145,16 +67,23 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const localSettings = ref<WorkspaceSecuritySettings>({
-  enablePathTraversalProtection: true,
-  allowAbsolutePaths: false,
-  allowedFileExtensions: [],
-  deniedFileExtensions: [],
-  maxFileSizeMb: 100,
-  // ... 其他默认值
-});
+const defaultWorkspaceSecurity: WorkspaceSecuritySettings = {
+  enableCommandWhitelist: true,
+  useSystemCommandWhitelist: true,
+  customAllowedCommands: [],
+  customDeniedCommands: [],
+  allowShellCommands: false,
+  allowBackgroundCommands: false,
+  allowPipeCommands: false,
+  commandExecutionTimeout: 30,
+  enableSandbox: true,
+  sandboxMode: 'disabled',
+  allowSandboxFallback: true,
+};
+
+const localSettings = ref<WorkspaceSecuritySettings>({ ...defaultWorkspaceSecurity });
 const saving = ref(false);
-const activeSections = ref(['path-security']);
+const activeSections = ref(['command-security']);
 
 const handleUpdate = (value: WorkspaceSecuritySettings) => {
   localSettings.value = value;
@@ -213,7 +142,7 @@ const loadSettings = async () => {
     const api = new WorkspaceSecurityApiService(props.workspaceId);
     const response = await api.getWorkspaceSecuritySettings();
     if (response.success && response.settings) {
-      localSettings.value = response.settings as WorkspaceSecuritySettings;
+      localSettings.value = { ...defaultWorkspaceSecurity, ...response.settings } as WorkspaceSecuritySettings;
     }
   } catch (error) {
     console.error('Failed to load workspace security settings:', error);

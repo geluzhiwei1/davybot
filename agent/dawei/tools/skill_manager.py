@@ -10,6 +10,9 @@ from typing import List, Dict
 3. Resources - 访问额外资源文件
 
 优先级（从高到低）：
+1. Workspace: {workspace}/.dawei/skills/
+2. User: ~/.dawei/skills/ (DAWEI_HOME)
+3. Roo Code: ~/.roo/skills/
 
 """
 
@@ -86,13 +89,15 @@ class SkillManager:
 
         Args:
             skills_roots: 包含.dawei目录的根路径列表（优先级从高到低）
-                          例如: [workspace_root, system_root, user_root]
+                          例如: [workspace_root, user_root]
             current_mode: 当前模式（用于mode-specific skills）
 
         """
         # 默认roots：DAWEI_HOME目录
         self.skills_roots = skills_roots or [get_dawei_home()]
         self.current_mode = current_mode
+        # Roo Code兼容路径（最低优先级）
+        self._roo_home = Path.home() / ".roo"
 
         # skill注册表: name -> List[Skill]
         # 同一个name可能有多个Skill（不同scope/mode）
@@ -107,10 +112,14 @@ class SkillManager:
         支持多级加载机制：
         - Workspace级别 (最高优先级)
         - User级别 (DAWEI_HOME)
+        - Roo Code兼容级别 (~/.roo, 最低优先级)
 
         每个级别都尝试：
         - .dawei/skills/ (市场安装的技能)
         - .dawei/skills-{mode}/ (模式特定的技能)
+
+        Roo Code兼容路径：
+        - ~/.roo/skills/ (最低优先级)
 
         Args:
             force: 是否强制重新发现
@@ -125,13 +134,8 @@ class SkillManager:
         for priority, root in enumerate(self.skills_roots):
             logger.debug(f"Scanning skills root (priority {priority}): {root}")
 
-            # 根据优先级确定scope
-            if priority == 0:
-                scope = "workspace"
-            elif priority == len(self.skills_roots) - 1:
-                scope = "user"
-            else:
-                scope = "system"
+            # 根据优先级确定scope: workspace > user
+            scope = "workspace" if priority == 0 else "user"
 
             # 1. 通用的 .dawei/skills/ (市场安装的技能)
             market_skills_dir = root / ".dawei" / "skills"
@@ -148,12 +152,12 @@ class SkillManager:
                         scope=scope,
                     )
 
-            # 3. Roo Code 兼容: .roo/skills/
+            # 3. Roo Code 兼容: .roo/skills/ (workspace/user级别下)
             roo_skills_dir = root / ".roo" / "skills"
             if roo_skills_dir.exists() and roo_skills_dir.is_dir():
                 self._discover_skills_in_dir(roo_skills_dir, mode=None, scope=scope)
 
-            # 4. Roo Code 兼容: .roo/skills-{mode}/
+            # 4. Roo Code 兼容: .roo/skills-{mode}/ (workspace/user级别下)
             if self.current_mode:
                 roo_mode_skills_dir = root / ".roo" / f"skills-{self.current_mode}"
                 if roo_mode_skills_dir.exists() and roo_mode_skills_dir.is_dir():
@@ -162,6 +166,20 @@ class SkillManager:
                         mode=self.current_mode,
                         scope=scope,
                     )
+
+        # 最低优先级: ~/.roo/skills/ (Roo Code全局兼容路径)
+        roo_skills_dir = self._roo_home / "skills"
+        if roo_skills_dir.exists() and roo_skills_dir.is_dir():
+            self._discover_skills_in_dir(roo_skills_dir, mode=None, scope="roo")
+
+        if self.current_mode:
+            roo_mode_skills_dir = self._roo_home / f"skills-{self.current_mode}"
+            if roo_mode_skills_dir.exists() and roo_mode_skills_dir.is_dir():
+                self._discover_skills_in_dir(
+                    roo_mode_skills_dir,
+                    mode=self.current_mode,
+                    scope="roo",
+                )
 
         self._initialized = True
         logger.info(
@@ -270,7 +288,7 @@ class SkillManager:
             reload: 是否重新发现skills
 
         Returns:
-            按优先级排序的skill列表（workspace > system > user, mode-specific > generic）
+            按优先级排序的skill列表（workspace > user > roo, mode-specific > generic）
 
         """
         if reload or not self._initialized:
@@ -280,15 +298,15 @@ class SkillManager:
         all_skills: List[Skill] = []
         seen: set[tuple[str, str | None]] = set()
 
-        # 按新的三级优先级顺序添加
-        # 优先级：workspace > system > user, mode-specific > generic
+        # 按优先级顺序添加
+        # 优先级：workspace > user > roo, mode-specific > generic
         priorities = [
             ("workspace", self.current_mode),
-            ("system", self.current_mode),
             ("user", self.current_mode),
+            ("roo", self.current_mode),
             ("workspace", None),
-            ("system", None),
             ("user", None),
+            ("roo", None),
         ]
 
         for scope, mode in priorities:
@@ -357,10 +375,12 @@ class SkillManager:
 
         # 按优先级排序
         priorities = [
-            ("project", self.current_mode),
-            ("global", self.current_mode),
-            ("project", None),
-            ("global", None),
+            ("workspace", self.current_mode),
+            ("user", self.current_mode),
+            ("roo", self.current_mode),
+            ("workspace", None),
+            ("user", None),
+            ("roo", None),
         ]
 
         for scope, mode in priorities:
@@ -390,10 +410,12 @@ class SkillManager:
 
         # 获取优先级最高的skill
         priorities = [
-            ("project", self.current_mode),
-            ("global", self.current_mode),
-            ("project", None),
-            ("global", None),
+            ("workspace", self.current_mode),
+            ("user", self.current_mode),
+            ("roo", self.current_mode),
+            ("workspace", None),
+            ("user", None),
+            ("roo", None),
         ]
 
         for scope, mode in priorities:

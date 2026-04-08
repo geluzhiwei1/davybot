@@ -226,14 +226,7 @@ const preferences = ref({
 });
 
 // 安全配置
-const securitySettings = ref<UserSecuritySettings>({
-  enablePathTraversalProtection: true,
-  allowAbsolutePaths: false,
-  baseAllowedExtensions: ['.py', '.txt', '.md', '.json'],
-  baseDeniedExtensions: ['.exe', '.dll', '.so'],
-  maxFileSizeMb: 100,
-  // ... 其他默认值
-});
+const securitySettings = ref<UserSecuritySettings>({} as UserSecuritySettings);
 
 const fontMarks = {
   12: '小',

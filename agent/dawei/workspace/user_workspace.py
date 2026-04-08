@@ -141,7 +141,6 @@ class UserWorkspace:
 
         # 安全相关
         self._forbidden_paths: set[str] = set()
-        self._allowed_commands_cache: set[str] | None = None
 
         # 生命周期状态
         self._initialized = False
@@ -261,6 +260,8 @@ class UserWorkspace:
     def is_command_allowed(self, command: str) -> bool:
         """检查命令是否允许执行
 
+        委托给 SecurityManager，根据 enable_command_whitelist 配置决定是否检查白名单。
+
         Args:
             command: 要检查的命令字符串
 
@@ -276,29 +277,42 @@ class UserWorkspace:
         if not command:
             return False
 
-        # 提取命令的第一个单词（命令名称）
-        command_parts = command.strip().split()
-        if not command_parts:
+        from dawei.core.security_manager import security_manager
+
+        sec = security_manager.get_settings()
+
+        # 白名单未启用 → 允许所有命令
+        if not sec.get("enable_command_whitelist", True):
+            logger.debug(f"is_command_allowed: whitelist disabled, allowing '{command[:30]}'")
+            return True
+
+        # 白名单启用 → 检查拒绝列表
+        command_name = command.strip().split()[0] if command.strip() else ""
+        denied_commands = sec.get("denied_commands", [])
+        if command_name in denied_commands:
+            logger.debug(f"is_command_allowed: '{command_name}' in denied_commands")
             return False
 
-        command_name = command_parts[0]
+        # 检查用户自定义允许列表
+        allowed_commands = sec.get("allowed_commands", [])
+        if allowed_commands:
+            # 有自定义列表 → 只允许列表中的命令
+            if command_name not in allowed_commands:
+                # 如果启用了系统白名单，系统白名单中的命令也允许
+                if sec.get("use_system_command_whitelist", True):
+                    from dawei.sandbox.command_whitelist import CommandWhitelist
+                    if command_name in CommandWhitelist.ALLOWED_COMMANDS:
+                        return True
+                logger.debug(f"is_command_allowed: '{command_name}' not in allowed_commands")
+                return False
 
-        # 如果有缓存的允许命令列表，使用缓存
-        if self._allowed_commands_cache is not None:
-            return command_name in self._allowed_commands_cache
+        # 没有自定义列表且启用了系统白名单 → 用系统白名单检查
+        if sec.get("use_system_command_whitelist", True):
+            from dawei.sandbox.command_whitelist import CommandWhitelist
+            is_valid, _ = CommandWhitelist.validate_command(command)
+            return is_valid
 
-        # 从workspace_settings获取允许的命令
-        if self.workspace_settings and hasattr(self.workspace_settings, "allowed_commands"):
-            allowed_commands = self.workspace_settings.allowed_commands
-            if allowed_commands:
-                # 缓存结果
-                self._allowed_commands_cache = set(allowed_commands)
-                return command_name in allowed_commands
-
-        # 如果没有配置允许的命令，默认允许所有命令（向后兼容）
-        logger.debug(
-            f"is_command_allowed: no allowed_commands configured, allowing '{command_name}'",
-        )
+        # 兜底：允许
         return True
 
     @property
@@ -348,6 +362,10 @@ class UserWorkspace:
 
             self._context = await WorkspaceService.get_context(self.absolute_path)
             logger.info(f"  ✓ Acquired WorkspaceContext (refs={self.context.ref_count})")
+
+            # 通知 SecurityManager 当前工作区
+            from dawei.core.security_manager import security_manager
+            security_manager.set_workspace(self.absolute_path)
 
             # 加载工作区信息（使用共享的 persistence_manager）
             await self._load_workspace_info()
@@ -830,7 +848,7 @@ class UserWorkspace:
 
         def find_skills_roots() -> List[Path]:
             """查找所有可能包含skills的根目录
-            返回两个级别的根目录列表（workspace和global user）
+            返回三个级别的根目录列表（workspace、global user、roo code）
 
             路径结构：
             - .dawei/skills/ (dawei 格式)
@@ -925,6 +943,25 @@ class UserWorkspace:
                     )
                     if dawei_home not in roots:
                         roots.append(dawei_home)
+
+            # ===== Level 3: Roo Code全局兼容级别 (最低优先级) =====
+            # 3.1 ~/.roo/skills/
+            roo_home = Path.home() / ".roo"
+            roo_skills_dir = roo_home / "skills"
+            if roo_skills_dir.exists() and any(roo_skills_dir.iterdir()):
+                logger.info("[Level 3: Roo Code] Found ~/.roo/skills")
+                if roo_home not in roots:
+                    roots.append(roo_home)
+
+            # 3.2 ~/.roo/skills-{mode}/
+            if current_mode:
+                roo_mode_skills = roo_home / f"skills-{current_mode}"
+                if roo_mode_skills.exists() and any(roo_mode_skills.iterdir()):
+                    logger.info(
+                        f"[Level 3: Roo Code] Found ~/.roo/skills-{current_mode}",
+                    )
+                    if roo_home not in roots:
+                        roots.append(roo_home)
 
             logger.info(f"Skills discovery: found {len(roots)} root(s) with skills")
             return roots

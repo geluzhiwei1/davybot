@@ -98,7 +98,7 @@ class ChatHandler(AsyncMessageHandler):
 
     # 配置常量
     DEFAULT_MAX_CONCURRENT_TASKS = 10
-    DEFAULT_TASK_TIMEOUT = 900.0  # 15分钟（支持大型HTML/代码生成）
+    DEFAULT_TASK_TIMEOUT = None  # 不限制整体任务时间，由单次 LLM/工具超时保护
     DEFAULT_RETRY_ATTEMPTS = 2
     DEFAULT_RETRY_DELAY = 1.0
     DEFAULT_MAX_RETRY_DELAY = 10.0

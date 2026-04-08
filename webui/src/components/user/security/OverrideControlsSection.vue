@@ -13,17 +13,6 @@
     </el-alert>
 
     <el-form :model="localValue" label-width="280px" label-position="left">
-      <!-- 路径安全覆盖控制 -->
-      <el-form-item :label="t('userSettings.security.overrideControls.allowOverridePath')">
-        <el-switch
-          v-model="localValue.allowWorkspaceOverridePathSecurity"
-          @change="handleUpdate"
-        />
-        <span class="form-item-help">
-          {{ t('userSettings.security.overrideControls.allowOverridePathHelp') }}
-        </span>
-      </el-form-item>
-
       <!-- 命令执行覆盖控制 -->
       <el-form-item :label="t('userSettings.security.overrideControls.allowOverrideCommand')">
         <el-switch
@@ -53,39 +42,6 @@
         </div>
         <span class="form-item-help">
           {{ t('userSettings.security.overrideControls.allowOverrideSandboxHelp') }}
-        </span>
-      </el-form-item>
-
-      <!-- 工具权限覆盖控制 -->
-      <el-form-item :label="t('userSettings.security.overrideControls.allowOverrideTools')">
-        <el-switch
-          v-model="localValue.allowWorkspaceOverrideToolPermissions"
-          @change="handleUpdate"
-        />
-        <span class="form-item-help">
-          {{ t('userSettings.security.overrideControls.allowOverrideToolsHelp') }}
-        </span>
-      </el-form-item>
-
-      <!-- 网络安全覆盖控制 -->
-      <el-form-item :label="t('userSettings.security.overrideControls.allowOverrideNetwork')">
-        <el-switch
-          v-model="localValue.allowWorkspaceOverrideNetworkSecurity"
-          @change="handleUpdate"
-        />
-        <span class="form-item-help">
-          {{ t('userSettings.security.overrideControls.allowOverrideNetworkHelp') }}
-        </span>
-      </el-form-item>
-
-      <!-- 资源限制覆盖控制 -->
-      <el-form-item :label="t('userSettings.security.overrideControls.allowOverrideResources')">
-        <el-switch
-          v-model="localValue.allowWorkspaceOverrideResourceLimits"
-          @change="handleUpdate"
-        />
-        <span class="form-item-help">
-          {{ t('userSettings.security.overrideControls.allowOverrideResourcesHelp') }}
         </span>
       </el-form-item>
     </el-form>

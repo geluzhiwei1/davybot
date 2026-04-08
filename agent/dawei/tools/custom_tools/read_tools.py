@@ -1,9 +1,9 @@
 # Copyright (c) 2025 格律至微
-from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import ast
 import logging
+import subprocess
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -35,8 +35,11 @@ class ReadFileTool(CustomBaseTool):
     """Tool for reading file contents."""
 
     name: str = "read_file"
-    description: str = "Reads the contents of one or more files. All file paths are relative to the current workspace directory. The tool outputs line-numbered content for easy reference."
+    description: str = "Reads the contents of files. Supports plain text files (with line numbers) and binary document formats (PDF, DOCX, DOC → extracted as plain text). All file paths are relative to the current workspace directory."
     args_schema: type[BaseModel] = ReadFileInput
+
+    # Binary document extensions that need special parsing
+    DOCUMENT_EXTENSIONS: set[str] = {".pdf", ".docx", ".doc"}
 
     @safe_tool_operation("read_file", fallback_value="Error: Failed to read file")
     def _run(
@@ -117,6 +120,20 @@ class ReadFileTool(CustomBaseTool):
         if not Path(full_path).exists():
             return f"Error: File not found at {Path(full_path).name}"
 
+        # Dispatch: binary documents vs plain text
+        extension = Path(full_path).suffix.lower()
+        if extension in self.DOCUMENT_EXTENSIONS:
+            return self._read_document(full_path, extension)
+
+        return self._read_text_file(full_path, start_line, end_line)
+
+    def _read_text_file(
+        self,
+        full_path: str | Path,
+        start_line: int | None = None,
+        end_line: int | None = None,
+    ) -> str:
+        """Read plain text file with optional line range and line numbers."""
         with Path(full_path).open(encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
 
@@ -133,6 +150,123 @@ class ReadFileTool(CustomBaseTool):
             numbered_lines.append(f"{i} | {line.rstrip()}")
 
         return "\n".join(numbered_lines)
+
+    def _read_document(self, full_path: str | Path, extension: str) -> str:
+        """Read binary document (PDF/DOCX/DOC) and return extracted text."""
+        if extension == ".pdf":
+            return self._read_pdf(full_path)
+        if extension == ".docx":
+            return self._read_docx(full_path)
+        if extension == ".doc":
+            return self._read_doc(full_path)
+        return f"Error: Unsupported document format: {extension}"
+
+    @safe_tool_operation("read_pdf", fallback_value="Error: Failed to read PDF")
+    def _read_pdf(self, file_path: str | Path) -> str:
+        """Extract text from PDF file using PyMuPDF."""
+        try:
+            import fitz  # PyMuPDF
+        except ImportError:
+            return "Error: PyMuPDF (fitz) not installed. Install with: pip install PyMuPDF"
+
+        doc = fitz.open(str(file_path))
+        pages = []
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            text = page.get_text("text")
+            pages.append(f"--- Page {page_num + 1} ---\n{text}")
+        return "\n".join(pages)
+
+    @safe_tool_operation("read_docx", fallback_value="Error: Failed to read DOCX")
+    def _read_docx(self, file_path: str | Path) -> str:
+        """Extract text from DOCX file using python-docx."""
+        try:
+            import docx
+        except ImportError:
+            return "Error: python-docx not installed. Install with: pip install python-docx"
+
+        doc = docx.Document(str(file_path))
+        paragraphs = []
+        for para in doc.paragraphs:
+            if para.style.name.startswith("Heading 1"):
+                paragraphs.append(f"# {para.text}")
+            elif para.style.name.startswith("Heading 2"):
+                paragraphs.append(f"## {para.text}")
+            elif para.style.name.startswith("Heading 3"):
+                paragraphs.append(f"### {para.text}")
+            else:
+                paragraphs.append(para.text)
+        return "\n".join(paragraphs)
+
+    @safe_tool_operation("read_doc", fallback_value="Error: Failed to read DOC")
+    def _read_doc(self, file_path: str | Path) -> str:
+        """Extract text from legacy .doc file.
+
+        Tries antiword, catdoc, libreoffice in order.
+        Falls back to python-docx2txt if available.
+        """
+        # Strategy 1: antiword (lightweight, best for simple docs)
+        try:
+            result = subprocess.run(
+                ["antiword", str(file_path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+        # Strategy 2: catdoc
+        try:
+            result = subprocess.run(
+                ["catdoc", str(file_path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+        # Strategy 3: libreoffice headless conversion
+        try:
+            result = subprocess.run(
+                [
+                    "libreoffice",
+                    "--headless",
+                    "--convert-to",
+                    "txt:Text",
+                    "--outdir",
+                    str(Path(file_path).parent),
+                    str(file_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0:
+                txt_path = Path(file_path).with_suffix(".txt")
+                if txt_path.exists():
+                    text = txt_path.read_text(encoding="utf-8", errors="replace")
+                    txt_path.unlink(missing_ok=True)  # clean up temp file
+                    return text
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+        # Strategy 4: python-docx2txt (handles both .doc and .docx)
+        try:
+            import docx2txt
+
+            text = docx2txt.process(str(file_path))
+            if text.strip():
+                return text
+        except ImportError:
+            pass
+
+        return "Error: Cannot read .doc file. Install one of: antiword (apt install antiword), catdoc (apt install catdoc), libreoffice, or pip install docx2txt"
 
 
 # List Files Tool
@@ -312,7 +446,7 @@ class ListCodeDefinitionsTool(CustomBaseTool):
         return "\n".join(definitions) if definitions else "No code definitions found"
 
     @safe_tool_operation("extract_definitions", fallback_value="Error: Failed to parse file")
-    def _extract_definitions(self, file_path: str) -> List[str]:
+    def _extract_definitions(self, file_path: str) -> list[str]:
         """Extract definitions from a Python file."""
         definitions = []
 

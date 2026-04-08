@@ -336,7 +336,7 @@ class AsyncTaskManagerConfig:
     """异步任务管理器配置"""
 
     max_concurrent_tasks: int = 10
-    default_timeout: float = 900.0  # 15分钟（支持大型HTML/代码生成）
+    default_timeout: float | None = None  # 不限制整体任务时间，由单次 LLM/工具超时保护
     checkpoint_interval: int = 30  # 30秒
     cleanup_interval: int = 60  # 60秒
     enable_metrics: bool = True

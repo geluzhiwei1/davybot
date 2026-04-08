@@ -360,8 +360,8 @@ class TaskNodeExecutionEngine:
 
         # 使用固定超时时间（默认值为原来的3倍）
         # 如果用户未指定，使用默认值
-        final_llm_timeout = llm_timeout if llm_timeout is not None else 1800.0  # 30分钟 (600 * 3)
-        final_tool_timeout = tool_execution_timeout if tool_execution_timeout is not None else 900.0  # 15分钟 (300 * 3)
+        final_llm_timeout = llm_timeout if llm_timeout is not None else 300.0   # 5分钟
+        final_tool_timeout = tool_execution_timeout if tool_execution_timeout is not None else 900.0  # 15分钟
 
         self.logger.info(
             f"Timeout configuration for task '{self.task_node.mode or 'unknown'}': LLM={final_llm_timeout:.0f}s, Tools={final_tool_timeout:.0f}s",

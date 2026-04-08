@@ -39,6 +39,7 @@ from typing import List, Dict, Any
 from dawei.sandbox.command_whitelist import CommandWhitelist
 from dawei.sandbox.sandbox_manager import SandboxConfig, SandboxManager
 from dawei.core.super_mode import is_super_mode_enabled, log_security_bypass
+from dawei.core.security_manager import security_manager
 
 logger = logging.getLogger(__name__)
 
@@ -142,18 +143,27 @@ class SecureCommandExecutor:
 
         logger.info(f"[SECURE_EXECUTOR] 执行命令: {command[:50]}...")
 
-        # 1. 验证命令白名单
-        is_valid, error_msg = self.whitelist.validate_command(command)
-        if not is_valid:
-            logger.warning(f"[SECURE_EXECUTOR] 命令验证失败: {error_msg}")
-            return {
-                "success": False,
-                "error": error_msg,
-                "stdout": "",
-                "stderr": error_msg,
-                "exit_code": -1,
-                "execution_time": 0,
-            }
+        # 获取安全配置
+        sec = security_manager.get_settings()
+
+        # 1. 检查是否启用白名单
+        if sec.get("enable_command_whitelist", True):
+            is_valid, error_msg = self.whitelist.validate_command(command)
+            if not is_valid:
+                logger.warning(f"[SECURE_EXECUTOR] 命令验证失败: {error_msg}")
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "stdout": "",
+                    "stderr": error_msg,
+                    "exit_code": -1,
+                    "execution_time": 0,
+                }
+        else:
+            logger.debug("[SECURE_EXECUTOR] 命令白名单已禁用，跳过验证")
+
+        # 从配置获取超时时间
+        self._timeout = sec.get("command_execution_timeout", 30)
 
         # 2. 尝试使用沙箱
         if self.execution_mode == "docker" and self.sandbox_available:
@@ -207,6 +217,7 @@ class SecureCommandExecutor:
     def _execute_with_subprocess(self, command: str, workspace_path: Path) -> Dict[str, Any]:
         """使用subprocess执行(带限制)"""
         start_time = time.time()
+        timeout = getattr(self, "_timeout", 30)
 
         try:
             # 解析命令
@@ -233,7 +244,7 @@ class SecureCommandExecutor:
                 cwd=workspace_path,
                 capture_output=True,
                 text=True,
-                timeout=30,  # 超时
+                timeout=timeout,
                 env=env,
             )
 
@@ -259,7 +270,7 @@ class SecureCommandExecutor:
                 "success": False,
                 "error": "Command timeout",
                 "stdout": "",
-                "stderr": "Command execution timeout (30s)",
+                "stderr": f"Command execution timeout ({timeout}s)",
                 "exit_code": -1,
                 "execution_time": execution_time,
             }

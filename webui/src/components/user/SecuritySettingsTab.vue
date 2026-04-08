@@ -24,18 +24,6 @@
         />
       </el-collapse-item>
 
-      <!-- 路径安全配置 -->
-      <el-collapse-item
-        name="path-security"
-        :title="t('workspace.settings.security.pathSecurity.title')"
-      >
-        <PathSecuritySection
-          v-model="localSettings"
-          is-user-level
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
       <!-- 命令执行安全配置 -->
       <el-collapse-item
         name="command-security"
@@ -54,66 +42,6 @@
         :title="t('workspace.settings.security.sandbox.title')"
       >
         <SandboxConfigSection
-          v-model="localSettings"
-          is-user-level
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 资源限制配置 -->
-      <el-collapse-item
-        name="resource-limits"
-        :title="t('workspace.settings.security.resource.title')"
-      >
-        <ResourceLimitsSection
-          v-model="localSettings"
-          is-user-level
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 模式权限配置 -->
-      <el-collapse-item
-        name="mode-permissions"
-        :title="t('workspace.settings.security.modePermissions.title')"
-      >
-        <ModePermissionsSection
-          v-model="localSettings"
-          is-user-level
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 工具权限配置 -->
-      <el-collapse-item
-        name="tool-permissions"
-        :title="t('workspace.settings.security.toolPermissions.title')"
-      >
-        <ToolPermissionsSection
-          v-model="localSettings"
-          is-user-level
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 网络安全配置 -->
-      <el-collapse-item
-        name="network-security"
-        :title="t('workspace.settings.security.network.title')"
-      >
-        <NetworkSecuritySection
-          v-model="localSettings"
-          is-user-level
-          @update:model-value="handleUpdate"
-        />
-      </el-collapse-item>
-
-      <!-- 高级安全选项 -->
-      <el-collapse-item
-        name="advanced-security"
-        :title="t('workspace.settings.security.advanced.title')"
-      >
-        <AdvancedSecuritySection
           v-model="localSettings"
           is-user-level
           @update:model-value="handleUpdate"
@@ -142,14 +70,8 @@ import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { usersSecurityApi } from '@/services/api/security';
 import OverrideControlsSection from './security/OverrideControlsSection.vue';
-import PathSecuritySection from '@/components/workspace/security/PathSecuritySection.vue';
 import CommandSecuritySection from '@/components/workspace/security/CommandSecuritySection.vue';
 import SandboxConfigSection from '@/components/workspace/security/SandboxConfigSection.vue';
-import ResourceLimitsSection from '@/components/workspace/security/ResourceLimitsSection.vue';
-import ModePermissionsSection from '@/components/workspace/security/ModePermissionsSection.vue';
-import ToolPermissionsSection from '@/components/workspace/security/ToolPermissionsSection.vue';
-import NetworkSecuritySection from '@/components/workspace/security/NetworkSecuritySection.vue';
-import AdvancedSecuritySection from '@/components/workspace/security/AdvancedSecuritySection.vue';
 import type { UserSecuritySettings } from '@/services/api/types';
 
 const props = defineProps<{
@@ -161,7 +83,29 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const localSettings = ref<UserSecuritySettings>({ ...props.modelValue });
+
+const defaultUserSecurity: UserSecuritySettings = {
+  enableCommandWhitelist: true,
+  useSystemCommandWhitelist: true,
+  baseAllowedCommands: [],
+  baseDeniedCommands: [],
+  allowShellCommands: false,
+  allowBackgroundCommands: false,
+  allowPipeCommands: false,
+  commandExecutionTimeout: 30,
+  enableSandbox: true,
+  sandboxMode: 'disabled',
+  allowSandboxFallback: true,
+  enforceSandbox: false,
+  containerRuntime: 'auto',
+  dropAllCapabilities: true,
+  noNewPrivileges: true,
+  sandboxDisableNetwork: true,
+  allowWorkspaceOverrideCommandSecurity: true,
+  allowWorkspaceOverrideSandbox: true,
+};
+
+const localSettings = ref<UserSecuritySettings>({ ...defaultUserSecurity, ...props.modelValue });
 const saving = ref(false);
 const activeSections = ref(['override-controls']);
 
@@ -214,8 +158,9 @@ const loadSettings = async () => {
   try {
     const response = await usersSecurityApi.getUserSecuritySettings();
     if (response.success && response.settings) {
-      localSettings.value = response.settings as UserSecuritySettings;
-      emit('update:modelValue', response.settings as UserSecuritySettings);
+      const settings = { ...defaultUserSecurity, ...response.settings } as UserSecuritySettings;
+      localSettings.value = settings;
+      emit('update:modelValue', settings);
     }
   } catch (error) {
     console.error('Failed to load user security settings:', error);

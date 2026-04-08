@@ -50,6 +50,8 @@ dawei server start
 python -m dawei.cli.dawei server start
 # Ctrl + C to exit
 
+# uvicorn dawei.server_app:create_app --reload --host 0.0.0.0 --port 8465
+
 # Access
 http://localhost:8465/app
 

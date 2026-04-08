@@ -71,10 +71,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        <el-table-column label="操作" width="260" align="center" fixed="right">
           <template #default="scope">
             <el-button size="small" @click="viewProvider(scope.row)">查看</el-button>
             <el-button size="small" type="primary" @click="editProvider(scope.row)">编辑</el-button>
+            <el-button size="small" type="success" @click="duplicateProvider(scope.row)">复制</el-button>
             <el-button size="small" type="danger" @click="deleteProvider(scope.row.name)">删除</el-button>
           </template>
         </el-table-column>
@@ -430,6 +431,41 @@ const editProvider = (provider: LLMProvider) => {
   showProviderDialog.value = true;
   // Reset test result
   providerTestResult.value = null;
+};
+
+// 复制Provider（以新建模式打开，填充已有数据）
+const duplicateProvider = (provider: LLMProvider) => {
+  editingProvider.value = null; // null = 新建模式
+  const config = llmSettings.value.allConfigs[provider.name];
+
+  providerForm.value = {
+    name: provider.name + '-copy',
+    apiProvider: config.apiProvider,
+    openAiBaseUrl: config.openAiBaseUrl || '',
+    openAiApiKey: config.openAiApiKey || '',
+    openAiModelId: config.openAiModelId || '',
+    openAiLegacyFormat: config.openAiLegacyFormat || false,
+    openAiHeaders: config.openAiHeaders || {},
+    diffEnabled: config.diffEnabled ?? true,
+    todoListEnabled: config.todoListEnabled ?? true,
+    fuzzyMatchThreshold: config.fuzzyMatchThreshold ?? 1,
+    rateLimitSeconds: config.rateLimitSeconds ?? 0,
+    consecutiveMistakeLimit: config.consecutiveMistakeLimit ?? 3,
+    enableReasoningEffort: config.enableReasoningEffort ?? true,
+    toolChoice: config.toolChoice ?? 'required',
+    temperature: config.temperature ?? 1.0,
+    timeout: config.timeout ?? 600,
+    maxRetries: config.maxRetries ?? 3,
+    retryDelay: config.retryDelay ?? 2.0,
+    saveLocation: (config.source as 'user' | 'workspace') || 'user'
+  };
+
+  customHeadersText.value = Object.keys(providerForm.value.openAiHeaders).length > 0
+    ? JSON.stringify(providerForm.value.openAiHeaders, null, 2)
+    : '';
+
+  providerTestResult.value = null;
+  showProviderDialog.value = true;
 };
 
 // Test provider Tool Call support

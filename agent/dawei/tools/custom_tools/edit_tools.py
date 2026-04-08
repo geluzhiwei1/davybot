@@ -1,9 +1,11 @@
 # Copyright (c) 2025 格律至微
-from typing import List, Dict
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import logging
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -147,25 +149,16 @@ class WriteToFileTool(CustomBaseTool):
     """Tool for creating new files or completely rewriting existing files."""
 
     name: str = "write_to_file"
-    description: str = """Creates new files or completely rewrites existing files with the provided content. All file paths are relative to the current workspace directory.
-
-⚠️ **CRITICAL WARNING - Large Files:**
-For files larger than 200 lines (especially HTML/CSS/JS), use **smart_file_edit** or **apply_diff** instead to avoid response truncation!
-
-**When to use write_to_file:**
-- Creating new files with <200 lines
-- Completely replacing small files (<100 lines)
-- Writing simple configuration files
-
-**When NOT to use write_to_file:**
-❌ Large HTML files (>500 lines) → Use smart_file_edit
-❌ Large code files (>200 lines) → Use apply_diff or smart_file_edit
-❌ Making partial edits → Use apply_diff
-
-**For large files, use:**
-- smart_file_edit: Multiple edits to different sections
-- apply_diff: Single focused edit using SEARCH/REPLACE format"""
+    description: str = (
+        "Creates new files or completely rewrites existing files with the provided content. "
+        "Supports plain text files and binary document formats (DOCX, DOC, PDF). "
+        "For DOCX/DOC/PDF, content is interpreted as Markdown/plain text and converted to the target format. "
+        "All file paths are relative to the current workspace directory."
+    )
     args_schema: type[BaseModel] = WriteToFileInput
+
+    # Extensions that need special binary document writing
+    DOCUMENT_EXTENSIONS: set[str] = {".pdf", ".docx", ".doc"}
 
     @safe_tool_operation("write_to_file", fallback_value="Error: Failed to write file")
     def _run(self, path: str, content: str, line_count: int | None = None) -> str:
@@ -186,7 +179,6 @@ For files larger than 200 lines (especially HTML/CSS/JS), use **smart_file_edit*
         # If we have a workspace directory, use safe path joining
         if workspace_dir:
             try:
-                # Allow common file extensions for code files
                 allowed_extensions: set[str] = {
                     ".py",
                     ".js",
@@ -229,25 +221,398 @@ For files larger than 200 lines (especially HTML/CSS/JS), use **smart_file_edit*
                 logger.exception("Path validation failed: ")
                 return f"Error: Invalid file path - {e!s}"
 
-        # Ensure content ends with newline if not empty
-        if content and not content.endswith("\n"):
-            content += "\n"
-
         # Create directory if it doesn't exist
-        # Handle case where path is a filename in the root directory
         path_obj = Path(path)
         dir_name = path_obj.parent
         if dir_name != Path():
             dir_name.mkdir(parents=True, exist_ok=True)
 
-        # Write content to file
+        # Dispatch: binary documents vs plain text
+        extension = path_obj.suffix.lower()
+        if extension in self.DOCUMENT_EXTENSIONS:
+            return self._write_document(path_obj, extension, content)
+
+        return self._write_text_file(path_obj, content)
+
+    def _write_text_file(self, path_obj: Path, content: str) -> str:
+        """Write plain text file with UTF-8 encoding."""
+        if content and not content.endswith("\n"):
+            content += "\n"
+
         path_obj.write_text(content, encoding="utf-8")
+        return f"File '{path_obj.name}' has been successfully written."
 
-        # Calculate actual lines written
-        content.count("\n")
+    def _write_document(self, path_obj: Path, extension: str, content: str) -> str:
+        """Write binary document from text/Markdown content."""
+        if extension == ".docx":
+            return self._write_docx(path_obj, content)
+        if extension == ".doc":
+            return self._write_doc(path_obj, content)
+        if extension == ".pdf":
+            return self._write_pdf(path_obj, content)
+        return f"Error: Unsupported document format: {extension}"
 
-        "overwrote" if path_obj.exists() else "created"
-        return f"File '{path_obj.name}' has been successfully written with the specified content."
+    @safe_tool_operation("write_docx", fallback_value="Error: Failed to write DOCX")
+    def _write_docx(self, path_obj: Path, content: str) -> str:
+        """Create a valid DOCX from Markdown. Tries pandoc first, falls back to python-docx."""
+        if shutil.which("pandoc"):
+            return self._write_docx_via_pandoc(path_obj, content)
+        return self._write_docx_via_python(path_obj, content)
+
+    # ------------------------------------------------------------------
+    # Strategy 1: pandoc (best quality)
+    # ------------------------------------------------------------------
+    def _write_docx_via_pandoc(self, path_obj: Path, content: str) -> str:
+        """Convert Markdown to DOCX via pandoc. Best format fidelity."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", encoding="utf-8", delete=False) as tmp:
+            tmp.write(content)
+            tmp_md = tmp.name
+
+        try:
+            proc = subprocess.run(
+                ["pandoc", tmp_md, "-o", str(path_obj)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if proc.returncode == 0:
+                return f"File '{path_obj.name}' has been successfully written as DOCX (pandoc)."
+            logger.warning("pandoc failed (rc=%d): %s", proc.returncode, proc.stderr)
+            # Pandoc failed, fall back to python-docx
+            return self._write_docx_via_python(path_obj, content)
+        except subprocess.TimeoutExpired:
+            logger.warning("pandoc timed out, falling back to python-docx")
+            return self._write_docx_via_python(path_obj, content)
+        finally:
+            Path(tmp_md).unlink(missing_ok=True)
+
+    # ------------------------------------------------------------------
+    # Strategy 2: markdown-it-py + python-docx (pure Python fallback)
+    # ------------------------------------------------------------------
+    def _write_docx_via_python(self, path_obj: Path, content: str) -> str:
+        """Convert Markdown to DOCX using markdown-it-py AST + python-docx."""
+        try:
+            from markdown_it import MarkdownIt
+        except ImportError:
+            return "Error: Neither pandoc nor markdown-it-py available. Install pandoc (apt install pandoc) or pip install markdown-it-py python-docx"
+        try:
+            import docx
+        except ImportError:
+            return "Error: python-docx not installed. Install with: pip install python-docx"
+
+        md = MarkdownIt("commonmark", {"html": False}).enable("table")
+        tokens = md.parse(content)
+
+        doc = docx.Document()
+
+        # Set default Chinese-friendly font
+        style = doc.styles["Normal"]
+        style.font.name = "Calibri"
+        style.font.size = docx.shared.Pt(11)
+        try:
+            style.element.rPr.rFonts.set(docx.oxml.ns.qn("w:eastAsia"), "宋体")
+        except Exception:
+            pass
+
+        # State for inline formatting within a paragraph
+        _heading_level = 0
+        _list_type: str | None = None  # "bullet" or "ordered"
+        _list_depth = 0
+        _list_number = 0
+        _in_table = False
+        _table_rows: list[list[str]] = []
+        _table_cols = 0
+
+        i = 0
+        while i < len(tokens):
+            tok = tokens[i]
+
+            # --- Headings ---
+            if tok.type == "heading_open":
+                _heading_level = int(tok.tag[1])  # h1 -> 1, h2 -> 2, ...
+                i += 1
+                continue
+            if tok.type == "heading_close":
+                _heading_level = 0
+                i += 1
+                continue
+            if tok.type == "inline" and _heading_level > 0:
+                text = self._render_inline_text(tok)
+                level = min(_heading_level, 4)
+                doc.add_heading(text, level=level)
+                _heading_level = 0
+                i += 1
+                continue
+
+            # --- Paragraphs ---
+            if tok.type == "paragraph_open":
+                i += 1
+                # Collect inline content
+                if i < len(tokens) and tokens[i].type == "inline":
+                    text = self._render_inline_text(tokens[i])
+                    if text.strip():
+                        doc.add_paragraph(text)
+                    i += 1
+                # skip paragraph_close
+                if i < len(tokens) and tokens[i].type == "paragraph_close":
+                    i += 1
+                continue
+
+            # --- Bullet lists ---
+            if tok.type == "bullet_list_open":
+                _list_type = "bullet"
+                _list_depth += 1
+                i += 1
+                continue
+            if tok.type == "bullet_list_close":
+                _list_type = None
+                _list_depth -= 1
+                i += 1
+                continue
+
+            # --- Ordered lists ---
+            if tok.type == "ordered_list_open":
+                _list_type = "ordered"
+                _list_number = int(tok.attrGet("start") or 1)
+                _list_depth += 1
+                i += 1
+                continue
+            if tok.type == "ordered_list_close":
+                _list_type = None
+                _list_depth = 0
+                _list_number = 0
+                i += 1
+                continue
+
+            # --- List items ---
+            if tok.type == "list_item_open":
+                i += 1
+                # Collect inline content inside the list item
+                text_parts: list[str] = []
+                while i < len(tokens) and tokens[i].type not in (
+                    "list_item_close",
+                    "bullet_list_close",
+                    "ordered_list_close",
+                ):
+                    if tokens[i].type == "inline":
+                        text_parts.append(self._render_inline_text(tokens[i]))
+                    i += 1
+                text = "".join(text_parts)
+                style_name = "List Bullet" if _list_type == "bullet" else "List Number"
+                doc.add_paragraph(text, style=style_name)
+                # skip list_item_close
+                if i < len(tokens) and tokens[i].type == "list_item_close":
+                    i += 1
+                continue
+
+            # --- Tables ---
+            if tok.type == "table_open":
+                _in_table = True
+                _table_rows = []
+                _table_cols = 0
+                i += 1
+                continue
+            if tok.type == "table_close":
+                _in_table = False
+                # Write collected table rows to DOCX
+                if _table_rows:
+                    num_cols = max(len(row) for row in _table_rows) if _table_rows else 0
+                    table = doc.add_table(rows=len(_table_rows), cols=num_cols)
+                    table.style = "Table Grid"
+                    for r_idx, row in enumerate(_table_rows):
+                        for c_idx, cell_text in enumerate(row):
+                            if c_idx < num_cols:
+                                table.cell(r_idx, c_idx).text = cell_text
+                _table_rows = []
+                i += 1
+                continue
+            if tok.type == "tr_open":
+                i += 1
+                current_row: list[str] = []
+                while i < len(tokens) and tokens[i].type != "tr_close":
+                    if tokens[i].type == "inline":
+                        current_row.append(self._render_inline_text(tokens[i]).strip())
+                    i += 1
+                _table_rows.append(current_row)
+                if i < len(tokens) and tokens[i].type == "tr_close":
+                    i += 1
+                continue
+
+            # --- Code blocks ---
+            if tok.type in ("code_block", "fence"):
+                code_text = tok.content.rstrip()
+                if code_text:
+                    para = doc.add_paragraph(code_text)
+                    para.style = doc.styles["Normal"]
+                    for run in para.runs:
+                        run.font.name = "Courier New"
+                        run.font.size = docx.shared.Pt(9)
+                i += 1
+                continue
+
+            # --- Horizontal rules ---
+            if tok.type == "hr":
+                doc.add_paragraph("—")
+                i += 1
+                continue
+
+            # --- Skip everything else ---
+            i += 1
+
+        doc.save(str(path_obj))
+        return f"File '{path_obj.name}' has been successfully written as DOCX (python-docx)."
+
+    @staticmethod
+    def _render_inline_text(tok) -> str:
+        """Render markdown-it inline token children to plain text."""
+        parts: list[str] = []
+        if not hasattr(tok, "children") or not tok.children:
+            return tok.content if tok.content else ""
+
+        for child in tok.children:
+            if child.type == "text":
+                parts.append(child.content)
+            elif child.type in ("softbreak", "hardbreak"):
+                parts.append("\n")
+            elif child.type in ("strong_open", "strong_close", "em_open", "em_close"):
+                pass  # Strip formatting markers for plain text output
+            elif child.type in ("link_open", "link_close"):
+                if child.type == "link_open":
+                    href = child.attrGet("href") or ""
+                    if href:
+                        parts.append("[")
+                else:
+                    href = ""
+                    # Find the matching link_open to get href
+                    parts.append("]")
+            elif child.type == "code_inline":
+                parts.append(f"`{child.content}`")
+            else:
+                parts.append(child.content if child.content else "")
+        return "".join(parts)
+
+    # ------------------------------------------------------------------
+    # DOC: write DOCX first, then convert via libreoffice
+    # ------------------------------------------------------------------
+    @safe_tool_operation("write_doc", fallback_value="Error: Failed to write DOC")
+    def _write_doc(self, path_obj: Path, content: str) -> str:
+        """Create a .doc file by writing DOCX first then converting via libreoffice."""
+        tmp_docx = path_obj.with_suffix(".tmp.docx")
+        result = self._write_docx(tmp_docx, content)
+        if result.startswith("Error:"):
+            tmp_docx.unlink(missing_ok=True)
+            return result
+
+        try:
+            proc = subprocess.run(
+                [
+                    "libreoffice",
+                    "--headless",
+                    "--convert-to",
+                    "doc",
+                    "--outdir",
+                    str(path_obj.parent),
+                    str(tmp_docx),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            tmp_docx.unlink(missing_ok=True)
+
+            if proc.returncode == 0 and path_obj.exists():
+                return f"File '{path_obj.name}' has been successfully written as DOC."
+            return f"Error: libreoffice conversion failed: {proc.stderr.strip()}"
+        except FileNotFoundError:
+            tmp_docx.unlink(missing_ok=True)
+            return "Error: libreoffice not installed. Cannot create .doc files without libreoffice."
+        except subprocess.TimeoutExpired:
+            tmp_docx.unlink(missing_ok=True)
+            return "Error: libreoffice conversion timed out."
+
+    # ------------------------------------------------------------------
+    # PDF: pandoc (best) → fpdf2 (fallback)
+    # ------------------------------------------------------------------
+    @safe_tool_operation("write_pdf", fallback_value="Error: Failed to write PDF")
+    def _write_pdf(self, path_obj: Path, content: str) -> str:
+        """Create a PDF from Markdown. Tries pandoc first, falls back to fpdf2."""
+        if shutil.which("pandoc"):
+            return self._write_pdf_via_pandoc(path_obj, content)
+        return self._write_pdf_via_fpdf(path_obj, content)
+
+    def _write_pdf_via_pandoc(self, path_obj: Path, content: str) -> str:
+        """Convert Markdown to PDF via pandoc."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", encoding="utf-8", delete=False) as tmp:
+            tmp.write(content)
+            tmp_md = tmp.name
+
+        try:
+            proc = subprocess.run(
+                ["pandoc", tmp_md, "-o", str(path_obj)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if proc.returncode == 0:
+                return f"File '{path_obj.name}' has been successfully written as PDF (pandoc)."
+            logger.warning("pandoc pdf failed (rc=%d): %s", proc.returncode, proc.stderr)
+            return self._write_pdf_via_fpdf(path_obj, content)
+        except subprocess.TimeoutExpired:
+            return self._write_pdf_via_fpdf(path_obj, content)
+        finally:
+            Path(tmp_md).unlink(missing_ok=True)
+
+    @safe_tool_operation("write_pdf_fpdf", fallback_value="Error: Failed to write PDF")
+    def _write_pdf_via_fpdf(self, path_obj: Path, content: str) -> str:
+        """Create a PDF from Markdown text using fpdf2 (pure Python fallback)."""
+        try:
+            from fpdf import FPDF
+        except ImportError:
+            return "Error: Neither pandoc nor fpdf2 available. Install pandoc or pip install fpdf2"
+
+        pdf = FPDF()
+        pdf.add_page()
+
+        # Try to register a CJK font
+        cjk_font = None
+        for font_name, font_path in [
+            ("WQY", "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+            ("Noto", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+            ("ARPL", "/usr/share/fonts/truetype/arphic/uming.ttc"),
+        ]:
+            if Path(font_path).exists():
+                pdf.add_font(font_name, "", font_path, uni=True)
+                cjk_font = font_name
+                break
+
+        def set_font(size: int = 11) -> None:
+            if cjk_font:
+                pdf.set_font(cjk_font, size=size)
+            else:
+                pdf.set_font("Helvetica", size=size)
+
+        set_font()
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                pdf.ln(5)
+                continue
+
+            # Count heading level
+            heading_match = re.match(r"^(#{1,4})\s", stripped)
+            if heading_match:
+                level = len(heading_match.group(1))
+                text = stripped[heading_match.end() :]
+                font_size = max(11, 18 - level * 2)
+                set_font(font_size)
+                pdf.multi_cell(0, 8, text)
+                pdf.ln(2)
+            else:
+                set_font()
+                pdf.multi_cell(0, 6, stripped)
+
+        pdf.output(str(path_obj))
+        return f"File '{path_obj.name}' has been successfully written as PDF (fpdf2)."
 
 
 # Enhanced Apply Diff Tool (improved version)
@@ -443,7 +808,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
 
         return -1
 
-    def _verify_diff(self, file_path: str, diff_blocks: List[dict]) -> str:
+    def _verify_diff(self, file_path: str, diff_blocks: list[dict]) -> str:
         """Verify that all diffs were applied correctly."""
         try:
             path_obj = Path(file_path)
@@ -467,7 +832,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
             # Diff block structure error
             return f"Verification failed: Invalid diff block structure - {e!s}"
 
-    def _parse_diff(self, diff: str) -> List[dict]:
+    def _parse_diff(self, diff: str) -> list[dict]:
         """Parse diff content into blocks. Supports both SEARCH/REPLACE and git unified diff formats."""
         # Auto-detect format
         if "<<<<<<< SEARCH" in diff or "<<<<<<< SEARCH" in diff:
@@ -482,7 +847,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
         logger.warning("Unable to detect diff format, trying unified diff parser")
         return self._parse_unified_diff(diff)
 
-    def _parse_search_replace(self, diff: str) -> List[dict]:
+    def _parse_search_replace(self, diff: str) -> list[dict]:
         """Parse SEARCH/REPLACE format diff."""
         blocks = []
         current_block = None
@@ -508,7 +873,7 @@ When editing files larger than 100 lines, split changes into multiple smaller di
 
         return blocks
 
-    def _parse_unified_diff(self, diff: str) -> List[dict]:
+    def _parse_unified_diff(self, diff: str) -> list[dict]:
         """Parse git unified diff format."""
         blocks = []
         lines = diff.split("\n")

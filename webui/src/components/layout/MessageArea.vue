@@ -21,36 +21,23 @@
               <span class="message-sender">你</span>
               <span class="message-time">{{ formatTimestamp(message.timestamp, 'time') }}</span>
             </div>
-            <div class="user-card" :class="{
-              'collapsed': !isUserExpanded(message.id) && !shouldAlwaysExpandUserMessage(message),
-              'always-expand': shouldAlwaysExpandUserMessage(message)
-            }" :data-summary="getUserMessageSummary(message)"
-              @click="!shouldAlwaysExpandUserMessage(message) && toggleUserExpand(message.id)">
+            <div class="user-card">
               <!-- 内容区域 -->
-              <el-collapse-transition>
-                <div v-show="isUserExpanded(message.id) || shouldAlwaysExpandUserMessage(message)"
-                  class="user-message-content">
-                  <div v-for="(contentBlock, index) in message.content"
-                    :key="`${message.id}-${contentBlock.type}-${index}`">
-                    <div v-if="contentBlock.type === ContentType.TEXT" class="user-text-block"
-                      :title="contentBlock.text">{{ contentBlock.text }}</div>
-                    <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="user-text-block"
-                      :title="(contentBlock as unknown).text">{{ (contentBlock as unknown).text }}</div>
-                  </div>
+              <div class="user-message-content">
+                <div v-for="(contentBlock, index) in message.content"
+                  :key="`${message.id}-${contentBlock.type}-${index}`">
+                  <div v-if="contentBlock.type === ContentType.TEXT" class="user-text-block"
+                    :title="contentBlock.text">{{ contentBlock.text }}</div>
+                  <div v-else-if="contentBlock.type === ContentType.SIMPLE_TEXT" class="user-text-block"
+                    :title="(contentBlock as unknown).text">{{ (contentBlock as unknown).text }}</div>
                 </div>
-              </el-collapse-transition>
+              </div>
 
               <!-- 操作按钮 -->
               <div class="message-actions user-actions" @click.stop>
                 <el-button size="small" circle @click.stop="copyMessage(message)">
                   <el-icon>
                     <DocumentCopy />
-                  </el-icon>
-                </el-button>
-                <el-button v-if="!shouldAlwaysExpandUserMessage(message)" size="small" circle
-                  @click.stop="toggleUserExpand(message.id)">
-                  <el-icon :class="{ 'rotate-180': isUserExpanded(message.id) }">
-                    <ArrowDown />
                   </el-icon>
                 </el-button>
               </div>
@@ -128,7 +115,7 @@
                 :class="{ 'clickable': !isToolExpanded(message.id) }">
                 <div class="tool-header-info">
                   <span v-if="getToolMessageSummary(message)" class="tool-summary">{{ getToolMessageSummary(message)
-                    }}</span>
+                  }}</span>
                 </div>
                 <div class="tool-header-actions">
                   <el-button size="small" circle @click.stop="copyMessage(message)">
@@ -239,9 +226,6 @@ const scrollbarRef = ref<InstanceType<typeof ElScrollbar>>();
 const innerRef = ref<HTMLDivElement>();
 const isTyping = ref(false);
 
-// 用户消息展开状态管理
-const userExpandedStates = ref<Map<string, boolean>>(new Map());
-
 // 工具消息展开状态管理
 const toolExpandedStates = ref<Map<string, boolean>>(new Map());
 
@@ -346,40 +330,6 @@ const getToolMessageSummary = (message: ChatMessage) => {
   }
 
   return parts.length > 0 ? parts.join(' · ') : '工具消息'
-}
-
-// 用户消息展开状态管理
-const isUserExpanded = (messageId: string) => {
-  // 默认折叠用户消息
-  return userExpandedStates.value.get(messageId) ?? false
-}
-
-const toggleUserExpand = (messageId: string) => {
-  const currentState = userExpandedStates.value.get(messageId) ?? false
-  userExpandedStates.value.set(messageId, !currentState)
-}
-
-// 判断用户消息是否应该始终展开(单行短文本)
-const shouldAlwaysExpandUserMessage = (message: ChatMessage) => {
-  const textBlocks = message.content.filter(b => b.type === ContentType.TEXT || b.type === ContentType.SIMPLE_TEXT)
-  if (textBlocks.length === 0) return false
-
-  const text = textBlocks[0] as unknown
-  const textContent = text.text || ''
-
-  // 如果文本为空或很短(少于50字符),不折叠
-  return textContent.length <= 50
-}
-
-// 获取用户消息摘要
-const getUserMessageSummary = (message: ChatMessage) => {
-  const textBlocks = message.content.filter(b => b.type === ContentType.TEXT)
-  if (textBlocks.length > 0) {
-    const text = textBlocks[0] as unknown
-    const preview = text.text?.substring(0, 50) || ''
-    return preview + (text.text?.length > 50 ? '...' : '')
-  }
-  return '用户消息'
 }
 
 // Markdown/纯文本模式切换相关方法
@@ -548,38 +498,6 @@ const getMessageModeTitle = (messageId: string) => {
   flex-direction: column;
 }
 
-.user-card.collapsed {
-  cursor: pointer;
-  min-height: 40px;
-}
-
-.user-card.collapsed .user-message-content {
-  display: none;
-}
-
-.user-card.collapsed::before {
-  content: attr(data-summary);
-  color: #94a3b8;
-  font-size: 13px;
-  padding: 10px 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-card::before {
-  display: none;
-}
-
-/* 始终展开的短消息样式 */
-.user-card.always-expand {
-  cursor: default;
-}
-
-.user-card.always-expand .user-message-content {
-  display: block;
-}
-
 /* 用户消息操作按钮 */
 .user-actions {
   display: flex;
@@ -614,11 +532,6 @@ const getMessageModeTitle = (messageId: string) => {
   -moz-user-select: none;
   -ms-user-select: none;
   pointer-events: none;
-}
-
-/* 在折叠状态下隐藏内容区域 */
-.user-card.collapsed .user-message-content {
-  display: none;
 }
 
 .user-card .user-message-content .user-text-block {

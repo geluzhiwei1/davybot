@@ -149,6 +149,11 @@ async def lifespan(app: FastAPI):
         (dawei_home / dir_name).mkdir(parents=True, exist_ok=True)
     print(f"[Dawei Server] Global directories created at {dawei_home}")
 
+    # Load SecurityManager (global singleton for security config)
+    from dawei.core.security_manager import security_manager
+    security_manager.load()
+    print("[Dawei Server] SecurityManager loaded")
+
     # Initialize WebSocket server
     await websocket_server.initialize()
 

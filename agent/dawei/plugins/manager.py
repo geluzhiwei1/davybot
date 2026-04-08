@@ -39,7 +39,7 @@ class PluginManager:
         logger.info(f"PluginManager initialized with workspace: {workspace_path}")
 
     def _init_discovery_paths(self) -> List[Path]:
-        """Initialize 4-tier discovery paths"""
+        """Initialize 3-tier discovery paths"""
         paths = []
 
         # Tier 1: Workspace plugins (highest priority)
