@@ -28,12 +28,12 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@tauri-apps/plugin-clipboard-manager': fileURLToPath(new URL('./src/stubs/tauri-clipboard-stub.ts', import.meta.url)),
-      // Fix incorrect package.json entry points for vue-office
-      '@vue-office/docx': fileURLToPath(new URL('./node_modules/.pnpm/@vue-office+docx@1.6.3_vue-demi@0.14.6_vue@3.5.27_typescript@5.9.3___vue@3.5.27_typescript@5.9.3_/node_modules/@vue-office/docx/lib/v3/index.js', import.meta.url)),
-      '@vue-office/excel': fileURLToPath(new URL('./node_modules/.pnpm/@vue-office+excel@1.7.14_vue-demi@0.14.6_vue@3.5.27_typescript@5.9.3___vue@3.5.27_typescript@5.9.3_/node_modules/@vue-office/excel/lib/v3/index.js', import.meta.url)),
+      // Fix incorrect package.json entry points for vue-office (Vue 3 only)
+      '@vue-office/docx': fileURLToPath(new URL('./node_modules/@vue-office/docx/lib/v3/index.js', import.meta.url)),
+      '@vue-office/excel': fileURLToPath(new URL('./node_modules/@vue-office/excel/lib/v3/index.js', import.meta.url)),
       // Fix CSS imports for vue-office
-      '@vue-office/docx/lib': fileURLToPath(new URL('./node_modules/.pnpm/@vue-office+docx@1.6.3_vue-demi@0.14.6_vue@3.5.27_typescript@5.9.3___vue@3.5.27_typescript@5.9.3_/node_modules/@vue-office/docx/lib', import.meta.url)),
-      '@vue-office/excel/lib': fileURLToPath(new URL('./node_modules/.pnpm/@vue-office+excel@1.7.14_vue-demi@0.14.6_vue@3.5.27_typescript@5.9.3___vue@3.5.27_typescript@5.9.3_/node_modules/@vue-office/excel/lib', import.meta.url)),
+      '@vue-office/docx/lib': fileURLToPath(new URL('./node_modules/@vue-office/docx/lib', import.meta.url)),
+      '@vue-office/excel/lib': fileURLToPath(new URL('./node_modules/@vue-office/excel/lib', import.meta.url)),
     },
   },
   define: {
