@@ -27,6 +27,7 @@
         <MessageStream
           :messages="chatStore.messages"
           :is-thinking="chatStore.isThinking"
+          :connection-status="chatStore.connectionStatus"
           @scroll-to-bottom="scrollToBottom"
         />
       </div>
@@ -285,6 +286,21 @@ watch([() => chatStore.messages, isLoading], scrollToBottom, { deep: true, immed
 
 :deep(.el-textarea__inner::placeholder) {
   color: var(--color-text-tertiary);
+}
+
+/* Disabled state - override Element Plus defaults for visual consistency */
+.message-input-wrapper:has(.is-disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-color: var(--color-border-default);
+  background-color: var(--color-surface-3);
+}
+
+:deep(.el-textarea.is-disabled .el-textarea__inner) {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  -webkit-text-fill-color: var(--color-text-secondary);
 }
 
 /* Button styling */

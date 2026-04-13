@@ -52,7 +52,7 @@ class SecurityManager:
             self._loaded = True
             logger.info(
                 f"SecurityManager loaded: enable_command_whitelist={self._user_settings.enable_command_whitelist}, "
-                f"sandbox_mode={self._user_settings.sandbox_mode}",
+                f"enable_sandbox={self._user_settings.enable_sandbox}",
             )
 
     def set_workspace(self, workspace_path: str | Path) -> None:

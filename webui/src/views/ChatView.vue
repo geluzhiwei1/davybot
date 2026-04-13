@@ -20,6 +20,16 @@
               <el-button :icon="Expand" @click="toggleSidePanel" text circle />
             </el-tooltip>
           </template>
+          <template v-if="!isChatPanelCollapsed">
+            <el-tooltip content="收起聊天区" placement="right">
+              <el-button :icon="Fold" @click="toggleChatPanel" text circle />
+            </el-tooltip>
+          </template>
+          <template v-else>
+            <el-tooltip content="展开聊天区" placement="right">
+              <el-button :icon="Expand" @click="toggleChatPanel" text circle />
+            </el-tooltip>
+          </template>
         </div>
 
         <!-- 下部按钮 -->
@@ -129,7 +139,7 @@
     <MobileBottomNav :open-files-count="openFiles.length" @navigate="handleMobileNavNavigate" />
 
     <!-- 右侧文件内容区 - 桌面端固定,移动端隐藏 -->
-    <el-aside v-if="isRightPanelVisible && !isMobile" class="right-panel" :width="rightPanelWidth + 'px'">
+    <el-aside v-if="isRightPanelVisible && !isMobile" class="right-panel" :class="{ 'right-panel--full': isChatPanelCollapsed }" :width="rightPanelWidth + 'px'">
       <FileContentArea ref="fileContentAreaRef" :files="openFiles" :active-file-id="currentActiveFileId"
         @close-file="handleCloseFile" @update:active-file-id="handleActiveFileChange" @save-file="saveFileContent"
         @update-file-content="updateFileContent" />
@@ -379,7 +389,8 @@ const mainContentWidth = computed({
     // 平板设备使用较小宽度
     if (isTablet.value) return 400;
     // 桌面端：计算剩余空间的50%
-    const availableWidth = window.innerWidth - 60 - sidePanelWidth.value; // 减去activity-bar和sidePanel
+    const sidePanelOffset = isSidePanelCollapsed.value ? 0 : sidePanelWidth.value;
+    const availableWidth = window.innerWidth - 60 - sidePanelOffset;
     return Math.floor(availableWidth * 0.5);
   },
   set: (val) => {
@@ -393,8 +404,11 @@ const rightPanelWidth = computed({
     if (isMobile.value) return window.innerWidth;
     // 平板设备使用较小宽度
     if (isTablet.value) return 400;
-    // 桌面端：计算剩余空间的50%
-    const availableWidth = window.innerWidth - 60 - sidePanelWidth.value; // 减去activity-bar和sidePanel
+    // 桌面端：计算剩余空间
+    const sidePanelOffset = isSidePanelCollapsed.value ? 0 : sidePanelWidth.value;
+    const availableWidth = window.innerWidth - 60 - sidePanelOffset;
+    // 聊天区折叠时占满全部剩余空间，否则占50%
+    if (isChatPanelCollapsed.value) return availableWidth;
     return Math.floor(availableWidth * 0.5);
   },
   set: (val) => {
@@ -534,6 +548,10 @@ onMounted(async () => {
 
 const toggleSidePanel = () => {
   isSidePanelCollapsed.value = !isSidePanelCollapsed.value;
+};
+
+const toggleChatPanel = () => {
+  isChatPanelCollapsed.value = !isChatPanelCollapsed.value;
 };
 
 const fetchFileContent = async (node: { path: string; name: string; is_directory?: boolean }): Promise<{ content: string; type: string }> => {
@@ -1107,7 +1125,11 @@ async function handleFollowupCancel(toolCallId: string) {
   flex-shrink: 0;
   min-width: 100px;
   overflow: hidden;
-  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.03);
+}
+
+.right-panel--full {
+  flex: 1;
+  width: auto !important;
 }
 
 /* ====================
