@@ -14,7 +14,7 @@ from typing import Any
 
 from dawei.entity.lm_messages import AssistantMessage, UserMessage
 from dawei.logg.logging import get_logger
-from dawei.sandbox.lightweight_executor import LightweightSandbox
+from dawei.sandbox.lightweight_executor import CommandExecutor
 from dawei.websocket.protocol import (
     AssistantWebSocketMessage,
     ErrorMessage,
@@ -48,8 +48,8 @@ class SystemCommandHandler:
 
         """
         self._send_message = send_message_callback
-        self.sandbox_executor = LightweightSandbox()
-        logger.info("[SYSTEM_COMMAND] LightweightSandbox initialized (no Docker required)")
+        self.sandbox_executor = CommandExecutor()
+        logger.info("[SYSTEM_COMMAND] CommandExecutor initialized")
 
     async def handle_command(
         self,
@@ -199,11 +199,14 @@ class SystemCommandHandler:
             stderr_limited += f"\n... (output truncated, total {len(stderr)} bytes)"
 
         # 创建包含系统命令结果的 assistant 消息
+        import json
+        from datetime import UTC, datetime
+
         assistant_message = AssistantWebSocketMessage(
             id=str(uuid.uuid4()),
             type=MessageType.ASSISTANT_MESSAGE,
             session_id=session_id,
-            content=[
+            content=json.dumps([
                 {
                     "type": "system_command_result",
                     "command": command,
@@ -213,8 +216,8 @@ class SystemCommandHandler:
                     "execution_time": execution_time,
                     "cwd": str(workspace_path),
                 },
-            ],
-            timestamp=time.time(),
+            ], ensure_ascii=False),
+            timestamp=datetime.now(UTC).isoformat(),
             task_id=task_id,
         )
 

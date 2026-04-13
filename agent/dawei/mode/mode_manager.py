@@ -115,9 +115,11 @@ class ModeConfigLoader:
             modes.update(self._load_dawei_directory(config_dir))
 
         # 然后加载 modes 文件（这样可以覆盖规则加载器创建的默认配置）
-        # 对于 builtin: config_dir/.roomode = builtin/agents/.roomode
-        # 对于 user: config_dir/.roomode = ~/.dawei/agents/.roomode
+        # 对于 builtin: config_dir/.roomode 或 config_dir/modes.yaml
+        # 对于 user: config_dir/.roomode 或 config_dir/modes.yaml
         modes_file = config_dir / ".roomode"
+        if not modes_file.exists():
+            modes_file = config_dir / "modes.yaml"
         if modes_file.exists():
             modes.update(self._load_modes_file(modes_file, modes))
 
@@ -169,12 +171,16 @@ class ModeConfigLoader:
                     modes.update(team_modes)
                     logger.debug(f"Loaded {len(team_modes)} modes from team directory: {team_dir.name}")
 
-        # 路径3: {workspace}/.roomodes (Roo Code 兼容)
-        roomodes_file = workspace_dir / ".roomodes"
+        # 路径3: {workspace}/.roomodes, .roomodes 或 modes.yaml (Roo Code 兼容)
+        roomodes_file = workspace_dir / ".roomode"
+        if not roomodes_file.exists():
+            roomodes_file = workspace_dir / ".roomodes"
+        if not roomodes_file.exists():
+            roomodes_file = workspace_dir / "modes.yaml"
         if roomodes_file.exists():
-            roo_modes = self._load_roomodes_file(roomodes_file, modes)
+            roo_modes = self._load_modes_file(roomodes_file, modes)
             modes.update(roo_modes)
-            logger.debug(f"Loaded {len(roo_modes)} modes from .roomodes")
+            logger.debug(f"Loaded {len(roo_modes)} modes from modes file")
 
         # 路径4: {workspace}/.roo/rules-{mode}/ (Roo Code 规则目录)
         roo_dir = workspace_dir / ".roo"

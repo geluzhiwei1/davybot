@@ -62,6 +62,13 @@ class SecurityManager:
             self._merged = None  # 强制重新合并
             logger.debug(f"SecurityManager: workspace security loaded from {workspace_path}")
 
+    def update_workspace_security(self, settings: dict[str, Any]) -> None:
+        """工作区安全配置变更后调用，更新内存缓存"""
+        with self._lock:
+            self._workspace_security = settings
+            self._merged = None  # 强制重新合并
+            logger.info(f"SecurityManager: workspace security updated, enable_command_whitelist={settings.get('enableCommandWhitelist')}")
+
     def get_settings(self) -> dict[str, Any]:
         """获取合并后的安全配置（所有执行层从这里读取）"""
         if is_super_mode_enabled():
@@ -110,9 +117,9 @@ class SecurityManager:
             return UserSecuritySettings()
 
     def _load_workspace_security(self, workspace_path: str | Path) -> dict[str, Any]:
-        """从 {workspace}/.dawei/security.json 加载工作区级覆盖"""
+        """从工作区 .dawei/settings.json 的 globalSettings.security 加载工作区级覆盖"""
         ws_path = Path(workspace_path)
-        config_file = ws_path / ".dawei" / "security.json"
+        config_file = ws_path / ".dawei" / "settings.json"
 
         if not config_file.exists():
             return {}
@@ -120,9 +127,9 @@ class SecurityManager:
         try:
             with config_file.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-            # 只提取安全相关字段，忽略无关字段
-            security_data = data.get("security", data)
-            logger.debug(f"Workspace security config loaded from {config_file}")
+            security_data = data.get("globalSettings", {}).get("security", {})
+            if security_data:
+                logger.debug(f"Workspace security config loaded from {config_file}")
             return security_data if isinstance(security_data, dict) else {}
         except Exception as e:
             logger.warning(f"Failed to load workspace security config: {e}")
@@ -188,34 +195,10 @@ class SecurityManager:
                 ),
             }
 
-        # === 沙箱配置 ===
-        if user.enforce_sandbox:
-            sandbox = {
-                "enable_sandbox": True,
-                "sandbox_mode": user.sandbox_mode,
-                "allow_sandbox_fallback": user.allow_sandbox_fallback,
-                "container_runtime": user.container_runtime,
-                "drop_all_capabilities": user.drop_all_capabilities,
-                "no_new_privileges": user.no_new_privileges,
-                "sandbox_disable_network": user.sandbox_disable_network,
-            }
-        elif not user.allow_workspace_override_sandbox:
-            sandbox = {
-                "enable_sandbox": user.enable_sandbox,
-                "sandbox_mode": user.sandbox_mode,
-                "allow_sandbox_fallback": user.allow_sandbox_fallback,
-                "container_runtime": user.container_runtime,
-                "drop_all_capabilities": user.drop_all_capabilities,
-                "no_new_privileges": user.no_new_privileges,
-                "sandbox_disable_network": user.sandbox_disable_network,
-            }
-        else:
+        # === 容器沙箱配置 ===
+        if user.allow_workspace_override_sandbox:
             sandbox = {
                 "enable_sandbox": ws.get("enableSandbox", user.enable_sandbox),
-                "sandbox_mode": ws.get("sandboxMode", user.sandbox_mode),
-                "allow_sandbox_fallback": ws.get(
-                    "allowSandboxFallback", user.allow_sandbox_fallback,
-                ),
                 "container_runtime": ws.get("containerRuntime", user.container_runtime),
                 "drop_all_capabilities": ws.get(
                     "dropAllCapabilities", user.drop_all_capabilities,
@@ -226,6 +209,14 @@ class SecurityManager:
                 "sandbox_disable_network": ws.get(
                     "sandboxDisableNetwork", user.sandbox_disable_network,
                 ),
+            }
+        else:
+            sandbox = {
+                "enable_sandbox": user.enable_sandbox,
+                "container_runtime": user.container_runtime,
+                "drop_all_capabilities": user.drop_all_capabilities,
+                "no_new_privileges": user.no_new_privileges,
+                "sandbox_disable_network": user.sandbox_disable_network,
             }
 
         return {**command, **sandbox}
@@ -243,8 +234,6 @@ class SecurityManager:
             "allow_pipe_commands": True,
             "command_execution_timeout": 300,
             "enable_sandbox": False,
-            "sandbox_mode": "disabled",
-            "allow_sandbox_fallback": True,
             "container_runtime": "auto",
             "drop_all_capabilities": False,
             "no_new_privileges": False,

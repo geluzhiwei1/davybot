@@ -25,12 +25,13 @@
         />
       </el-collapse-item>
 
-      <!-- 沙箱配置 -->
+      <!-- 容器沙箱配置 -->
       <el-collapse-item
         name="sandbox-config"
         :title="t('workspace.settings.security.sandbox.title')"
       >
         <SandboxConfigSection
+          ref="sandboxConfigRef"
           v-model="localSettings"
           :is-user-level="false"
           @update:model-value="handleUpdate"
@@ -55,6 +56,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import type { InstanceType } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { WorkspaceSecurityApiService } from '@/services/api/security';
@@ -76,9 +78,11 @@ const defaultWorkspaceSecurity: WorkspaceSecuritySettings = {
   allowBackgroundCommands: false,
   allowPipeCommands: false,
   commandExecutionTimeout: 30,
-  enableSandbox: true,
-  sandboxMode: 'disabled',
-  allowSandboxFallback: true,
+  enableSandbox: false,
+  containerRuntime: 'auto',
+  dropAllCapabilities: true,
+  noNewPrivileges: true,
+  sandboxDisableNetwork: true,
 };
 
 const localSettings = ref<WorkspaceSecuritySettings>({ ...defaultWorkspaceSecurity });
@@ -89,6 +93,8 @@ const handleUpdate = (value: WorkspaceSecuritySettings) => {
   localSettings.value = value;
 };
 
+const sandboxConfigRef = ref<InstanceType<typeof SandboxConfigSection>>();
+
 const handleSave = async () => {
   if (!props.workspaceId) {
     ElMessage.error('Workspace ID is required');
@@ -97,6 +103,11 @@ const handleSave = async () => {
 
   saving.value = true;
   try {
+    // 保存前校验沙箱运行时
+    if (sandboxConfigRef.value) {
+      const valid = await sandboxConfigRef.value.validateBeforeSave();
+      if (!valid) return;
+    }
     const api = new WorkspaceSecurityApiService(props.workspaceId);
     const response = await api.updateWorkspaceSecuritySettings(
       localSettings.value

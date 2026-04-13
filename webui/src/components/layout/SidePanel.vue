@@ -353,7 +353,7 @@ const uploadTargetPath = ref('');
 const uploadTargetName = ref('');
 
 // 当前激活的折叠面板（默认展开工作区）
-const activeCollapse = ref(['workspace']);
+const activeCollapse = ref(['workspace', 'conversations']);
 
 // 移动端抽屉模式处理
 const handleCloseMobileDrawer = () => {

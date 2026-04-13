@@ -1,7 +1,7 @@
 <template>
   <div class="sandbox-config-section">
     <el-form :model="localValue" label-width="250px" label-position="left">
-      <!-- 启用沙箱隔离 -->
+      <!-- 启用容器沙箱隔离 -->
       <el-form-item :label="t('workspace.settings.security.sandbox.enableSandbox')">
         <el-switch
           v-model="localValue.enableSandbox"
@@ -12,27 +12,8 @@
         </span>
       </el-form-item>
 
-      <!-- 沙箱模式 -->
-      <el-form-item :label="t('userSettings.security.sandbox.sandboxMode')">
-        <el-radio-group
-          v-model="localValue.sandboxMode"
-          @change="handleUpdate"
-          :disabled="!localValue.enableSandbox"
-        >
-          <el-radio value="docker">Docker/Podman 沙箱</el-radio>
-          <el-radio value="lightweight">轻量级沙箱</el-radio>
-          <el-radio value="disabled">禁用</el-radio>
-        </el-radio-group>
-        <div class="form-item-help">
-          <p><strong>Docker/Podman 沙箱：</strong>完整的容器隔离，最安全但需要容器运行时</p>
-          <p><strong>轻量级沙箱：</strong>使用 firejail 或 chroot，无需容器运行时</p>
-          <p><strong>禁用：</strong>直接在主机执行，不推荐</p>
-        </div>
-      </el-form-item>
-
       <!-- 容器运行时选择 -->
       <el-form-item
-        v-if="localValue.sandboxMode === 'docker'"
         :label="t('userSettings.security.sandbox.containerRuntime')"
       >
         <div class="runtime-selection-wrapper">
@@ -75,18 +56,6 @@
         </el-alert>
       </el-form-item>
 
-      <!-- 允许降级 -->
-      <el-form-item :label="t('workspace.settings.security.sandbox.allowFallback')">
-        <el-switch
-          v-model="localValue.allowSandboxFallback"
-          @change="handleUpdate"
-          :disabled="!localValue.enableSandbox"
-        />
-        <span class="form-item-help">
-          {{ t('workspace.settings.security.sandbox.allowFallbackHelp') }}
-        </span>
-      </el-form-item>
-
       <!-- 用户级：强制使用沙箱 -->
       <el-form-item
         v-if="isUserLevel"
@@ -101,16 +70,13 @@
         </span>
       </el-form-item>
 
-      <!-- Docker沙箱细粒度安全控制 -->
-      <el-divider v-if="localValue.sandboxMode === 'docker'" content-position="left">
-        Docker 沙箱细粒度安全控制
+      <!-- 容器安全控制 -->
+      <el-divider content-position="left">
+        容器安全控制
       </el-divider>
 
       <!-- 移除所有capabilities -->
-      <el-form-item
-        v-if="localValue.sandboxMode === 'docker'"
-        :label="t('userSettings.security.sandbox.dropAllCapabilities')"
-      >
+      <el-form-item :label="t('userSettings.security.sandbox.dropAllCapabilities')">
         <el-switch
           v-model="localValue.dropAllCapabilities"
           @change="handleUpdate"
@@ -122,10 +88,7 @@
       </el-form-item>
 
       <!-- 禁止获得新权限 -->
-      <el-form-item
-        v-if="localValue.sandboxMode === 'docker'"
-        :label="t('userSettings.security.sandbox.noNewPrivileges')"
-      >
+      <el-form-item :label="t('userSettings.security.sandbox.noNewPrivileges')">
         <el-switch
           v-model="localValue.noNewPrivileges"
           @change="handleUpdate"
@@ -137,10 +100,7 @@
       </el-form-item>
 
       <!-- 网络禁用 -->
-      <el-form-item
-        v-if="localValue.sandboxMode === 'docker'"
-        :label="t('userSettings.security.sandbox.sandboxDisableNetwork')"
-      >
+      <el-form-item :label="t('userSettings.security.sandbox.sandboxDisableNetwork')">
         <el-switch
           v-model="localValue.sandboxDisableNetwork"
           @change="handleUpdate"
@@ -189,12 +149,11 @@ const handleUpdate = () => {
 };
 
 // 检测容器运行时
-const detectContainerRuntime = async () => {
+const detectContainerRuntime = async (): Promise<boolean> => {
   detecting.value = true;
   detectionResult.value = null;
 
   try {
-    // 调用后端 API 进行检测
     const response = await fetch('/api/system/container-runtime/detect', {
       method: 'GET',
       headers: {
@@ -208,7 +167,6 @@ const detectContainerRuntime = async () => {
 
     const result = await response.json();
 
-    // 格式化检测结果
     let message = '<div style="line-height: 1.8;">';
 
     if (result.docker?.available) {
@@ -228,7 +186,6 @@ const detectContainerRuntime = async () => {
 
     message += '</div>';
 
-    // 推荐配置
     if (result.podman?.available && !result.docker?.available) {
       message += `<p style="margin-top: 12px; padding: 8px; background: var(--el-color-success-light-9); border-radius: 4px;">💡 推荐使用 <strong>Podman</strong>（更安全，支持 rootless 模式）</p>`;
     } else if (result.docker?.available && !result.podman?.available) {
@@ -245,6 +202,7 @@ const detectContainerRuntime = async () => {
     };
 
     ElMessage.success('容器运行时检测完成');
+    return result.docker?.available || result.podman?.available || false;
   } catch (error) {
     console.error('检测容器运行时失败:', error);
     detectionResult.value = {
@@ -252,10 +210,27 @@ const detectContainerRuntime = async () => {
       message: `<p style="color: var(--el-color-danger);">检测失败: ${error instanceof Error ? error.message : '未知错误'}</p>`
     };
     ElMessage.error('检测容器运行时失败');
+    return false;
   } finally {
     detecting.value = false;
   }
 };
+
+// 保存前校验：启用沙箱时自动检测运行时，不可用则阻止保存
+const validateBeforeSave = async (): Promise<boolean> => {
+  if (!localValue.value.enableSandbox) return true;
+
+  const available = await detectContainerRuntime();
+  if (!available) {
+    ElMessage.warning('未检测到可用的容器运行时（Docker/Podman），无法启用沙箱隔离');
+    localValue.value.enableSandbox = false;
+    handleUpdate();
+    return false;
+  }
+  return true;
+};
+
+defineExpose({ validateBeforeSave });
 </script>
 
 <style scoped lang="scss">

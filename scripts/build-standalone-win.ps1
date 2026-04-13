@@ -26,7 +26,7 @@ function Write-Error { Write-ColorOutput Red @args }
 # Paths
 $ScriptPath = $PSScriptRoot
 $ProjectRoot = Split-Path -Parent $ScriptPath
-$WebDir = Join-Path $ProjectRoot "apps\web"
+$WebDir = Join-Path $ProjectRoot "webui"
 $TauriDir = Join-Path $WebDir "src-tauri"
 $TargetDir = Join-Path $TauriDir "target\release"
 
@@ -76,7 +76,7 @@ Write-Output ""
 
 # Step 1: Prepare Python environment
 Write-Info "[1/5] Preparing Python environment..."
-Set-Location (Join-Path $ProjectRoot "services\agent-api")
+Set-Location (Join-Path $ProjectRoot "agent")
 
 if (-not (Test-Path ".venv")) {
     Write-Output "  Creating virtual environment..."
@@ -92,7 +92,7 @@ Write-Output ""
 # Step 2: Copy Python environment to Tauri
 Write-Info "[2/5] Copying Python environment to Tauri resources..."
 
-$VenvSrc = Join-Path $ProjectRoot "services\agent-api\.venv"
+$VenvSrc = Join-Path $ProjectRoot "agent\.venv"
 $VenvDst = Join-Path $TauriDir "resources\python-env"
 
 if (Test-Path $VenvDst) {

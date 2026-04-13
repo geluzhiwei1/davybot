@@ -98,6 +98,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useConnectionStore } from '@/stores/connection'
+import { useAgentStore } from '@/stores/agent'
 import { Paperclip, Promotion, Document } from '@element-plus/icons-vue'
 import type { ElInput } from 'element-plus'
 import ResourceMention from '@/components/controls/ResourceMention.vue'

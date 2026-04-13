@@ -26,13 +26,15 @@ async def get_workspace_security_settings(
 ) -> SecuritySettingsResponse:
     """获取工作区安全配置"""
     try:
-        # TODO: 从工作区配置中加载安全设置
-        # 这里需要注入 workspace_manager 或其他依赖
         from dawei.workspace.workspace_manager import workspace_manager
 
         workspace = await workspace_manager.get_workspace(workspace_id)
         if not workspace:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workspace {workspace_id} not found")
+
+        # 确保 workspace 已初始化（加载 workspace_settings）
+        if not workspace._initialized:
+            await workspace.initialize()
 
         # 从 WorkspaceSettings 中获取 security 字段
         security_settings = {}
@@ -57,19 +59,26 @@ async def update_workspace_security_settings(
 ) -> SecuritySettingsResponse:
     """更新工作区安全配置"""
     try:
-        # TODO: 更新工作区配置中的安全设置
         from dawei.workspace.workspace_manager import workspace_manager
 
         workspace = await workspace_manager.get_workspace(workspace_id)
         if not workspace:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workspace {workspace_id} not found")
 
+        # 确保 workspace 已初始化（加载 workspace_settings）
+        if not workspace._initialized:
+            await workspace.initialize()
+
         # 更新安全配置
         if workspace.workspace_settings:
             workspace.workspace_settings.security = settings_data
 
-            # TODO: 保存到持久化存储
-            # await workspace.persistence_manager.save_workspace_settings(workspace_id, workspace.workspace_settings.to_dict())
+            # 保存到持久化存储
+            await workspace._save_settings({"security"})
+
+            # 同步更新 SecurityManager 内存缓存
+            from dawei.core.security_manager import security_manager
+            security_manager.update_workspace_security(settings_data)
 
         return SecuritySettingsResponse(success=True, settings=settings_data, message="Workspace security settings updated successfully")
     except HTTPException:
@@ -91,10 +100,20 @@ async def reset_workspace_security_settings(
         if not workspace:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workspace {workspace_id} not found")
 
+        # 确保 workspace 已初始化（加载 workspace_settings）
+        if not workspace._initialized:
+            await workspace.initialize()
+
         # 重置为空配置（将使用用户级配置）
         empty_settings = {}
         if workspace.workspace_settings:
             workspace.workspace_settings.security = empty_settings
+            # 保存到持久化存储
+            await workspace._save_settings({"security"})
+
+            # 同步更新 SecurityManager 内存缓存
+            from dawei.core.security_manager import security_manager
+            security_manager.update_workspace_security(empty_settings)
 
         return SecuritySettingsResponse(success=True, settings=empty_settings, message="Workspace security settings reset (will use user-level settings)")
     except HTTPException:

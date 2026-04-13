@@ -36,12 +36,13 @@
         />
       </el-collapse-item>
 
-      <!-- 沙箱配置 -->
+      <!-- 容器沙箱配置 -->
       <el-collapse-item
         name="sandbox-config"
         :title="t('workspace.settings.security.sandbox.title')"
       >
         <SandboxConfigSection
+          ref="sandboxConfigRef"
           v-model="localSettings"
           is-user-level
           @update:model-value="handleUpdate"
@@ -66,6 +67,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
+import type { InstanceType } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { usersSecurityApi } from '@/services/api/security';
@@ -93,10 +95,7 @@ const defaultUserSecurity: UserSecuritySettings = {
   allowBackgroundCommands: false,
   allowPipeCommands: false,
   commandExecutionTimeout: 30,
-  enableSandbox: true,
-  sandboxMode: 'disabled',
-  allowSandboxFallback: true,
-  enforceSandbox: false,
+  enableSandbox: false,
   containerRuntime: 'auto',
   dropAllCapabilities: true,
   noNewPrivileges: true,
@@ -122,9 +121,16 @@ const handleUpdate = (value: UserSecuritySettings) => {
   emit('update:modelValue', value);
 };
 
+const sandboxConfigRef = ref<InstanceType<typeof SandboxConfigSection>>();
+
 const handleSave = async () => {
   saving.value = true;
   try {
+    // 保存前校验沙箱运行时
+    if (sandboxConfigRef.value) {
+      const valid = await sandboxConfigRef.value.validateBeforeSave();
+      if (!valid) return;
+    }
     const response = await usersSecurityApi.updateUserSecuritySettings(
       localSettings.value
     );

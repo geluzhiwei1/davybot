@@ -528,7 +528,7 @@ export interface ScheduledTaskExecutionsResponse {
 
 // 用户级安全配置（与后端 UserSecuritySettings 对齐，只保留有运行时执行逻辑的字段）
 export interface UserSecuritySettings {
-  // === 命令执行安全配置 ===
+  // === 命令执行安全 ===
   enableCommandWhitelist: boolean;
   useSystemCommandWhitelist: boolean;
   baseAllowedCommands: string[];
@@ -538,16 +538,9 @@ export interface UserSecuritySettings {
   allowPipeCommands: boolean;
   commandExecutionTimeout: number;
 
-  // === 沙箱配置 ===
+  // === 容器沙箱配置 ===
   enableSandbox: boolean;
-  sandboxMode: 'docker' | 'podman' | 'lightweight' | 'disabled';
-  allowSandboxFallback: boolean;
-  enforceSandbox: boolean;
-
-  // === 容器运行时选择 ===
   containerRuntime: 'docker' | 'podman' | 'auto';
-
-  // === 容器沙箱细粒度安全控制 ===
   dropAllCapabilities: boolean;
   noNewPrivileges: boolean;
   sandboxDisableNetwork: boolean;
@@ -559,7 +552,6 @@ export interface UserSecuritySettings {
 
 // 工作区级安全配置
 export interface WorkspaceSecuritySettings {
-  // === 命令执行安全配置 ===
   enableCommandWhitelist: boolean;
   useSystemCommandWhitelist: boolean;
   customAllowedCommands: string[];
@@ -569,15 +561,9 @@ export interface WorkspaceSecuritySettings {
   allowPipeCommands: boolean;
   commandExecutionTimeout: number;
 
-  // === 沙箱配置 ===
+  // === 容器沙箱配置 ===
   enableSandbox: boolean;
-  sandboxMode: 'docker' | 'podman' | 'lightweight' | 'disabled';
-  allowSandboxFallback: boolean;
-
-  // === 容器运行时选择 ===
   containerRuntime?: 'docker' | 'podman' | 'auto';
-
-  // === 容器沙箱细粒度安全控制 ===
   dropAllCapabilities?: boolean;
   noNewPrivileges?: boolean;
   sandboxDisableNetwork?: boolean;

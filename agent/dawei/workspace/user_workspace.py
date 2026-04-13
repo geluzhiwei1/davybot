@@ -281,6 +281,8 @@ class UserWorkspace:
 
         sec = security_manager.get_settings()
 
+        logger.info(f"[is_command_allowed] command='{command[:50]}', enable_command_whitelist={sec.get('enable_command_whitelist', True)}, use_system_command_whitelist={sec.get('use_system_command_whitelist', True)}")
+
         # 白名单未启用 → 允许所有命令
         if not sec.get("enable_command_whitelist", True):
             logger.debug(f"is_command_allowed: whitelist disabled, allowing '{command[:30]}'")
@@ -370,6 +372,11 @@ class UserWorkspace:
             # 加载工作区信息（使用共享的 persistence_manager）
             await self._load_workspace_info()
             logger.info("  ✓ Workspace info loaded")
+
+            # 同步工作区安全设置到 SecurityManager（API 保存到 settings.json，SecurityManager 需要内存缓存）
+            if self.workspace_settings and self.workspace_settings.security:
+                security_manager.update_workspace_security(self.workspace_settings.security)
+                logger.info("  ✓ Workspace security synced to SecurityManager")
 
             # 加载配置
             await self._load_configurations()
@@ -698,6 +705,7 @@ class UserWorkspace:
             "http_proxy": "httpProxy",
             "https_proxy": "httpsProxy",
             "no_proxy": "noProxy",
+            "security": "security",
         }
 
         # 增量更新或全量更新

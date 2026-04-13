@@ -228,8 +228,13 @@ async def update_workspace_llm_settings(
     with settings_file.open("w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
 
-    # 清除工作区的llm_manager缓存，强制重新加载配置
-    workspace.llm_manager = None
+    # 重新加载 LLM 配置（而不是设置为 None，这样所有 Agent 都能立即看到新配置）
+    if workspace.llm_manager:
+        workspace.llm_manager.reload_configs()
+        logger.info(f"Reloaded LLM configs after creating provider '{provider_data.name}'")
+    else:
+        # 如果 llm_manager 已经是 None（已被缓存清除），下次会自动创建新的
+        logger.info("LLM manager was None, will create new instance on next access")
 
     logger.info(f"Updated LLM settings for workspace: {workspace.absolute_path}")
 
@@ -328,8 +333,13 @@ async def create_llm_provider(
     with settings_file.open("w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
 
-    # 清除工作区的llm_manager缓存，强制重新加载配置
-    workspace.llm_manager = None
+    # 重新加载 LLM 配置（而不是设置为 None，这样所有 Agent 都能立即看到新配置）
+    if workspace.llm_manager:
+        workspace.llm_manager.reload_configs()
+        logger.info(f"Reloaded LLM configs after creating provider '{provider_data.name}'")
+    else:
+        # 如果 llm_manager 已经是 None（已被缓存清除），下次会自动创建新的
+        logger.info("LLM manager was None, will create new instance on next access")
 
     location_name = "用户级" if save_location == "user" else "工作区级"
     logger.info(f"Created LLM provider '{provider_data.name}' at {location_name} config: {settings_file}")
@@ -436,8 +446,13 @@ async def update_llm_provider(
     with settings_file.open("w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
 
-    # 清除工作区的llm_manager缓存，强制重新加载配置
-    workspace.llm_manager = None
+    # 重新加载 LLM 配置（而不是设置为 None，这样所有 Agent 都能立即看到新配置）
+    if workspace.llm_manager:
+        workspace.llm_manager.reload_configs()
+        logger.info(f"Reloaded LLM configs after creating provider '{provider_data.name}'")
+    else:
+        # 如果 llm_manager 已经是 None（已被缓存清除），下次会自动创建新的
+        logger.info("LLM manager was None, will create new instance on next access")
 
     logger.info(f"Updated LLM provider: {provider_name}")
 
@@ -654,8 +669,13 @@ async def delete_llm_provider(
     with settings_file.open("w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
 
-    # 清除工作区的llm_manager缓存，强制重新加载配置
-    workspace.llm_manager = None
+    # 重新加载 LLM 配置（而不是设置为 None，这样所有 Agent 都能立即看到新配置）
+    if workspace.llm_manager:
+        workspace.llm_manager.reload_configs()
+        logger.info(f"Reloaded LLM configs after creating provider '{provider_data.name}'")
+    else:
+        # 如果 llm_manager 已经是 None（已被缓存清除），下次会自动创建新的
+        logger.info("LLM manager was None, will create new instance on next access")
 
     logger.info(f"Deleted LLM provider: {provider_name} from {settings_file}")
 

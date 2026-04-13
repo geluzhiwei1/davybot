@@ -141,6 +141,13 @@ class CommandWhitelist:
         },
         "awk": {"max_args": 10, "description": "文本处理"},
         # 系统信息
+        "where": {"max_args": 5, "description": "查找命令位置(Windows)"},
+        "which": {"max_args": 5, "description": "查找命令位置(Unix)"},
+        "uv": {
+            "max_args": 20,
+            "allowed_flags": ["--version", "-V", "pip", "run", "sync", "add", "remove", "init", "venv", "lock", "tree", "cache"],
+            "description": "Python包管理器",
+        },
         "df": {
             "max_args": 5,
             "allowed_flags": ["-h", "-H", "-i", "-T"],

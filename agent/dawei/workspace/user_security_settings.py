@@ -6,9 +6,9 @@
 定义用户的全局默认安全策略，所有工作区继承这些配置
 除非工作区明确覆盖了某些选项
 
-只保留有运行时执行逻辑的配置项：
-- 命令执行安全（SecureCommandExecutor / CommandWhitelist）
-- 沙箱配置（SandboxManager / SandboxConfig）
+配置项：
+- 命令执行安全（CommandExecutor / CommandWhitelist）
+- 容器沙箱配置（SandboxManager / SandboxConfig）
 """
 
 import logging
@@ -28,24 +28,16 @@ class UserSecuritySettings:
     # === 命令执行安全配置 ===
     enable_command_whitelist: bool = True
     use_system_command_whitelist: bool = True
-    # 用户级自定义命令白名单（工作区可以添加但不能删除）
     base_allowed_commands: list[str] = field(default_factory=list)
-    # 用户级强制禁用的命令（工作区不能允许）
     base_denied_commands: list[str] = field(default_factory=list)
     allow_shell_commands: bool = False
     allow_background_commands: bool = False
     allow_pipe_commands: bool = False
     command_execution_timeout: int = 30
 
-    # === 沙箱配置 ===
-    enable_sandbox: bool = True
-    sandbox_mode: Literal["docker", "podman", "lightweight", "disabled"] = "disabled"
-    allow_sandbox_fallback: bool = True
-    # 是否强制所有工作区使用沙箱
-    enforce_sandbox: bool = False  # 如果为 True，工作区不能禁用沙箱
-    # 容器运行时选择
+    # === 容器沙箱配置 ===
+    enable_sandbox: bool = False
     container_runtime: Literal["docker", "podman", "auto"] = "auto"
-    # 容器安全控制
     drop_all_capabilities: bool = True
     no_new_privileges: bool = True
     sandbox_disable_network: bool = True
@@ -72,13 +64,9 @@ class UserSecuritySettings:
             allow_background_commands=config_dict.get("allowBackgroundCommands", False),
             allow_pipe_commands=config_dict.get("allowPipeCommands", False),
             command_execution_timeout=config_dict.get("commandExecutionTimeout", 30),
-            # 沙箱
-            enable_sandbox=config_dict.get("enableSandbox", True),
-            sandbox_mode=config_dict.get("sandboxMode", "disabled"),
-            allow_sandbox_fallback=config_dict.get("allowSandboxFallback", True),
-            enforce_sandbox=config_dict.get("enforceSandbox", False),
+            # 容器沙箱
+            enable_sandbox=config_dict.get("enableSandbox", False),
             container_runtime=config_dict.get("containerRuntime", "auto"),
-            # 容器安全控制
             drop_all_capabilities=config_dict.get("dropAllCapabilities", True),
             no_new_privileges=config_dict.get("noNewPrivileges", True),
             sandbox_disable_network=config_dict.get("sandboxDisableNetwork", True),

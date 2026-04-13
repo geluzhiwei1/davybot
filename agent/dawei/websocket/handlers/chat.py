@@ -8,12 +8,12 @@
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from dawei.core.datetime_compat import UTC
 from typing import List, Dict, Any
 
 from dawei.core.events import TaskEvent
-from dawei.sandbox.lightweight_executor import LightweightSandbox
+from dawei.sandbox.lightweight_executor import CommandExecutor
 from dawei.websocket.protocol import (
     AgentCompleteMessage,
     AgentStartMessage,
@@ -130,8 +130,8 @@ class ChatHandler(AsyncMessageHandler):
         self._task_manager.set_completion_callback(self._on_task_completion)
 
         # 初始化轻量级沙箱执行器（无需Docker）
-        self.sandbox_executor = LightweightSandbox()
-        logger.info("[CHAT_HANDLER] LightweightSandbox initialized (no Docker required)")
+        self.sandbox_executor = CommandExecutor()
+        logger.info("[CHAT_HANDLER] CommandExecutor initialized")
 
     def get_supported_types(self) -> List[str]:
         """获取支持的消息类型"""
@@ -2468,11 +2468,13 @@ class ChatHandler(AsyncMessageHandler):
                 stderr_limited += f"\n... (output truncated, total {len(stderr)} bytes)"
 
             # 创建包含系统命令结果的assistant消息
+            import json
+
             assistant_message = AssistantWebSocketMessage(
                 id=str(uuid.uuid4()),
                 type=MessageType.ASSISTANT_MESSAGE,
                 session_id=session_id,
-                content=[
+                content=json.dumps([
                     {
                         "type": "system_command_result",
                         "command": command,
@@ -2482,8 +2484,8 @@ class ChatHandler(AsyncMessageHandler):
                         "execution_time": execution_time,
                         "cwd": str(user_workspace.absolute_path),
                     },
-                ],
-                timestamp=time.time(),
+                ], ensure_ascii=False),
+                timestamp=datetime.now(UTC).isoformat(),
                 task_id=task_id,
             )
 
