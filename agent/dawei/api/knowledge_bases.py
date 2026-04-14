@@ -135,6 +135,17 @@ class SyncTaskManager:
             return task
         return None
 
+    def get_last_task_for_base(self, base_id: str) -> SyncTask | None:
+        """Get the most recent finished task for a knowledge base (completed or failed)."""
+        candidates = [
+            t for t in self._tasks.values()
+            if t.base_id == base_id and t.status in (SyncTaskStatus.COMPLETED, SyncTaskStatus.FAILED)
+        ]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda t: t.finished_at or 0, reverse=True)
+        return candidates[0]
+
     def _cleanup_old_tasks(self) -> None:
         """Keep only the last 100 finished tasks."""
         finished = [(tid, t) for tid, t in self._tasks.items() if t.status in (SyncTaskStatus.COMPLETED, SyncTaskStatus.FAILED)]
@@ -1436,11 +1447,17 @@ async def sync_from_directory(
 
 @router.get("/by-id/{base_id}/sync-status")
 async def get_sync_status(base_id: str):
-    """Get the sync task status for a knowledge base."""
-    # Check active task first
+    """Get the sync task status for a knowledge base.
+
+    Returns active task if running, otherwise the last finished task
+    (so the frontend can see recent errors).
+    """
     task = _sync_task_manager.get_active_task_for_base(base_id)
     if not task:
-        # No active task - return idle status
+        # No active task — check last finished task (may contain errors)
+        last = _sync_task_manager.get_last_task_for_base(base_id)
+        if last:
+            return last.to_dict()
         return {"base_id": base_id, "status": "idle", "task_id": None}
     return task.to_dict()
 

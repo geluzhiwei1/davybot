@@ -33,6 +33,8 @@ ALWAYS_AVAILABLE_TOOLS = {
     "switch_mode",
     "run_slash_command",
     "timer",
+    "search_user_knowledge_base",
+    "query_user_knowledge_base",
 }
 
 # 工具组定义，参考 TypeScript 版本结构

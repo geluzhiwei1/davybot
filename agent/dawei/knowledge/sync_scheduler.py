@@ -90,6 +90,8 @@ class KnowledgeSyncScheduler:
 
     async def _sync_all_enabled(self):
         """Scan all knowledge bases and sync those with watch_enabled."""
+        from dawei.api.knowledge_bases import SyncTaskStatus, _sync_task_manager
+
         bases = self._manager.list_bases()
         for kb in bases.items:
             if not kb.settings.watch_enabled:
@@ -99,15 +101,45 @@ class KnowledgeSyncScheduler:
             if kb.status != "active":
                 continue
 
+            # Skip if a manual sync is already running for this base
+            if _sync_task_manager.get_active_task_for_base(kb.id):
+                continue
+
             try:
                 result = await self._do_sync(kb.id)
-                if result and result.get("imported", 0) > 0:
-                    logger.info(
-                        f"Auto-sync for '{kb.name}' ({kb.id}): "
-                        f"{result.get('imported', 0)} files synced"
-                    )
+
+                # Record result in SyncTaskManager for sync-status API
+                task = _sync_task_manager.create_task(kb.id, force_rebuild=False)
+                if task:
+                    if result and result.get("imported", 0) > 0:
+                        task.status = SyncTaskStatus.COMPLETED
+                        task.result = result
+                        logger.info(
+                            f"Auto-sync for '{kb.name}' ({kb.id}): "
+                            f"{result.get('imported', 0)} files synced"
+                        )
+                    elif result and result.get("errors"):
+                        task.status = SyncTaskStatus.FAILED
+                        task.result = result
+                        task.error = f"{len(result['errors'])} file(s) failed"
+                        logger.error(
+                            f"Auto-sync FAILED for '{kb.name}' ({kb.id}): "
+                            f"{len(result['errors'])} file(s) failed. "
+                            f"First error: {result['errors'][0]}"
+                        )
+                    else:
+                        task.status = SyncTaskStatus.COMPLETED
+                        task.result = result
+                    _sync_task_manager.finish_task(task)
+
             except Exception as e:
                 logger.warning(f"Auto-sync failed for '{kb.name}' ({kb.id}): {e}")
+                # Record exception in SyncTaskManager
+                task = _sync_task_manager.create_task(kb.id, force_rebuild=False)
+                if task:
+                    task.status = SyncTaskStatus.FAILED
+                    task.error = str(e)
+                    _sync_task_manager.finish_task(task)
 
             self._last_sync_at[kb.id] = datetime.now()
 
@@ -282,13 +314,14 @@ class KnowledgeSyncScheduler:
                 logger.error(error_msg, exc_info=True)
                 errors.append(error_msg)
 
-        # Update stats
+        # Update stats — only update last_indexed_at when at least one file succeeded
         kb.stats.total_documents += total_documents
         kb.stats.total_chunks += total_chunks
         kb.stats.total_entities += total_entities
         kb.stats.total_relations += total_relations
         kb.stats.indexed_documents += total_documents
-        kb.stats.last_indexed_at = datetime.now()
+        if total_documents > 0:
+            kb.stats.last_indexed_at = datetime.now()
         kb.stats.last_updated_at = datetime.now()
         kb.updated_at = datetime.now()
         self._manager._save_metadata()

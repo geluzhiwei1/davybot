@@ -463,7 +463,7 @@ class KnowledgeConfig(BaseSettings):
         extra="allow",
     )
 
-    enabled: bool = Field(default=False)
+    enabled: bool = Field(default=True)
     vector_store_type: str = Field(default="sqlite-vec")
     embedding_model: str = Field(default="Qwen/Qwen3-Embedding-0.6B")
     dimension: int = Field(default=1024)

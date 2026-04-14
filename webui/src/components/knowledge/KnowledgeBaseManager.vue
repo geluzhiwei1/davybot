@@ -35,6 +35,10 @@
           <div class="stats">
             <div>{{ row.stats.total_documents }} 文档</div>
             <div>{{ row.stats.total_chunks }} 文档块</div>
+            <div v-if="syncErrors[row.id]" class="sync-error-hint" :title="syncErrors[row.id]">
+              <el-icon><WarningFilled /></el-icon>
+              <span>同步失败</span>
+            </div>
           </div>
         </template>
       </el-table-column>
@@ -359,7 +363,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Upload, UploadFilled, Plus, Refresh } from '@element-plus/icons-vue'
+import { Upload, UploadFilled, Plus, Refresh, WarningFilled } from '@element-plus/icons-vue'
 import { knowledgeBasesApi, knowledgeApi } from '@/services/api/knowledge'
 import type {
   KnowledgeBase,
@@ -418,6 +422,9 @@ const uploadBaseId = ref('')
 const uploadBaseName = ref('')
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const uploadFileList = ref<any[]>([])
+
+// auto-sync 错误提示 (base_id → error message)
+const syncErrors = ref<Record<string, string>>({})
 
 const uploadActionUrl = computed(() => {
   if (uploadBaseId.value) {
@@ -490,12 +497,40 @@ const loadBases = async () => {
   try {
     const response = await knowledgeBasesApi.listBases()
     knowledgeBases.value = response.items
+    // 检查 watch-enabled KB 的 auto-sync 状态
+    await checkSyncErrors(response.items)
   } catch (error) {
     ElMessage.error('加载知识库列表失败')
     console.error(error)
   } finally {
     loading.value = false
   }
+}
+
+/** 对 watch-enabled 且无文档的 KB 查询 sync-status，提取错误信息 */
+const checkSyncErrors = async (bases: KnowledgeBase[]) => {
+  const candidates = bases.filter(
+    b => b.settings?.watch_enabled && b.stats?.total_documents === 0 && b.id,
+  )
+  if (!candidates.length) {
+    syncErrors.value = {}
+    return
+  }
+  const errors: Record<string, string> = {}
+  await Promise.allSettled(
+    candidates.map(async (b) => {
+      try {
+        const status = await knowledgeBasesApi.getSyncStatus(b.id)
+        if (status.status === 'failed') {
+          const detail = status.result?.errors?.[0] || status.error || '同步失败'
+          errors[b.id] = String(detail)
+        }
+      } catch {
+        // 忽略单个查询失败
+      }
+    }),
+  )
+  syncErrors.value = errors
 }
 
 const loadDomains = async () => {
@@ -912,6 +947,19 @@ defineExpose({
   font-size: 12px;
   color: var(--el-text-color-secondary);
   line-height: 1.6;
+}
+
+.sync-error-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--el-color-danger);
+  font-size: 12px;
+  cursor: help;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .upload-demo {

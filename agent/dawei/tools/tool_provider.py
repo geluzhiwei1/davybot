@@ -209,32 +209,37 @@ class CustomToolProvider(ToolProvider):
                 # Level 1: Workspace (优先级最高) - if workspace_path provided
                 if self.workspace_root:
                     ws_path = Path(self.workspace_root)
-                    ws_skills_dir = ws_path / ".dawei" / "skills"
-                    logger.info(f"[Skills] Checking workspace skills: {ws_skills_dir}")
-                    if ws_skills_dir.exists():
-                        skills_roots.append(ws_path)
-                        logger.info(f"[Skills] ✓ Added workspace skills root: {ws_skills_dir}")
+                    has_dawei_skills = (ws_path / ".dawei" / "skills").exists()
+                    has_roo_skills = (ws_path / ".roo" / "skills").exists()
 
-                    # Roo Code 兼容: {workspace}/.roo/skills/
-                    ws_roo_skills_dir = ws_path / ".roo" / "skills"
-                    logger.info(f"[Skills] Checking workspace Roo skills: {ws_roo_skills_dir}")
-                    if ws_roo_skills_dir.exists() and ws_path not in skills_roots:
+                    if has_dawei_skills or has_roo_skills:
                         skills_roots.append(ws_path)
-                        logger.info(f"[Skills] ✓ Added workspace Roo skills root: {ws_roo_skills_dir}")
+                        sources = []
+                        if has_dawei_skills:
+                            sources.append(f".dawei/skills/")
+                        if has_roo_skills:
+                            sources.append(f".roo/skills/")
+                        logger.info(
+                            f"[Skills] ✓ Added workspace root: {ws_path} "
+                            f"(sources: {', '.join(sources)})",
+                        )
 
                 # Level 2: Global user (DAWEI_HOME) - always included
-                global_skills_dir = dawei_home / ".dawei" / "skills"
-                logger.info(f"[Skills] Checking global skills: {global_skills_dir}")
-                if global_skills_dir.exists():
-                    skills_roots.append(dawei_home)
-                    logger.info(f"[Skills] ✓ Added global skills root: {global_skills_dir}")
+                has_global_dawei = (dawei_home / ".dawei" / "skills").exists()
+                has_global_roo = (dawei_home / ".roo" / "skills").exists()
 
-                # Roo Code 兼容: ~/.dawei/.roo/skills/ (global level)
-                global_roo_skills_dir = dawei_home / ".roo" / "skills"
-                logger.info(f"[Skills] Checking global Roo skills: {global_roo_skills_dir}")
-                if global_roo_skills_dir.exists() and dawei_home not in skills_roots:
-                    skills_roots.append(dawei_home)
-                    logger.info(f"[Skills] ✓ Added global Roo skills root: {global_roo_skills_dir}")
+                if has_global_dawei or has_global_roo:
+                    if dawei_home not in skills_roots:
+                        skills_roots.append(dawei_home)
+                    sources = []
+                    if has_global_dawei:
+                        sources.append(f".dawei/skills/")
+                    if has_global_roo:
+                        sources.append(f".roo/skills/")
+                    logger.info(
+                        f"[Skills] ✓ Added global root: {dawei_home} "
+                        f"(sources: {', '.join(sources)})",
+                    )
 
                 # Always create skills tools, even if skills_roots is empty
                 # This allows list_skills to work as a discovery tool

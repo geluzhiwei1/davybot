@@ -441,7 +441,6 @@ class SkillManager:
 
         for skill in skills:
             mode_str = f" [{skill.mode}]" if skill.mode else ""
-            scope_str = f" ({skill.scope}){mode_str}"
-            lines.append(f"- **{skill.name}**{scope_str}: {skill.description}")
+            lines.append(f"- **{skill.name}**{mode_str}: {skill.description}")
 
         return "\n".join(lines)
