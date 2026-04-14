@@ -333,10 +333,12 @@ class ListFilesTool(CustomBaseTool):
         if not Path(full_path).is_dir():
             return f"Error: {Path(full_path).name} is not a directory"
 
+        exclude_dirs = {".dawei", ".roo"}
         result = []
 
         if recursive:
-            for root, _dirs, files in Path(full_path).walk():
+            for root, dirs, files in Path(full_path).walk():
+                dirs[:] = [d for d in dirs if d not in exclude_dirs]
                 # ✅ Cross-platform: Use Path.parts for platform-independent path depth calculation
                 # Calculate relative path depth for proper indentation
                 try:
@@ -355,6 +357,8 @@ class ListFilesTool(CustomBaseTool):
         else:
             items = sorted(Path(full_path).iterdir())
             for item in items:
+                if item.name in exclude_dirs:
+                    continue
                 if item.is_dir():
                     result.append(f"{item.name}/")
                 else:

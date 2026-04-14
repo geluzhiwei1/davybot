@@ -12,6 +12,7 @@ from collections.abc import AsyncGenerator
 from typing import List, Dict, Any
 
 from dawei.core.events import TaskEventType
+from dawei.core.exceptions import LLMContextOverflowError
 from dawei.entity.lm_messages import ToolCall
 from dawei.entity.stream_message import (
     ContentMessage,
@@ -351,6 +352,23 @@ class StreamProcessor:
                     f"Last finish_reason={last_finish_reason}. "
                     f"Response may be TRUNCATED - tool calls with incomplete JSON arguments are likely.",
                 )
+
+            # 检测 context overflow — 立即抛异常，阻止无效重试
+            if last_chunk is not None:
+                choices = last_chunk.get("choices", [])
+                if choices:
+                    raw_reason = choices[0].get("finish_reason", "")
+                    if raw_reason in ("model_context_window_exceeded", "context_overflow"):
+                        logger.error(
+                            f"LLM context window exceeded after {chunk_count} chunks. "
+                            f"finish_reason={raw_reason}. "
+                            f"Caller MUST truncate context before retrying.",
+                        )
+                        raise LLMContextOverflowError(
+                            f"Model context window exceeded (finish_reason={raw_reason}). "
+                            f"Truncate conversation context and retry.",
+                            {"chunk_count": chunk_count, "finish_reason": raw_reason},
+                        )
 
             # 流式结束后，发送完成消息
             try:

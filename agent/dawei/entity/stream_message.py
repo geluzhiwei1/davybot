@@ -415,6 +415,7 @@ def map_finish_reason(finish_reason: str) -> str:
         "tool_calls": "tool_calls",
         "content_filter": "content_filter",
         "function_call": "function_call",
+        "model_context_window_exceeded": "context_overflow",
     }
     return mapping.get(finish_reason, finish_reason)
 

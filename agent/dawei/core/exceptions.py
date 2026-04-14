@@ -176,6 +176,10 @@ class LLMResponseError(LLMError):
     """LLM response error."""
 
 
+class LLMContextOverflowError(LLMError):
+    """LLM model context window exceeded - requires context truncation and retry."""
+
+
 # Workspace Errors
 class WorkspaceError(BaseError):
     """Workspace error."""

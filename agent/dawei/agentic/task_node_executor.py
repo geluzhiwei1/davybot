@@ -478,21 +478,21 @@ class TaskNodeExecutionEngine:
                     callback=stream_callback,
                     tools=api_request.get("tools", []),
                 ),
-                timeout=llm_timeout,
+                timeout=final_llm_timeout,
             )
 
             self.logger.info(
-                f"Message processed successfully (LLM: {llm_timeout}s, Tools: {tool_execution_timeout}s)",
+                f"Message processed successfully (LLM: {final_llm_timeout}s, Tools: {final_tool_timeout}s)",
             )
 
         except TimeoutError:
             # LLM timeout - log but don't include stack trace (expected flow)
-            self.logger.exception(f"LLM call timeout after {llm_timeout}s")
+            self.logger.exception(f"LLM call timeout after {final_llm_timeout}s")
             await self._send_error_to_frontend(
-                error_message=f"LLM调用超时（{llm_timeout:.0f}秒），请稍后重试或简化任务。",
+                error_message=f"LLM调用超时（{final_llm_timeout:.0f}秒），请稍后重试或简化任务。",
                 error_type="timeout",
                 details={
-                    "timeout": llm_timeout,
+                    "timeout": final_llm_timeout,
                     "suggestion": "简化任务内容或稍后重试",
                 },
             )

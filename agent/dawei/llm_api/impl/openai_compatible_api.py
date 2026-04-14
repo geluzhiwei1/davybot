@@ -612,9 +612,13 @@ class OpenaiCompatibleClient(BaseClient):
             if url_suffix:
                 self.base_url = original_url
 
-            # 实时流式处理：直接 yield 流式响应中的每个数据块
-            async for chunk in response_stream:
-                yield chunk
+            try:
+                # 实时流式处理：直接 yield 流式响应中的每个数据块
+                async for chunk in response_stream:
+                    yield chunk
+            finally:
+                # 确保 response_stream generator 被关闭，触发其内部的 finally 块写入日志
+                await response_stream.aclose()
 
         # 使用流式处理器处理数据并直接返回 BaseStreamMessage
         stream_processor = StreamProcessor(provider=self.provider)

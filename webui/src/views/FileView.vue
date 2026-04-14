@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -87,27 +87,42 @@ const loadFile = async () => {
       throw new Error(`${t('fileView.errors.loadFailed')}: ${response.statusText}`)
     }
 
-    // 根据文件类型处理响应
-    const contentType = response.headers.get('content-type') || ''
-    let content = ''
+    // 根据文件扩展名判断文件类型
+    const name = fileName.value || filePath.value.split('/').pop() || ''
+    const extension = name.split('.').pop()?.toLowerCase() || ''
+    const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico',
+      'mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'flv',
+      'mp3', 'wav', 'flac', 'aac', 'm4a',
+      'pdf']
+    const isBinary = binaryExtensions.includes(extension)
 
-    if (contentType.includes('application/json')) {
-      const json = await response.json()
-      content = json.content || ''
-    } else if (contentType.includes('text/') || contentType.includes('application/json')) {
-      content = await response.text()
+    let content = ''
+    let fileType = 'file'
+
+    if (isBinary) {
+      // 二进制文件 (图片, PDF, 视频, 音频) - 使用 blob URL
+      const blob = await response.blob()
+      content = URL.createObjectURL(blob)
+      if (extension === 'pdf') fileType = 'pdf'
+      else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(extension)) fileType = 'image'
+      else if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'flv'].includes(extension)) fileType = 'video'
+      else if (['mp3', 'wav', 'flac', 'aac', 'm4a'].includes(extension)) fileType = 'audio'
     } else {
-      // 二进制文件 (图片, PDF, Office 文件等)
-      // 对于 Office 文件,保持为空字符串,由 FileContentArea 组件处理
-      content = ''
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        const json = await response.json()
+        content = json.content || ''
+      } else {
+        content = await response.text()
+      }
     }
 
     // 构造文件对象
     file.value = {
       id: filePath.value,
-      name: fileName.value || filePath.value.split('/').pop() || '',
+      name: name,
       path: filePath.value,
-      type: 'file',
+      type: fileType,
       content: content,
       isDirty: false
     }
@@ -141,6 +156,15 @@ const goBack = () => {
  */
 onMounted(() => {
   loadFile()
+})
+
+/**
+ * 组件卸载时释放 blob URL
+ */
+onUnmounted(() => {
+  if (file.value?.content && file.value.content.startsWith('blob:')) {
+    URL.revokeObjectURL(file.value.content)
+  }
 })
 </script>
 

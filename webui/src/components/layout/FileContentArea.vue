@@ -153,8 +153,8 @@
 
           <!-- Office 文件预览（DOCX、Excel）- 使用 vue-office -->
           <VueOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
-            :filename="activeFile.name" :filepath="activeFile.path" :editable="false" :workspace-id="getCurrentWorkspaceId()"
-            @error="handleOfficeError" class="office-viewer-wrapper" />
+            :filename="activeFile.name" :filepath="activeFile.path" :editable="false"
+            :workspace-id="getCurrentWorkspaceId()" @error="handleOfficeError" class="office-viewer-wrapper" />
           <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
             class="drawio-editor-tabs">
             <el-tab-pane name="drawio">
@@ -289,8 +289,8 @@
 
               <!-- Office 文件预览（DOCX、Excel）- 使用 vue-office -->
               <VueOfficeEditor v-if="activeFile && isOfficeFile(activeFile)" v-model="activeFile.content"
-                :filename="activeFile.name" :filepath="activeFile.path" :editable="false" :workspace-id="getCurrentWorkspaceId()"
-                @error="handleOfficeError" class="office-viewer-wrapper" />
+                :filename="activeFile.name" :filepath="activeFile.path" :editable="false"
+                :workspace-id="getCurrentWorkspaceId()" @error="handleOfficeError" class="office-viewer-wrapper" />
 
               <!-- Drawio 编辑器 -->
               <el-tabs v-if="isDrawioFile(activeFile)" v-model="drawioActiveTab" type="border-card"
@@ -354,7 +354,7 @@ import PDFViewer from '@/components/editor/PDFViewer.vue'
 import HTMLViewer from '@/components/editor/HTMLViewer.vue'
 import DrawioEditor from '@/components/editor/DrawioEditor.vue'
 import VueOfficeEditor from '@/components/editor/VueOfficeEditor.vue'
-import { isTauri } from '@/utils/platform'
+import { isTauri, getApiBaseUrl } from '@/utils/platform'
 import { useWorkspaceStore } from '@/stores/workspace'
 
 interface File {
@@ -516,14 +516,14 @@ function isOfficeFile(file: File): boolean {
 function isExcelFile(file: File): boolean {
   const excelExtensions = ['xlsx', 'xls', 'ods', 'csv']
   return file.name.endsWith('.xlsx') ||
-         file.name.endsWith('.xls') ||
-         file.name.endsWith('.ods') ||
-         file.name.endsWith('.csv') ||
-         file.type === 'excel' ||
-         file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-         file.type === 'application/vnd.ms-excel' ||
-         file.type === 'application/vnd.oasis.opendocument.spreadsheet' ||
-         file.type === 'text/csv'
+    file.name.endsWith('.xls') ||
+    file.name.endsWith('.ods') ||
+    file.name.endsWith('.csv') ||
+    file.type === 'excel' ||
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    file.type === 'application/vnd.ms-excel' ||
+    file.type === 'application/vnd.oasis.opendocument.spreadsheet' ||
+    file.type === 'text/csv'
 }
 
 function isImageFile(file: File): boolean {
@@ -821,21 +821,14 @@ const buildImageApiUrl = (imagePath: string): string | null => {
     : ''
 
   const resolvedPath = resolveRelativePath(imagePath, currentDir)
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+  const apiBaseUrl = getApiBaseUrl()
   return `${apiBaseUrl}/workspaces/${workspaceId}/files?path=${encodeURIComponent(resolvedPath)}`
 }
 
 /**
- * 修复 DOM 中所有图片的 src 属性，将相对路径替换为 API URL。
- * 用于在 Vditor 初始渲染后（after 回调）修复已渲染的图片。
+ * 修复指定容器中所有图片的 src 属性，将相对路径替换为 API URL。
  */
-const fixRenderedImageSrcs = () => {
-  const targetRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
-  if (!targetRef) return
-
-  const container = targetRef.querySelector('.vditor-wysiwyg .vditor-reset') as HTMLElement
-  if (!container) return
-
+const fixImagesInContainer = (container: HTMLElement) => {
   container.querySelectorAll('img').forEach((img) => {
     const src = img.getAttribute('src')
     if (!src || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return
@@ -853,8 +846,33 @@ const fixRenderedImageSrcs = () => {
 }
 
 /**
+ * 修复 DOM 中所有图片的 src 属性，将相对路径替换为 API URL。
+ * 用于在 Vditor 初始渲染后（after 回调）修复已渲染的图片。
+ * 覆盖所有渲染模式：wysiwyg、ir、sv、preview。
+ */
+const fixRenderedImageSrcs = () => {
+  const targetRef = isPageFullscreen.value ? vditorRefFullscreen.value : vditorRef.value
+  if (!targetRef) return
+
+  // 覆盖所有可能的 Vditor 内容容器
+  const selectors = [
+    '.vditor-wysiwyg .vditor-reset',
+    '.vditor-ir .vditor-reset',
+    '.vditor-sv .vditor-reset',
+    '.vditor-preview',
+  ]
+  for (const selector of selectors) {
+    const container = targetRef.querySelector(selector) as HTMLElement
+    if (container) {
+      fixImagesInContainer(container)
+    }
+  }
+}
+
+/**
  * 通过 Lute 的 SetJSRenderers 设置自定义 renderLinkDest，
  * 拦截后续编辑/粘贴产生的图片和链接路径。
+ * 同时覆盖 Md2VditorDOM（wysiwyg/ir 模式）和 Md2HTML（preview 模式）。
  */
 const setupLuteImageRenderer = () => {
   if (!vditor.value) return
@@ -885,6 +903,7 @@ const setupLuteImageRenderer = () => {
   lute.SetJSRenderers({
     renderers: {
       Md2VditorDOM: { renderLinkDest },
+      Md2HTML: { renderLinkDest },
     }
   })
 }
@@ -1042,6 +1061,9 @@ const initVditor = () => {
     },
     preview: {
       parse: (element: HTMLElement) => {
+        // 修复预览区域中的图片 src 路径
+        fixImagesInContainer(element)
+
         // 处理代码块的复制按钮
         const codeBlocks = element.querySelectorAll('pre code')
         codeBlocks.forEach((block) => {

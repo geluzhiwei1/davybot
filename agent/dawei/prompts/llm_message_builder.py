@@ -815,8 +815,30 @@ class EnhancedSystemBuilder(IMessageProcessor):
                 strategy_used="none",
             )
 
+        # 计算实际可用于对话的 token 预算
+        # = 模型上下文窗口 - (system_prompt + tools + skills + files + 安全余量)
+        effective_target = None
+        context_manager = getattr(user_workspace, "context_manager", None)
+        if context_manager:
+            ctx_stats = context_manager.get_stats()
+            overhead = (
+                ctx_stats.breakdown.system_prompt
+                + ctx_stats.breakdown.tool_definitions
+                + ctx_stats.breakdown.skills
+                + ctx_stats.breakdown.workspace_files
+                + 8000  # 安全余量，留给模型输出
+            )
+            effective_target = max(ctx_stats.total - overhead, 8000)
+            logger.info(
+                f"Effective compression budget: {effective_target} tokens "
+                f"(total={ctx_stats.total}, overhead={overhead})",
+            )
+
         # 应用压缩
-        compressed, stats = compressor.compress_conversation(messages)
+        compressed, stats = compressor.compress_conversation(
+            messages,
+            target_tokens=effective_target,
+        )
 
         return compressed, stats
 
