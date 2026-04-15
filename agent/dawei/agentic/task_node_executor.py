@@ -8,16 +8,17 @@
 import asyncio
 import json
 import time
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
+from dawei import get_dawei_home
 from dawei.agentic.agent_config import Config
 from dawei.agentic.checkpoint_manager import (
     CheckpointType,
     IntelligentCheckpointManager,
 )
-from dawei import get_dawei_home
 from dawei.core.errors import CheckpointError, LLMError
 from dawei.core.events import TaskEventType, emit_typed_event
+from dawei.core.exceptions import LLMContextOverflowError
 from dawei.entity.lm_messages import (
     AssistantMessage,
     LLMMessage,
@@ -117,8 +118,8 @@ class TaskNodeExecutionEngine:
         description: str,
         mode: str = "",
         parent_task_id: str | None = None,
-        todos: List[TodoItem] | None = None,
-        metadata: Dict[str, Any] | None = None,
+        todos: list[TodoItem] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """创建任务（更新当前任务节点的属性）
 
@@ -363,8 +364,19 @@ class TaskNodeExecutionEngine:
         final_llm_timeout = llm_timeout if llm_timeout is not None else 300.0   # 5分钟
         final_tool_timeout = tool_execution_timeout if tool_execution_timeout is not None else 900.0  # 15分钟
 
+        # 流式空闲超时：LLM流在此时间内无任何数据则判定为卡死
+        # 与总超时不同，只要流还在活跃发送数据就不会触发
+        try:
+            from dawei.config.settings import get_settings
+
+            settings = get_settings()
+            final_stream_idle_timeout = settings.agent_timeout.stream_idle_timeout
+        except Exception:
+            final_stream_idle_timeout = 120  # 默认120秒
+
         self.logger.info(
-            f"Timeout configuration for task '{self.task_node.mode or 'unknown'}': LLM={final_llm_timeout:.0f}s, Tools={final_tool_timeout:.0f}s",
+            f"Timeout configuration for task '{self.task_node.mode or 'unknown'}': "
+            f"LLM={final_llm_timeout:.0f}s, StreamIdle={final_stream_idle_timeout:.0f}s, Tools={final_tool_timeout:.0f}s",
         )
 
         self._tool_message_handler._has_attempt_completion = False
@@ -380,7 +392,7 @@ class TaskNodeExecutionEngine:
 
         if not self._llm_service.get_current_provider():
             # 使用 LLMProvider 获取模式特定的配置
-            mode = self.task_node.mode or "plan"  # 默认使用 plan 模式
+            mode = self.task_node.mode or "pdca"  # 默认使用 plan 模式
             mode_config = self._user_workspace.llm_manager.get_mode_config(mode)
             if mode_config:
                 self._llm_service.set_provider(mode_config.name)
@@ -428,8 +440,14 @@ class TaskNodeExecutionEngine:
                     self.logger.exception(f"原始消息 {i}: type={type(msg_dict).__name__}, value={repr(msg_dict)[:200]}")
                 raise
 
+        # 流活跃时间戳，用于空闲超时检测
+        last_stream_activity = asyncio.get_event_loop().time()
+
         async def stream_callback(stream_message: StreamMessages) -> None:
             """流式回调函数，处理工具消息和事件转换"""
+            nonlocal last_stream_activity
+            last_stream_activity = asyncio.get_event_loop().time()
+
             # 🔧 FIX: 在每个流式消息处理时检查停止标志
             if self._agent and self._agent.is_stop_requested():
                 self.logger.info(
@@ -459,9 +477,9 @@ class TaskNodeExecutionEngine:
                             ToolMessage(
                                 content=json.dumps(
                                     {
-                                        "error": f"Tool call was truncated due to output length limit. "
-                                        f"Please split this operation into smaller calls "
-                                        f"(e.g. use apply_diff instead of write_to_file for large files).",
+                                        "error": "Tool call was truncated due to output length limit. "
+                                        "Please split this operation into smaller calls "
+                                        "(e.g. use smart_text_edit instead of write_text_file for large files).",
                                         "details": str(e)[:500],
                                     },
                                     ensure_ascii=False,
@@ -471,65 +489,176 @@ class TaskNodeExecutionEngine:
                         )
 
         try:
-            # LLM调用使用独立的超时控制
-            await asyncio.wait_for(
-                self._llm_service.create_message_with_callback(
-                    messages,
-                    callback=stream_callback,
-                    tools=api_request.get("tools", []),
-                ),
-                timeout=final_llm_timeout,
-            )
+            # 上下文溢出重试：最多重试1次，强制压缩后重试
+            max_context_overflow_retries = 1
+            for context_retry in range(max_context_overflow_retries + 1):
+                try:
+                    # LLM调用：总超时 + 流空闲超时双重保护
+                    # 总超时防止无限运行，流空闲超时检测流卡死
+                    llm_task = asyncio.ensure_future(
+                        self._llm_service.create_message_with_callback(
+                            messages,
+                            callback=stream_callback,
+                            tools=api_request.get("tools", []),
+                        ),
+                    )
+                    try:
+                        # 流空闲看门狗：监控流是否在发数据
+                        idle_watchdog_cancelled = False
+                        idle_error = None
 
-            self.logger.info(
-                f"Message processed successfully (LLM: {final_llm_timeout}s, Tools: {final_tool_timeout}s)",
-            )
+                        async def _idle_watchdog() -> None:
+                            nonlocal idle_error, idle_watchdog_cancelled
+                            try:
+                                while True:
+                                    await asyncio.sleep(final_stream_idle_timeout)
+                                    elapsed = asyncio.get_event_loop().time() - last_stream_activity
+                                    if elapsed >= final_stream_idle_timeout:
+                                        idle_error = TimeoutError(
+                                            f"LLM stream idle for {elapsed:.0f}s (limit: {final_stream_idle_timeout}s)",
+                                        )
+                                        llm_task.cancel()  # noqa: B023
+                                        return
+                            except asyncio.CancelledError:
+                                idle_watchdog_cancelled = True
+                                raise
 
-        except TimeoutError:
-            # LLM timeout - log but don't include stack trace (expected flow)
-            self.logger.exception(f"LLM call timeout after {final_llm_timeout}s")
-            await self._send_error_to_frontend(
-                error_message=f"LLM调用超时（{final_llm_timeout:.0f}秒），请稍后重试或简化任务。",
-                error_type="timeout",
-                details={
-                    "timeout": final_llm_timeout,
-                    "suggestion": "简化任务内容或稍后重试",
-                },
-            )
-            raise
+                        watchdog = asyncio.ensure_future(_idle_watchdog())
+                        try:
+                            await asyncio.wait_for(llm_task, timeout=final_llm_timeout)
+                        except TimeoutError:
+                            watchdog.cancel()
+                            if idle_error:
+                                # 流空闲超时触发
+                                self.logger.warning(
+                                    f"LLM stream idle timeout: {idle_error}",
+                                )
+                                raise TimeoutError(str(idle_error))
+                            # 总超时触发
+                            raise
+                        except asyncio.CancelledError:
+                            watchdog.cancel()
+                            if idle_error:
+                                raise TimeoutError(str(idle_error))
+                            raise
+                        finally:
+                            if not watchdog.done():
+                                watchdog.cancel()
+                    finally:
+                        if not llm_task.done():
+                            llm_task.cancel()
 
-        except LLMError as e:
-            # LLM API error - log with stack trace for debugging
-            error_str = str(e)
-            self.logger.error(f"LLM API error: {error_str}", exc_info=True)
+                    self.logger.info(
+                        f"Message processed successfully (LLM: {final_llm_timeout}s, Tools: {final_tool_timeout}s)",
+                    )
+                    break  # 成功，退出重试循环
 
-            # 检测429 rate limit错误
-            if "429" in error_str or "rate_limit" in error_str.lower():
-                self.logger.warning(f"Rate limit detected: {e}")
-                await self._send_error_to_frontend(
-                    error_message="API请求过于频繁，请稍后重试。建议等待60秒后点击重试按钮。",
-                    error_type="rate_limit_exceeded",
-                    details={
-                        "error_code": "429",
-                        "recoverable": True,
-                        "retry_after": 60,
-                        "suggestion": "等待60秒后重试",
-                        "original_error": error_str[:500],  # 限制长度
-                    },
-                )
-            else:
-                # 其他LLM错误
-                self.logger.exception("LLM API error: ")
-                await self._send_error_to_frontend(
-                    error_message=f"LLM API错误：{error_str[:200]}",
-                    error_type="llm_api_error",
-                    details={
-                        "error": error_str[:500],
-                        "recoverable": False,
-                        "suggestion": "请检查API配置或联系管理员",
-                    },
-                )
-            raise
+                except LLMContextOverflowError as e:
+                    if context_retry >= max_context_overflow_retries:
+                        # 已用完重试次数，报告错误
+                        self.logger.error(
+                            f"Context overflow persisted after compression retry, giving up: {e}",
+                            exc_info=True,
+                        )
+                        await self._send_error_to_frontend(
+                            error_message="对话上下文过长，即使压缩后仍超出模型限制。请开启新会话。",
+                            error_type="context_overflow",
+                            details={
+                                "error": str(e)[:500],
+                                "recoverable": False,
+                                "suggestion": "请开启新会话",
+                            },
+                        )
+                        raise
+
+                    # 首次溢出：强制压缩对话并重试
+                    self.logger.warning(
+                        f"LLM context overflow detected (attempt {context_retry + 1}), "
+                        f"forcing aggressive compression and retrying...",
+                    )
+                    try:
+                        compressed = await self._force_compress_conversation()
+                        if compressed:
+                            # 用压缩后的消息重新构建请求
+                            api_request = await self._message_processor.build_messages(
+                                user_workspace=self._user_workspace,
+                                capabilities=self._get_capabilities(),
+                            )
+                            raw_messages = api_request.get("messages", [])
+                            converted_messages = []
+                            for i, msg_dict in enumerate(raw_messages):
+                                if msg_dict is None:
+                                    continue
+                                if isinstance(msg_dict, dict):
+                                    role = msg_dict.get("role")
+                                    if role == "system":
+                                        converted_messages.append(SystemMessage.from_openai_format(msg_dict))
+                                    elif role == "user":
+                                        converted_messages.append(UserMessage.from_openai_format(msg_dict))
+                                    elif role == "assistant":
+                                        converted_messages.append(AssistantMessage.from_openai_format(msg_dict))
+                                    elif role == "tool":
+                                        converted_messages.append(ToolMessage.from_openai_format(msg_dict))
+                                else:
+                                    converted_messages.append(msg_dict)
+                            messages = converted_messages
+                            self.logger.info(
+                                f"Context compressed, retrying with {len(messages)} messages",
+                            )
+                        else:
+                            self.logger.warning("Compression returned no changes, retrying anyway")
+                    except Exception as compress_err:
+                        self.logger.error(
+                            f"Failed to compress conversation for overflow retry: {compress_err}",
+                            exc_info=True,
+                        )
+                        raise
+
+                except TimeoutError:
+                    # LLM timeout - log but don't include stack trace (expected flow)
+                    self.logger.exception(f"LLM call timeout after {final_llm_timeout}s")
+                    await self._send_error_to_frontend(
+                        error_message=f"LLM调用超时（{final_llm_timeout:.0f}秒），请稍后重试或简化任务。",
+                        error_type="timeout",
+                        details={
+                            "timeout": final_llm_timeout,
+                            "suggestion": "简化任务内容或稍后重试",
+                        },
+                    )
+                    raise
+
+                except LLMError as e:
+                    # LLM API error - log with stack trace for debugging
+                    error_str = str(e)
+                    self.logger.error(f"LLM API error: {error_str}", exc_info=True)
+
+                    # 检测429 rate limit错误
+                    if "429" in error_str or "rate_limit" in error_str.lower():
+                        self.logger.warning(f"Rate limit detected: {e}")
+                        await self._send_error_to_frontend(
+                            error_message="API请求过于频繁，请稍后重试。建议等待60秒后点击重试按钮。",
+                            error_type="rate_limit_exceeded",
+                            details={
+                                "error_code": "429",
+                                "recoverable": True,
+                                "retry_after": 60,
+                                "suggestion": "等待60秒后重试",
+                                "original_error": error_str[:500],  # 限制长度
+                            },
+                        )
+                    else:
+                        # 其他LLM错误
+                        self.logger.exception("LLM API error: ")
+                        await self._send_error_to_frontend(
+                            error_message=f"LLM API错误：{error_str[:200]}",
+                            error_type="llm_api_error",
+                            details={
+                                "error": error_str[:500],
+                                "recoverable": False,
+                                "suggestion": "请检查API配置或联系管理员",
+                            },
+                        )
+                    raise
 
         except asyncio.CancelledError:
             # 🔧 FIX: 用户请求停止 - 正常的停止流程,不是错误
@@ -794,8 +923,8 @@ class TaskNodeExecutionEngine:
 
         subtask_id = str(uuid.uuid4())
         description = todo.metadata.get("description", todo.title)
-        # 获取 mode，如果父任务 mode 为 None，使用默认值 "plan"
-        parent_mode = self.task_node.mode or "plan"
+        # 获取 mode，如果父任务 mode 为 None，使用默认值 "pdca"
+        parent_mode = self.task_node.mode or "pdca"
         mode = todo.metadata.get("mode", parent_mode)
 
         task_data = TaskData(
@@ -844,7 +973,7 @@ class TaskNodeExecutionEngine:
 
                 self.last_checkpoint_time = current_time
 
-    def _get_capabilities(self) -> List[str]:
+    def _get_capabilities(self) -> list[str]:
         """获取能力列表
 
         Returns:
@@ -881,7 +1010,7 @@ class TaskNodeExecutionEngine:
         """
         return self.execution_task is not None and not self.execution_task.done()
 
-    async def get_execution_status(self) -> Dict[str, Any]:
+    async def get_execution_status(self) -> dict[str, Any]:
         """获取执行状态
 
         Returns:
@@ -930,7 +1059,7 @@ class TaskNodeExecutionEngine:
             当前模式
 
         """
-        return self.task_node.mode or "plan"
+        return self.task_node.mode or "pdca"
 
     async def handle_followup_response(self, tool_call_id: str, response: str) -> bool:
         """处理前端发来的追问回复
@@ -958,11 +1087,96 @@ class TaskNodeExecutionEngine:
         """
         return await self._tool_message_handler.handle_followup_cancel(tool_call_id, reason)
 
+    async def _force_compress_conversation(self) -> bool:
+        """强制压缩当前对话以应对上下文溢出。
+
+        直接裁剪 current_conversation.messages，仅保留最近的消息和关键消息，
+        确保下次 build_messages() 构建出更短的上下文。
+
+        Returns:
+            True 如果成功压缩了消息（有消息被移除），False 如果没有变化
+        """
+        from dawei.agentic.conversation_compressor import ConversationCompressor
+
+        conversation = self._user_workspace.current_conversation
+        if not conversation or not conversation.messages:
+            self.logger.warning("No conversation to compress")
+            return False
+
+        messages = conversation.messages
+        if len(messages) <= 5:
+            self.logger.warning(f"Conversation too short ({len(messages)} msgs) to compress further")
+            return False
+
+        # 将消息转为 dict 用于压缩器分析
+        msg_dicts = []
+        for msg in messages:
+            if hasattr(msg, "to_dict"):
+                msg_dicts.append(msg.to_dict())
+            elif isinstance(msg, dict):
+                msg_dicts.append(msg)
+            else:
+                msg_dicts.append({"role": getattr(msg, "role", "unknown"), "content": str(getattr(msg, "content", ""))})
+
+        # 使用压缩器识别关键消息
+        compressor = ConversationCompressor(preserve_recent=10)
+        key_indices, metadata_list = compressor.identify_key_messages(msg_dicts)
+
+        # 激进策略：只保留最近10条 + 关键消息
+        preserve_count = 10
+        kept_indices = set()
+
+        # 保留最近的消息
+        for idx in range(max(0, len(messages) - preserve_count), len(messages)):
+            kept_indices.add(idx)
+
+        # 保留关键消息（仅保留最近的 preserve_count 范围之外的）
+        for idx in sorted(key_indices):
+            if idx not in kept_indices:
+                kept_indices.add(idx)
+
+        original_count = len(messages)
+
+        if len(kept_indices) >= original_count:
+            self.logger.warning("Compression would keep all messages, skipping")
+            return False
+
+        # 生成被裁剪消息的简要摘要
+        removed_messages = [msg_dicts[i] for i in range(original_count) if i not in kept_indices]
+        summary_parts = []
+        for m in removed_messages:
+            role = m.get("role", "?")
+            content = str(m.get("content", ""))
+            if content:
+                summary_parts.append(f"[{role}] {content[:200]}")
+        summary_text = "\n".join(summary_parts[-20:])  # 最多保留20条摘要
+
+        # 裁剪对话消息
+        new_messages = [messages[i] for i in sorted(kept_indices)]
+        conversation.messages = new_messages
+
+        # 注入压缩摘要作为系统消息，让 LLM 知道历史被压缩了
+        from dawei.entity.lm_messages import SystemMessage
+
+        summary_msg = SystemMessage(
+            content=(
+                f"[Context Overflow Recovery] "
+                f"Conversation was compressed from {original_count} to {len(new_messages)} messages "
+                f"due to context window limit. Summary of removed messages:\n{summary_text}"
+            ),
+        )
+        conversation.messages.insert(0, summary_msg)
+
+        self.logger.info(
+            f"Forced conversation compression: {original_count} -> {len(new_messages) + 1} messages",
+        )
+        return True
+
     async def _send_error_to_frontend(
         self,
         error_message: str,
         error_type: str = "execution_error",
-        details: Dict[str, Any] | None = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """发送错误消息到前端
 

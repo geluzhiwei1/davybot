@@ -23,7 +23,7 @@ class CallACPAgentInput(BaseModel):
     prompt: str = Field(..., description="Prompt text sent to the ACP agent")
     args: List[str] = Field(default_factory=list, description="Command arguments for the ACP agent process")
     cwd: str | None = Field(None, description="Working directory used to start ACP agent process")
-    session_cwd: str | None = Field(None, description="Session working directory sent via ACP new_session")
+    session_cwd: str | None = Field(None, description="Working directory for the ACP agent session. Overrides the default workspace directory if specified.")
     timeout: int = Field(300, description="Prompt timeout in seconds")
 
 
@@ -32,7 +32,7 @@ class CallACPAgentTool(CustomBaseTool):
 
     name: str = "call_acp_agent"
     # Base description; will be overridden dynamically in model_post_init
-    description: str = "Calls an external ACP agent process and returns its response."
+    description: str = "Calls an external ACP (Agent Client Protocol) agent process and returns its response. Available agents are dynamically loaded from the ACP registry at startup."
     args_schema: type[BaseModel] = CallACPAgentInput
 
     def model_post_init(self, __context: object) -> None:

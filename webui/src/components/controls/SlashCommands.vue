@@ -191,7 +191,7 @@ const getModeTagType = (mode: string | null) => {
       return 'success'
     case 'ask':
       return 'info'
-    case 'plan':
+    case 'pdca':
       return 'warning'
     default:
       return 'info'

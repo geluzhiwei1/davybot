@@ -53,14 +53,6 @@ class CreateA2UISurfaceTool(CustomBaseTool):
 
     The UI is rendered on the client side using Element Plus components, ensuring
     a consistent, native look and feel with no code execution risks.
-
-    Args:
-        title: Surface title (shown in header)
-        description: Optional surface description
-        surface_type: Type of surface ('form', 'dashboard', 'visualization', 'custom')
-        components: List of A2UI component definitions (flat adjacency list)
-        data_model: Initial data model for the UI state
-        root_component_id: ID of the root component (first component if not specified)
     """
 
     class Args(BaseModel):
@@ -142,7 +134,8 @@ class CreateA2UISurfaceTool(CustomBaseTool):
             }
 
             # Return special A2UI marker format for tool executor to process
-            # This format will be detected by tool_message_handler and sent via WebSocket
+            # NOTE: Returns dict (not str) by design — tool_message_handler detects
+            # the __a2ui__ marker and routes it via WebSocket instead of normal LLM flow.
             return {
                 "__a2ui__": True,  # Marker for A2UI data
                 "surface_id": surface_id,
@@ -225,6 +218,8 @@ class UpdateA2UIDataTool(CustomBaseTool):
             }
 
             # Return special A2UI marker format for tool executor to process
+            # NOTE: Returns dict (not str) by design — tool_message_handler detects
+            # the __a2ui__ marker and routes it via WebSocket instead of normal LLM flow.
             return {
                 "__a2ui__": True,  # Marker for A2UI data
                 "surface_id": args.surface_id,

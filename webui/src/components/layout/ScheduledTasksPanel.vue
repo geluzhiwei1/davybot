@@ -214,10 +214,7 @@
             allow-clear
           >
             <el-option label="Orchestrator" value="orchestrator" />
-            <el-option label="Plan" value="plan" />
-            <el-option label="Do" value="do" />
-            <el-option label="Check" value="check" />
-            <el-option label="Act" value="act" />
+            <el-option label="PDCA" value="pdca" />
           </el-select>
           <span style="margin-left: 8px; font-size: 12px; color: #999;">
             {{ t('scheduledTasks.optional') }}

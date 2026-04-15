@@ -737,7 +737,7 @@ class MagicCommandManager:
         if not args:
             return f"Current mode: {context.agent_mode}"
 
-        valid_modes = ["orchestrator", "plan", "do", "check", "act"]
+        valid_modes = ["orchestrator", "pdca"]
         if args not in valid_modes:
             return f"Invalid mode. Valid modes: {', '.join(valid_modes)}"
 

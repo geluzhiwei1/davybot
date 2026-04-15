@@ -7,7 +7,6 @@
 依赖MCP Python SDK和已配置的MCP服务器。
 """
 
-import asyncio
 import json
 from pathlib import Path
 from typing import List, Dict, Any
@@ -16,29 +15,8 @@ from pydantic import BaseModel, Field
 
 from dawei.core.decorators import safe_tool_operation
 from dawei.tools.custom_base_tool import CustomBaseTool
+from dawei.tools.custom_tools.async_utils import run_async
 from dawei.tools.mcp_tool_manager import MCPToolManager
-
-
-def _run_async(coro):
-    """在现有事件循环中运行协程，或者创建新的事件循环
-
-    Args:
-        coro: 要运行的协程
-
-    Returns:
-        协程的返回值
-    """
-    try:
-        asyncio.get_running_loop()
-        # 已经在运行的事件循环中，创建 task 并等待
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
-    except RuntimeError:
-        # 没有运行的事件循环，使用 asyncio.run
-        return asyncio.run(coro)
 
 
 # Use MCP Tool
@@ -57,7 +35,7 @@ class UseMCPTool(CustomBaseTool):
     """Tool for using tools provided by MCP servers."""
 
     name: str = "use_mcp_tool"
-    description: str = "Uses a tool provided by a connected MCP server with specified parameters. Requires MCP server to be configured and connected."
+    description: str = "Uses a tool from a connected MCP server. Use list_mcp_servers first to discover available servers and their tools. Requires MCP server to be configured and connected."
     args_schema: type[BaseModel] = UseMCPToolInput
 
     def __init__(self, workspace_root: str | None = None):
@@ -72,7 +50,7 @@ class UseMCPTool(CustomBaseTool):
         """Use MCP tool (real implementation using MCP SDK)."""
         try:
             # Execute tool call asynchronously
-            result = _run_async(self.mcp_manager.call_tool(server_name, tool_name, arguments))
+            result = run_async(self.mcp_manager.call_tool(server_name, tool_name, arguments))
             return json.dumps(result, indent=2, ensure_ascii=False)
 
         except Exception as e:
@@ -115,7 +93,7 @@ class AccessMCPResource(CustomBaseTool):
         """Access MCP resource (real implementation using MCP SDK)."""
         try:
             # Execute resource access asynchronously
-            result = _run_async(self.mcp_manager.access_resource(server_name, uri))
+            result = run_async(self.mcp_manager.access_resource(server_name, uri))
             return json.dumps(result, indent=2, ensure_ascii=False)
 
         except Exception as e:
@@ -228,7 +206,7 @@ class ConnectMCPServer(CustomBaseTool):
         """Connect to MCP server."""
         try:
             # Execute connection asynchronously
-            success = _run_async(self.mcp_manager.connect_server(server_name))
+            success = run_async(self.mcp_manager.connect_server(server_name))
 
             if success:
                 server_info = self.mcp_manager.get_server_info(server_name)
@@ -289,7 +267,7 @@ class DisconnectMCPServer(CustomBaseTool):
         """Disconnect from MCP server."""
         try:
             # Execute disconnection asynchronously
-            success = _run_async(self.mcp_manager.disconnect_server(server_name))
+            success = run_async(self.mcp_manager.disconnect_server(server_name))
 
             if success:
                 return json.dumps(

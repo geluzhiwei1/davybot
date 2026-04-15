@@ -504,7 +504,7 @@ export interface LLMApiErrorMessage extends BaseMessage {
 export interface AgentStartMessage extends BaseMessage {
   type: MessageType.AGENT_START;
   task_id: string;
-  agent_mode: string;  // architect, code, ask, debug, plan
+  agent_mode: string;  // orchestrator, pdca
   user_message: string;
   workspace_id: string;
   metadata?: {
@@ -914,7 +914,7 @@ export interface ChatMessage {
  */
 export interface ModeSwitchMessage extends BaseMessage {
   type: MessageType.MODE_SWITCH;
-  mode: 'plan' | 'build';  // 目标模式
+  mode: 'orchestrator' | 'pdca';  // 目标模式
 }
 
 /**
@@ -922,8 +922,8 @@ export interface ModeSwitchMessage extends BaseMessage {
  */
 export interface ModeSwitchedMessage extends BaseMessage {
   type: MessageType.MODE_SWITCHED;
-  previous_mode: 'plan' | 'build';
-  current_mode: 'plan' | 'build';
+  previous_mode: 'orchestrator' | 'pdca';
+  current_mode: 'orchestrator' | 'pdca';
   message: string;
 }
 

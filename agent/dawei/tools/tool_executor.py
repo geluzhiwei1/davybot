@@ -41,26 +41,11 @@ if TYPE_CHECKING:
 # Tool Permission Definitions
 # ============================================================================
 
-# Write operation tools (blocked in Plan mode)
-WRITE_TOOLS = {
-    "write_to_file",
-    "apply_diff",
-    "insert_content",
-    "execute_command",
-    "run_command",
-    "browser_action",
-    "create_task_graph",
-    "add_task_node",
-    "delete_task_node",
-    "generate_todo_plan",
-    "update_todo_list",
-}
-
 # Tools that require snapshots (file write operations)
 SNAPSHOT_TOOLS = {
-    "write_to_file",
-    "apply_diff",
-    "insert_content",
+    "write_text_file",
+    "smart_text_edit",
+    "insert_text_content",
 }
 
 
@@ -157,6 +142,24 @@ class ToolExecutor(IToolCallService):
         else:
             self.logger.debug("No knowledge tools found to inject knowledge_base_ids")
 
+    def inject_agent(self, agent) -> None:
+        """Inject agent reference into tools that need it (e.g., ShowCostTool).
+
+        This method is called by Agent during initialization.
+
+        Args:
+            agent: Agent instance
+
+        """
+        injected_count = 0
+        for tool_name, tool_instance in self.tools.items():
+            if hasattr(tool_instance, "set_agent"):
+                tool_instance.set_agent(agent)
+                self.logger.debug(f"Injected agent into {tool_name}")
+                injected_count += 1
+        if injected_count > 0:
+            self.logger.info(f"Successfully injected agent into {injected_count} tools")
+
     def _load_tools(self):
         """Load all tools from tool manager."""
         from .custom_base_tool import CustomBaseTool
@@ -230,97 +233,9 @@ class ToolExecutor(IToolCallService):
             log_security_bypass("check_permission", f"tool={tool_name}")
             return True
 
-        if self._agent is None:
-            return True
-
-        try:
-            from dawei.agentic.agent_config import AgentMode
-
-            current_mode = self._agent.config.mode
-        except (AttributeError, ImportError):
-            return True
-
-        # Check if it's a write operation tool in Plan mode
-        if current_mode == AgentMode.PLAN and tool_name in WRITE_TOOLS:
-            # For file write tools, check if the file is in the whitelist
-            if tool_name in ["write_to_file", "apply_diff", "insert_content"] and parameters and self._check_file_write_permission(parameters):
-                return True  # File is in whitelist, allow editing
-
-            # Not in whitelist or no parameters provided
-            self.logger.warning(
-                f"Tool '{tool_name}' is not allowed in PLAN mode (except for plan files in .dawei/plans/). Switch to DO mode to execute write operations.",
-            )
-            return False
-
+        # All tools are allowed in all modes; mode-specific restrictions
+        # are handled by the mode's tool group configuration in modes.yaml
         return True
-
-    def _check_file_write_permission(self, parameters: dict[str, Any]) -> bool:
-        """Check if file write is allowed based on whitelist (Plan mode).
-
-        Args:
-            parameters: Tool parameters containing file path
-
-        Returns:
-            True if file can be edited, False otherwise
-
-        """
-        import fnmatch
-
-        # Extract file path from parameters
-        file_path = None
-        if "path" in parameters:
-            file_path = parameters["path"]
-        elif "file_path" in parameters:
-            file_path = parameters["file_path"]
-        elif "filename" in parameters:
-            file_path = parameters["filename"]
-        else:
-            return False  # No file path found
-
-        if not file_path:
-            return False
-
-        # Resolve to absolute path
-        try:
-            file_path_obj = Path(file_path).resolve()
-        except (OSError, ValueError):
-            return False
-
-        # Get workspace path
-        if not self.user_workspace:
-            return False
-
-        try:
-            workspace = Path(self.user_workspace.workspace_info.absolute_path)
-        except (AttributeError, TypeError):
-            return False
-
-        # Check if file is within workspace
-        try:
-            relative_path = file_path_obj.relative_to(workspace)
-        except ValueError:
-            # Outside workspace
-            return False
-
-        # Whitelist patterns for Plan mode
-        allowed_patterns = [
-            ".dawei/plans/*.md",  # Plan directory markdown files
-            "*.md",  # All markdown files in workspace
-        ]
-
-        # Check if file matches any whitelist pattern
-        for pattern in allowed_patterns:
-            if fnmatch.fnmatch(str(relative_path), pattern):
-                self.logger.info(
-                    f"File '{relative_path}' is in Plan mode whitelist, allowing write operation",
-                )
-                return True
-
-        # Not in whitelist
-        self.logger.warning(
-            f"File '{relative_path}' is not in Plan mode whitelist. Only .dawei/plans/*.md and *.md files can be edited in Plan mode.",
-        )
-        return False
 
     @staticmethod
     def _perform_external_security_check(
@@ -350,7 +265,7 @@ class ToolExecutor(IToolCallService):
             return None
 
         # File operation security check
-        if tool_name in ["read_file", "write_to_file", "list_files", "search_files"]:
+        if tool_name in ["read_file", "write_text_file", "list_files"]:
             for param_name, param_value in parameters.items():
                 if "path" in param_name.lower() and isinstance(param_value, str) and not user_workspace.is_path_allowed(param_value):
                     raise ToolSecurityError(

@@ -69,11 +69,11 @@ class SmartFileEditTool(CustomBaseTool):
     ]
     """
 
-    name: str = "smart_file_edit"
+    name: str = "smart_text_edit"
     description: str = """Edits large files safely using diff-based approach. Automatically splits edits into chunks and applies them sequentially to prevent truncation.
 
 **CRITICAL FOR LARGE FILES (>200 lines):**
-Use this tool instead of write_to_file to avoid response truncation.
+Use this tool instead of write_text_file to avoid response truncation.
 
 **How it works:**
 1. Accepts multiple edits in a single call
@@ -85,7 +85,7 @@ Use this tool instead of write_to_file to avoid response truncation.
 - HTML files >500 lines
 - Code files >200 lines
 - Multiple changes to same file
-- Previous write_to_file calls failed
+- Previous write_text_file calls failed
 
 **Format:**
 edits = [
@@ -99,7 +99,7 @@ edits = [
 - Order edits logically (top to bottom of file)"""
     args_schema: type[BaseModel] = SmartFileEditInput
 
-    @safe_tool_operation("smart_file_edit", fallback_value="Error: Failed to edit file")
+    @safe_tool_operation("smart_text_edit", fallback_value="Error: Failed to edit file")
     def _run(self, file_path: str, edits: List[Dict[str, str]], _chunk_size: int = 50) -> str:
         """Smart edit file using diff-based approach."""
         # Get workspace directory from context

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from dawei.core.decorators import safe_tool_operation
 from dawei.tools.custom_base_tool import CustomBaseTool
+from dawei.tools.custom_tools.async_utils import run_async
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class KnowledgeSearchInput(BaseModel):
     )
     knowledge_base_ids: List[str] = Field(
         default_factory=list,
-        description="List of knowledge base IDs to search. If not specified, uses the agent's default knowledge base.",
+        description="List of knowledge base IDs to search. If not specified, uses injected IDs or the agent's default knowledge base.",
     )
     mode: str = Field(
         default="hybrid",
@@ -63,14 +64,30 @@ class KnowledgeSearchTool(CustomBaseTool):
         "knowledge_search",
         fallback_value="Error: Knowledge search failed",
     )
-    async def _run(
+    def _run(
         self,
         query: str,
         knowledge_base_ids: List[str] = None,
         mode: str = "hybrid",
         top_k: int = 5,
     ) -> str:
-        """Execute knowledge search
+        """Execute knowledge search (sync wrapper).
+
+        Delegates to _async_run via run_async to keep _run synchronous
+        as required by CustomBaseTool's interface contract.
+        """
+        return run_async(
+            self._async_run(query, knowledge_base_ids, mode, top_k),
+        )
+
+    async def _async_run(
+        self,
+        query: str,
+        knowledge_base_ids: List[str] = None,
+        mode: str = "hybrid",
+        top_k: int = 5,
+    ) -> str:
+        """Execute knowledge search (async implementation).
 
         Args:
             query: Search query string
@@ -246,7 +263,7 @@ class KnowledgeRAGInput(BaseModel):
     )
     knowledge_base_id: str = Field(
         default=None,
-        description="Knowledge base ID to query. If not specified, uses the agent's default knowledge base.",
+        description="Knowledge base ID to query. If not specified, uses injected IDs or the agent's default knowledge base.",
     )
     max_context_length: int = Field(
         default=4000,
@@ -282,13 +299,28 @@ class KnowledgeRAGTool(CustomBaseTool):
         "knowledge_rag",
         fallback_value="Error: RAG query failed",
     )
-    async def _run(
+    def _run(
         self,
         query: str,
         knowledge_base_id: str = None,
         max_context_length: int = 4000,
     ) -> str:
-        """Execute RAG query
+        """Execute RAG query (sync wrapper).
+
+        Delegates to _async_run via run_async to keep _run synchronous
+        as required by CustomBaseTool's interface contract.
+        """
+        return run_async(
+            self._async_run(query, knowledge_base_id, max_context_length),
+        )
+
+    async def _async_run(
+        self,
+        query: str,
+        knowledge_base_id: str = None,
+        max_context_length: int = 4000,
+    ) -> str:
+        """Execute RAG query (async implementation).
 
         Args:
             query: Query string

@@ -1310,21 +1310,18 @@ class ModeSwitchMessage(BaseWebSocketMessage):
     """
 
     type: MessageType = MessageType.MODE_SWITCH
-    mode: str = Field(..., description="目标模式: orchestrator, plan, do, check, act, 或 build")
+    mode: str = Field(..., description="目标模式: orchestrator, pdca")
 
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, v):
         """验证模式名称
 
-        支持的 PDCA 模式:
+        支持的模式:
         - orchestrator: 智能协调者模式（默认）
-        - plan: 规划阶段
-        - do: 执行阶段
-        - check: 检查阶段
-        - act: 改进阶段
+        - pdca: PDCA 持续改进模式（Plan-Do-Check-Act 自管理循环）
         """
-        valid_modes = ["orchestrator", "plan", "do", "check", "act"]
+        valid_modes = ["orchestrator", "pdca"]
         if v not in valid_modes:
             raise ValueError(f"Invalid mode: '{v}'. Valid modes: {', '.join(valid_modes)}")
         return v

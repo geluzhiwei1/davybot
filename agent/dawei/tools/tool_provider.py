@@ -6,7 +6,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Dict, Any, get_type_hints
+from typing import Any, Dict, List, get_type_hints
 
 from pydantic import BaseModel
 
@@ -20,7 +20,7 @@ class ToolProvider(ABC):
     """An abstract base class for tool providers."""
 
     @abstractmethod
-    def get_tools(self) -> List[Dict[str, Any]]:
+    def get_tools(self) -> list[dict[str, Any]]:
         """Returns a list of tools in a standardized format.
         Each tool is represented as a dictionary.
         """
@@ -75,7 +75,7 @@ class CustomToolProvider(ToolProvider):
         # Default: instantiate with no parameters
         return tool_class()
 
-    def get_tools(self) -> List[Dict[str, Any]]:
+    def get_tools(self) -> list[dict[str, Any]]:
         """Load and parse tools from custom_tools package.
 
         Returns:
@@ -93,14 +93,11 @@ class CustomToolProvider(ToolProvider):
             from .custom_tools import (
                 acp_tools,
                 command_tools,
-                diff_applier,
-                document_parser,
+                cost_tools,
                 edit_tools,
-                knowledge_management_tool,
                 knowledge_tool,
                 mcp_tools,
                 read_tools,
-                search_tools,
                 timer_tools,
             )
 
@@ -108,16 +105,13 @@ class CustomToolProvider(ToolProvider):
             tool_modules = [
                 edit_tools,
                 read_tools,
-                search_tools,
                 command_tools,
                 acp_tools,
                 mcp_tools,
-                document_parser,
-                diff_applier,
                 timer_tools,
                 a2ui_tools,
                 knowledge_tool,
-                knowledge_management_tool,
+                cost_tools,
             ]
 
             # Also check the top-level custom_tools __init__ for any directly defined/imported tools
@@ -216,9 +210,9 @@ class CustomToolProvider(ToolProvider):
                         skills_roots.append(ws_path)
                         sources = []
                         if has_dawei_skills:
-                            sources.append(f".dawei/skills/")
+                            sources.append(".dawei/skills/")
                         if has_roo_skills:
-                            sources.append(f".roo/skills/")
+                            sources.append(".roo/skills/")
                         logger.info(
                             f"[Skills] ✓ Added workspace root: {ws_path} "
                             f"(sources: {', '.join(sources)})",
@@ -233,9 +227,9 @@ class CustomToolProvider(ToolProvider):
                         skills_roots.append(dawei_home)
                     sources = []
                     if has_global_dawei:
-                        sources.append(f".dawei/skills/")
+                        sources.append(".dawei/skills/")
                     if has_global_roo:
-                        sources.append(f".roo/skills/")
+                        sources.append(".roo/skills/")
                     logger.info(
                         f"[Skills] ✓ Added global root: {dawei_home} "
                         f"(sources: {', '.join(sources)})",
@@ -287,7 +281,7 @@ class CustomToolProvider(ToolProvider):
         logger.info(f"Loaded {len(tools)} tools from CustomToolProvider")
         return tools
 
-    def _pydantic_to_json_schema(self, schema_class: type[BaseModel]) -> Dict[str, Any]:
+    def _pydantic_to_json_schema(self, schema_class: type[BaseModel]) -> dict[str, Any]:
         """Convert a Pydantic model to JSON Schema format.
 
         Args:
@@ -361,7 +355,7 @@ class CustomToolProvider(ToolProvider):
             logger.exception("Error converting Pydantic schema to JSON Schema: ")
             return {"type": "object", "properties": {}, "required": []}
 
-    def _parse_function_tool(self, func: callable, name: str) -> Dict[str, Any]:
+    def _parse_function_tool(self, func: callable, name: str) -> dict[str, Any]:
         """Parse a function decorated with @tool into a standard format.
 
         Args:

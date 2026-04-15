@@ -22,7 +22,7 @@ def get_builtin_modes() -> list[str]:
     Returns:
         list[str]: 内置模式的 slug 列表，按优先级排序
     """
-    return ["orchestrator", "plan", "do", "check", "act"]
+    return ["orchestrator", "pdca"]
 
 
 def get_default_mode() -> str:

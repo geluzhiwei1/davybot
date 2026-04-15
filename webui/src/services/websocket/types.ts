@@ -408,7 +408,7 @@ export type MessagePayloadMap = {
     duration_seconds?: number;
   }
   [MessageType.MODE_SWITCH]: {
-    mode: 'orchestrator' | 'plan' | 'do' | 'check' | 'act' | 'build';
+    mode: 'orchestrator' | 'pdca';
   }
   [MessageType.MODE_SWITCHED]: {
     previous_mode: string;

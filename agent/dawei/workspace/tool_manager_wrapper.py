@@ -213,7 +213,7 @@ class WorkspaceToolManager:
             # 基本工具总是允许的
             if tool_name in [
                 "read_file",
-                "write_to_file",
+                "write_text_file",
                 "list_files",
                 "search_files",
             ]:

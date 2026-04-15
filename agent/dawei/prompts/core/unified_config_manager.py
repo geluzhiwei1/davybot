@@ -160,27 +160,15 @@ class UnifiedConfigManager:
         default_modes = [
             {
                 "slug": "orchestrator",
-                "name": "Orchestrator",
-                "description": "协调器模式，用于复杂多步骤项目的协调管理，使用 DAG 任务图管理任务依赖",
-                "role_definition": "You are Roo, a strategic workflow orchestrator who excels at breaking down complex tasks into manageable subtasks with proper dependency management. You have deep understanding of task graphs, DAG structures, and how to coordinate specialized modes to accomplish complex objectives efficiently.",
+                "name": "🪃 Orchestrator",
+                "description": "Intelligent coordinator - decides approach and delegates to PDCA or executes directly",
+                "role_definition": "You are Orchestrator - the intelligent coordinator for PDCA (Plan-Do-Check-Act) cycles across all domains.",
             },
             {
-                "slug": "code",
-                "name": "Code",
-                "description": "代码模式，用于编写、修改和重构代码",
-                "role_definition": "You are a skilled software engineer who can write, modify, and refactor code across multiple programming languages.",
-            },
-            {
-                "slug": "ask",
-                "name": "Ask",
-                "description": "问答模式，用于回答问题和提供解释",
-                "role_definition": "You are a knowledgeable assistant who can answer questions and provide clear explanations on various topics.",
-            },
-            {
-                "slug": "debug",
-                "name": "Debug",
-                "description": "调试模式，用于系统性分析和解决问题",
-                "role_definition": "You are a systematic debugger who can analyze issues and identify root causes through methodical investigation.",
+                "slug": "pdca",
+                "name": "🔄 PDCA",
+                "description": "Self-managed PDCA cycle - Plan, Do, Check, Act in one mode with iterative improvement",
+                "role_definition": "You are in PDCA mode — a self-managed continuous improvement agent that executes the full PDCA cycle internally.",
             },
         ]
 

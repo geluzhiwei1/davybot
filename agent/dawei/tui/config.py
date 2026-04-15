@@ -252,7 +252,7 @@ class TUIConfig:
 def create_tui_config(
     workspace: str,
     llm: str = "",  # Empty means load from workspace config
-    mode: str = "plan",
+    mode: str = "pdca",
     verbose: bool = False,
     **kwargs,
 ) -> TUIConfig:

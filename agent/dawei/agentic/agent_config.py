@@ -29,10 +29,7 @@ class AgentMode(StrEnum):
     """
 
     ORCHESTRATOR = "orchestrator"  # 智能协调者模式 - 跨领域PDCA协调（拥有所有工具权限）
-    PLAN = "plan"  # 规划阶段 - 只读模式：仅分析，不修改文件
-    DO = "do"  # 执行阶段 - 执行具体任务
-    CHECK = "check"  # 检查阶段 - 验证结果
-    ACT = "act"  # 行动阶段 - 改进措施
+    PDCA = "pdca"  # PDCA 持续改进模式 - 自管理 Plan-Do-Check-Act 循环
 
 
 class Config:

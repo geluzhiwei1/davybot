@@ -230,7 +230,7 @@ class Agent:
 
         # 【新增】Plan Mode 工作流执行器
         self.plan_workflow = None
-        if self.config.mode == "plan":
+        if self.config.mode == "pdca":
             try:
                 from dawei.agentic.plan_workflow import PlanWorkflowExecutor
 
@@ -458,6 +458,18 @@ class Agent:
                     f"Failed to inject knowledge_base_id into tools: {e}",
                     exc_info=True,
                 )
+
+        # Inject agent reference into tools that need it (e.g., ShowCostTool)
+        try:
+            if hasattr(self.execution_engine, "tool_call_service"):
+                tool_call_service = self.execution_engine.tool_call_service
+                if hasattr(tool_call_service, "inject_agent"):
+                    tool_call_service.inject_agent(self)
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to inject agent into tools: {e}",
+                exc_info=True,
+            )
 
         # 标记为已初始化
         self._initialized = True

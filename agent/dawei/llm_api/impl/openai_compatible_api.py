@@ -469,6 +469,9 @@ class OpenaiCompatibleClient(BaseClient):
                 total_tokens += self.get_num_tokens(content)
         return total_tokens
 
+    # LLM API 标准字段白名单，非标准字段（timestamp/id等）会导致部分提供商报错
+    _LLM_MESSAGE_ALLOWED_KEYS = {"role", "content", "name", "tool_calls", "tool_call_id"}
+
     def _prepare_request_params(self, messages: List[LLMMessage], **kwargs) -> Dict[str, Any]:
         """准备请求参数"""
         params = {**self.default_params, **kwargs}
@@ -477,9 +480,13 @@ class OpenaiCompatibleClient(BaseClient):
         serialized_messages = []
         for message in messages:
             if hasattr(message, "to_dict"):
-                serialized_messages.append(message.to_dict())
+                msg_dict = message.to_dict()
             else:
-                serialized_messages.append(message)
+                msg_dict = message
+            # 剥离非标准字段（如 timestamp、id），避免严格校验的提供商（GLM等）报 400
+            serialized_messages.append(
+                {k: v for k, v in msg_dict.items() if k in self._LLM_MESSAGE_ALLOWED_KEYS}
+            )
 
         params["messages"] = serialized_messages
 

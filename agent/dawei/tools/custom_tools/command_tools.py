@@ -4,7 +4,9 @@ from typing import List, Dict
 
 import json
 import os
+import platform
 import subprocess
+import sys
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -36,19 +38,54 @@ DANGEROUS_COMMANDS = {
     },
 }
 
-ALLOWED_SHELL_COMMANDS = [
-    "ls",
-    "pwd",
-    "echo",
-    "cat",
-    "grep",
-    "find",
-    "wc",
-    "head",
-    "tail",
-    "sort",
-    "uniq",
-]
+# OS-specific safe command whitelists (read-only / non-destructive)
+_ALLOWED_POSIX_COMMANDS = sorted([
+    # File inspection
+    "ls", "pwd", "cat", "file", "stat",
+    # Text processing
+    "grep", "find", "wc", "head", "tail", "sort", "uniq",
+    "cut", "tr", "diff", "comm", "paste", "fmt",
+    # System info (read-only)
+    "uname", "hostname", "whoami", "id", "date", "uptime",
+    "env", "printenv", "which", "whereis", "type",
+    # Disk / memory / process (read-only)
+    "df", "du", "free", "ps", "lsof",
+    # Hashing / encoding
+    "md5sum", "sha256sum", "sha1sum", "base64", "xxd", "od",
+    # Path utilities
+    "basename", "dirname", "realpath", "readlink",
+    # Network (read-only diagnostics)
+    "ping", "ip", "ss", "dig", "nslookup", "curl",
+    # Misc
+    "echo", "true", "false", "test", "printf",
+])
+
+_ALLOWED_WINDOWS_COMMANDS = sorted([
+    # File inspection
+    "cmd", "dir", "type", "where",
+    # Text processing
+    "findstr", "sort", "more",
+    # System info (read-only)
+    "hostname", "whoami", "ver", "systeminfo", "date", "time",
+    "set", "echo",
+    # Disk / network (read-only)
+    "fsutil", "ipconfig", "ping", "nslookup",
+    # Misc
+    "certutil",
+])
+
+
+def _get_allowed_shell_commands() -> list[str]:
+    """Detect OS and return the appropriate safe command whitelist."""
+    system = sys.platform
+    if system == "win32" or system == "cygwin":
+        return _ALLOWED_WINDOWS_COMMANDS
+    # linux, darwin (macOS), freebsd, etc.
+    return _ALLOWED_POSIX_COMMANDS
+
+
+# Resolve at import time
+ALLOWED_SHELL_COMMANDS = _get_allowed_shell_commands()
 
 
 def _check_dangerous_command(command: str) -> str | None:
@@ -313,7 +350,7 @@ class RunSlashCommandTool(CustomBaseTool):
     """
 
     name: str = "run_slash_command"
-    description: str = "Execute predefined slash commands for templated workflows and instructions"
+    description: str = "Execute predefined slash commands for templated workflows and instructions. Supports built-in commands, user commands, and workspace-specific commands (3-tier priority). Returns JSON with the command's content, description, mode, and source. Use '/help' to discover available commands."
     args_schema: type[BaseModel] = RunSlashCommandInput
 
     def __init__(self, command_manager=None):
@@ -436,14 +473,23 @@ class ShellCommandInput(BaseModel):
 class ShellCommandTool(CustomBaseTool):
     """Tool for executing shell commands with argument list for better security.
 
-    Only allows a predefined set of safe commands.
+    Only allows a predefined set of safe commands (OS-specific whitelist).
     Always executes in the workspace directory.
 
     Note: This tool ALWAYS executes in the workspace directory. The cwd parameter is ignored.
     """
 
     name: str = "shell_command"
-    description: str = "Executes shell commands with argument list for better security. Only allows safe commands: " + ", ".join(ALLOWED_SHELL_COMMANDS)
+    # description is built lazily in __init__ to use the runtime ALLOWED_SHELL_COMMANDS
+    description: str = ""
+
+    def __init__(self):
+        super().__init__()
+        self.description = (
+            "Executes shell commands with argument list for better security. "
+            f"OS: {platform.system()}. "
+            f"Allowed commands: {', '.join(ALLOWED_SHELL_COMMANDS)}"
+        )
     args_schema: type[BaseModel] = ShellCommandInput
 
     @safe_tool_operation(

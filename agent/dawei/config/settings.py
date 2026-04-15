@@ -398,6 +398,9 @@ class AgentTimeoutConfig(BaseSettings):
 
     tool_execution_timeout: int = Field(default=60)
     request_timeout: int = Field(default=180)
+    # 流式空闲超时：LLM流在此时间内无任何数据则判定为卡死（秒）
+    # 仅当流完全无数据时触发，流活跃则不计时
+    stream_idle_timeout: int = Field(default=120)
 
 
 class AgentExecutionConfig(BaseSettings):
@@ -534,17 +537,6 @@ class ToolConfig(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
-    )
-
-    # 始终可用的工具
-    always_available_tools: List[str] = Field(
-        default_factory=lambda: [
-            "ask_followup_question",
-            "attempt_completion",
-            "switch_mode",
-            "run_slash_command",
-            "timer",
-        ],
     )
 
     # 工具组配置

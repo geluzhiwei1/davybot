@@ -26,54 +26,38 @@ from .tool_provider import CustomToolProvider
 logger = logging.getLogger(__name__)
 
 
-# 始终可用的工具列表，参考 TypeScript 版本结构
-ALWAYS_AVAILABLE_TOOLS = {
-    "ask_followup_question",
-    "attempt_completion",
-    "switch_mode",
-    "run_slash_command",
-    "timer",
-    "search_user_knowledge_base",
-    "query_user_knowledge_base",
-}
-
-# 工具组定义，参考 TypeScript 版本结构
+# 工具组定义
+# 每个 mode 必须在 modes.yaml 中显式声明需要的 groups
+# 未声明的组中的工具在该 mode 下不可用
 TOOL_GROUPS = {
     "read": {
         "tools": [
             "read_file",
-            "fetch_instructions",
-            "search_files",
             "list_files",
-            "list_code_definition_names",
-            "codebase_search",
         ],
     },
     "edit": {
-        "tools": ["apply_diff", "write_to_file", "insert_content", "generate_image"],
-        "custom_tools": ["search_and_replace"],
-    },
-    "browser": {
-        "tools": ["browser_action"],
+        "tools": [
+            "write_text_file",
+            "smart_text_edit",
+            "insert_text_content",
+        ],
     },
     "command": {
-        "tools": ["execute_command"],
+        "tools": [
+            "execute_command",
+            "run_slash_command",
+            "shell_command",
+        ],
     },
     "mcp": {
-        "tools": ["use_mcp_tool", "access_mcp_resource", "call_acp_agent"],
-    },
-    "modes": {
-        "tools": ["switch_mode", "new_task"],
-        "always_available": True,
-    },
-    # 任务图和 workflow 工具组
-    "task_graph": {
         "tools": [
-            "create_task_graph",
-            "add_task_node",
-            "set_task_dependency",
-            "get_task_graph",
-            "execute_task_graph",
+            "use_mcp_tool",
+            "access_mcp_resource",
+            "call_acp_agent",
+            "list_mcp_servers",
+            "connect_mcp_server",
+            "disconnect_mcp_server",
         ],
     },
     "workflow": {
@@ -81,11 +65,11 @@ TOOL_GROUPS = {
             "new_task",
             "update_todo_list",
             "get_task_status",
-            "analyze_task_complexity",
-            "generate_todo_plan",
-            "validate_todo_plan",
-            "adjust_todo_order",
             "timer",
+            "ask_followup_question",
+            "attempt_completion",
+            "switch_mode",
+            "show_cost",
         ],
     },
     "knowledge": {
@@ -93,6 +77,28 @@ TOOL_GROUPS = {
             "search_user_knowledge_base",
             "query_user_knowledge_base",
         ],
+    },
+    "docx": {
+        "custom_tools": [
+            "docx_read_structured",
+            "docx_diff",
+            "docx_edit",
+        ],
+    },
+    "skills": {
+        "custom_tools": [
+            "list_skills",
+            "search_skills",
+            "get_skill",
+            "list_skill_resources",
+            "read_skill_resource",
+        ],
+    },
+    "browser": {
+        "tools": [],  # Browser tools are loaded dynamically by skill system
+    },
+    "task_graph": {
+        "tools": [],  # TaskGraph tools are injected by workspace, not static
     },
 }
 
@@ -102,7 +108,6 @@ class ToolGroupConfig:
     """工具组配置数据类"""
 
     tools: List[str] = field(default_factory=list)
-    always_available: bool = False
     custom_tools: List[str] = field(default_factory=list)
 
     @classmethod
@@ -110,7 +115,6 @@ class ToolGroupConfig:
         """从字典创建工具组配置"""
         return cls(
             tools=data.get("tools", []),
-            always_available=data.get("always_available", False),
             custom_tools=data.get("custom_tools", []),
         )
 
@@ -118,7 +122,6 @@ class ToolGroupConfig:
         """转换为字典"""
         return {
             "tools": self.tools,
-            "always_available": self.always_available,
             "custom_tools": self.custom_tools,
         }
 
@@ -616,7 +619,7 @@ class ToolManager:
         all_tools: List[Dict[str, Any]],
         workspace_settings=None,
     ) -> set[str]:
-        """根据工作区设置过滤工具名称，确保始终可用工具在任何模式下都可用
+        """根据工作区设置过滤工具名称
 
         Args:
             all_tools: 所有工具列表
@@ -633,21 +636,6 @@ class ToolManager:
 
         for tool in all_tools:
             tool_name = tool["name"]
-
-            # 始终可用的工具总是允许的
-            if self.is_always_available(tool_name):
-                allowed_tools.add(tool_name)
-                continue
-
-            # 基本工具总是允许的
-            if tool_name in [
-                "read_file",
-                "write_to_file",
-                "list_files",
-                "search_files",
-            ]:
-                allowed_tools.add(tool_name)
-                continue
 
             # MCP工具需要检查设置
             if tool_name.startswith(("mcp_", "use_mcp_")):
@@ -779,48 +767,20 @@ class ToolManager:
         logger.debug(f"Found {len(tool_names)} tool names in groups: {group_names}")
         return tool_names
 
-    def get_always_available_tools(self) -> set[str]:
-        """获取始终可用工具集合
-
-        Returns:
-            Set[str]: 始终可用的工具名称集合
-
-        """
-        return ALWAYS_AVAILABLE_TOOLS.copy()
-
-    def is_always_available(self, tool_name: str) -> bool:
-        """检查工具是否始终可用
-
-        Args:
-            tool_name: 工具名称
-
-        Returns:
-            bool: 如果工具始终可用则返回 True，否则返回 False
-
-        """
-        return tool_name in ALWAYS_AVAILABLE_TOOLS
-
     def get_available_tools_with_groups(self, group_names: List[str]) -> set[str]:
-        """结合工具组和始终可用工具获取最终可用工具列表
+        """根据 mode 声明的工具组获取可用工具列表
 
         Args:
             group_names: 工具组名称列表
 
         Returns:
-            Set[str]: 包含指定工具组工具和始终可用工具的集合
+            Set[str]: 指定工具组中的工具名称集合
 
         """
-        # 获取指定工具组的工具
-        group_tools = self.get_group_tools(group_names)
-
-        # 添加始终可用的工具
-        always_available = self.get_always_available_tools()
-
-        # 合并两个集合
-        available_tools = group_tools.union(always_available)
+        available_tools = self.get_group_tools(group_names)
 
         logger.debug(
-            f"Found {len(available_tools)} available tools (groups: {group_names}, always available: {len(always_available)})",
+            f"Found {len(available_tools)} available tools for groups: {group_names}",
         )
         return available_tools
 

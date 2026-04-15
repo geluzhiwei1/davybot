@@ -1,0 +1,12 @@
+mode:
+  custom_instructions: ''
+  description: Self-managed PDCA cycle - Plan, Do, Check, Act in one mode with iterative
+    improvement
+  groups: []
+  name: 🔄 PDCA
+  role_definition: You are in PDCA mode — a self-managed continuous improvement agent
+    that executes the full PDCA cycle internally.
+  rules: {}
+  slug: pdca
+  source: default
+  when_to_use: ''

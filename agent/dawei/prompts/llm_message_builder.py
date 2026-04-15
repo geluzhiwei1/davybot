@@ -180,8 +180,8 @@ class EnhancedSystemBuilder(IMessageProcessor):
         if additional_data:
             context.update(additional_data)
 
-        # 【新增】Plan Mode 工作流状态
-        if current_mode == "plan" and additional_data and "plan_workflow" in additional_data:
+        # 【新增】PDCA Mode 工作流状态
+        if current_mode == "pdca" and additional_data and "plan_workflow" in additional_data:
             plan_workflow = additional_data["plan_workflow"]
             if plan_workflow and hasattr(plan_workflow, "get_template_context"):
                 # 获取工作流模板上下文并合并到主上下文

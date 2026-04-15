@@ -15,9 +15,9 @@
       </el-tooltip>
     </div>
 
-    <!-- 简化模式 -->
+    <!-- 模式选择 -->
     <div class="mode-section">
-      <div class="mode-section-title">简化模式</div>
+      <div class="mode-section-title">Agent 模式</div>
       <div class="mode-buttons">
         <button
           :class="['mode-btn', { active: currentMode === 'orchestrator' }]"
@@ -31,60 +31,14 @@
         </button>
 
         <button
-          :class="['mode-btn', { active: currentMode === 'plan' }]"
-          @click="switchMode('plan')"
+          :class="['mode-btn', { active: currentMode === 'pdca' }]"
+          @click="switchMode('pdca')"
           :disabled="isSwitching"
         >
-          <span class="mode-icon">📋</span>
-          <span class="mode-name">Plan Only</span>
-          <span class="mode-desc">只读分析</span>
-          <span v-if="currentMode === 'plan'" class="mode-badge">当前</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- PDCA 完整模式 -->
-    <div class="mode-section">
-      <div class="mode-section-title">PDCA 循环模式</div>
-      <div class="pdca-cycle">
-        <button
-          :class="['pdca-btn', { active: currentMode === 'plan', active: pdcaPhase === 'plan' }]"
-          @click="switchMode('plan')"
-          :disabled="isSwitching"
-        >
-          <span class="pdca-icon">📋</span>
-          <span class="pdca-name">Plan</span>
-          <span class="pdca-desc">规划</span>
-        </button>
-
-        <button
-          :class="['pdca-btn', { active: currentMode === 'do' }]"
-          @click="switchMode('do')"
-          :disabled="isSwitching"
-        >
-          <span class="pdca-icon">⚙️</span>
-          <span class="pdca-name">Do</span>
-          <span class="pdca-desc">执行</span>
-        </button>
-
-        <button
-          :class="['pdca-btn', { active: currentMode === 'check' }]"
-          @click="switchMode('check')"
-          :disabled="isSwitching"
-        >
-          <span class="pdca-icon">✓</span>
-          <span class="pdca-name">Check</span>
-          <span class="pdca-desc">检查</span>
-        </button>
-
-        <button
-          :class="['pdca-btn', { active: currentMode === 'act' }]"
-          @click="switchMode('act')"
-          :disabled="isSwitching"
-        >
-          <span class="pdca-icon">🚀</span>
-          <span class="pdca-name">Act</span>
-          <span class="pdca-desc">改进</span>
+          <span class="mode-icon">🔄</span>
+          <span class="mode-name">PDCA</span>
+          <span class="mode-desc">完整循环</span>
+          <span v-if="currentMode === 'pdca'" class="mode-badge">当前</span>
         </button>
       </div>
     </div>
@@ -125,7 +79,7 @@ import { MessageType } from '@/types/websocket';
 const { sendMessage, subscribe, sessionId, isConnected } = useWebSocket();
 
 // PDCA Modes 类型
-type PDAMode = 'orchestrator' | 'plan' | 'do' | 'check' | 'act';
+type PDAMode = 'orchestrator' | 'pdca';
 
 const currentMode = ref<PDAMode>('orchestrator');
 const isSwitching = ref(false);
@@ -197,7 +151,7 @@ onMounted(() => {
 
   // 从本地存储恢复模式状态
   const savedMode = localStorage.getItem('agent_mode') as PDAMode;
-  if (savedMode && ['orchestrator', 'plan', 'do', 'check', 'act'].includes(savedMode)) {
+  if (savedMode && ['orchestrator', 'pdca'].includes(savedMode)) {
     currentMode.value = savedMode;
   }
 });

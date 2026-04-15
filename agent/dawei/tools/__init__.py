@@ -8,8 +8,6 @@ from typing import List, Dict
 
 from .custom_base_tool import CustomBaseTool
 from .custom_tools import (
-    ApplyDiffTool,
-    DocumentParsingTool,
     NewTaskTool,
     SmartFileEditTool,
     UpdateTodoListTool,
@@ -49,9 +47,7 @@ def get_tools_for_mode(mode: str, user_workspace=None):
 
 
 __all__ = [
-    "ApplyDiffTool",
     "CustomBaseTool",
-    "DocumentParsingTool",
     "GetSkillTool",
     "ListSkillResourcesTool",
     "ListSkillsTool",

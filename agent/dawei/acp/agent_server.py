@@ -101,10 +101,7 @@ class DaweiACPAgent:
         schema = self._acp.schema
         available_modes = [
             schema.SessionMode(id="orchestrator", name="Orchestrator", description="Default Dawei orchestration mode"),
-            schema.SessionMode(id="plan", name="Plan", description="PDCA Plan mode"),
-            schema.SessionMode(id="do", name="Do", description="PDCA Do mode"),
-            schema.SessionMode(id="check", name="Check", description="PDCA Check mode"),
-            schema.SessionMode(id="act", name="Act", description="PDCA Act mode"),
+            schema.SessionMode(id="pdca", name="PDCA", description="Self-managed PDCA cycle mode"),
         ]
         return schema.SessionModeState(available_modes=available_modes, current_mode_id=self.default_mode)
 

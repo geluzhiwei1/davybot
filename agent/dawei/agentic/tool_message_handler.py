@@ -573,6 +573,18 @@ class ToolMessageHandle:
                     source="tool_message_handler",
                 )
 
+                # 将用户回复作为 ToolMessage 添加到对话历史
+                # 这样新一轮 LLM 调用时能看到用户的回答
+                self._user_workspace.current_conversation.say(
+                    ToolMessage(
+                        content=json.dumps(result, ensure_ascii=False),
+                        tool_call_id=tool_call_id,
+                    ),
+                )
+                self.logger.info(
+                    f"Added followup response ToolMessage to conversation: tool_call_id={tool_call_id}",
+                )
+
                 # 返回结果，告诉 LLM 用户的回答
                 return result
 
@@ -598,6 +610,14 @@ class ToolMessageHandle:
                     self._event_bus,
                     task_id=self.task_node.task_node_id,
                     source="tool_message_handler",
+                )
+
+                # 将超时结果也添加到对话历史
+                self._user_workspace.current_conversation.say(
+                    ToolMessage(
+                        content=json.dumps(result, ensure_ascii=False),
+                        tool_call_id=tool_call_id,
+                    ),
                 )
 
                 return result

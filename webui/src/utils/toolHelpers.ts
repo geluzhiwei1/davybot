@@ -124,6 +124,63 @@ export function getErrorSuggestion(errorCode?: string): string {
   return ERROR_SUGGESTION_MAP[errorCode] || ''
 }
 
+// ==================== Unicode 解码 ====================
+
+/**
+ * 解码字符串中的 \uXXXX unicode 转义序列为实际字符
+ * 用于工具结果显示时将 \\u0627 等转义还原为可读文本
+ */
+function decodeUnicodeEscapes(str: string): string {
+  try {
+    // 用 JSON.parse 解码：将字符串包装成 JSON 字符串格式来解析
+    const decoded = JSON.parse(`"${str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"`)
+    return typeof decoded === 'string' ? decoded : str
+  } catch {
+    // fallback: 正则替换
+    return str.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    )
+  }
+}
+
+/**
+ * 对可能包含 unicode 转义的字符串进行智能解码
+ * 如果字符串是 JSON 格式，先解析再格式化
+ */
+function smartDecode(str: string): string {
+  // 尝试作为 JSON 解析（可能是双重编码的 JSON 字符串）
+  const trimmed = str.trim()
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(str)
+      // 递归解码对象中的所有字符串值
+      const decoded = deepDecodeUnicode(parsed)
+      return JSON.stringify(decoded, null, 2)
+    } catch {
+      // 不是有效 JSON，继续尝试 unicode 解码
+    }
+  }
+  return decodeUnicodeEscapes(str)
+}
+
+/**
+ * 递归解码对象中所有字符串值的 unicode 转义
+ */
+function deepDecodeUnicode(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return decodeUnicodeEscapes(value)
+  } else if (Array.isArray(value)) {
+    return value.map(deepDecodeUnicode)
+  } else if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = deepDecodeUnicode(val)
+    }
+    return result
+  }
+  return value
+}
+
 // ==================== 格式化函数 ====================
 
 /**
@@ -150,11 +207,12 @@ export function formatExecutionTime(time: number): string {
  */
 export function formatToolInput(input: unknown): string {
   if (typeof input === 'string') {
-    return input
+    return smartDecode(input)
   } else if (input === null || input === undefined) {
     return 'null'
   } else {
-    return JSON.stringify(input, null, 2)
+    const decoded = deepDecodeUnicode(input)
+    return JSON.stringify(decoded, null, 2)
   }
 }
 
@@ -165,11 +223,12 @@ export function formatToolInput(input: unknown): string {
  */
 export function formatToolOutput(output: unknown): string {
   if (typeof output === 'string') {
-    return output
+    return smartDecode(output)
   } else if (output === null || output === undefined) {
     return 'null'
   } else {
-    return JSON.stringify(output, null, 2)
+    const decoded = deepDecodeUnicode(output)
+    return JSON.stringify(decoded, null, 2)
   }
 }
 
@@ -180,11 +239,12 @@ export function formatToolOutput(output: unknown): string {
  */
 export function formatToolResult(result: unknown): string {
   if (typeof result === 'string') {
-    return result
+    return smartDecode(result)
   } else if (result === null || result === undefined) {
     return 'null'
   } else {
-    return JSON.stringify(result, null, 2)
+    const decoded = deepDecodeUnicode(result)
+    return JSON.stringify(decoded, null, 2)
   }
 }
 

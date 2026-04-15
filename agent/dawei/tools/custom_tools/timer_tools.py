@@ -7,7 +7,6 @@
 提供延迟执行、定时执行和重复执行功能
 """
 
-import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -16,63 +15,43 @@ from dawei.core.datetime_compat import UTC
 from pydantic import BaseModel, Field
 
 from dawei.entity.scheduled_task import ScheduledTask, ScheduleType, TriggerStatus
+from dawei.core.decorators import safe_tool_operation
 from dawei.logg.logging import get_logger
 from dawei.tools.custom_base_tool import CustomBaseTool
+from dawei.tools.custom_tools.async_utils import run_async
 from dawei.tools.scheduler import scheduler_manager
 
 
-def _run_async(coro):
-    """在现有事件循环中运行协程，或者创建新的事件循环
-
-    Args:
-        coro: 要运行的协程
-
-    Returns:
-        协程的返回值
-    """
-    try:
-        asyncio.get_running_loop()
-        # 已经在运行的事件循环中，创建 task 并等待
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
-    except RuntimeError:
-        # 没有运行的事件循环，使用 asyncio.run
-        return asyncio.run(coro)
-
-
 class TimerSetInput(BaseModel):
-    """创建定时任务输入"""
+    """Input for creating a scheduled task."""
 
-    description: str = Field(..., description="任务描述")
-    delay_seconds: int | None = Field(None, description="延迟秒数")
-    execute_at: str | None = Field(None, description="执行时间(ISO格式)")
-    repeat_interval: int | None = Field(None, description="重复间隔(秒)")
-    max_repeats: int | None = Field(None, description="最大重复次数")
-    cron: str | None = Field(None, description="Cron表达式 (如: '0 9 * * *' 每天9点)")
-    execution_type: str = Field("message", description="执行类型: 仅支持 message")
-    llm: str | None = Field(None, description="LLM 模型 (可选，覆盖默认值)")
-    mode: str | None = Field(None, description="Agent 模式 (可选，覆盖默认值)")
+    description: str = Field(..., description="Human-readable description of the task to execute.")
+    delay_seconds: int | None = Field(None, description="Number of seconds to wait before executing the task.")
+    execute_at: str | None = Field(None, description="Absolute execution time in ISO format (e.g., '2025-01-01T12:00:00').")
+    repeat_interval: int | None = Field(None, description="Interval in seconds between repeated executions.")
+    max_repeats: int | None = Field(None, description="Maximum number of times the task can repeat.")
+    cron: str | None = Field(None, description="Cron expression for scheduling (e.g., '0 9 * * *' for daily at 9am, '*/5 * * * *' for every 5 minutes).")
+    execution_type: str = Field("message", description="Execution type. Currently only 'message' is supported.")
+    llm: str | None = Field(None, description="LLM model name to use for execution (optional, overrides workspace default).")
+    mode: str | None = Field(None, description="Agent mode for execution (e.g., 'orchestrator', 'pdca'; optional, overrides workspace default).")
 
 
 class TimerInput(BaseModel):
-    """Timer tool input schema - 支持所有操作"""
+    """Timer tool input schema."""
 
-    action: str = Field(..., description="操作类型: set/cancel/list/check")
-    set: TimerSetInput | None = Field(None, description="创建任务的参数 (action='set'时使用)")
-    task_id: str | None = Field(None, description="任务ID (action='cancel'/'check'时使用)")
+    action: str = Field(..., description="Operation type: 'set' to create a task, 'cancel' to cancel, 'list' to list all tasks, 'check' to check a task's status.")
+    set: TimerSetInput | None = Field(None, description="Parameters for creating a task (used when action='set').")
+    task_id: str | None = Field(None, description="Task ID to cancel or check (used when action='cancel' or action='check').")
 
 
 class TimerTool(CustomBaseTool):
-    """定时任务工具
+    """Scheduled task management tool.
 
-    支持以下操作:
-    - set: 创建定时任务
-    - cancel: 取消任务
-    - list: 列出任务
-    - check: 检查任务状态
+    Supported operations:
+    - set: Create a scheduled task
+    - cancel: Cancel a task
+    - list: List all tasks
+    - check: Check task status
 
     Examples:
     - timer(action='set', set={'description': 'Check status', 'delay_seconds': 60})
@@ -84,20 +63,22 @@ class TimerTool(CustomBaseTool):
 
     name: str = "timer"
     description: str = (
-        "定时任务管理工具。\n"
-        "set: 创建定时任务 - timer(action='set', set={'description': 'xxx', 'delay_seconds': 60})\n"
-        "cancel: 取消任务 - timer(action='cancel', task_id='xxx')\n"
-        "list: 列出任务 - timer(action='list')\n"
-        "check: 检查任务 - timer(action='check', task_id='xxx')\n\n"
-        "参数说明:\n"
-        "- delay_seconds: 延迟执行的秒数\n"
-        "- execute_at: 指定执行时间(ISO格式, 如 '2025-01-01T12:00:00')\n"
-        "- repeat_interval: 重复间隔(秒)\n"
-        "- max_repeats: 最大重复次数\n"
-        "- cron: Cron表达式 (如 '0 9 * * *' 每天9点, '*/5 * * * *' 每5分钟)\n"
-        "- llm: LLM 模型 (可选, 覆盖 workspace 默认值)\n"
-        "- mode: Agent 模式 (可选, 如 'orchestrator/plan/do/check/act', 覆盖 workspace 默认值)\n\n"
-        "Cron表达式格式: 分 时 日 月 周 (如: '0 9 * * 1-5' 工作日每天9点)"
+        "Scheduled task management tool.\n"
+        "set: Create a scheduled task - timer(action='set', set={'description': 'xxx', 'delay_seconds': 60})\n"
+        "cancel: Cancel a task - timer(action='cancel', task_id='xxx')\n"
+        "list: List all tasks - timer(action='list')\n"
+        "check: Check task status - timer(action='check', task_id='xxx')\n\n"
+        "Scheduling options (specify one):\n"
+        "- delay_seconds: Seconds to wait before execution\n"
+        "- execute_at: Absolute time in ISO format (e.g., '2025-01-01T12:00:00')\n"
+        "- cron: Cron expression (e.g., '0 9 * * *' daily at 9am, '*/5 * * * *' every 5 min)\n\n"
+        "Repeat options:\n"
+        "- repeat_interval: Seconds between repeated executions\n"
+        "- max_repeats: Maximum number of repetitions\n\n"
+        "Optional overrides:\n"
+        "- llm: LLM model name for execution (overrides workspace default)\n"
+        "- mode: Agent PDCA mode for execution (e.g., 'orchestrator/plan/do/check/act'; overrides workspace default)\n\n"
+        "Cron format: minute hour day month weekday (e.g., '0 9 * * 1-5' weekdays at 9am)"
     )
     args_schema: type[BaseModel] = TimerInput
 
@@ -105,6 +86,7 @@ class TimerTool(CustomBaseTool):
         super().__init__()
         self.logger = get_logger(__name__)
 
+    @safe_tool_operation("timer", fallback_value="Error: Timer operation failed")
     def _run(
         self,
         action: str,
@@ -175,7 +157,7 @@ class TimerTool(CustomBaseTool):
         """创建定时任务"""
         try:
             # ✅ 使用 _run_async 包装异步操作
-            return _run_async(self._set_task_async(workspace_id, workspace_path, params))
+            return run_async(self._set_task_async(workspace_id, workspace_path, params))
         except Exception as e:
             self.logger.error(f"Error in _set_task: {e}", exc_info=True)
             return json.dumps({"status": "error", "message": f"Error: {e!s}"}, indent=2)
@@ -332,7 +314,7 @@ class TimerTool(CustomBaseTool):
 
         try:
             # ✅ 使用 _run_async 包装异步操作
-            result = _run_async(self._cancel_task_async(workspace_id, workspace_path, task_id))
+            result = run_async(self._cancel_task_async(workspace_id, workspace_path, task_id))
             return json.dumps(result, indent=2)
         except Exception as e:
             self.logger.error(f"Failed to cancel task {task_id}: {e}", exc_info=True)
@@ -368,7 +350,7 @@ class TimerTool(CustomBaseTool):
         """列出所有定时任务"""
         try:
             # ✅ 使用 _run_async 包装异步操作
-            result = _run_async(self._list_tasks_async(workspace_id, workspace_path))
+            result = run_async(self._list_tasks_async(workspace_id, workspace_path))
             return json.dumps(result, indent=2)
         except Exception as e:
             self.logger.error(f"Failed to list tasks: {e}", exc_info=True)
@@ -415,7 +397,7 @@ class TimerTool(CustomBaseTool):
 
         try:
             # ✅ 使用 _run_async 包装异步操作
-            result = _run_async(self._check_task_async(workspace_id, workspace_path, task_id))
+            result = run_async(self._check_task_async(workspace_id, workspace_path, task_id))
             return json.dumps(result, indent=2)
         except Exception as e:
             self.logger.error(f"Failed to check task {task_id}: {e}", exc_info=True)
