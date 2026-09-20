@@ -1,0 +1,25 @@
+{
+  "slug": "labor-cross-border",
+  "name": "跨境用工与外派合规评估清单",
+  "category": "劳动用工",
+  "description": "外派管理、EHS、IP/数据跨境、信息安全、资产管理五维度跨境合规",
+  "applicable_scenarios": ["外派方案评估", "海外用工体系设计", "跨境派遣", "本地雇佣"],
+  "items": [
+    { "task": "三方派遣协议完备性审查", "category": "外派" },
+    { "task": "Cross-Default 联动解雇条款审查", "category": "外派" },
+    { "task": "薪酬拆分双重税务审查", "category": "外派" },
+    { "task": "欧盟 Posted Workers 12月吞噬红线校验", "category": "外派" },
+    { "task": "签证/就劳资质合规校验", "category": "外派" },
+    { "task": "强制工伤险在保校验（新加坡 WICA 等）", "category": "EHS" },
+    { "task": "高温/极端环境排班审查", "category": "EHS" },
+    { "task": "特种作业持牌资质前置校验", "category": "EHS" },
+    { "task": "德国雇员发明报酬机制审计", "category": "IP" },
+    { "task": "加州 Non-Compete 合法性过滤", "category": "IP" },
+    { "task": "GDPR/PIPL 监控与数据跨境审查", "category": "数据" },
+    { "task": "电子通信资产无隐私期待审查", "category": "信息安全" },
+    { "task": "境外公寓/住房收回机制合法性", "category": "资产" },
+    { "task": "报销舞弊零容忍闭环审查", "category": "资产" },
+    { "task": "状态码分类输出（MOB/EHS/IP/SEC/FIN）", "category": "分析" },
+    { "task": "证据链完整性检查", "category": "合规记录" }
+  ]
+}

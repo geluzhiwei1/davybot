@@ -1,0 +1,88 @@
+platform: wechat_mp
+display_name: 微信公众号
+version: 0.2.6
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 20000
+  max_files: 20
+  max_video_seconds: 600
+  rich_text: true
+domains:
+- mp.weixin.qq.com
+publish:
+  compose_url: https://mp.weixin.qq.com/
+  selectors:
+    # 2026 版首页:创作菜单直出(.weui-desktop-panel「新的创作」),无入口按钮,直点「文章」项
+    compose_button:
+      primary: .new-creation__menu-item:has-text("文章")
+      fallback: .new-creation__menu-content:has-text("文章"), .weui-desktop-btn:has-text("新的创作")
+      wait_after_click_ms: 4000
+    # 2026 版编辑器(appmsg_edit_v2)为 ProseMirror 双栏:#title/ueditor 均为隐藏的旧 DOM
+    # wait_timeout_ms:新标签编辑器 SPA 冷启渲染慢,默认 8s 不够(真机 2026-08-28 复现)
+    title_input:
+      primary: .ProseMirror >> nth=0
+      fallback: '#title, textarea.js_article_title'
+      wait_timeout_ms: 20000
+    compose_box:
+      primary: .ProseMirror >> nth=1
+      fallback: '#ueditor_0, div[contenteditable="true"].edui-body'
+      wait_timeout_ms: 25000
+    save_draft_button:
+      primary: button:has-text("保存")
+      fallback: .weui-desktop-btn:has-text("保存为草稿"), .toolkit-btn:has-text("保存")
+      wait_after_click_ms: 3000
+    publish_button:
+      primary: button:has-text("群发")
+      fallback: .weui-desktop-btn:has-text("群发")
+      wait_after_click_ms: 5000
+    media_upload:
+      primary: input[type="file"][accept*="image"]
+      max_files: 20
+      max_video_seconds: 600
+    success_indicator:
+      method: text_contains
+      pattern: 已保存
+  rich_text:
+    enabled: true
+    content_format: html_inline_style
+    # 微信方言:块级映射 section+style(标题附字号);PM paste 管线才认,标准 h2/p 会被剥成纯文本
+    dialect: wechat_section
+    # 真剪贴板 Ctrl+V 走 PM paste 解析(2026-08-28 真机三路对照唯一样式全保留);insertHTML 仅兜底
+    inject_method: clipboard_paste
+    image_handling: file_upload
+    style:
+      heading_style: 'margin: 1.2em 0 0.6em; font-weight: bold;'
+      paragraph_style: 'margin: 0.8em 0; line-height: 1.75; letter-spacing: 0.5px;'
+      image_style: 'max-width: 100%; margin: 10px auto; display: block;'
+      blockquote_style: 'margin: 1em 0; padding: 0.5em 1em; border-left: 4px solid #07c160; color: #666;
+        background: #f7f7f7;'
+      list_style: 'margin: 0.8em 0; padding-left: 2em;'
+  login_check:
+    url: https://mp.weixin.qq.com/
+    # 仅命中登录后才存在的元素;去掉 .main_nav/.header__info(登录页也有,会误判已登录)
+    indicator: .new-creation__btn, .weui-desktop-account__info, .account_box
+    # 负向标记:存在任一即判未登录(登录页 QR/账号选择容器)
+    absent_indicator: '#login_qrcode_area, #js_login_qrcode, .login__type__container, .login_box'
+trending:
+  url: ''
+  container: ''
+  topic: ''
+  pagination: click
+metrics:
+  reads: .read_num, span:has-text("阅读")
+  likes: .like_num, span:has-text("赞")
+  comments: .comment_num, span:has-text("留言")
+  shares: .share_num, span:has-text("分享")
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

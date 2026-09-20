@@ -1,0 +1,295 @@
+# 合规工作区模板: 员工手册/规章制度合规审查（升级版 v2.0）
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# 覆盖章节：Ch 1-3（总则/企业文化/商业行为）+ Ch 14（信息安全）+ Ch 20（区域附录）+ Ch 21（动态迭代）
+# 状态码：STATUS_500/403/402/401/302/200 多级判定
+
+template:
+  slug: labor-employment-contract
+  name: "员工手册/规章制度合规审查"
+  version: "2.0"
+  team_slug: labor
+
+  description: >-
+    多法域员工手册合规审查，覆盖总则、企业文化、商业行为准则、信息安全基础、
+    区域附录与动态迭代机制
+
+  applicable_scenarios:
+    - "员工手册审查"
+    - "规章制度合法性"
+    - "全球手册框架设计"
+    - "区域附录定制"
+
+  estimated_time: "45-60 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入贵司全称"
+        store: "input/company_info.json"
+
+      - key: employee_count
+        label: "员工规模"
+        type: select
+        options:
+          - { value: "under50", label: "50 人以下" }
+          - { value: "50to200", label: "50-200 人" }
+          - { value: "200to500", label: "200-500 人" }
+          - { value: "500to1000", label: "500-1000 人" }
+          - { value: "over1000", label: "1000 人以上" }
+        store: "input/company_info.json"
+
+      - key: handbook_file
+        label: "员工手册/规章制度文件"
+        type: file
+        accept: ".pdf,.docx,.txt"
+        store: "input/"
+        description: "上传待审查的员工手册、规章制度或管理手册全文本"
+
+      - key: target_jurisdictions
+        label: "适用法区"
+        type: multiselect
+        options:
+          - "中国内地"
+          - "美国（含加州）"
+          - "英国"
+          - "德国"
+          - "法国"
+          - "西班牙"
+          - "意大利"
+          - "日本"
+          - "韩国"
+          - "新加坡"
+          - "阿联酋/沙特"
+          - "澳大利亚"
+          - "印度"
+          - "印尼"
+          - "巴西"
+          - "南非"
+          - "中国台湾"
+          - "其他（请在备注说明）"
+        store: "input/task_parameters.json"
+
+      - key: review_scope
+        label: "审查范围"
+        type: multiselect
+        options:
+          - "总则与效力条款"
+          - "反腐败与商业行为准则"
+          - "利益冲突管理"
+          - "区域附录（Local Addendum）"
+          - "动态迭代与生效机制"
+          - "工会/民主程序"
+          - "竞业限制/保密"
+          - "信息安全与监控制度"
+          - "全面审查（全本）"
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: has_labor_union
+        label: "是否设有工会/职代会"
+        type: boolean
+        default: false
+        store: "input/company_info.json"
+
+      - key: existing_local_addendum
+        label: "既有区域附录文件"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+        description: "上传已有的区域附录（如法语 RI、印尼语 PP、沙特 Qiwa 核准件）"
+
+      - key: industry_sector
+        label: "所属行业"
+        type: string
+        placeholder: "如：机器人/智能制造、半导体、新能源..."
+        store: "input/company_info.json"
+
+      - key: known_issues
+        label: "已知合规问题或风险"
+        type: text
+        placeholder: "描述已知的手册执行中遇到的问题、劳动仲裁败诉案例等"
+        store: "input/task_parameters.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：全球员工手册合规审查-2026"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/labor-employment-contract"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要审查的员工手册、规章制度文件和相关信息。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 状态码体系
+
+    | 状态码 | 等级 | 含义 |
+    |--------|------|------|
+    | STATUS_500 (FATAL_ERROR) | 🔴 致命 | 底层逻辑缺陷，手册整体失效 |
+    | STATUS_403 (CRITICAL_LOCK) | 🔴 严重 | 触犯强制性法规，面临集体诉讼或处罚 |
+    | STATUS_402 (REJECT_NO_APPROVAL) | 🟠 限制 | 未完成官方核准程序，丧失执行力 |
+    | STATUS_401 (ILLEGAL_PROCEDURE) | 🟠 违规 | 未经法定程序，相关条款不具备执行力 |
+    | STATUS_302 (WARNING) | 🟡 警告 | 存在合规缺陷，建议补充完善 |
+    | STATUS_200 (OK) | 🟢 通过 | 手册架构通过 |
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件（员工手册、区域附录等）
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解手册全文本结构和适用法区
+    - 解析手册全文本，识别总则、行为准则、区域附录、迭代机制四大模块
+    - 制定多法域冲突审查方案（5 大法系 × 冲突点矩阵）
+    - 根据合规清单制定员工手册合规审查执行计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 总则与效力条款审查 → `output/general_provisions_review.md`
+       - 扫描是否包含 Severability Clause 分割存续条款 [CODE: ETH-01]
+       - 扫描是否包含工会/民主程序前置接口 [CODE: ETH-02]
+       - 扫描兼职限制条款的法域兼容性 [CODE: ETH-03]
+
+    b. 反腐败与商业行为审查 → `output/anti_corruption_review.md`
+       - FCPA/UKBA 合规对齐
+       - 制裁联动条款（联动 Agent 2/3）
+
+    c. 利益冲突制度审查 → `output/conflict_of_interest_review.md`
+       - 年度申报机制完备性
+       - 数字化签收留痕
+
+    d. 区域附录审查 → `output/local_addendum_review.md`
+       - 主权凌驾条款 [CODE: ADD-01]
+       - 法国 RI 章程报备 [CODE: ADD-02]
+       - 沙特 Qiwa/印尼 MOM 核准 [CODE: ADD-03]
+
+    e. 动态迭代机制审查 → `output/iteration_mechanism_review.md`
+       - 年度滚动更新机制 [CODE: ITER-01]
+       - 不利变更工会同意 [CODE: ITER-02]
+       - 加州仲裁 Opt-Out [CODE: ITER-03]
+
+    f. 信息安全制度审查（Ch 14 基础覆盖） → `output/info_security_basic_review.md`
+       - 电子资产无隐私期待声明 [CODE: SEC-01]
+       - 影子 IT 禁止条款 [CODE: SEC-02]
+       - 注：深度信息安全审查（含跨境数据传输）在模板 6 中进行
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证效力熔断优先序的闭环性
+    - 确认所有适用法区的必要前置程序均已覆盖
+    - 交叉验证各模块状态码的一致性
+
+    ### Act (输出)
+    - 生成员工手册合规审查报告 → `reports/employee_handbook_review.docx`
+    - 报告必须包含：审查概况、各模块审查结果（含状态码）、冲突点矩阵、
+      整改优先级路线图、证据链核查清单
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 关注最新司法解释和各法域地方法规差异
+    - 规章制度需履行民主程序并公示
+    - 区域附录需完成当地法定核准程序方具执行力
+    - 信息安全基础审查仅覆盖 Ch 14，深度审查请转至专门模板
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - general_provisions_review
+      - anti_corruption_review
+      - conflict_of_interest_review
+      - local_addendum_review
+      - iteration_mechanism_review
+      - info_security_basic_review
+      - status_code_matrix
+      - remediation_roadmap
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_general
+      label: "总则与效力条款"
+      progress: 15
+    - name: do_anticorruption
+      label: "反腐败与商业行为"
+      progress: 15
+    - name: do_conflict
+      label: "利益冲突审查"
+      progress: 10
+    - name: do_addendum
+      label: "区域附录审查"
+      progress: 15
+    - name: do_iteration
+      label: "动态迭代机制"
+      progress: 10
+    - name: do_infosec
+      label: "信息安全基础"
+      progress: 10
+    - name: check
+      label: "质量审查"
+      progress: 5
+    - name: act
+      label: "报告生成"
+      progress: 10
+
+  # ── 对话采集模式配置 ──
+  chat_collection:
+    opening: >-
+      你好！我是员工手册合规审查顾问。接下来我会引导你提供手册审查所需的信息。整个过程大约需要 5-10 分钟。你可以一次提供所有信息，也可以逐步回答。
+    groups:
+      - name: "企业概况"
+        fields:
+          - company_name
+          - employee_count
+          - industry_sector
+      - name: "手册架构"
+        intro: "请上传待审查的员工手册文件。"
+        fields:
+          - handbook_file
+          - review_scope
+      - name: "法域与冲突"
+        fields:
+          - target_jurisdictions
+          - has_labor_union
+          - existing_local_addendum
+      - name: "已知问题"
+        fields:
+          - known_issues
+          - task_subject

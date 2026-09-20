@@ -1,0 +1,171 @@
+# 项目合规模板: 跨境贸易合规
+# 纵向复合模板 — 聚焦跨境贸易场景的制裁、出口管制、税务、结算
+
+template:
+  slug: project-cross-border-trade
+  name: "跨境贸易合规"
+  version: "1.0"
+  category: "project"
+  team_slug: compliance
+  is_project_template: true
+
+  description: |
+    面向跨境贸易企业的全链路合规管理。覆盖交易对手制裁筛查、
+    出口管制分类（ECCN/ITAR）、海关合规、转让定价、外汇结算风险。
+    以单笔交易或贸易关系为单元，持续跟踪合规状态。
+
+  applicable_scenarios:
+    - "大宗商品国际贸易"
+    - "技术/设备出口贸易"
+    - "跨境电商/海外仓"
+    - "转口贸易/三角贸易"
+    - "加工贸易/保税业务"
+
+  estimated_time: "贸易关系全周期"
+
+  domains_covered:
+    - key: sanctions
+      label: "制裁合规"
+      reason: "交易对手/银行制裁筛查，SDN 50%规则"
+    - key: export-control
+      label: "出口管制"
+      reason: "EAR/ECCN分类、ITAR、FDPR、De Minimis"
+    - key: overseas-tax
+      label: "海外税务"
+      reason: "转让定价、PE风险、海关估价"
+    - key: anti-bribery
+      label: "反商业贿赂"
+      reason: "海关腐败风险、第三方代理尽调"
+
+  agent_teams:
+    - sanctions-team
+    - export-control-team
+    - overseas-tax-team
+    - anti-bribery-team
+    - compliance-team
+
+  data_requirements:
+    required:
+      - key: project_name
+        label: "贸易项目/关系名称"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "如：中东地区设备出口贸易合规"
+
+      - key: trade_type
+        label: "贸易类型"
+        type: select
+        options:
+          - { value: "export", label: "出口贸易" }
+          - { value: "import", label: "进口贸易" }
+          - { value: "re-export", label: "转口/再出口" }
+          - { value: "processing", label: "加工贸易" }
+          - { value: "other", label: "其他" }
+        store: "input/project_info.json"
+
+      - key: project_location
+        label: "目标市场/贸易国别"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "如：阿联酋、沙特、土耳其"
+
+    optional:
+      - key: commodity_description
+        label: "主要商品描述"
+        type: text
+        store: "input/project_info.json"
+        placeholder: "商品名称、HS编码、技术参数等"
+
+      - key: us_tech_content
+        label: "是否含美国技术/组件"
+        type: select
+        options:
+          - { value: "yes", label: "是" }
+          - { value: "no", label: "否" }
+          - { value: "uncertain", label: "不确定" }
+        store: "input/project_info.json"
+
+      - key: settlement_currency
+        label: "结算货币"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "如：USD / EUR / CNY"
+
+  checklists:
+    - ref: "checklist/sanctions-entity-screening"
+    - ref: "checklist/sanctions-risk-assessment"
+
+  workspace_structure:
+    - dir: input
+      description: "贸易合规输入数据"
+      initial_files:
+        - path: "input/README.md"
+          content: |
+            # 贸易合规输入数据
+
+            ## 摸底调查表
+            `input/investigation.json` — 交易对象/物流/资金信息
+
+            ## 项目材料
+            `input/materials/` — 贸易合同、报关单、发票、信用证等
+    - dir: output
+    - dir: output/screening_results
+    - dir: output/contract_review
+    - dir: reports
+    - dir: references
+
+  agent_instructions: |
+    # {template_name} — 贸易合规工作区
+
+    你已加入贸易合规工作区。聚焦跨境贸易全链路合规。
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 合规审查重点
+
+    ### 1. 制裁筛查（sanctions-team）
+    - 交易对手/银行制裁筛查
+    - OFAC 50%规则穿透
+    - 国别风险（全面制裁国/行业制裁）
+
+    ### 2. 出口管制（export-control-team）
+    - ECCN/ITAR 分类判断
+    - De Minimis 含美量计算
+    - FDPR 外国直接产品规则
+    - 最终用途/最终用户审查
+
+    ### 3. 税务合规（overseas-tax-team）
+    - 转让定价分析
+    - PE（常设机构）风险
+    - 海关估价合规
+
+    ### 4. 反贿赂（anti-bribery-team）
+    - 海关清关腐败风险
+    - 第三方代理尽调
+    - FCPA/UKBA 承诺
+
+    ## 智能体工具优先级
+    1. nn-kb-searcher（法律检索）
+    2. sanctions-knowledge（制裁筛查）
+    3. web search（兜底）
+
+    ## 关联合规清单
+    {checklist_table}
+
+  phases:
+    - name: initiation
+      label: "立项 — 贸易背景调查"
+      progress: 10
+    - name: screening
+      label: "尽调 — 制裁/管制筛查"
+      progress: 30
+    - name: monitoring
+      label: "执行 — 合规审查"
+      progress: 30
+    - name: reporting
+      label: "交付 — 合规报告"
+      progress: 20
+    - name: exit
+      label: "退出 — 归档"
+      progress: 10

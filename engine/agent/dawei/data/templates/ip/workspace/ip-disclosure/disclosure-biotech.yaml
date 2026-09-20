@@ -1,0 +1,147 @@
+template:
+  slug: disclosure-biotech
+  name: "生物/医药技术交底书"
+  version: "1.0"
+  module: ip-disclosure
+  team_slug: ip-disclosure
+
+  description: |
+    针对药物化合物、生物序列、医疗器械等领域的交底书撰写。
+    重点关注实验数据、序列信息、生物保藏、治疗效果量化。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "如：一种靶向抗肿瘤化合物及其制备方法和应用"
+        store: "input/task_params.json"
+      - key: description
+        label: "技术创意描述"
+        type: string
+        placeholder: "描述化合物结构/生物序列/器械设计/治疗效果（200字以上）"
+        store: "input/task_params.json"
+    optional:
+      - key: tech_field
+        label: "技术领域"
+        type: select
+        placeholder: "选择子领域"
+        default: ""
+        options:
+          - value: ""
+            label: "请选择"
+          - value: "药物化合物"
+            label: "药物化合物/药物组合物"
+          - value: "生物序列"
+            label: "基因/蛋白质/核酸序列"
+          - value: "医疗器械"
+            label: "医疗器械/植入物"
+          - value: "诊断方法"
+            label: "诊断/检测方法"
+          - value: "疫苗"
+            label: "疫苗/免疫制剂"
+          - value: "细胞工程"
+            label: "细胞工程/基因编辑"
+          - value: "中药"
+            label: "中药/天然产物"
+        store: "input/task_params.json"
+      - key: sequence_info
+        label: "序列/结构信息"
+        type: string
+        placeholder: "化学结构式/氨基酸序列/核苷酸序列/晶体结构等"
+        store: "input/task_params.json"
+      - key: experimental_data
+        label: "实验数据概况"
+        type: string
+        placeholder: "已有实验类型：体外活性/体内药效/毒理/临床试验阶段"
+        store: "input/task_params.json"
+      - key: inventor_names
+        label: "发明人"
+        type: string
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+    - knowledge/patent-examination-guidelines
+
+  checklists:
+    - ref: "checklist/patentability-check"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游评估继承的文件"
+    - dir: input/checklists
+      description: "交底书检查清单"
+    - dir: output
+      description: "各章节输出"
+    - dir: drafts
+      description: "完整交底书文件"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入生物/医药技术交底书撰写工作区，请按照 PDCA 工作流执行。
+
+    ## 领域重点：生物/医药交底书
+    生物医药类交底书需特别关注以下方面：
+    1. **客体合规**：避免描述疾病诊断/治疗方法（不可专利），聚焦于产品/组合物/用途
+    2. **序列/结构描述**：化合物结构式、氨基酸/核苷酸序列（附SEQ ID NO）
+    3. **实验数据充分性**：体外活性数据、体内药效数据、对照实验设置
+    4. **生物材料保藏**：涉及微生物/细胞株需注明保藏信息（保藏单位/日期/编号）
+    5. **制备方法**：合成路线/发酵工艺/纯化步骤的可重复性描述
+    6. **用途与效果**：适应症、治疗有效率、副作用等数据
+
+    ## 交底书 8 章节
+    1. 技术领域（明确生物医药子领域）
+    2. 背景技术（现有药物/方法的不足）
+    3. 发明目的（要解决的技术问题）
+    4. 技术方案（化合物/序列结构 + 制备方法 + 用途）
+    5. 有益效果（实验数据支撑的定量效果）
+    6. 具体实施方式（制备实施例 + 活性测试实施例）
+    7. 附图说明（结构式/序列对比图/数据图表）
+    8. 权利要求概要（化合物+组合物+方法+用途）
+
+    ## 输入数据
+    1. `input/task_params.json` — 发明名称、结构/序列信息、实验数据
+    2. `input/inherited/` — 可选的上游评估报告
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 读取输入，确认生物/医药核心创新点
+    ### Do: 逐章节撰写，重点描述结构和实验数据
+    ### Check: 核对交底书完整性清单（关注客体合规和充分公开）
+    ### Act: 汇总输出完整交底书
+
+  deliverables:
+    - file: "drafts/disclosure_full.md"
+      name: "生物医药技术交底书全文"
+      format: markdown
+    - file: "output/disclosure_sections.md"
+      name: "各章节结构化数据"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "理解技术方案"
+      progress: 10
+    - name: do_core
+      label: "撰写技术方案"
+      progress: 25
+    - name: do_embodiments
+      label: "撰写实施方式"
+      progress: 25
+    - name: do_remaining
+      label: "撰写其他章节"
+      progress: 20
+    - name: check
+      label: "完整性审查"
+      progress: 15
+    - name: act
+      label: "汇总输出"
+      progress: 5

@@ -1,0 +1,231 @@
+template:
+  slug: trademark-portfolio
+  name: "商标组合管理与续展规划"
+  version: "1.0"
+  module: ip-trademark
+  team_slug: ip-trademark
+
+  description: |
+    企业商标资产组合全面审计：健康度评分、续展时间线管理、使用合规审查、
+    防御布局评估、费用优化建议。输出续展日历和组合优化方案。
+
+  data_requirements:
+    required:
+      - key: portfolio_data
+        label: "商标组合数据"
+        type: string
+        placeholder: "商标名称列表、注册号、类别、注册日期、状态（或上传商标清单文件）"
+        store: "input/task_params.json"
+    optional:
+      - key: audit_focus
+        label: "审计重点"
+        type: select
+        default: "comprehensive"
+        options:
+          - { value: "comprehensive", label: "全面审计" }
+          - { value: "renewal", label: "续展管理" }
+          - { value: "usage_compliance", label: "使用合规审查" }
+          - { value: "cost_optimization", label: "费用优化" }
+          - { value: "defensive_layout", label: "防御布局评估" }
+        store: "input/task_params.json"
+      - key: jurisdictions
+        label: "覆盖管辖地"
+        type: string
+        placeholder: "如：CN, US, EU, JP（逗号分隔）"
+        store: "input/task_params.json"
+      - key: business_change
+        label: "业务变化"
+        type: string
+        placeholder: "近期业务变化：新业务线、品牌升级、市场退出等"
+        store: "input/task_params.json"
+      - key: budget_concern
+        label: "预算关注"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "无特殊预算限制" }
+          - { value: "reduce", label: "需要削减费用" }
+          - { value: "reallocate", label: "需要优化配置" }
+          - { value: "expand", label: "计划扩大布局" }
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/trademark-law
+
+  checklists:
+    - ref: "checklist/trademark-portfolio"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/data
+      description: "商标组合数据文件"
+    - dir: input/checklists
+      description: "审计检查清单"
+    - dir: output
+      description: "分析产出"
+    - dir: drafts
+      description: "组合管理方案"
+    - dir: references
+      description: "法规参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入商标组合管理工作区，请按照 PDCA 工作流执行。
+
+    ## 商标组合管理框架
+
+    ### 商标生命周期
+
+    | 阶段 | 关键动作 | 时间节点 |
+    |------|---------|---------|
+    | 申请前 | 检索 → 策略 → 选类 | T-0 |
+    | 申请中 | 提交 → 审查 → 公告 | T+12~18月 |
+    | 注册后维护 | 使用证据收集 → Section 8/15 | 第5-6年（美国） |
+    | 续展 | 续展申请 → 宽展期 | 第10年 + 每10年 |
+    | 战略评估 | 组合审计 → 优化调整 | 定期（年度/半年度） |
+
+    ### 续展时间线
+
+    | 管辖地 | 首次续展 | 后续续展 | 宽展期 | 未续展后果 |
+    |-------|---------|---------|-------|-----------|
+    | 中国 CNIPA | 注册日起10年 | 每10年 | 6个月宽展期 | 商标失效 |
+    | 美国 USPTO | 注册日起5-6年（Sec.8）+ 10年（Sec.9） | 每10年 | 6个月宽展期（需额外费） | 商标失效 |
+    | 欧盟 EUIPO | 注册日起10年 | 每10年 | 6个月宽展期 | 商标失效 |
+    | 日本 JPO | 注册日起10年（5/10年分割缴纳） | 每10年 | 6个月宽展期 | 商标失效 |
+
+    **关键提醒**：
+    - 美国商标需在注册后第5-6年提交 Section 8 使用声明（不可跳过！）
+    - 续展也需要提交使用证据（美国）
+    - 6个月宽展期费用通常更高
+    - 错过宽展期 → 商标永久失效（需重新申请）
+
+    ## 审计维度
+
+    ### 1. 健康度评分体系
+
+    | 维度 | 权重 | 评分标准 |
+    |------|------|---------|
+    | 法律状态健康 | 25% | 有效注册比例、无争议状态 |
+    | 覆盖完整性 | 20% | 核心类别覆盖率、关键市场覆盖 |
+    | 使用合规性 | 20% | 实际使用与注册范围一致性 |
+    | 续展风险 | 15% | 近期到期商标数量、续展准备 |
+    | 防御布局 | 10% | 防御注册、联合商标覆盖 |
+    | 成本效率 | 10% | 无用商标占比、费用合理性 |
+
+    评分等级：
+    - **90-100（优秀）**：组合管理完善，仅需常规维护
+    - **75-89（良好）**：有小问题需优化，整体可控
+    - **60-74（需改善）**：存在明显短板，需立即行动
+    - **60以下（高风险）**：严重问题，需紧急干预
+
+    ### 2. 使用合规审查
+
+    | 审查项 | 风险等级 | 说明 |
+    |-------|---------|------|
+    | 注册未使用（超3年） | 高 | 可能被撤销（中国：连续3年不使用） |
+    | 使用范围超出注册 | 中 | 可能面临侵权风险 |
+    | 使用形式与注册不符 | 中 | 可能丧失商标权保护 |
+    - 未保留使用证据 | 高 | 美国 Section 8/续展时无法提交 |
+
+    ### 3. 防御布局评估
+
+    | 防御类型 | 目的 | 评估标准 |
+    |---------|------|---------|
+    | 联合商标 | 防止近似商标注册 | 核心商标的近似变体是否已注册 |
+    | 防御商标 | 防止跨类注册 | 核心类别外的关联类别是否覆盖 |
+    | 驰名商标保护 | 跨类保护 | 是否有驰名商标认定 |
+    - 国际布局 | 目标市场覆盖 | 主要出口国/目标市场是否已注册 |
+
+    ### 4. 费用优化
+
+    | 优化方向 | 方法 | 节省幅度 |
+    |---------|------|---------|
+    | 放弃无用商标 | 识别不再使用的商标，停止续展 | 直接节省续展费 |
+    | 合并申请 | 多类别合并为一件申请 | 减少基础申请费 |
+    - 精简类别 | 删除不必要的防御类别 | 减少类别费 |
+    | 提前规划 | 避免宽展期加急费用 | 避免额外50%-100%费用 |
+    | 马德里体系 | 国际注册走马德里通道 | 比逐一国家申请节省费用 |
+
+    ## 分析方法论
+
+    ### Step 1: 数据整理
+    将商标组合数据整理为标准化格式：
+
+    | 商标名称 | 注册号 | 类别 | 管辖地 | 注册日 | 到期日 | 状态 | 使用状态 | 续展风险 |
+    |---------|-------|------|-------|-------|-------|------|---------|---------|
+
+    ### Step 2: 续展时间线生成
+    按时间排序生成续展日历，标记紧急程度：
+    - **红色**：6个月内到期/到期进入宽展期
+    - **橙色**：12个月内到期
+    - **黄色**：24个月内到期
+    - **绿色**：24个月以上
+
+    ### Step 3: 健康度评估
+    逐维度评分并计算加权总分
+
+    ### Step 4: 优化方案
+    - 即时行动项（紧急续展、Section 8 声明等）
+    - 短期优化（3-6月内）
+    - 长期战略（年度规划）
+
+    ## 输入数据
+    1. `input/task_params.json` — 组合数据、审计重点、预算关注
+    2. `input/data/` — 商标清单文件（如有）
+    3. `input/checklists/` — 审计检查清单
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 数据整理与标准化，确认审计重点
+    ### Do:
+    - 续展时间线生成
+    - 使用合规审查
+    - 健康度评分
+    - 防御布局评估
+    - 费用优化分析
+    ### Check: 交叉验证评分，确认行动项优先级
+    ### Act: 输出组合管理方案 + 续展日历 + 优化建议
+
+  deliverables:
+    - file: "drafts/portfolio_management_plan.md"
+      name: "商标组合管理方案"
+      format: markdown
+    - file: "output/renewal_calendar.md"
+      name: "续展时间线与日历"
+      format: markdown
+    - file: "output/health_score.md"
+      name: "组合健康度评估"
+      format: markdown
+    - file: "output/usage_audit.md"
+      name: "使用合规审查报告"
+      format: markdown
+    - file: "output/cost_optimization.md"
+      name: "费用优化建议"
+      format: markdown
+    - file: "output/action_items.md"
+      name: "紧急行动项清单"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "数据整理标准化"
+      progress: 15
+    - name: do_renewal
+      label: "续展时间线"
+      progress: 20
+    - name: do_audit
+      label: "健康度与合规审查"
+      progress: 25
+    - name: do_optimize
+      label: "防御布局与费用优化"
+      progress: 20
+    - name: check
+      label: "交叉验证"
+      progress: 12
+    - name: act
+      label: "输出方案"
+      progress: 8

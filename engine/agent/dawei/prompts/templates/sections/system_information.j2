@@ -1,0 +1,12 @@
+{#
+  This template renders the SYSTEM INFORMATION section.
+  It expects a `system_information` dictionary and a `workspace_path` variable.
+#}
+{% if system_information is defined %}
+Operating System: {{ system_information.os }}
+Default Shell: {{ system_information.shell }}
+Home Directory: {{ system_information.home_dir }}
+Current Workspace Directory: {{ workspace_path }}
+
+{{ system_information.workspace_description }}
+{% endif %}

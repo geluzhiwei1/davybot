@@ -1,0 +1,20 @@
+{
+  "slug": "labor-recruitment-onboarding",
+  "name": "招聘与入职管理合规审查清单",
+  "category": "劳动用工",
+  "description": "EEO 非歧视审查、Offer 穿透、试用期量化考核、背景调查合规",
+  "applicable_scenarios": ["JD 合规审查", "Offer 发放", "试用期制度", "招聘流程审计"],
+  "items": [
+    { "task": "JD 歧视性红线扫描（年龄/性别/地域/婚姻等非业务因素）", "category": "招聘" },
+    { "task": "面试流程非歧视合规审查", "category": "招聘" },
+    { "task": "Offer Letter 条款审查与跨境一致性校验", "category": "Offer" },
+    { "task": "阿联酋 Offer 福利不得缩水校验", "category": "Offer" },
+    { "task": "试用期最高时限本地强行法校验", "category": "入职" },
+    { "task": "试用期 KPI 确认书签收完备性（入职 5 日内）", "category": "入职" },
+    { "task": "欺诈入职一票否决条款审查", "category": "入职" },
+    { "task": "背景调查数据最小化与 GDPR/PIPL 合规", "category": "入职" },
+    { "task": "非欺诈入职承诺确认书完备性", "category": "入职" },
+    { "task": "状态码分类输出（REC-01/02/03）", "category": "分析" },
+    { "task": "证据链完整性检查", "category": "合规记录" }
+  ]
+}

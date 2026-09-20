@@ -1,0 +1,66 @@
+platform: naver
+display_name: Naver 博客
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  - direct
+  trending: none
+  metrics: none
+constraints:
+  char_limit: 100000
+  max_files: 30
+  max_video_seconds: 0
+  rich_text: true
+domains:
+- blog.naver.com
+publish:
+  compose_url: https://blog.naver.com/PostWrite.naver
+  selectors:
+    # v0.1.0 未真机验证:네이버 블로그 编辑器(Smart Editor);「임시저장」=存草稿,「발행」=发布
+    title_input:
+      primary: "#title, input[placeholder*='제목']"
+      fallback: ".se-title-input, [class*='title'] textarea"
+      wait_timeout_ms: 15000
+    compose_box:
+      primary: ".se-edit-container [contenteditable='true'], .se-editor-contents"
+      fallback: "#se_components_iframe, [contenteditable='true']"
+      wait_timeout_ms: 20000
+    save_draft_button:
+      primary: "button:has-text('임시저장'), .se-save-button"
+      fallback: "a:has-text('임시저장')"
+      wait_after_click_ms: 4000
+    publish_button:
+      primary: "button:has-text('발행')"
+      fallback: ".se-publish-button, a:has-text('발행')"
+      wait_after_click_ms: 6000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 30
+    success_indicator:
+      method: url_change
+      pattern: blog.naver.com
+  rich_text:
+    enabled: true
+    content_format: html_semantic
+    inject_method: clipboard_paste
+    image_handling: file_upload
+    style:
+      heading_style: 'margin: 1.2em 0 0.6em; font-weight: bold;'
+      paragraph_style: 'margin: 0.8em 0; line-height: 1.75;'
+      blockquote_style: 'margin: 1em 0; padding: 0.5em 1em; border-left: 4px solid #03c75a; color: #666;'
+      list_style: 'margin: 0.8em 0; padding-left: 2em;'
+  login_check:
+    url: https://blog.naver.com/PostWrite.naver
+    indicator: ".se-title-input, #title"
+    absent_indicator: "a[href*='nid.naver.com/nidlogin']"
+    wait_timeout_ms: 15000
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: kr
+  countries:
+  - KR
+  languages:
+  - ko

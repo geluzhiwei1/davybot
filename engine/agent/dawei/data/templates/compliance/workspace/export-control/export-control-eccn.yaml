@@ -1,0 +1,178 @@
+# 合规工作区模板: ECCN 分类判断
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: export-control-eccn
+  name: "ECCN 分类判断"
+  version: "1.0"
+  team_slug: export-control
+
+  description: |
+    基于美国《出口管理条例》(EAR) 和商业管制清单 (CCL)，
+    对产品/技术进行 ECCN 分类判定，确定出口许可要求。
+
+  applicable_scenarios:
+    - "美国原产物项出口"
+    - "外国制造直接产品规则 (FDPR) 判定"
+    - "ECCN 分类自评"
+    - "出口许可证申请准备"
+
+  estimated_time: "20-30 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入待评估企业全称"
+        store: "input/company_info.json"
+
+      - key: product_name
+        label: "产品/技术名称"
+        type: string
+        placeholder: "请输入产品/技术准确名称"
+        store: "input/task_parameters.json"
+
+      - key: product_description
+        label: "产品/技术描述"
+        type: text
+        placeholder: "请详细描述产品功能、技术参数、应用领域..."
+        store: "input/task_parameters.json"
+
+      - key: export_destination
+        label: "出口目的地"
+        type: select
+        options:
+          - { value: china, label: "中国 (含香港)" }
+          - { value: russia, label: "俄罗斯" }
+          - { value: iran, label: "伊朗" }
+          - { value: nk, label: "朝鲜" }
+          - { value: eu, label: "欧盟" }
+          - { value: other, label: "其他" }
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: product_specs
+        label: "产品规格书/技术参数文档"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: us_origin_content
+        label: "美国原产成分比例 (%)"
+        type: string
+        placeholder: "如：25"
+        store: "input/task_parameters.json"
+
+      - key: known_eccn
+        label: "已知或疑似 ECCN 编号"
+        type: string
+        placeholder: "如：3A001"
+        store: "input/task_parameters.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：XX产品ECCN分类判定"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/export-control-first-export"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的产品技术信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解产品技术特征和出口场景
+    - 根据合规清单制定 ECCN 分类判定步骤
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. EAR 管辖范围判定 → `output/ear_jurisdiction.md`
+    b. CCL 类别初步筛选 (Category 0-9) → `output/ccl_category_screening.md`
+    c. ECCN 子分类逐级匹配 → `output/eccn_matching_analysis.md`
+    d. 出口许可要求判定 (基于目的地) → `output/license_requirement.csv`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证 ECCN 分类逻辑链条
+    - 确认未遗漏相关管制原因 (AT/CC/NS/MT 等)
+    - 提交分类结果供用户确认
+
+    ### Act (输出)
+    - 生成 ECCN 分类判定报告 → `reports/eccn_classification_report.docx`
+    - 报告必须包含：执行摘要、产品技术描述、EAR管辖分析、ECCN分类推理过程、最终分类结论及置信度、出口许可要求、合规建议
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - ECCN 分类涉及高度专业判断，AI分析结果仅供参考
+    - 正式出口前建议专业出口管制律师复核
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - product_description
+      - ear_jurisdiction
+      - eccn_analysis
+      - classification_conclusion
+      - license_requirements
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_jurisdiction
+      label: "EAR 管辖判定"
+      progress: 15
+    - name: do_screening
+      label: "CCL 类别筛选"
+      progress: 25
+    - name: do_matching
+      label: "ECCN 逐级匹配"
+      progress: 30
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

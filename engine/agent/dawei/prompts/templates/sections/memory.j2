@@ -1,0 +1,14 @@
+{#
+  记忆段落模板
+  四层记忆按作用域标注, LLM 可区分:
+  - 用户级 (跨工作区): 用户本人特征和偏好
+  - 工作区级 (仅当前项目): 项目相关事实和经验
+#}
+{% if memory_context %}
+You have the following memories organized by scope.
+User-level memories apply to ALL workspaces (they are about the user as a person).
+Workspace-level memories apply to THIS project only.
+Auto memories were extracted by the agent from previous conversations.
+
+{{ memory_context }}
+{% endif %}

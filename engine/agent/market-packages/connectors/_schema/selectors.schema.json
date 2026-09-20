@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "social-connector-selectors",
+  "title": "Social Connector Selectors",
+  "description": "浏览器轨选择器组(recipe)。版本化于 manifest.selectors_version;selector 会过期,健康遥测驱动热更新(PRD §11.3)。",
+  "type": "object",
+  "required": ["compose"],
+  "additionalProperties": false,
+  "properties": {
+    "compose_url": { "type": "string", "format": "uri" },
+    "compose": { "$ref": "#/$defs/selectorGroup" },
+    "publish_button": { "$ref": "#/$defs/selectorGroup" },
+    "save_draft_button": { "$ref": "#/$defs/selectorGroup" },
+    "title_input": { "$ref": "#/$defs/selectorGroup" },
+    "media_upload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primary": { "type": "string" },
+        "max_files": { "type": "integer" }
+      }
+    },
+    "success_indicator": {
+      "type": "object",
+      "required": ["method"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "enum": ["url_change", "element_visible", "api_check"] },
+        "pattern": { "type": "string" }
+      }
+    },
+    "login_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "indicator": { "type": "string" }
+      }
+    },
+    "trending": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "container": { "type": "string" },
+        "topic": { "type": "string" },
+        "category": { "type": "string" },
+        "pagination": { "enum": ["scroll", "click", "none"] }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "指标名 → CSS 选择器(likes/comments/collects/shares…)"
+    }
+  },
+  "$defs": {
+    "selectorGroup": {
+      "type": "object",
+      "required": ["primary"],
+      "additionalProperties": false,
+      "properties": {
+        "primary": { "type": "string", "minLength": 1 },
+        "fallback": { "type": "string" },
+        "wait_after_click_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

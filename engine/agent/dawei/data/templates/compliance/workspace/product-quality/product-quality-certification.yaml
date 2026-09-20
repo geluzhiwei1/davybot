@@ -1,0 +1,169 @@
+# 合规工作区模板: 产品认证评估
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: product-quality-certification
+  name: "产品认证评估"
+  version: "1.0"
+  team_slug: product-quality
+
+  description: |
+    针对目标市场产品认证要求进行合规评估，涵盖 CCC、CE、UL、
+    FCC、RoHS、REACH 等主要产品认证体系。
+
+  applicable_scenarios:
+    - "新市场产品准入认证评估"
+    - "产品认证合规自查"
+    - "多市场同时准入规划"
+    - "OEM/ODM 产品认证要求审查"
+
+  estimated_time: "20-30 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入申请认证企业全称"
+        store: "input/company_info.json"
+
+      - key: product_type
+        label: "产品类型"
+        type: select
+        options:
+          - { value: electronics, label: "电子/电器" }
+          - { value: machinery, label: "机械设备" }
+          - { value: medical, label: "医疗器械" }
+          - { value: toys, label: "玩具/儿童用品" }
+          - { value: food_contact, label: "食品接触材料" }
+          - { value: automotive, label: "汽车零部件" }
+          - { value: chemicals, label: "化学品" }
+          - { value: textile, label: "纺织品" }
+          - { value: other, label: "其他" }
+        store: "input/task_parameters.json"
+
+      - key: target_markets
+        label: "目标销售市场"
+        type: multiselect
+        options: ["中国", "欧盟", "美国", "日本", "韩国", "东南亚", "中东", "南美", "非洲"]
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: existing_certifications
+        label: "既有产品认证文件"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: product_specs
+        label: "产品规格书/技术文档"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：XX产品欧盟CE+美国FCC认证评估"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/product-quality-certification"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的产品认证信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解产品类型和目标市场
+    - 根据合规清单制定产品认证评估执行计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 各市场强制认证要求识别 → `output/mandatory_certifications.csv`
+    b. 认证路径与流程分析 → `output/certification_pathways.md`
+    c. 标准/指令适用性判定 → `output/standards_applicability.md`
+    d. 认证时间线与成本估算 → `output/timeline_cost_estimate.json`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证未遗漏目标市场强制性认证
+    - 确认标准版本和过渡期
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成产品认证评估报告 → `reports/product_certification_assessment.docx`
+    - 报告必须包含：执行摘要、产品概述、各市场强制认证清单、认证路径流程、标准适用性分析、时间计划与预算估算、认证策略建议
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 注意各标准的更新和过渡期 (如 CE 指令向法规转换)
+    - 部分认证要求使用授权实验室/认证机构
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - product_overview
+      - mandatory_certifications
+      - certification_pathways
+      - standards_applicability
+      - timeline_budget
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_identification
+      label: "强制认证识别"
+      progress: 25
+    - name: do_pathways
+      label: "认证路径分析"
+      progress: 25
+    - name: do_standards
+      label: "标准适用判定"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

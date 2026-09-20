@@ -1,0 +1,58 @@
+platform: line
+display_name: LINE VOOM
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: none
+  metrics: none
+constraints:
+  char_limit: 3000
+  max_files: 10
+  max_video_seconds: 300
+  rich_text: false
+domains:
+- timeline.line.me
+- line.me
+publish:
+  compose_url: https://timeline.line.me/
+  selectors:
+    # v0.1.0 未真机验证:VOOM 时间线顶部 composer;「投稿する」=发布
+    compose_box:
+      primary: "textarea[placeholder*='投稿'], [contenteditable='true']"
+      fallback: ".composer textarea"
+      wait_timeout_ms: 15000
+    publish_button:
+      primary: "button:has-text('投稿する')"
+      fallback: "button:has-text('投稿'), [class*='submit']"
+      wait_after_click_ms: 6000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 10
+    success_indicator:
+      method: url_change
+      pattern: timeline.line.me
+  rich_text:
+    enabled: false
+    content_format: plain
+    inject_method: fill
+    image_handling: file_upload
+  login_check:
+    url: https://timeline.line.me/
+    indicator: "textarea, [contenteditable='true']"
+    absent_indicator: "[class*='login'], a[href*='login']"
+    wait_timeout_ms: 15000
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: jp
+  countries:
+  - JP
+  - TH
+  - TW
+  languages:
+  - ja
+  - th
+  - zh
+  - en

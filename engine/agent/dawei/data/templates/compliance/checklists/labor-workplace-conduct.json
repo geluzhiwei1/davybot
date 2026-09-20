@@ -1,0 +1,21 @@
+{
+  "slug": "labor-workplace-conduct",
+  "name": "职场行为与合规调查审查清单",
+  "category": "劳动用工",
+  "description": "反骚扰制度、员工关系机制、举报人保护体系多法域审查",
+  "applicable_scenarios": ["反骚扰制度审查", "举报渠道建立", "员工关系审计", "合规调查程序"],
+  "items": [
+    { "task": "反骚扰像素级行为定义完备性", "category": "反骚扰" },
+    { "task": "印度 POSH ICC 委员会架设状态（≥10人）", "category": "反骚扰" },
+    { "task": "骚扰案件存续期报复性动作熔断审查", "category": "反骚扰" },
+    { "task": "西班牙/拉美本地语言 Protocolo 登记校验", "category": "反骚扰" },
+    { "task": "安全屋匿名举报渠道建立状态", "category": "反骚扰" },
+    { "task": "薪资讨论权合规（美国 NLRA）", "category": "员工关系" },
+    { "task": "制度修改民主程序合规（欧洲 Works Council）", "category": "员工关系" },
+    { "task": "印尼 PP 备案/沙特 Qiwa 核准状态", "category": "员工关系" },
+    { "task": "欧盟本地举报渠道建立（≥50人）", "category": "举报人" },
+    { "task": "NDA 吹哨人豁免条款审查", "category": "举报人" },
+    { "task": "举证责任倒置执行状态", "category": "举报人" },
+    { "task": "状态码分类输出（HAR/REL/WHI）", "category": "分析" }
+  ]
+}

@@ -1,0 +1,43 @@
+{#
+  USER ENVIRONMENT CONTEXT section.
+  Renders dynamic context from the user's frontend: language preference,
+  open files, current file, and selected text.
+  All fields are optional and guarded by {% if %} blocks.
+
+  Expected context variables:
+    - user_ui_context: object with fields current_user_language, open_files,
+      current_file, current_selected_content (all optional)
+#}
+{% set ui_ctx = user_ui_context %}
+
+{% if ui_ctx %}
+{% if ui_ctx.current_user_language %}
+You MUST respond in the user's preferred language: {{ ui_ctx.current_user_language }}.
+{% if ui_ctx.current_user_language.startswith('zh') %}
+(简体中文 — 所有回复、解释、代码注释均使用中文。)
+{% elif ui_ctx.current_user_language.startswith('en') %}
+(English — all responses, explanations, and code comments must be in English.)
+{% else %}
+(Use {{ ui_ctx.current_user_language }} for all responses.)
+{% endif %}
+{% endif %}
+
+{% if ui_ctx.current_file or (ui_ctx.open_files and ui_ctx.open_files|length > 0) %}
+{% if ui_ctx.current_file %}
+User's active file: {{ ui_ctx.current_file }}
+{% endif %}
+{% if ui_ctx.open_files and ui_ctx.open_files|length > 0 %}
+Open files:
+{% for f in ui_ctx.open_files %}
+- {{ f }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if ui_ctx.current_selected_content %}
+User's selected text (from {{ ui_ctx.current_file or 'editor' }}):
+---
+{{ ui_ctx.current_selected_content }}
+---
+{% endif %}
+{% endif %}

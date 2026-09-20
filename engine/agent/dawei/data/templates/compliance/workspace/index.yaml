@@ -1,0 +1,180 @@
+# 合规工作区模板索引
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# Layer 2: Compliance Checklist (JSON) — 定义 WHAT (位于 agents/davybot.com/compliance-team/templates/)
+
+templates:
+  supply-chain:
+    - slug: supply-chain-uflpa
+      name: "UFLPA 风险评估"
+      estimated_time: "30-45 分钟"
+      description: "基于 UFLPA 执法框架，对向美国出口企业进行供应链强迫劳动风险全链路评估"
+    - slug: supply-chain-conflict-minerals
+      name: "冲突矿产合规"
+      estimated_time: "20-30 分钟"
+      description: "Dodd-Frank 1502 冲突矿产溯源与报告"
+    - slug: supply-chain-due-diligence
+      name: "供应链全面尽调"
+      estimated_time: "45-60 分钟"
+      description: "CSDDD 合规差距分析与供应链人权环境尽调"
+
+  antitrust:
+    - slug: antitrust-merger-filing
+      name: "经营者集中申报"
+      estimated_time: "30-45 分钟"
+      description: "反垄断经营者集中申报评估与文件准备"
+    - slug: antitrust-compliance-program
+      name: "反垄断合规体系建设"
+      estimated_time: "45-60 分钟"
+      description: "反垄断合规政策审查与内控体系评估"
+
+  esg:
+    - slug: esg-carbon-neutrality
+      name: "碳中和路径评估"
+      estimated_time: "30-45 分钟"
+      description: "CBAM 碳关税应对与碳中和战略评估"
+    - slug: esg-disclosure-readiness
+      name: "ESG 披露准备度评估"
+      estimated_time: "25-40 分钟"
+      description: "CSRD/ESRS 披露要求准备度全面评估"
+
+  data:
+    - slug: data-pipl-basic
+      name: "PIPL 基础合规评估"
+      estimated_time: "25-35 分钟"
+      description: "个人信息保护法基础合规差距分析"
+    - slug: data-gdpr-compliance
+      name: "GDPR 合规差距分析"
+      estimated_time: "30-45 分钟"
+      description: "GDPR 数据保护合规全面差距分析与整改路线图"
+    - slug: data-export-assessment
+      name: "数据出境安全评估"
+      estimated_time: "30-40 分钟"
+      description: "数据出境安全评估申报材料准备与合规分析"
+
+  export-control:
+    - slug: export-control-eccn
+      name: "ECCN 分类判断"
+      estimated_time: "20-30 分钟"
+      description: "美国 EAR 出口管制分类编码 (ECCN) 判定"
+    - slug: export-control-itar
+      name: "ITAR 合规评估"
+      estimated_time: "25-35 分钟"
+      description: "ITAR 军品管制清单合规评估"
+
+  sanctions:
+    - slug: sanctions-entity-screening
+      name: "制裁名单快捷筛查"
+      estimated_time: "15-25 分钟"
+      description: "多法域制裁名单快速筛查，含 OFAC 50% Rule 风险提示"
+    - slug: sanctions-counterparty-deep-diligence
+      name: "交易对手深度尽调"
+      estimated_time: "45-60 分钟"
+      description: "穿透式 KYC/UBO 审计 + OFAC 50% Rule 聚合计算 + 实质控制权刺破"
+    - slug: sanctions-transaction-chain-audit
+      name: "交易全链路合规审计"
+      estimated_time: "60-90 分钟"
+      description: "KYT 交易链筛查 + 标的物 HS/ECCN 审计 + De Minimis 计算 + 司法管辖连接点分析"
+    - slug: sanctions-risk-assessment
+      name: "制裁风险综合评估"
+      estimated_time: "90-120 分钟"
+      description: "七维度全面制裁合规风险评估：KYC/UBO、交易链、标的物、地理连接、红旗预警、突发压力、ICP 内控"
+    - slug: sanctions-red-flag-radar
+      name: "红旗预警与危机响应"
+      estimated_time: "30-45 分钟"
+      description: "异常红旗捕获、银行 RFI 响应、监管传票应对、供应链连带雪崩评估"
+    - slug: sanctions-icp-audit
+      name: "内控体系(ICP)成熟度审计"
+      estimated_time: "45-60 分钟"
+      description: "OFAC ICP 五要素测试、模糊匹配阈值审计、5年回溯机制、档案留痕评估"
+
+  overseas-investment:
+    - slug: overseas-investment-cfius
+      name: "CFIUS 国家安全审查"
+      estimated_time: "30-45 分钟"
+      description: "CFIUS 国家安全审查风险评估与应对策略"
+    - slug: overseas-investment-odi
+      name: "ODI 备案分析"
+      estimated_time: "25-35 分钟"
+      description: "境外投资 ODI 备案流程合规分析"
+
+  overseas-tax:
+    - slug: overseas-tax-transfer-pricing
+      name: "转让定价合规分析"
+      estimated_time: "30-45 分钟"
+      description: "关联交易转让定价合规分析与文档准备"
+    - slug: overseas-tax-pe-risk
+      name: "PE 风险评估"
+      estimated_time: "25-35 分钟"
+      description: "常设机构 (PE) 风险识别与防范方案"
+
+  anti-bribery:
+    - slug: anti-bribery-third-party
+      name: "第三方尽调审查"
+      estimated_time: "30-45 分钟"
+      description: "FCPA/UKBA 第三方商业伙伴反腐败尽调"
+    - slug: anti-bribery-policy-review
+      name: "反腐败政策审查"
+      estimated_time: "25-35 分钟"
+      description: "企业内部反腐败政策体系评估与整改建议"
+
+  product-quality:
+    - slug: product-quality-certification
+      name: "产品认证评估"
+      estimated_time: "20-30 分钟"
+      description: "CCC/CE/UL/FCC 等产品认证合规评估"
+    - slug: product-quality-recall
+      name: "召回准备度评估"
+      estimated_time: "25-35 分钟"
+      description: "产品召回预案与合规流程审查"
+
+  labor:
+    - slug: labor-employment-contract
+      name: "员工手册/规章制度合规审查"
+      estimated_time: "45-60 分钟"
+      description: "多法域员工手册合规审查，含效力熔断、民主程序、区域附录、动态迭代机制"
+    - slug: labor-recruitment-onboarding
+      name: "招聘与入职管理合规审查"
+      estimated_time: "25-35 分钟"
+      description: "EEO非歧视审查、Offer条款穿透、试用期量化考核合规"
+    - slug: labor-compensation-benefits
+      name: "工时休假与薪酬福利合规审查"
+      estimated_time: "35-50 分钟"
+      description: "工时考勤、加班审批、休假制度、薪酬结构、社保缴纳多维度审查"
+    - slug: labor-termination-assessment
+      name: "绩效管理与解聘合规评估"
+      estimated_time: "30-45 分钟"
+      description: "绩效体系审查、PIP程序评估、10国解聘强行法专项校验、补偿金计算"
+    - slug: labor-workplace-conduct
+      name: "职场行为与合规调查审查"
+      estimated_time: "30-45 分钟"
+      description: "反骚扰制度、员工关系机制、举报人保护体系多法域审查"
+    - slug: labor-cross-border
+      name: "跨境用工与外派合规评估"
+      estimated_time: "45-60 分钟"
+      description: "外派管理、EHS、IP/数据跨境、信息安全、资产管理五维度跨境合规评估"
+
+  ip-compliance:
+    - slug: ip-fto-analysis
+      name: "FTO 自由实施分析"
+      estimated_time: "30-45 分钟"
+      description: "专利自由实施 (FTO) 分析与侵权风险评估"
+    - slug: ip-trademark-registration
+      name: "商标注册策略"
+      estimated_time: "25-35 分钟"
+      description: "跨境商标注册策略与侵权风险评估"
+    - slug: ip-patent-landscape
+      name: "专利全景分析"
+      estimated_time: "30-45 分钟"
+      description: "竞争对手专利布局、技术空白识别与 PCT 申请策略规划"
+    - slug: ip-trade-secret-audit
+      name: "商业秘密合规审计"
+      estimated_time: "25-35 分钟"
+      description: "保密协议审查、离职竞业评估与技术泄露风险识别"
+    - slug: ip-open-source-compliance
+      name: "开源合规审查"
+      estimated_time: "20-30 分钟"
+      description: "GPL/AGPL 传染性分析、许可证兼容矩阵与合规整改方案"
+    - slug: ip-cross-border-licensing
+      name: "跨境技术许可合规"
+      estimated_time: "35-50 分钟"
+      description: "技术出口管制交叉检查、许可费合规与转让定价评估"

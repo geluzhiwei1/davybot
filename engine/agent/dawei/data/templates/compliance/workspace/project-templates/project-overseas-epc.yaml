@@ -1,0 +1,203 @@
+# 项目合规模板: 海外工程项目合规
+# 纵向复合模板 — 一个项目同时涉及多个合规域
+# 对齐 PRD-Compliance 90章：双核驱动（实体筛查 + 合同审查）+ 5阶段生命周期
+
+template:
+  slug: project-overseas-epc
+  name: "海外工程项目合规"
+  version: "1.0"
+  category: "project"
+  team_slug: compliance
+  is_project_template: true
+
+  description: |
+    面向海外工程项目（EPC总承包、投资建厂、基础设施等）的全生命周期合规管理。
+    以摸底调查表为数据骨架，以合同条款审核为核心，覆盖制裁筛查、出口管制、
+    供应链合规、反商业贿赂、劳动用工等多个合规域。
+    通过 PDCA 引擎驱动多智能体协同完成合规审查。
+
+  applicable_scenarios:
+    - "海外 EPC 工程总承包项目"
+    - "一带一路海外投资建厂"
+    - "跨国基础设施建设项目"
+    - "海外矿业/能源开发项目"
+    - "国际工程分包项目"
+
+  estimated_time: "项目全生命周期"
+
+  # 项目模板涵盖的合规域（非排他，用户可后续添加）
+  domains_covered:
+    - key: sanctions
+      label: "制裁合规"
+      reason: "业主/交易对手制裁筛查，SDN 50%规则"
+    - key: supply-chain
+      label: "供应链合规"
+      reason: "供应商尽调、UFLPA风险、冲突矿产"
+    - key: export-control
+      label: "出口管制"
+      reason: "设备/技术 ECCN 分类、两用物项"
+    - key: anti-bribery
+      label: "反商业贿赂"
+      reason: "FCPA/UKBA 合规承诺、第三方尽调"
+    - key: labor
+      label: "劳动合规"
+      reason: "跨境用工、外派管理、强迫劳动风险"
+
+  # 项目模板预装的智能体团队
+  agent_teams:
+    - sanctions-team
+    - supply-chain-team
+    - export-control-team
+    - anti-bribery-team
+    - labor-team
+    - compliance-team
+
+  # 摸底调查表是项目模板的核心数据入口
+  # 不强制预填表单 — 用户在详情页 Tab 中逐步填写
+  data_requirements:
+    required:
+      - key: project_name
+        label: "项目名称"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "如：印尼苏拉威西镍矿开采项目"
+
+      - key: project_location
+        label: "项目所在地"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "如：印度尼西亚，苏拉威西岛"
+
+      - key: project_type
+        label: "项目类型"
+        type: select
+        options:
+          - { value: "epc", label: "EPC工程总承包" }
+          - { value: "investment", label: "投资建厂" }
+          - { value: "trade", label: "国际贸易" }
+          - { value: "other", label: "其他" }
+        store: "input/project_info.json"
+
+    optional:
+      - key: contract_value
+        label: "合同金额"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "如：5000万美元"
+
+      - key: project_duration
+        label: "项目工期"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "如：36个月"
+
+      - key: owner_name
+        label: "业主名称"
+        type: string
+        store: "input/project_info.json"
+        placeholder: "项目业主/发包方名称"
+
+  # 关联多个合规域的检查清单
+  checklists:
+    - ref: "checklist/sanctions-entity-screening"
+    - ref: "checklist/sanctions-risk-assessment"
+
+  workspace_structure:
+    - dir: input
+      description: "项目输入数据"
+      initial_files:
+        - path: "input/README.md"
+          content: |
+            # 项目输入数据
+
+            ## 摸底调查表
+            `input/investigation.json` — 在「摸底调查」Tab 中填写
+
+            ## 合同条款
+            `input/contract_clauses.json` — 在「合同审查」Tab 中录入或由 Agent 提取
+
+            ## 项目材料
+            `input/materials/` — 上传合同、招标文件、财务文件、证照等任意项目材料
+              - contracts/    合同/协议
+              - bidding/      招标文件
+              - financials/   财务文件
+              - certificates/ 营业执照/资质
+              - misc/         其他
+    - dir: output
+      description: "Agent 分析输出"
+    - dir: output/screening_results
+      description: "制裁筛查结果"
+    - dir: output/contract_review
+      description: "合同审查结果"
+    - dir: reports
+      description: "合规报告和 Ethics Plan"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — 项目合规工作区
+
+    你已加入项目合规工作区。本工作区采用**双核驱动 + 5阶段生命周期**模型。
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 5阶段生命周期
+
+    | 阶段 | 代号 | 核心任务 |
+    |------|------|----------|
+    | 立项 | initiation | 创建workspace、填写摸底调查表 |
+    | 尽调 | screening | 制裁筛查、风险评估（5维度） |
+    | 执行 | monitoring | 合同审核（三点关注）、持续监控、Ethics Plan |
+    | 交付 | reporting | 合规报告生成 |
+    | 退出 | exit | 归档、经验沉淀 |
+
+    ## 双核驱动
+
+    ### 核心1：实体筛查核（摸底调查表 → 制裁筛查 → 风险评估）
+    - 读取 `input/investigation.json` 中的 parties
+    - 对每个交易对象执行制裁筛查
+    - 更新 5 维度风险评估（交易对象/国别/物项/最终用途/银行结算）
+
+    ### 核心2：合同审查核（合同条款 → 三点关注审核 → Ethics Plan）
+    - 读取 `input/contract_clauses.json`
+    - ① 合规名词解释审核（Business Integrity Laws / Restricted Party 定义）
+    - ② 合规承诺条款审核（无调查承诺 / 非受限主体 / Modern Slavery）
+    - ③ 合规体系要求审核（Ethics Plan / 培训 / 审计权）
+
+    ## 智能体工具优先级
+
+    1. 🥇 **知识库工具**（nn-kb-searcher :8014）— search_legal_knowledge, ask_legal_question
+    2. 🥈 **制裁数据库**（sanctions-knowledge :8012）— sanctions_screen_entity
+    3. 🥉 **互联网搜索**（兜底）
+    4. **用户上传材料**（input/materials/）— query_user_knowledge_base
+
+    ## 涵盖合规域
+
+    本项目模板涵盖以下合规域（智能体团队已预装）：
+    - 制裁合规（sanctions-team）— 实体筛查、SDN 50%规则
+    - 供应链合规（supply-chain-team）— 供应商尽调、UFLPA
+    - 出口管制（export-control-team）— ECCN分类、两用物项
+    - 反商业贿赂（anti-bribery-team）— FCPA/UKBA承诺
+    - 劳动用工（labor-team）— 跨境用工、外派管理
+    - 通用合规（compliance-team）— 通用合规审查
+
+    ## 关联合规清单
+    {checklist_table}
+
+  phases:
+    - name: initiation
+      label: "立项 — 填写摸底调查表"
+      progress: 10
+    - name: screening
+      label: "尽调 — 制裁筛查 + 风险评估"
+      progress: 25
+    - name: monitoring
+      label: "执行 — 合同审核 + 持续监控"
+      progress: 30
+    - name: reporting
+      label: "交付 — 合规报告"
+      progress: 25
+    - name: exit
+      label: "退出 — 归档"
+      progress: 10

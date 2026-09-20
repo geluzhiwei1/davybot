@@ -1,0 +1,22 @@
+{
+  "slug": "labor-employment-contract",
+  "name": "员工手册/规章制度合规审查清单",
+  "category": "劳动用工",
+  "description": "多法域员工手册合规审查 — 效力熔断、民主程序、反腐败、利益冲突、区域附录、动态迭代",
+  "applicable_scenarios": ["员工手册审查", "规章制度合法性", "全球手册框架设计", "区域附录定制"],
+  "items": [
+    { "task": "总则效力：Severability Clause 分割存续条款审查", "category": "总则" },
+    { "task": "总则效力：工会/民主程序前置接口审查", "category": "总则" },
+    { "task": "总则效力：兼职限制法域兼容性审查", "category": "总则" },
+    { "task": "反腐败：FCPA/UKBA 合规对齐", "category": "商业行为" },
+    { "task": "利益冲突：年度申报机制完备性", "category": "商业行为" },
+    { "task": "区域附录：主权凌驾条款审查", "category": "区域附录" },
+    { "task": "区域附录：法国 RI 章程报备状态", "category": "区域附录" },
+    { "task": "区域附录：沙特 Qiwa/印尼 MOM 核准状态", "category": "区域附录" },
+    { "task": "动态迭代：年度滚动更新机制审查", "category": "迭代" },
+    { "task": "动态迭代：不利变更工会同意校验", "category": "迭代" },
+    { "task": "动态迭代：加州仲裁 Opt-Out 机制审查", "category": "迭代" },
+    { "task": "状态码分类输出与风险等级判定", "category": "分析" },
+    { "task": "证据链完整性检查", "category": "合规记录" }
+  ]
+}

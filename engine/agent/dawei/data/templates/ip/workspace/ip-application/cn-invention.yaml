@@ -1,0 +1,114 @@
+template:
+  slug: cn-invention
+  name: "中国发明专利申请文件"
+  version: "1.0"
+  module: ip-application
+  team_slug: ip-application
+  target_country: CN
+
+  description: |
+    基于专利草案生成符合 CNIPA 要求的发明专利申请文件（五书）。
+
+  data_requirements:
+    required:
+      - key: applicant_name
+        label: "申请人全称"
+        type: string
+        placeholder: "企业营业执照上的全称"
+        store: "input/task_params.json"
+      - key: inventor_names
+        label: "发明人姓名"
+        type: string
+        store: "input/task_params.json"
+    optional:
+      - key: applicant_address
+        label: "申请人地址"
+        type: string
+        store: "input/task_params.json"
+      - key: agent_name
+        label: "专利代理机构"
+        type: string
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+    - knowledge/patent-examination-guidelines
+
+  checklists:
+    - ref: "checklist/cn-invention-format"
+    - ref: "checklist/draft-completeness"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游草案继承的文件"
+    - dir: input/checklists
+      description: "格式检查清单"
+    - dir: output
+      description: "五书各分册"
+    - dir: drafts
+      description: "完整申请文件"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入中国发明专利申请文件工作区，请按照 PDCA 工作流执行。
+
+    ## 核心原则：格式合规
+    从草案中提取内容，按 CNIPA 格式要求重组。不要修改草案的技术内容。
+
+    ## CNIPA 发明专利申请五书
+    | 文件 | 法律依据 |
+    |------|---------|
+    | 请求书 | 细则第16条 |
+    | 权利要求书 | 法第26条第4款 |
+    | 说明书 | 细则第17条 |
+    | 说明书摘要 | 细则第23条 |
+    | 说明书附图 | 细则第18条 |
+
+    ## 输入数据
+    1. `input/task_params.json` — 申请人信息
+    2. `input/inherited/` — 专利草案
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 读取草案，确认五书生成顺序
+    ### Do: 请求书→权利要求书→说明书→摘要→附图
+    ### Check: 逐项核对格式清单
+    ### Act: 生成完整申请文件包
+
+  deliverables:
+    - file: "drafts/cn_patent_package.md"
+      name: "中国发明专利申请五书"
+      format: markdown
+    - file: "output/02_claims_cnipa.md"
+      name: "权利要求书"
+    - file: "output/03_description_cnipa.md"
+      name: "说明书"
+    - file: "output/01_request_form.md"
+      name: "请求书"
+
+  phases:
+    - name: plan
+      label: "分析草案内容"
+      progress: 10
+    - name: do_claims
+      label: "生成权利要求书"
+      progress: 25
+    - name: do_description
+      label: "生成说明书"
+      progress: 30
+    - name: do_abstract_form
+      label: "生成摘要和请求书"
+      progress: 15
+    - name: check
+      label: "格式审查"
+      progress: 15
+    - name: act
+      label: "生成最终文件"
+      progress: 5

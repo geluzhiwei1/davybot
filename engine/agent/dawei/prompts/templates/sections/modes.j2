@@ -1,0 +1,40 @@
+{#
+  MODES section - separated into system modes (internal) and expert modes (user-facing).
+  Expert modes come from installed agent packages (workspace .dawei/agents/).
+  System modes (orchestrator, pdca) are internal and auto-managed.
+#}
+{% if expert_modes is defined and expert_modes|length > 0 %}
+====
+
+DOMAIN EXPERTS
+
+以下领域专家可用。你可以用 switch_mode 工具切换到合适的专家。
+选择专家是可选的 — 如果任务不需要特定领域知识，直接回答即可。
+
+{% for expert in expert_modes %}
+- {{ expert.slug }}: {{ expert.name }}{% if expert.when_to_use %} — {{ expert.when_to_use }}{% endif %}
+{% endfor %}
+
+{% if user_selected_expert %}
+✅ 已激活专家角色: {{ user_selected_expert }}
+{% else %}
+当任务匹配某个专家领域时，用 switch_mode 工具切换过去以获得更专业的回答。
+{% endif %}
+
+{% endif %}
+
+{% if system_modes is defined and system_modes|length > 0 %}
+====
+
+SYSTEM MODES (内部，无需手动切换)
+
+系统会在需要时自动在以下模式间切换：
+{% for mode in system_modes %}
+- {{ mode.slug }}: {{ mode.description }}
+{% endfor %}
+
+{% endif %}
+
+{% if mode_description %}
+当前运行在 {{ mode_name }} 模式。
+{% endif %}

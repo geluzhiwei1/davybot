@@ -1,0 +1,71 @@
+{
+  "slug": "filing-requirements",
+  "name": "专利申请提交要求检查清单",
+  "version": "1.0",
+  "module": "ip-filing",
+  "items": [
+    {
+      "id": "FR001",
+      "category": "时间要求",
+      "check": "是否确认优先权日（如有）",
+      "law_ref": "专利法第29条",
+      "severity": "critical"
+    },
+    {
+      "id": "FR002",
+      "category": "时间要求",
+      "check": "PCT申请是否在优先权日起12个月内提交",
+      "law_ref": "PCT条约第8条",
+      "severity": "critical"
+    },
+    {
+      "id": "FR003",
+      "category": "时间要求",
+      "check": "巴黎公约进入国家阶段是否在优先权日起12/6个月内",
+      "law_ref": "巴黎公约第4条",
+      "severity": "critical"
+    },
+    {
+      "id": "FR004",
+      "category": "费用",
+      "check": "申请费是否已预算",
+      "law_ref": "实施细则第93条",
+      "severity": "important"
+    },
+    {
+      "id": "FR005",
+      "category": "费用",
+      "check": "各国费用对比是否完成",
+      "law_ref": null,
+      "severity": "optional"
+    },
+    {
+      "id": "FR006",
+      "category": "文件完整性",
+      "check": "申请文件是否齐备（请求书+权利要求书+说明书+摘要+附图）",
+      "law_ref": "专利法第26条",
+      "severity": "critical"
+    },
+    {
+      "id": "FR007",
+      "category": "文件完整性",
+      "check": "委托书是否签署（如委托代理机构）",
+      "law_ref": "实施细则第15条",
+      "severity": "important"
+    },
+    {
+      "id": "FR008",
+      "category": "策略",
+      "check": "是否确定目标申请国家/地区列表",
+      "law_ref": null,
+      "severity": "important"
+    },
+    {
+      "id": "FR009",
+      "category": "策略",
+      "check": "是否选择申请路径（PCT/巴黎公约/直接）",
+      "law_ref": null,
+      "severity": "important"
+    }
+  ]
+}

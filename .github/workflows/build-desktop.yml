@@ -1,0 +1,639 @@
+name: Build Desktop
+
+# Full NormNomos Desktop build: sidecar (PyInstaller) + Tauri + updater signing.
+# Replicates scripts/build-desktop.sh as a GitHub Actions workflow.
+#
+# 单仓布局 (拆库方案 §2): 仓库根 = engine/ + app/ + scripts/。
+# 旧版的跨仓 checkout ../nn-bot 已移除 — sidecar 源码在同仓 engine/agent/。
+#
+# Each platform (Linux, macOS, Windows) runs as an independent parallel job
+# on its own runner, performing: version resolve → sidecar build → sidecar copy
+# → Tauri build → artifact verify.
+#
+# Triggers:
+#   - Push tag v*           → full build + release
+#   - workflow_dispatch      → manual trigger with platform/mode selection
+#
+# Prerequisites (secrets):
+#   TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_KEY_PASSWORD  — updater signing
+#   APPLE_CERTIFICATE_BASE64 / APPLE_CERTIFICATE_PASSWORD   — macOS codesign
+#   APPLE_SIGNING_IDENTITY / APPLE_TEAM_ID                  — macOS notarization
+#   APPLE_NOTARY_USER / APPLE_NOTARY_PASSWORD               — macOS notarization
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Target platforms"
+        required: false
+        type: choice
+        default: "all"
+        options: ["all", "linux", "macos", "windows"]
+      mode:
+        description: "Build mode"
+        required: false
+        type: choice
+        default: "all"
+        options: ["all", "sidecar", "tauri"]
+
+concurrency:
+  group: build-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20.19.0"
+  RUST_VERSION: "1.82"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ─── Lint + Type Check + Unit Test ────────────────────────────────
+  verify:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run ci:lint
+
+      - name: TypeScript type check
+        run: npm run ci:typecheck
+
+      - name: Unit tests
+        run: npm run ci:test
+
+  # ─── Linux: sidecar + Tauri (runs on ubuntu) ──────────────────────
+  build-linux:
+    name: Build Linux (x86_64)
+    needs: verify
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux' || github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      # fetch-depth 0: setuptools_scm 版本推导需要完整 git 历史
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libssl-dev \
+            libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "app/src-tauri -> target"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # ── Step 1: Resolve & inject version ──
+      - name: Resolve version from setuptools_scm
+        id: version
+        run: |
+          cd "${{ github.workspace }}/engine/agent"
+          VERSION=$(uv run python -c "
+          from dawei._version import __version__
+          import re
+          v = __version__
+          v = re.sub(r'\.post(\d+)', r'-post.\1', v)
+          v = re.sub(r'\.dev(\d+)', r'.dev.\1', v)
+          v = re.sub(r'(\d+\.\d+\.\d+)a(\d+)',  lambda m: f'{m.group(1)}-alpha.{m.group(2)}', v)
+          v = re.sub(r'(\d+\.\d+\.\d+)b(\d+)',   lambda m: f'{m.group(1)}-beta.{m.group(2)}',  v)
+          v = re.sub(r'(\d+\.\d+\.\d+)rc(\d+)',  lambda m: f'{m.group(1)}-rc.{m.group(2)}',    v)
+          m = re.match(r'^\d+\.\d+\.\d+(-[a-zA-Z]+\.\d+(\.[a-zA-Z]+\.\d+)*)?$', v)
+          print(m.group(0) if m else v)
+          " 2>/dev/null | tail -1)
+          if [ -z "$VERSION" ]; then
+            echo "WARN: Could not resolve version, using 0.0.0"
+            VERSION="0.0.0"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Inject version into Tauri config
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node -e "
+          const fs = require('fs');
+          const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          conf.version = process.env.VERSION;
+          fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          console.log('Injected version ' + process.env.VERSION + ' into tauri.conf.json');
+          "
+          sed -i 's/^version = ".*"/version = "'"$VERSION"'"/' src-tauri/Cargo.toml
+          echo "Injected version $VERSION into Cargo.toml"
+
+      # ── Step 2: Build sidecar (PyInstaller) ──
+      - name: Build sidecar binary
+        if: ${{ github.event.inputs.mode != 'tauri' }}
+        run: |
+          cd "${{ github.workspace }}/engine/agent"
+          uv run --python 3.12 --with pyinstaller python scripts/build-binary.py --clean
+          echo "Sidecar built: $(du -h dist/dawei | cut -f1)"
+
+      # ── Step 3: Copy sidecar to Tauri binaries ──
+      - name: Copy sidecar to Tauri binaries
+        if: ${{ github.event.inputs.mode != 'tauri' }}
+        run: |
+          TARGET="x86_64-unknown-linux-gnu"
+          SIDEAR_BIN="${{ github.workspace }}/engine/agent/dist/dawei"
+          DEST="${{ github.workspace }}/app/src-tauri/binaries/dawei-${TARGET}"
+          mkdir -p "$(dirname "$DEST")"
+          cp "$SIDEAR_BIN" "$DEST"
+          chmod +x "$DEST"
+          echo "Sidecar copied to $DEST ($(du -h "$DEST" | cut -f1))"
+
+      # ── Step 4: Build Tauri ──
+      - name: Clean stale AppDir
+        run: |
+          APPDIR="src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/NormNomos.AppDir"
+          if [ -d "$APPDIR" ]; then
+            rm -rf "$APPDIR"
+            echo "Cleaned stale AppDir"
+          fi
+
+      - name: Build Tauri desktop app (Linux)
+        if: ${{ github.event.inputs.mode != 'sidecar' }}
+        run: npm run package:linux
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+
+      - name: Verify Linux artifacts
+        run: |
+          BUNDLE_DIR="src-tauri/target/x86_64-unknown-linux-gnu/release/bundle"
+          if [ ! -d "$BUNDLE_DIR" ]; then
+            BUNDLE_DIR="src-tauri/target/release/bundle"
+          fi
+
+          DEB_COUNT=$(find "$BUNDLE_DIR" -name "*.deb" 2>/dev/null | wc -l)
+          APPIMAGE_COUNT=$(find "$BUNDLE_DIR" -name "*.AppImage" 2>/dev/null | wc -l)
+          SIG_COUNT=$(find "$BUNDLE_DIR" -name "*.sig" 2>/dev/null | wc -l)
+
+          echo "Bundle dir: $BUNDLE_DIR"
+          [ "$DEB_COUNT" -gt 0 ] && echo "Found $DEB_COUNT .deb package(s)" || echo "WARN: No .deb packages found"
+          [ "$APPIMAGE_COUNT" -gt 0 ] && echo "Found $APPIMAGE_COUNT AppImage(s)" || echo "WARN: No AppImages found"
+          [ "$SIG_COUNT" -gt 0 ] && echo "Found $SIG_COUNT updater signature(s)" || echo "WARN: No .sig files (unsigned build)"
+
+      # 注意: uses: 步骤的 path 相对仓库根解析 (不受 defaults working-directory 影响)
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: normnomos-linux-x86_64
+          path: |
+            app/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            app/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+            app/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.tar.gz
+            app/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.tar.gz.sig
+            app/src-tauri/target/release/bundle/deb/*.deb
+            app/src-tauri/target/release/bundle/appimage/*.AppImage
+            app/src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
+            app/src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
+          if-no-files-found: warn
+
+  # ─── macOS: sidecar + Tauri (runs on macos) ────────────────────────
+  build-macos:
+    name: Build macOS (aarch64)
+    needs: verify
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' || github.event_name != 'workflow_dispatch' }}
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "app/src-tauri -> target"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # ── Step 1: Resolve & inject version ──
+      - name: Resolve version from setuptools_scm
+        id: version
+        run: |
+          cd "${{ github.workspace }}/engine/agent"
+          VERSION=$(uv run python -c "
+          from dawei._version import __version__
+          import re
+          v = __version__
+          v = re.sub(r'\.post(\d+)', r'-post.\1', v)
+          v = re.sub(r'\.dev(\d+)', r'.dev.\1', v)
+          v = re.sub(r'(\d+\.\d+\.\d+)a(\d+)',  lambda m: f'{m.group(1)}-alpha.{m.group(2)}', v)
+          v = re.sub(r'(\d+\.\d+\.\d+)b(\d+)',   lambda m: f'{m.group(1)}-beta.{m.group(2)}',  v)
+          v = re.sub(r'(\d+\.\d+\.\d+)rc(\d+)',  lambda m: f'{m.group(1)}-rc.{m.group(2)}',    v)
+          m = re.match(r'^\d+\.\d+\.\d+(-[a-zA-Z]+\.\d+(\.[a-zA-Z]+\.\d+)*)?$', v)
+          print(m.group(0) if m else v)
+          " 2>/dev/null | tail -1)
+          if [ -z "$VERSION" ]; then
+            echo "WARN: Could not resolve version, using 0.0.0"
+            VERSION="0.0.0"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Inject version into Tauri config
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node -e "
+          const fs = require('fs');
+          const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          conf.version = process.env.VERSION;
+          fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          console.log('Injected version ' + process.env.VERSION + ' into tauri.conf.json');
+          "
+          # macOS sed requires '' for in-place with no backup
+          sed -i '' 's/^version = ".*"/version = "'"$VERSION"'"/' src-tauri/Cargo.toml
+          echo "Injected version $VERSION into Cargo.toml"
+
+      # ── Step 2: macOS prerequisites ──
+      - name: Install Rust target aarch64-apple-darwin
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Import Apple Developer Certificate
+        if: ${{ secrets.APPLE_SIGNING_IDENTITY != '' }}
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          security create-keychain -p temp build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p temp build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temp build.keychain
+          rm certificate.p12
+
+      # ── Step 3: Build sidecar (PyInstaller) ──
+      - name: Build sidecar binary
+        if: ${{ github.event.inputs.mode != 'tauri' }}
+        run: |
+          cd "${{ github.workspace }}/engine/agent"
+          uv run --python 3.12 --with pyinstaller python scripts/build-binary.py --clean
+          echo "Sidecar built: $(du -h dist/dawei | cut -f1)"
+
+      # ── Step 4: Copy sidecar to Tauri binaries ──
+      - name: Copy sidecar to Tauri binaries
+        if: ${{ github.event.inputs.mode != 'tauri' }}
+        run: |
+          TARGET="aarch64-apple-darwin"
+          SIDEAR_BIN="${{ github.workspace }}/engine/agent/dist/dawei"
+          DEST="${{ github.workspace }}/app/src-tauri/binaries/dawei-${TARGET}"
+          mkdir -p "$(dirname "$DEST")"
+          cp "$SIDEAR_BIN" "$DEST"
+          chmod +x "$DEST"
+          echo "Sidecar copied to $DEST ($(du -h "$DEST" | cut -f1))"
+
+      # ── Step 5: Build Tauri ──
+      - name: Build Tauri desktop app (macOS)
+        if: ${{ github.event.inputs.mode != 'sidecar' }}
+        run: npm run package:macos
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Notarize macOS DMG
+        if: ${{ secrets.APPLE_TEAM_ID != '' }}
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_NOTARY_USER: ${{ secrets.APPLE_NOTARY_USER }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+        run: |
+          DMG_FILE=$(find src-tauri/target -name "*.dmg" -path "*/bundle/*" | head -1)
+          if [[ -f "$DMG_FILE" ]]; then
+            echo "Notarizing $DMG_FILE..."
+            xcrun notarytool submit "$DMG_FILE" \
+              --apple-id "$APPLE_NOTARY_USER" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_NOTARY_PASSWORD" \
+              --wait
+          fi
+
+      - name: Verify macOS artifacts
+        run: |
+          BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
+          if [ ! -d "$BUNDLE_DIR" ]; then
+            BUNDLE_DIR="src-tauri/target/release/bundle"
+          fi
+
+          DMG_COUNT=$(find "$BUNDLE_DIR" -name "*.dmg" 2>/dev/null | wc -l)
+          SIG_COUNT=$(find "$BUNDLE_DIR" -name "*.sig" 2>/dev/null | wc -l)
+
+          echo "Bundle dir: $BUNDLE_DIR"
+          [ "$DMG_COUNT" -gt 0 ] && echo "Found $DMG_COUNT .dmg package(s)" || echo "WARN: No .dmg packages found"
+          [ "$SIG_COUNT" -gt 0 ] && echo "Found $SIG_COUNT updater signature(s)" || echo "WARN: No .sig files (unsigned build)"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: normnomos-macos-aarch64
+          path: |
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.dmg.tar.gz
+            app/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.dmg.tar.gz.sig
+            app/src-tauri/target/release/bundle/dmg/*.dmg
+            app/src-tauri/target/release/bundle/macos/*.dmg.tar.gz
+            app/src-tauri/target/release/bundle/macos/*.dmg.tar.gz.sig
+          if-no-files-found: warn
+
+  # ─── Windows: sidecar + Tauri (runs on windows) ───────────────────
+  build-windows:
+    name: Build Windows (x86_64)
+    needs: verify
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' || github.event_name != 'workflow_dispatch' }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "app/src-tauri -> target"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # ── Step 1: Resolve & inject version ──
+      - name: Resolve version from setuptools_scm
+        id: version
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}/engine/agent"
+          VERSION=$(uv run python -c "
+          from dawei._version import __version__
+          import re
+          v = __version__
+          v = re.sub(r'\.post(\d+)', r'-post.\1', v)
+          v = re.sub(r'\.dev(\d+)', r'.dev.\1', v)
+          v = re.sub(r'(\d+\.\d+\.\d+)a(\d+)',  lambda m: f'{m.group(1)}-alpha.{m.group(2)}', v)
+          v = re.sub(r'(\d+\.\d+\.\d+)b(\d+)',   lambda m: f'{m.group(1)}-beta.{m.group(2)}',  v)
+          v = re.sub(r'(\d+\.\d+\.\d+)rc(\d+)',  lambda m: f'{m.group(1)}-rc.{m.group(2)}',    v)
+          m = re.match(r'^\d+\.\d+\.\d+(-[a-zA-Z]+\.\d+(\.[a-zA-Z]+\.\d+)*)?$', v)
+          print(m.group(0) if m else v)
+          " 2>/dev/null | tail -1)
+          if [ -z "$VERSION" ]; then
+            echo "WARN: Could not resolve version, using 0.0.0"
+            VERSION="0.0.0"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Inject version into Tauri config
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          node -e "
+          const fs = require('fs');
+          const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          conf.version = process.env.VERSION;
+          fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          console.log('Injected version ' + process.env.VERSION + ' into tauri.conf.json');
+          "
+          sed -i 's/^version = ".*"/version = "'"$VERSION"'"/' src-tauri/Cargo.toml
+          echo "Injected version $VERSION into Cargo.toml"
+
+      # ── Step 2: Build sidecar (PyInstaller) ──
+      # Delegates to the canonical builder (HIDDEN_IMPORTS + --collect-all dawei);
+      # no per-platform --add-data separator (":/" vs ";") needed.
+      - name: Build sidecar binary
+        if: ${{ github.event.inputs.mode != 'tauri' }}
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}/engine/agent"
+          uv run --python 3.12 --with pyinstaller python scripts/build-binary.py --clean
+          BIN="dist/dawei.exe"
+          if [ ! -f "$BIN" ]; then
+            BIN="dist/dawei"
+          fi
+          echo "Sidecar built: $(du -h "$BIN" | cut -f1)"
+
+      # ── Step 3: Copy sidecar to Tauri binaries ──
+      - name: Copy sidecar to Tauri binaries
+        if: ${{ github.event.inputs.mode != 'tauri' }}
+        shell: bash
+        run: |
+          TARGET="x86_64-pc-windows-msvc"
+          SIDEAR_BIN="${{ github.workspace }}/engine/agent/dist/dawei.exe"
+          if [ ! -f "$SIDEAR_BIN" ]; then
+            SIDEAR_BIN="${{ github.workspace }}/engine/agent/dist/dawei"
+          fi
+          DEST="${{ github.workspace }}/app/src-tauri/binaries/dawei-${TARGET}.exe"
+          mkdir -p "$(dirname "$DEST")"
+          cp "$SIDEAR_BIN" "$DEST"
+          echo "Sidecar copied to $DEST ($(du -h "$DEST" | cut -f1))"
+
+      # ── Step 4: Build Tauri ──
+      - name: Build Tauri desktop app (Windows)
+        if: ${{ github.event.inputs.mode != 'sidecar' }}
+        run: npm run package:windows
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+
+      - name: Verify Windows artifacts
+        shell: bash
+        run: |
+          BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+          if [ ! -d "$BUNDLE_DIR" ]; then
+            BUNDLE_DIR="src-tauri/target/release/bundle"
+          fi
+
+          NSIS_COUNT=$(find "$BUNDLE_DIR" -name "*.exe" 2>/dev/null | wc -l)
+          MSI_COUNT=$(find "$BUNDLE_DIR" -name "*.msi" 2>/dev/null | wc -l)
+          SIG_COUNT=$(find "$BUNDLE_DIR" -name "*.sig" 2>/dev/null | wc -l)
+
+          echo "Bundle dir: $BUNDLE_DIR"
+          [ "$NSIS_COUNT" -gt 0 ] && echo "Found $NSIS_COUNT NSIS installer(s)" || echo "WARN: No NSIS installers found"
+          [ "$MSI_COUNT" -gt 0 ] && echo "Found $MSI_COUNT .msi package(s)" || echo "WARN: No .msi packages found"
+          [ "$SIG_COUNT" -gt 0 ] && echo "Found $SIG_COUNT updater signature(s)" || echo "WARN: No .sig files (unsigned build)"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: normnomos-windows-x86_64
+          path: |
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
+            app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
+            app/src-tauri/target/release/bundle/msi/*.msi
+            app/src-tauri/target/release/bundle/nsis/*.nsis.zip
+            app/src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+          if-no-files-found: warn
+
+  # ─── Verify all artifacts ─────────────────────────────────────────
+  verify-artifacts:
+    name: Verify Artifacts
+    needs: [build-linux, build-macos, build-windows]
+    if: always() && needs.build-linux.result != 'failed' && needs.build-macos.result != 'failed' && needs.build-windows.result != 'failed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: artifacts/
+
+      - name: List and verify artifacts
+        run: |
+          echo "=== Build Artifacts ==="
+          find artifacts/ -type f | sort
+
+          echo ""
+          echo "=== Summary ==="
+          DEB=$(find artifacts/ -name "*.deb" | wc -l)
+          APPIMAGE=$(find artifacts/ -name "*.AppImage" | wc -l)
+          DMG=$(find artifacts/ -name "*.dmg" | wc -l)
+          MSI=$(find artifacts/ -name "*.msi" | wc -l)
+          NSIS=$(find artifacts/ -name "*.nsis.zip" | wc -l)
+          SIGS=$(find artifacts/ -name "*.sig" | wc -l)
+
+          echo "Linux:   $DEB deb(s), $APPIMAGE AppImage(s)"
+          echo "macOS:   $DMG dmg(s)"
+          echo "Windows: $MSI msi(s), $NSIS nsis installer(s)"
+          echo "Sigs:    $SIGS signature file(s)"
+
+          TOTAL=$((DEB + APPIMAGE + DMG + MSI + NSIS))
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "ERROR: No build artifacts found!"
+            exit 1
+          fi
+
+  # ─── Create GitHub Release (tag push only) ────────────────────────
+  release:
+    name: Create Release
+    needs: [build-linux, build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: artifacts/
+
+      - name: Generate release notes
+        run: |
+          echo "## NormNomos Desktop ${{ github.ref_name }}" > RELEASE.md
+          echo "" >> RELEASE.md
+          echo "### What's New" >> RELEASE.md
+          echo "$(git log --oneline $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo HEAD~10)..HEAD | sed 's/^/- /')" >> RELEASE.md
+          echo "" >> RELEASE.md
+          echo "### Installation" >> RELEASE.md
+          echo "- **Linux**: Download the \`.deb\` or \`.AppImage\` file" >> RELEASE.md
+          echo "- **macOS**: Open the \`.dmg\` and drag to Applications" >> RELEASE.md
+          echo "- **Windows**: Run the \`.msi\` installer" >> RELEASE.md
+          echo "" >> RELEASE.md
+          echo "### Auto-Update" >> RELEASE.md
+          echo "This version includes automatic update checking. The app will notify you when a new version is available." >> RELEASE.md
+
+      # 发布下载基址可通过仓库变量 RELEASES_BASE_URL 覆盖 (默认沿用产品 CDN)
+      - name: Generate update manifest (latest.json)
+        run: |
+          python3 app/scripts/generate-update-manifest.py \
+            --version ${{ github.ref_name }} \
+            --channel community \
+            --artifacts-dir artifacts/ \
+            --base-url "${{ vars.RELEASES_BASE_URL || 'https://releases.normnomos.com/desktop' }}" \
+            --output latest.json \
+            --notes "$(cat RELEASE.md)"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: "NormNomos Desktop ${{ github.ref_name }}"
+          body_path: RELEASE.md
+          files: |
+            artifacts/**/*
+            latest.json
+          draft: false
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}

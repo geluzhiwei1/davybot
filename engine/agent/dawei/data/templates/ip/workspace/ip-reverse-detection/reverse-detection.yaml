@@ -1,0 +1,210 @@
+template:
+  slug: reverse-detection
+  name: "反向侵权探测（通用）"
+  version: "2.0"
+  module: ip-reverse-detection
+  team_slug: ip-reverse-detection
+
+  description: |
+    检测市场上产品/技术是否侵犯我方专利权。
+    逐项对比权利要求与疑似侵权产品特征，基于全面覆盖原则和等同原则进行侵权概率评估，
+    生成侵权分析报告、证据链和警告函草稿。
+
+  data_requirements:
+    required:
+      - key: patent_numbers
+        label: "我方专利号"
+        type: string
+        placeholder: "如：CN1234567A, US9876543B2（逗号分隔，支持多件）"
+        store: "input/task_params.json"
+      - key: claim_focus
+        label: "重点分析的权利要求"
+        type: string
+        placeholder: "如：权1-3（方法），权10-15（装置）。留空表示分析全部独立权利要求"
+        store: "input/task_params.json"
+      - key: suspected_product
+        label: "疑似侵权产品/技术"
+        type: string
+        placeholder: "描述疑似侵权的产品名称、技术方案、公开信息"
+        store: "input/task_params.json"
+    optional:
+      - key: claim_type
+        label: "权利要求类型"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "全部（方法+产品+装置）" }
+          - { value: "method", label: "方法权利要求" }
+          - { value: "product", label: "产品/装置权利要求" }
+          - { value: "system", label: "系统权利要求" }
+        store: "input/task_params.json"
+      - key: jurisdiction
+        label: "侵权判定管辖地"
+        type: select
+        default: "CN"
+        options:
+          - { value: "CN", label: "中国（全面覆盖+等同原则）" }
+          - { value: "US", label: "美国（Literal+Doctrine of Equivalents）" }
+          - { value: "EP", label: "欧洲（Article 69 + Protocol）" }
+          - { value: "JP", label: "日本（均等论）" }
+        store: "input/task_params.json"
+      - key: known_competitors
+        label: "已知竞争对手"
+        type: string
+        placeholder: "列出已知的疑似侵权方/竞争对手"
+        store: "input/task_params.json"
+      - key: evidence_available
+        label: "已有证据"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "暂无" }
+          - { value: "product", label: "已购买对方产品" }
+          - { value: "marketing", label: "对方宣传资料/网站" }
+          - { value: "patents", label: "对方专利/论文" }
+          - { value: "mixed", label: "多种来源" }
+        store: "input/task_params.json"
+      - key: target_markets
+        label: "目标市场"
+        type: string
+        placeholder: "如：CN, US, EP（逗号分隔）"
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+
+  checklists:
+    - ref: "checklist/infringement-analysis"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游草案/专利文件继承的文件"
+    - dir: input/checklists
+      description: "侵权分析清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: drafts
+      description: "探测报告"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入反向侵权探测工作区，请按照 PDCA 工作流执行。
+
+    ## 侵权判定核心原则
+
+    ### 1. 全面覆盖原则（Literal Infringement / 字面侵权）
+    - 被控侵权产品**包含**权利要求中记载的**所有**技术特征
+    - 缺少任何一个技术特征 → 不构成字面侵权
+    - 多于权利要求的技术特征 → 仍可能构成字面侵权
+
+    ### 2. 等同原则（Doctrine of Equivalents / 等同侵权）
+    - 被控产品的技术特征与权利要求特征**实质相同**
+    - 判断维度：方式（Way）-功能（Function）-效果（Result）
+    - 中国司法解释：以基本相同的手段，实现相同的功能，达到相同的效果
+    - 美国限缩：检举禁止（Prosecution History Estoppel）、贡献原则
+
+    ### 3. 各管辖地判定方法
+    | 管辖地 | 主要原则 | 特别注意 |
+    |--------|---------|---------|
+    | 中国 | 全面覆盖+等同 | 专利权人可选主张保护范围；司法解释明确等同判定标准 |
+    | 美国 | Literal + DOE | File Wrapper Estoppel；Means-plus-function（112(f)）特殊解释 |
+    | 欧洲 | Article 69 + Protocol | 保护范围由权利要求内容确定，说明书和附图解释；均衡原则 |
+    | 日本 | 均等论+目的论 | 第5要件（替换容易性）；专利权人在申请中可预测的范围 |
+
+    ## 分析方法论
+
+    ### Step 1: 权利要求解析
+    1. 识别独立权利要求和从属权利要求
+    2. 将每项独立权利要求拆解为技术特征列表
+    3. 标注每个技术特征的类型：
+       - **结构特征**：部件、组成、连接关系
+       - **方法特征**：步骤、顺序、条件
+       - **功能特征**：功能性限定（Means-plus-function）
+       - **参数特征**：数值范围、参数限定
+
+    ### Step 2: 被控产品信息收集
+    1. 产品名称、型号、厂商信息
+    2. 技术规格、说明书、白皮书
+    3. 宣传资料、展会信息、技术演示
+    4. 已有的逆向分析报告（如有）
+    5. 对方相关专利/论文/开源代码
+
+    ### Step 3: 逐项特征对比
+    对每个技术特征构建对比矩阵：
+
+    | 权利要求特征 | 被控产品对应特征 | 字面侵权？ | 等同侵权？ | 证据强度 | 备注 |
+    |-------------|----------------|-----------|-----------|---------|------|
+
+    评分标准：
+    - **确认匹配**：公开信息直接显示该特征存在
+    - **高度可能**：可合理推断该特征存在
+    - **可能匹配**：部分信息支持，需进一步调查
+    - **信息不足**：公开信息无法确认，需购买产品/进一步取证
+    - **不匹配**：公开信息显示该特征不存在
+
+    ### Step 4: 侵权概率评级
+    | 等级 | 标准 | 建议行动 |
+    |------|------|---------|
+    | 高（>70%） | 所有特征确认匹配或高度可能 | 准备警告函/取证 |
+    | 中（40-70%） | 部分特征可能匹配，存在等同可能 | 补充证据/技术调查 |
+    | 低（<40%） | 关键特征不匹配或信息不足 | 持续监控/放弃 |
+
+    ## 证据链构建
+    - **直接证据**：产品拆解报告、源代码分析、成分分析报告
+    - **间接证据**：产品手册、技术白皮书、学术论文、专利文件
+    - **时间线**：对方产品上市时间 vs 我方专利公开时间
+    - **保全建议**：公证购买、时间戳固化、第三方检测报告
+
+    ## 输入数据
+    1. `input/task_params.json` — 专利号、权利要求重点、疑似产品、管辖地
+    2. `input/inherited/` — 专利全文/权利要求（如有）
+    3. `input/checklists/` — 侵权分析检查清单
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 解析权利要求，提取技术特征列表，确认管辖地判定标准
+    ### Do:
+    - 收集被控产品公开信息
+    - 构建特征对比矩阵（逐项分析）
+    - 评估字面侵权和等同侵权可能性
+    - 构建证据链
+    ### Check: 交叉验证对比结果，标记证据缺口，评估侵权概率
+    ### Act: 生成探测报告 + 证据包目录 + 警告函草稿
+
+  deliverables:
+    - file: "drafts/infringement_report.md"
+      name: "反向侵权探测报告"
+      format: markdown
+    - file: "output/claim_chart.md"
+      name: "权利要求对比表（Claim Chart）"
+      format: markdown
+    - file: "output/evidence_chain.md"
+      name: "证据链目录"
+      format: markdown
+    - file: "output/warning_letter_draft.md"
+      name: "警告函草稿"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "解析权利要求"
+      progress: 15
+    - name: do_research
+      label: "收集产品信息"
+      progress: 20
+    - name: do_compare
+      label: "特征逐项对比"
+      progress: 30
+    - name: check
+      label: "侵权概率评估"
+      progress: 20
+    - name: act
+      label: "生成报告"
+      progress: 15

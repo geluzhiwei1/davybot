@@ -1,0 +1,216 @@
+# Copyright (c) 2025 格律至微
+from typing import List, Dict
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""Scheduled Task Storage
+
+定时任务持久化存储层
+负责定时任务的CRUD操作和持久化
+"""
+
+import logging
+from datetime import timedelta
+from pathlib import Path
+
+from dawei.core.datetime_compat import UTC
+from datetime import datetime
+
+from dawei.entity.scheduled_task import ScheduledTask, TriggerStatus
+from dawei.workspace.persistence_manager import (
+    ResourceType,
+    WorkspacePersistenceManager,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class ScheduledTaskStorage:
+    """定时任务存储"""
+
+    def __init__(self, workspace_path: str):
+        """初始化存储
+
+        Args:
+            workspace_path: workspace路径
+
+        """
+        self.workspace_path = Path(workspace_path)
+        self.persistence = WorkspacePersistenceManager(str(workspace_path))
+        self._cache: Dict[str, ScheduledTask] = {}
+        self._loaded = False
+
+    async def _ensure_loaded(self, fail_on_error: bool = False) -> None:
+        """加载任务到缓存 - 加载所有任务（包括已完成和失败的）
+
+        Args:
+            fail_on_error: 如果为True，加载失败时抛出异常（fast fail）
+
+        Raises:
+            RuntimeError: 当fail_on_error=True且有任务加载失败时
+
+        """
+        if self._loaded:
+            return
+
+        tasks_data = await self.persistence.list_resources(ResourceType.SCHEDULED_TASK)
+
+        loaded_count = 0
+        failed_tasks = []
+
+        for task_data in tasks_data:
+            try:
+                task = ScheduledTask.from_dict(task_data)
+                # ✅ 加载所有任务到缓存
+                self._cache[task.task_id] = task
+                loaded_count += 1
+            except Exception as e:
+                task_id = task_data.get("task_id", "unknown")
+                failed_tasks.append(task_id)
+                logger.error(
+                    f"[SCHEDULER_STORAGE] Failed to load task {task_id}: {e}",
+                    exc_info=True,
+                )
+
+        # ✅ Fast fail: 如果有任务加载失败，抛出异常
+        if fail_on_error and failed_tasks:
+            raise RuntimeError(f"Failed to load {len(failed_tasks)} scheduled tasks: {failed_tasks}. Please check task data integrity in {self.workspace_path}")
+
+        self._loaded = True
+        logger.info(f"[SCHEDULER_STORAGE] Loaded {loaded_count} scheduled tasks (total files: {len(tasks_data)}, failed: {len(failed_tasks)})")
+
+    async def save_task(self, task: ScheduledTask) -> bool:
+        """保存任务
+
+        Args:
+            task: 要保存的任务
+
+        Returns:
+            是否保存成功
+
+        """
+        await self._ensure_loaded()
+
+        success = await self.persistence.save_resource(
+            ResourceType.SCHEDULED_TASK,
+            task.task_id,
+            task.to_dict(),
+        )
+
+        if success:
+            self._cache[task.task_id] = task
+            logger.debug(f"[SCHEDULER_STORAGE] Saved task {task.task_id}")
+        else:
+            logger.error(f"[SCHEDULER_STORAGE] Failed to save task {task.task_id}")
+
+        return success
+
+    async def get_task(self, task_id: str) -> ScheduledTask | None:
+        """获取任务
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            任务对象,不存在则返回None
+
+        """
+        await self._ensure_loaded()
+        return self._cache.get(task_id)
+
+    async def list_tasks(self) -> List[ScheduledTask]:
+        """列出所有任务
+
+        Returns:
+            任务列表
+
+        """
+        await self._ensure_loaded()
+        return list(self._cache.values())
+
+    async def delete_task(self, task_id: str) -> bool:
+        """删除任务
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            是否删除成功
+
+        """
+        await self._ensure_loaded()
+
+        success = await self.persistence.delete_resource(ResourceType.SCHEDULED_TASK, task_id)
+
+        if success and task_id in self._cache:
+            del self._cache[task_id]
+            logger.debug(f"[SCHEDULER_STORAGE] Deleted task {task_id}")
+
+        return success
+
+    async def get_due_tasks(self) -> List[ScheduledTask]:
+        """获取到期任务
+
+        Returns:
+            到期任务列表
+
+        """
+        await self._ensure_loaded()
+        return [t for t in self._cache.values() if t.is_due()]
+
+    async def get_pending_tasks(self) -> List[ScheduledTask]:
+        """获取待处理任务
+
+        Returns:
+            待处理任务列表
+
+        """
+        await self._ensure_loaded()
+        return [t for t in self._cache.values() if t.status.value == "pending"]
+
+    async def cleanup_old_tasks(self, max_age_days: int = 30) -> int:
+        """清理过旧的已完成/失败/取消任务
+
+        Args:
+            max_age_days: 保留天数, 默认30天
+
+        Returns:
+            清理的任务数量
+
+        """
+        await self._ensure_loaded()
+
+        now = datetime.now(UTC)
+        cutoff = now - timedelta(days=max_age_days)
+        terminal_statuses = {
+            TriggerStatus.COMPLETED,
+            TriggerStatus.FAILED,
+            TriggerStatus.CANCELLED,
+        }
+
+        to_delete = []
+        for task_id, task in list(self._cache.items()):
+            if task.status in terminal_statuses:
+                task_time = task.updated_at or task.triggered_at or task.created_at
+                if task_time and task_time < cutoff:
+                    to_delete.append(task_id)
+
+        cleaned = 0
+        for task_id in to_delete:
+            success = await self.delete_task(task_id)
+            if success:
+                cleaned += 1
+
+        if cleaned > 0:
+            logger.info(f"[SCHEDULER_STORAGE] Cleaned up {cleaned} old tasks (>{max_age_days}d)")
+
+        return cleaned
+
+    async def clear_cache(self) -> None:
+        """清空缓存"""
+        self._cache.clear()
+        self._loaded = False
+
+
+__all__ = [
+    "ScheduledTaskStorage",
+]

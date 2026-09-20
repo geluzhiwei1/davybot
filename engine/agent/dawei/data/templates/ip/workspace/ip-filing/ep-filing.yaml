@@ -1,0 +1,180 @@
+template:
+  slug: ep-filing
+  name: "欧洲专利申请策略"
+  version: "1.0"
+  module: ip-filing
+  team_slug: ip-filing
+
+  description: |
+    向 EPO（欧洲专利局）提交专利申请的完整策略规划。
+    包含 EPO 申请流程、Unitary Patent（单一专利）、验证国选择、语言策略。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "请输入发明名称"
+        store: "input/task_params.json"
+      - key: application_type
+        label: "申请类型"
+        type: select
+        default: "direct_ep"
+        options:
+          - { value: "direct_ep", label: "直接向 EPO 申请" }
+          - { value: "euro_pct", label: "PCT 进入欧洲阶段（Euro-PCT）" }
+          - { value: "euro_direct", label: "巴黎公约路径进入" }
+        store: "input/task_params.json"
+      - key: language
+        label: "申请语言"
+        type: select
+        default: "en"
+        options:
+          - { value: "en", label: "英语" }
+          - { value: "de", label: "德语" }
+          - { value: "fr", label: "法语" }
+        store: "input/task_params.json"
+    optional:
+      - key: unitary_patent
+        label: "单一专利（Unitary Patent）"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "暂不考虑" }
+          - { value: "yes", label: "希望利用单一专利" }
+          - { value: "traditional", label: "传统验证国模式" }
+        store: "input/task_params.json"
+      - key: validation_countries
+        label: "验证国（传统模式）"
+        type: string
+        placeholder: "如：DE, FR, GB, IT, ES（逗号分隔）"
+        store: "input/task_params.json"
+      - key: has_foreign_priority
+        label: "外国优先权"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "无" }
+          - { value: "yes", label: "有优先权申请" }
+        store: "input/task_params.json"
+      - key: acceleration
+        label: "加速策略"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "普通审查（约3-5年）" }
+          - { value: "ppa", label: "PACE 加速审查程序（免费）" }
+          - { value: "pph", label: "PPH（基于外国审查结果）" }
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+
+  checklists:
+    - ref: "checklist/filing-requirements"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游申请书继承的文件"
+    - dir: input/checklists
+      description: "申请要求清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: drafts
+      description: "完整策略方案"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入欧洲专利申请策略规划工作区，请按照 PDCA 工作流执行。
+
+    ## EPO 申请核心规则
+
+    ### 申请路径
+    1. **直接向 EPO 申请**（Euro-Direct）：在优先权日 12 个月内直接提交欧洲专利申请
+    2. **Euro-PCT**：通过 PCT 国际申请，在优先权日 31 个月内进入欧洲阶段
+    3. **巴黎公约路径**：在首次申请后 12 个月内提交
+
+    ### EPO 审查流程
+    | 阶段 | 时间 | 内容 |
+    |------|------|------|
+    | 申请提交 | T+0 | 提交申请文件（可任选英/法/德语） |
+    | 形式审查 | 1-3 月 | 形式合规检查 |
+    | 检索报告 | 6-12 月 | EPO 出具欧洲检索报告（ESR） |
+    | 实质审查请求 | 6 个月内 | 必须在检索报告公布后6个月内提交审查请求 |
+    | 实质审查 | 1-3 年 | 审查专利性（新颖性、创造性、工业适用性） |
+    | 授权决定 | — | 拟授权通知书（Intention to Grant） |
+    | 验证/单一专利 | 授权后3个月 | 在各指定国验证或选择单一专利 |
+
+    ### Unitary Patent（单一专利）vs 传统验证
+    | 维度 | 单一专利 | 传统验证 |
+    |------|---------|---------|
+    | 覆盖范围 | 17个参与国（2024年起） | 自由选择 |
+    | 费用 | 一次缴纳统一维持费 | 各国分别缴纳年费 |
+    | 翻译 | 过渡期内需翻译（2027年前） | 各国翻译要求不同 |
+    | 诉讼 | 统一专利法院（UPC） | 各国法院 |
+
+    ### 语言策略
+    - **程序语言**：英/法/德（任选一种用于程序交流）
+    - **权利要求翻译**：需翻译为另外两种 EPO 语言
+    - **验证翻译**：传统模式下可能需翻译为各验证国官方语言
+
+    ### PACE 加速程序
+    - **免费**，无需额外费用
+    - 审查周期可缩短至 12-18 个月
+    - 需主动请求，可随时撤回
+
+    ### EPO 官费参考
+    - 申请费：€130（在线提交）
+    - 检索费：€1,500（Euro-Direct）/ 已含在 PCT 国际阶段（Euro-PCT）
+    - 审查费：€1,915
+    - 指定费：€630（授权时缴纳）
+    - 年费：从第3年起逐年递增（第3年 €530 → 第10年 €1,640 → 第20年 €3,665）
+
+    ## 输入数据
+    1. `input/task_params.json` — 发明名称、申请路径、语言、加速策略
+    2. `input/inherited/` — 专利草案/申请书
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 确认申请路径、语言选择、验证国策略
+    ### Do: 申请时间线 + 费用预算 + 单一专利可行性分析 + 翻译安排
+    ### Check: 核对申请要求清单、31个月期限检查（Euro-PCT）、审查请求期限
+    ### Act: 生成完整策略方案
+
+  deliverables:
+    - file: "drafts/ep_filing_strategy.md"
+      name: "欧洲专利申请策略方案"
+      format: markdown
+    - file: "output/filing_timeline.md"
+      name: "申请时间线（含关键截止日）"
+      format: markdown
+    - file: "output/fee_breakdown.md"
+      name: "费用明细（含验证/单一专利对比）"
+      format: markdown
+    - file: "output/unitary_vs_traditional.md"
+      name: "单一专利 vs 传统验证对比分析"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "分析申请需求"
+      progress: 15
+    - name: do_strategy
+      label: "制定申请策略"
+      progress: 30
+    - name: do_fees
+      label: "费用预算"
+      progress: 25
+    - name: check
+      label: "核验清单"
+      progress: 20
+    - name: act
+      label: "输出方案"
+      progress: 10

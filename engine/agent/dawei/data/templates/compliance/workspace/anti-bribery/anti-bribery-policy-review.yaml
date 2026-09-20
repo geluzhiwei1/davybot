@@ -1,0 +1,167 @@
+# 合规工作区模板: 反腐败政策审查
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: anti-bribery-policy-review
+  name: "反腐败政策审查"
+  version: "1.0"
+  team_slug: anti-bribery
+
+  description: |
+    基于 FCPA/UKBA/中国反商业贿赂法等多法域反腐败法规，对
+    企业内部反腐败政策体系进行审查评估，识别制度漏洞和改进方向。
+
+  applicable_scenarios:
+    - "反腐败政策体系评估"
+    - "合规制度更新/新建"
+    - "反腐败合规审计"
+    - "ISO 37001 认证准备"
+
+  estimated_time: "25-35 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入待评估企业全称"
+        store: "input/company_info.json"
+
+      - key: applicable_laws
+        label: "适用的反腐败法规体系"
+        type: multiselect
+        options: ["FCPA (美国)", "UK Bribery Act (英国)", "中国反商业贿赂法", "法国 Sapin II", "巴西清洁公司法"]
+        store: "input/task_parameters.json"
+
+      - key: has_anti_bribery_policy
+        label: "是否有既有反腐败政策/行为守则"
+        type: boolean
+        default: false
+        store: "input/company_info.json"
+
+    optional:
+      - key: existing_policies
+        label: "既有反腐败政策文件集"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: employee_count
+        label: "企业员工数量"
+        type: string
+        placeholder: "如：500"
+        store: "input/company_info.json"
+
+      - key: has_whistleblower
+        label: "是否已有内部举报机制"
+        type: boolean
+        default: false
+        store: "input/company_info.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：反腐败政策体系全面审查"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/anti-bribery-policy-review"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的反腐败政策文件和相关信息。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解企业现状和适用的法域要求
+    - 根据合规清单制定反腐败政策审查执行计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 既有政策文件逐项审查 → `output/policy_content_review.md`
+    b. 多法域要求对照分析 → `output/multi_jurisdiction_comparison.md`
+    c. 关键制度要素完整性检查 (礼品/招待/赞助/捐赠等) → `output/key_elements_checklist.md`
+    d. 举报机制与调查程序评估 → `output/whistleblower_program_assessment.md`
+    e. 培训与沟通机制评估 → `output/training_communication_assessment.md`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证制度覆盖所有法域要求
+    - 确认七要素/六项程序对标
+    - 提交审查结论供用户审核
+
+    ### Act (输出)
+    - 生成反腐败政策体系审查报告 → `reports/anti_bribery_policy_review.docx`
+    - 报告必须包含：执行摘要、政策现状评估、多法域合规差距矩阵、关键制度要素完成度、改进建议（分为紧急/重要/建议）、政策模板/条款建议
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - UK Bribery Act Section 7 "未能防止贿赂" 要求充分程序
+    - 反腐败制度需定期审查更新，符合有效性原则
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - policy_status
+      - gap_matrix
+      - key_elements_completeness
+      - improvement_recommendations
+      - policy_templates
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_review
+      label: "政策内容审查"
+      progress: 25
+    - name: do_gap
+      label: "合规差距分析"
+      progress: 25
+    - name: do_procedures
+      label: "程序机制评估"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

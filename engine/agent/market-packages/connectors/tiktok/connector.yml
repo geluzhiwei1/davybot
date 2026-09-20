@@ -1,0 +1,40 @@
+# TikTok —— API 轨(Content Posting API;adapter 代码在 social-control)
+platform: tiktok
+display_name: TikTok
+version: 1.0.0
+capability:
+  publish: api
+  publish_modes: []
+  trending: api
+  metrics: api
+constraints:
+  char_limit: 2200
+  max_files: 1
+  max_video_seconds: 600
+  rich_text: false
+domains:
+- business-api.tiktok.com
+- open.tiktokapis.com
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - ID
+  - BR
+  - MX
+  - TH
+  - VN
+  - PH
+  languages:
+  - en
+  - es
+  - pt
+  - id
+  - th
+  - vi
+  - ar
+  - ja
+  - ko
+  - ru

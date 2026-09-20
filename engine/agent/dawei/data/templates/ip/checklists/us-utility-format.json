@@ -1,0 +1,93 @@
+{
+  "slug": "us-utility-format",
+  "name": "USPTO 发明专利申请格式检查",
+  "description": "美国发明专利申请 (Utility Patent Application) 格式合规清单",
+  "module": "ip-application",
+  "target_country": "US",
+  "items": [
+    {
+      "id": "us-001",
+      "category": "Specification",
+      "description": "说明书包含 Title of Invention",
+      "reference": "37 CFR 1.72(a)",
+      "required": true
+    },
+    {
+      "id": "us-002",
+      "category": "Specification",
+      "description": "说明书包含 Cross-Reference to Related Applications（如适用）",
+      "reference": "37 CFR 1.78",
+      "required": false
+    },
+    {
+      "id": "us-003",
+      "category": "Specification",
+      "description": "说明书包含 Background of the Invention",
+      "reference": "37 CFR 1.72(a)",
+      "required": true
+    },
+    {
+      "id": "us-004",
+      "category": "Specification",
+      "description": "说明书包含 Summary of the Invention",
+      "reference": "37 CFR 1.72(a)",
+      "required": true
+    },
+    {
+      "id": "us-005",
+      "category": "Specification",
+      "description": "说明书包含 Detailed Description (enabling disclosure)",
+      "reference": "35 U.S.C. § 112(a)",
+      "required": true
+    },
+    {
+      "id": "us-006",
+      "category": "Claims",
+      "description": "权利要求以 'What is claimed is:' 开头",
+      "reference": "37 CFR 1.75(a)",
+      "required": true
+    },
+    {
+      "id": "us-007",
+      "category": "Claims",
+      "description": "独立权利要求含 preamble + transitional phrase + body",
+      "reference": "35 U.S.C. § 112(b)",
+      "required": true
+    },
+    {
+      "id": "us-008",
+      "category": "Claims",
+      "description": "从属权利要求正确引用前置权利要求编号",
+      "reference": "37 CFR 1.75(c)",
+      "required": true
+    },
+    {
+      "id": "us-009",
+      "category": "Abstract",
+      "description": "摘要不超过 150 词",
+      "reference": "37 CFR 1.72(b)",
+      "required": true
+    },
+    {
+      "id": "us-010",
+      "category": "Drawings",
+      "description": "附图说明标注 FIG. 编号",
+      "reference": "37 CFR 1.84",
+      "required": true
+    },
+    {
+      "id": "us-011",
+      "category": "General",
+      "description": "申请人/发明人信息完整",
+      "reference": "35 U.S.C. § 111(a)",
+      "required": true
+    },
+    {
+      "id": "us-012",
+      "category": "General",
+      "description": "无 means-plus-function 不当限定（或明确 112(f)）",
+      "reference": "35 U.S.C. § 112(f)",
+      "required": false
+    }
+  ]
+}

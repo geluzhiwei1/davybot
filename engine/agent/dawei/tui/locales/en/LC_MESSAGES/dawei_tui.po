@@ -1,0 +1,176 @@
+# English translations for Dawei TUI
+# Copyright (c) 2026 Dawei Project
+# This file is distributed under the same license as the Dawei package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Dawei TUI 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-09 01:30+0800\n"
+"PO-Revision-Date: 2026-02-09 01:30+0800\n"
+"Last-Translator: Dawei Team\n"
+"Language-Team: English <en@li.org>\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Quit"
+msgstr "Quit"
+
+msgid "Help"
+msgstr "Help"
+
+msgid "Commands"
+msgstr "Commands"
+
+msgid "Settings"
+msgstr "Settings"
+
+msgid "Save Session"
+msgstr "Save Session"
+
+msgid "Clear Chat"
+msgstr "Clear Chat"
+
+msgid "History"
+msgstr "History"
+
+msgid "Dawei TUI - Agent Terminal Interface"
+msgstr "Dawei TUI - Agent Terminal Interface"
+
+msgid "Agent"
+msgstr "Agent"
+
+msgid "Type @skill:name or message... (Tab to autocomplete, Enter to send)"
+msgstr "Type @skill:name or message... (Tab to autocomplete, Enter to send)"
+
+msgid "Chat Output"
+msgstr "Chat Output"
+
+msgid "Messages"
+msgstr "Messages"
+
+msgid "Loaded skill '{skill_name}' to context ({char_count} chars)"
+msgstr "Loaded skill '{skill_name}' to context ({char_count} chars)"
+
+msgid "Type to filter commands... (Esc to close)"
+msgstr "Type to filter commands... (Esc to close)"
+
+msgid "PDCA"
+msgstr "PDCA"
+
+msgid "Understanding requirements, exploring context, and creating a plan."
+msgstr "Understanding requirements, exploring context, and creating a plan."
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Thinking"
+msgstr "Thinking"
+
+msgid "AI Thinking Process"
+msgstr "AI Thinking Process"
+
+msgid "Tools"
+msgstr "Tools"
+
+msgid "Tool Execution"
+msgstr "Tool Execution"
+
+msgid "Notification"
+msgstr "Notification"
+
+msgid "Info"
+msgstr "Info"
+
+msgid "Success"
+msgstr "Success"
+
+msgid "Warning"
+msgstr "Warning"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Settings"
+msgstr "Settings"
+
+msgid "Display Settings"
+msgstr "Display Settings"
+
+msgid "Panel Settings"
+msgstr "Panel Settings"
+
+msgid "Keyboard Shortcuts"
+msgstr "Keyboard Shortcuts"
+
+msgid "Session History"
+msgstr "Session History"
+
+msgid "Session:"
+msgstr "Session:"
+
+msgid "Created:"
+msgstr "Created:"
+
+msgid "Messages:"
+msgstr "Messages:"
+
+msgid "Language"
+msgstr "Language"
+
+msgid "Select Language"
+msgstr "Select Language"
+
+msgid "English"
+msgstr "English"
+
+msgid "Simplified Chinese"
+msgstr "Simplified Chinese"
+
+msgid "Traditional Chinese"
+msgstr "Traditional Chinese"
+
+msgid "Mode"
+msgstr "Mode"
+
+msgid "Model"
+msgstr "Model"
+
+msgid "N/A"
+msgstr "N/A"
+
+msgid "Chat Area initialized!"
+msgstr "Chat Area initialized!"
+
+msgid "Messages will appear here..."
+msgstr "Messages will appear here..."
+
+msgid "You:"
+msgstr "You:"
+
+msgid "Assistant:"
+msgstr "Assistant:"
+
+msgid "System:"
+msgstr "System:"
+
+msgid "Failed to load skill '{skill_name}'"
+msgstr "Failed to load skill '{skill_name}'"
+
+msgid "Skills Loaded:"
+msgstr "Skills Loaded:"
+
+msgid "Thinking..."
+msgstr "Thinking..."
+
+msgid "Tools..."
+msgstr "Tools..."
+
+msgid "Params:"
+msgstr "Params:"
+
+msgid "Language Settings"
+msgstr "Language Settings"

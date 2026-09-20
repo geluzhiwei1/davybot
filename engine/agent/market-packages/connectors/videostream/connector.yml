@@ -1,0 +1,59 @@
+platform: videostream
+display_name: 视频号
+version: 1.0.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  - direct
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 1000
+  max_files: 1
+  max_video_seconds: 3600
+  rich_text: false
+domains:
+- channels.weixin.qq.com
+publish:
+  compose_url: https://channels.weixin.qq.com/publish
+  selectors:
+    title_input:
+      primary: "#title-input"
+      fallback: input[placeholder*='标题']
+    compose_box:
+      primary: "#desc-editor"
+      fallback: "[contenteditable='true']"
+    media_upload:
+      primary: input[type='file']
+      fallback: input[type='file'][accept*='video']
+    save_draft_button:
+      primary: button:has-text('保存')
+      fallback: button.save-btn
+      wait_after_click_ms: 1500
+    publish_button:
+      primary: button:has-text('发布')
+      fallback: button.publish-btn
+      wait_after_click_ms: 2000
+    success_indicator:
+      method: url_change
+      pattern: /publish/success
+  login_check:
+    url: https://channels.weixin.qq.com/publish
+    indicator: ".weui-desktop-account, .account-info"
+trending:
+  url: https://channels.weixin.qq.com/platform/post/list
+  container: div.video-item
+  topic: span.title
+  pagination: scroll
+metrics:
+  likes: span.like-count
+  comments: span.comment-count
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

@@ -1,0 +1,52 @@
+platform: vk
+display_name: VK
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: none
+  metrics: none
+constraints:
+  char_limit: 16000
+  max_files: 10
+  max_video_seconds: 0
+  rich_text: false
+domains:
+- vk.com
+publish:
+  compose_url: https://vk.com/feed
+  selectors:
+    # v0.1.0 未真机验证:feed 顶部的 composer(发帖框);确认按钮「Опубликовать」(发布)
+    compose_box:
+      primary: "#post_button_textarea, textarea[placeholder*='Что у вас нового']"
+      fallback: "[contenteditable='true']"
+      wait_timeout_ms: 15000
+    publish_button:
+      primary: "button:has-text('Опубликовать')"
+      fallback: "#send_post, .post_button"
+      wait_after_click_ms: 6000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 10
+    success_indicator:
+      method: text_contains
+      pattern: Запись опубликована
+  rich_text:
+    enabled: false
+    content_format: plain
+    inject_method: fill
+    image_handling: file_upload
+  login_check:
+    url: https://vk.com/feed
+    indicator: "#post_button_textarea, [id*='feed']"
+    absent_indicator: "#login_submit, [id*='login']"
+    wait_timeout_ms: 12000
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: ru
+  countries:
+  - RU
+  languages:
+  - ru

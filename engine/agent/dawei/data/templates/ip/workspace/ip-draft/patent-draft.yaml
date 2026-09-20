@@ -1,0 +1,142 @@
+template:
+  slug: patent-draft
+  name: "专利草案撰写（通用）"
+  version: "1.0"
+  module: ip-draft
+  team_slug: ip-draft
+
+  description: |
+    基于技术交底书撰写管辖中立的专利草案。
+    草案聚焦于发明内容的完整阐述，不限定任何国家的格式要求。
+    草案产出是后续 M4 专利申请文件生成的唯一内容来源。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "请输入发明名称（建议25字以内）"
+        store: "input/task_params.json"
+      - key: tech_field
+        label: "技术领域"
+        type: string
+        placeholder: "如：人工智能、新能源、生物医药"
+        store: "input/task_params.json"
+      - key: draft_strategy
+        label: "撰写策略"
+        type: select
+        options:
+          - { value: "balanced", label: "均衡策略" }
+          - { value: "broad", label: "宽泛策略" }
+          - { value: "narrow", label: "保守策略" }
+        default: "balanced"
+        store: "input/task_params.json"
+    optional:
+      - key: applicant_name
+        label: "申请人名称"
+        type: string
+        store: "input/task_params.json"
+      - key: inventor_names
+        label: "发明人"
+        type: string
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+    - knowledge/patent-examination-guidelines
+
+  checklists:
+    - ref: "checklist/draft-completeness"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游交底书继承的文件"
+    - dir: input/checklists
+      description: "草案完整性清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: output/claims
+      description: "权利要求层次结构"
+    - dir: output/description
+      description: "技术方案阐述各部分"
+    - dir: drafts
+      description: "完整草案文件"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入专利草案撰写工作区，请按照以下 PDCA 工作流执行。
+
+    ## 你的角色
+    当前模式：patent-agent
+    执行权限：read + edit + write + command
+
+    ## 核心原则：管辖中立
+    本草案产出的所有内容不限定任何国家的专利法格式。
+    专注于发明内容的完整性、清晰性和保护范围的合理性。
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_params.json` — 发明名称、技术领域、撰写策略
+    2. `input/inherited/` — 技术交底书（从上游继承）
+
+    ## 法律参考
+    - `references/patent-law/` — 中国专利法及实施细则
+    - `references/patent-examination-guidelines/` — 专利审查指南
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 读取所有输入文件，完整理解发明内容
+    - 列出技术特征清单（必要特征 vs 附加特征）
+    - 规划权利要求层次
+    - 向用户展示规划，等待确认
+
+    ### Do (执行)
+    a. 权利要求层次 → `output/claims/claims_hierarchy.md`
+    b. 技术方案阐述
+       - 技术领域 → `output/description/01_technical_field.md`
+       - 背景技术 → `output/description/02_background.md`
+       - 发明内容 → `output/description/03_summary.md`
+       - 附图说明 → `output/description/04_drawings.md`
+       - 具体实施方式 → `output/description/05_embodiments.md`
+       - 摘要 → `output/description/06_abstract.md`
+    c. 完整草案汇总 → `drafts/patent_draft_full.md`
+
+    ### Check (验证)
+    - 逐项核对清单
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 提示用户：草案完成后可进入申请书模块
+
+  deliverables:
+    - file: "drafts/patent_draft_full.md"
+      name: "专利草案全文（Markdown）"
+      format: markdown
+    - file: "output/claims/claims_hierarchy.md"
+      name: "权利要求层次结构"
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 15
+    - name: do_claims
+      label: "撰写权利要求"
+      progress: 25
+    - name: do_description
+      label: "撰写技术方案"
+      progress: 30
+    - name: check
+      label: "质量审查"
+      progress: 20
+    - name: act
+      label: "生成草案文件"
+      progress: 10

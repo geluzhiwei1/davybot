@@ -1,0 +1,70 @@
+platform: x
+display_name: X (Twitter)
+version: 0.2.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 280
+  max_files: 4
+  max_video_seconds: 140
+  rich_text: false
+domains:
+- x.com
+publish:
+  compose_url: https://x.com/compose/post
+  selectors:
+    compose_box:
+      primary: '[data-testid="tweetTextarea_0"]'
+      fallback: '[role="textbox"][aria-label="Post text"]'
+    publish_button:
+      primary: '[data-testid="tweetButton"]'
+      fallback: '[data-testid="tweetButtonInline"]'
+      wait_after_click_ms: 3000
+    media_upload:
+      primary: input[type="file"][accept*="image"]
+      max_files: 4
+      max_video_seconds: 140
+    success_indicator:
+      method: url_change
+      pattern: /status/
+  login_check:
+    url: https://x.com/home
+    indicator: '[data-testid="AppTabBar_Home_Link"]'
+trending:
+  url: https://x.com/explore/tabs/trending
+  container: '[data-testid="trend"]'
+  topic: span[data-testid="trend-topic"]
+  pagination: scroll
+metrics:
+  likes: '[data-testid="like"] span'
+  reposts: '[data-testid="retweet"] span'
+  replies: '[data-testid="reply"] span'
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - JP
+  - GB
+  - SA
+  - ID
+  - BR
+  - IN
+  languages:
+  - en
+  - ja
+  - es
+  - pt
+  - ar
+  - hi
+  - id
+  - ko
+  - tr
+  - ru
+  - de
+  - fr

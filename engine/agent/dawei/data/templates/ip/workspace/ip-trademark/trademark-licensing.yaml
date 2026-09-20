@@ -1,0 +1,301 @@
+template:
+  slug: trademark-licensing
+  name: "商标许可与转让方案"
+  version: "1.0"
+  module: ip-trademark
+  team_slug: ip-trademark
+
+  description: |
+    商标许可（独占/排他/普通许可）、转让、 franchise 体系构建。
+    包含许可策略选择、合同条款起草、质量控制方案、备案登记管理。
+
+  data_requirements:
+    required:
+      - key: transaction_type
+        label: "交易类型"
+        type: select
+        default: "license"
+        options:
+          - { value: "license", label: "商标许可" }
+          - { value: "assignment", label: "商标转让" }
+          - { value: "franchise", label: "特许经营（加盟）" }
+          - { value: "co_branding", label: "联合品牌" }
+        store: "input/task_params.json"
+      - key: trademark_info
+        label: "商标信息"
+        type: string
+        placeholder: "商标名称、注册号、类别、注册日期"
+        store: "input/task_params.json"
+      - key: counterparty
+        label: "对方信息"
+        type: string
+        placeholder: "被许可方/受让方/加盟商信息"
+        store: "input/task_params.json"
+    optional:
+      - key: license_scope
+        label: "许可范围"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "待分析" }
+          - { value: "exclusive", label: "独占许可（仅被许可方可使用）" }
+          - { value: "sole", label: "排他许可（许可方+被许可方，不含第三方）" }
+          - { value: "non_exclusive", label: "普通许可（可许可多方）" }
+          - { value: "sub_license", label: "可分许可" }
+        store: "input/task_params.json"
+      - key: territory
+        label: "地域范围"
+        type: string
+        placeholder: "如：中国大陆 / 北美 / 全球"
+        store: "input/task_params.json"
+      - key: term
+        label: "期限"
+        type: string
+        placeholder: "如：5年 / 注册有效期内 / 不定期"
+        store: "input/task_params.json"
+      - key: royalty_model
+        label: "费用模式"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "待协商" }
+          - { value: "fixed", label: "固定许可费" }
+          - { value: "percentage", label: "按销售额提成" }
+          - { value: "milestone", label: "里程碑付费" }
+          - { value: "mixed", label: "固定+提成混合" }
+        store: "input/task_params.json"
+      - key: quality_control
+        label: "质量控制要求"
+        type: select
+        default: "yes"
+        options:
+          - { value: "yes", label: "需要严格质量控制" }
+          - { value: "light", label: "轻度质量控制" }
+          - { value: "no", label: "不要求质量控制（裸许可风险）" }
+        store: "input/task_params.json"
+      - key: jurisdiction
+        label: "管辖地"
+        type: select
+        default: "CN"
+        options:
+          - { value: "CN", label: "中国" }
+          - { value: "US", label: "美国" }
+          - { value: "EU", label: "欧盟" }
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/trademark-law
+
+  checklists:
+    - ref: "checklist/trademark-licensing"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/checklists
+      description: "合同检查清单"
+    - dir: output
+      description: "分析产出"
+    - dir: drafts
+      description: "合同草稿"
+    - dir: references
+      description: "法规与模板参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入商标许可与转让工作区，请按照 PDCA 工作流执行。
+
+    ## 许可类型对比
+
+    | 许可类型 | 许可方使用权 | 被许可方权利 | 第三方权利 | 适用场景 |
+    |---------|------------|------------|-----------|---------|
+    | 独占许可 | **不可**使用 | **独占**使用权 | 不可再许可 | 核心业务完全外包 |
+    | 排他许可 | **可以**使用 | **排他**使用权 | 不可再许可 | 战略合作伙伴 |
+    | 普通许可 | 可以使用 | 可以使用 | 可以许可他人 | 广泛市场推广 |
+
+    ### 独占许可的特殊效力
+    - 独占被许可人通常有**独立起诉侵权**的权利
+    - 独占被许可人通常有**再许可权**（需合同明确）
+    - 独占许可可能导致商标权人暂时失去使用权
+
+    ## 许可合同核心条款
+
+    ### 1. 许可标的
+    - 明确商标名称、注册号、类别
+    - 是否包含未来取得的商标
+    - 是否包含相关域名、社交媒体账号
+
+    ### 2. 许可范围
+    - **地域**：明确地理范围
+    - **商品/服务**：明确可用于哪些商品/服务
+    - **使用方式**：制造、销售、广告、展示
+
+    ### 3. 质量控制（Quality Control）—— 关键条款
+
+    **为什么重要**：
+    - 美国："裸许可"（Naked Licensing）可能导致**商标权丧失**
+    - 中国：商标法要求许可人监督被许可方使用其注册商标的商品质量
+    - 通用化风险：缺乏质量控制可能导致商标退化为通用名称
+
+    | 质量控制措施 | 具体内容 |
+    |------------|---------|
+    | 原材料标准 | 指定原材料来源/标准 |
+    | 生产标准 | 生产流程/质量检测标准 |
+    | 培训要求 | 被许可方人员培训 |
+    - 定期检查 | 许可方定期验厂/抽检 |
+    | 消费者投诉 | 投诉处理与反馈机制 |
+    | 品牌指南 | 品牌使用规范手册 |
+
+    ### 4. 费用条款
+
+    | 费用模式 | 优点 | 缺点 | 适用场景 |
+    |---------|------|------|---------|
+    | 固定许可费 | 收入稳定可预测 | 不分享增长红利 | 品牌成熟、收入稳定 |
+    | 按销售额提成 | 分享增长红利 | 需要审计监督 | 快速增长品牌 |
+    - 最低保证+提成 | 保底+增长 | 兼顾双方 | 最常用 |
+    | 里程碑付费 | 与发展挂钩 | 需明确里程碑 | 技术类许可 |
+
+    常见提成基准：
+    - **净销售额** = 销售额 - 退货 - 折扣 - 运费 - 税费
+    - **利润** = 销售收入 - 成本（较少使用，因计算复杂）
+    - **单位数量** = 按件/吨/个计费（简单透明）
+
+    ### 5. 转让限制
+    - 被许可方不得转让许可
+    - 关联方例外（需定义关联方）
+    - 合同终止后停止使用
+
+    ### 6. 终止条款
+    - 期限届满终止
+    - 违约终止（具体违约情形+补救期）
+    - 提前终止（提前通知期+违约金）
+    - 终止后过渡期安排
+
+    ## 商标转让特殊规则
+
+    ### 商誉一并转让原则
+    - 商标不得脱离商誉单独转让（中国商标法第42条）
+    - 美国：Assignment in gross（脱离商誉的转让）无效
+    - 已许可的商标转让需被许可方同意（或合同有约定）
+
+    ### 转让 vs 许可对比
+    | 维度 | 转让 | 许可 |
+    |------|------|------|
+    | 所有权 | **永久转移** | 保留所有权 |
+    | 控制权 | 完全失去 | 保留控制权 |
+    - 费用性质 | 一次性买断 | 持续性收入 |
+    | 税务 | 资产转让税 | 许可收入税 |
+    | 可逆性 | 不可逆（除非回购） | 可终止 |
+
+    ## 备案登记
+
+    | 管辖地 | 许可备案 | 转让备案 | 效力 |
+    |-------|---------|---------|------|
+    | 中国 | 商标法第43条：应当备案 | 商标法第42条：应当核准 | 对抗第三人 |
+    | 美国 | 可选记录 | 应当记录 | 对抗第三人 |
+    | 欧盟 | 可选记录 | 应当记录 | 对抗第三人 |
+
+    **未备案风险**：
+    - 不能对抗善意第三人
+    - 可能影响侵权诉讼中的损害赔偿
+    - 可能被认定为未实际使用
+
+    ## 特许经营（Franchise）特殊考虑
+
+    商标许可是特许经营的**核心组成部分**，但还涉及：
+    - 经营模式许可
+    - 技术秘密许可
+    - 培训支持义务
+    - 统一采购要求
+    - 区域保护
+    - 信息披露义务（中国《商业特许经营管理条例》）
+
+    特许经营备案要求（中国）：
+    - 首次订立特许经营合同之日起15日内向商务主管部门备案
+    - "两店一年"门槛（拥有至少2个直营店，经营时间超过1年）
+
+    ## 分析方法论
+
+    ### Step 1: 交易结构设计
+    1. 确定交易类型（许可/转让/加盟）
+    2. 确定许可范围（类型、地域、期限）
+    3. 评估税务和合规影响
+
+    ### Step 2: 条款起草
+    按照核心条款清单逐一起草：
+    - 定义条款
+    - 许可/转让标的
+    - 范围与限制
+    - 费用与支付
+    - 质量控制
+    - 知识产权保护
+    - 保密条款
+    - 违约与终止
+    - 争议解决
+
+    ### Step 3: 风险评估
+
+    | 风险类型 | 严重程度 | 应对措施 |
+    |---------|---------|---------|
+    | 裸许可风险 | 高 | 质量控制条款 |
+    | 通用化风险 | 高 | 品牌使用规范 |
+    | 被许可方竞争 | 中 | 竞业限制条款 |
+    | 商标淡化 | 中 | 使用范围限定 |
+    | 终止后继续使用 | 高 | 过渡期+停止使用条款 |
+    | 税务风险 | 中 | 税务架构设计 |
+
+    ## 输入数据
+    1. `input/task_params.json` — 交易类型、商标信息、对方信息、范围
+    2. `input/checklists/` — 合同检查清单
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 确认交易类型与范围，制定结构方案
+    ### Do:
+    - 许可/转让条款起草
+    - 质量控制方案设计
+    - 费用结构设计
+    - 风险评估
+    - 备案登记指导
+    ### Check: 条款完整性审查，合规性检查，风险确认
+    ### Act: 输出合同草稿 + 条款分析 + 风险报告
+
+  deliverables:
+    - file: "drafts/license_assignment_draft.md"
+      name: "许可/转让合同草稿"
+      format: markdown
+    - file: "output/term_analysis.md"
+      name: "核心条款分析"
+      format: markdown
+    - file: "output/quality_control_plan.md"
+      name: "质量控制方案"
+      format: markdown
+    - file: "output/risk_assessment.md"
+      name: "风险评估报告"
+      format: markdown
+    - file: "output/filing_registration.md"
+      name: "备案登记指南"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "交易结构设计"
+      progress: 15
+    - name: do_terms
+      label: "条款起草"
+      progress: 25
+    - name: do_quality
+      label: "质量控制方案"
+      progress: 20
+    - name: do_risk
+      label: "风险评估"
+      progress: 20
+    - name: check
+      label: "合规审查"
+      progress: 12
+    - name: act
+      label: "输出文件"
+      progress: 8

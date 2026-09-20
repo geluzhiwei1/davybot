@@ -1,0 +1,17 @@
+{#
+  模式特定规则模板
+  从 rules-{mode}/*.md 文件加载的模式特定规则
+  支持多个规则文件，每个文件都会被包含在系统提示中
+#}
+{% if mode_rules %}
+{% for rule_name, rule_content in mode_rules.items() %}
+{% if rule_content.strip() %}
+
+====
+RULE SET: {{ rule_name | upper }}
+
+{{ rule_content }}
+
+{% endif %}
+{% endfor %}
+{% endif %}

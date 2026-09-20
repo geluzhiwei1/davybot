@@ -1,0 +1,37 @@
+# Meta(Facebook/Instagram)—— API 轨(Graph API;adapter 代码在 social-control)
+platform: meta
+display_name: Meta
+version: 1.0.0
+capability:
+  publish: api
+  publish_modes: []
+  trending: api
+  metrics: api
+constraints:
+  char_limit: 63206
+  max_files: 10
+  max_video_seconds: 600
+  rich_text: false
+domains:
+- graph.facebook.com
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - BR
+  - IN
+  - ID
+  - MX
+  - PH
+  languages:
+  - en
+  - es
+  - pt
+  - hi
+  - id
+  - ar
+  - th
+  - vi
+  - fil

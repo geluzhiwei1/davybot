@@ -1,0 +1,960 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""OpenAI兼容客户端实现
+使用aiohttp实现异步HTTP请求，支持OpenAI API格式的各种LLM服务
+"""
+
+import json
+from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
+from dawei.core.datetime_compat import UTC
+from pathlib import Path
+from typing import List, Dict, Any
+
+from dawei.config.logging_config import LoggingConfig, get_config
+from dawei.core import local_context
+from dawei.core.error_handler import handle_errors
+from aiohttp import ClientError
+
+from dawei.core.errors import LLMError, ValidationError
+from dawei.core.exceptions import LLMConnectionError
+from dawei.core.metrics import increment_counter
+from dawei.entity.lm_messages import (
+    AssistantMessage,
+    ChatGeneration,
+    ChatResult,
+    FunctionCall,
+    LLMMessage,
+    ToolCall,
+)
+from dawei.entity.stream_message import (
+    CompleteMessage,
+    ContentMessage,
+    ReasoningMessage,
+    StreamMessages,
+    ToolCallMessage,
+    UsageMessage,
+)
+from dawei.llm_api.base_client import BaseClient
+from dawei.llm_api.base_llm_api import StreamChunkParser
+from dawei.logg.logging import get_logger, log_performance
+
+from .stream_processor import StreamProcessor
+
+logger = get_logger(__name__)
+
+
+class OpenaiCompatibleClient(BaseClient):
+    """OpenAI兼容的LLM客户端，实现LLMProvider接口
+    使用aiohttp实现异步HTTP请求，支持流式和非流式响应
+
+    该类直接实现了LLMProvider接口，提供了与Task模块兼容的API，
+    同时保持了原有的generate()和stream_generate()方法以确保向后兼容性。
+    """
+
+    def __init__(self, config: Dict[str, Any]) -> None:
+        """初始化OpenAI兼容客户端
+
+        Args:
+            config: LLM配置字典，包含以下字段：
+                - apiProvider: 提供商类型（openai、ollama、gemini、deepseek等）
+                - openAiBaseUrl: OpenAI兼容API的基础URL
+                - openAiApiKey: API密钥
+                - openAiModelId: 模型ID
+                - temperature: 温度参数（默认0.7）
+                - max_tokens: 最大生成令牌数
+                - timeout: 请求超时时间（默认180秒）
+                - maxRetries: 最大重试次数（默认3）
+                - retryDelay: 重试延迟时间（默认1.0秒）
+                - reasoningEffort: 推理努力程度（可选）
+                - openAiLegacyFormat: 是否使用旧格式（默认False）
+                - openAiCustomModelInfo: 自定义模型信息
+                - openAiHeaders: 自定义请求头
+
+        """
+        super().__init__(config)
+
+        # 初始化logger属性
+        self.logger = logger
+
+        self.provider = config.get("apiProvider", "openai")
+
+        # 所有 OpenAI 兼容提供商使用统一字段（包括 Ollama）
+        base_url = config.get("openAiBaseUrl", config.get("base_url", ""))
+        self.base_url = base_url.rstrip("/")
+        # 支持两种字段名：openAiApiKey（原始配置）和 api_key（LLMConfig内部字段）
+        self.api_key = config.get("openAiApiKey", config.get("api_key", ""))
+        # 支持两种字段名：openAiModelId（原始配置）和 model_id（LLMConfig内部字段）
+        self.model = config.get("openAiModelId", config.get("model_id", ""))
+
+        # 验证配置 - 使用断言式验证替代assert
+        if not self.base_url or not self.base_url.startswith("http"):
+            raise ValidationError("base_url", self.base_url, "must be a valid HTTP/HTTPS URL")
+
+        # roo code 特有配置
+        self.reasoning_effort = config.get("reasoningEffort", config.get("reasoning_effort"))
+        self.legacy_format = config.get("openAiLegacyFormat", False)
+        # 支持两种字段名：openAiCustomModelInfo（原始配置）和 custom_model_info（LLMConfig内部字段）
+        self.custom_model_info = config.get(
+            "openAiCustomModelInfo",
+            config.get("custom_model_info", {}),
+        )
+        self.max_context_tokens = self.custom_model_info.get("max_context_tokens")
+        self.max_output_tokens = self.custom_model_info.get("max_output_tokens")
+
+        # 移除tiktoken依赖，使用简单的字符数估算
+        self.encoding = None
+
+        # 设置默认参数
+        self.default_params = {
+            "model": self.model,
+            "temperature": config.get("temperature", 0.7),
+            # "max_tokens": config.get("max_tokens"),
+            # "top_p": config.get("top_p", 1.0),
+            # "frequency_penalty": config.get("frequency_penalty", 0.0),
+            # "presence_penalty": config.get("presence_penalty", 0.0),
+            "stream": False,
+        }
+
+    def _prepare_headers(self) -> Dict[str, str]:
+        """准备请求头"""
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        # 支持两种字段名：openAiHeaders（原始配置）和 custom_headers（LLMConfig内部字段）
+        custom_headers = self.config.get("openAiHeaders", self.config.get("custom_headers"))
+        if custom_headers and isinstance(custom_headers, dict):
+            headers.update(custom_headers)
+
+        # 认证
+        if "Authorization" not in headers:
+            if self.provider == "gemini":
+                # Gemini uses API key in URL, not header
+                pass
+            elif self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+
+        return headers
+
+    @handle_errors(component="openai_compatible_api", operation="prepare_log_files")
+    def _prepare_log_files(
+        self,
+        workspace_root: str,
+        _endpoint: str,
+    ) -> tuple[Path | None, Path | None]:
+        """准备日志文件路径
+
+        Args:
+            workspace_root: 工作空间路径
+            endpoint: API端点
+
+        Returns:
+            (request_log_file, response_log_file): 日志文件路径元组
+
+        """
+        # 检查是否启用 HTTP 日志记录
+        log_config = get_config()
+        if not log_config.enable_llm_api_http_logging:
+            return None, None
+
+        if not workspace_root:
+            return None, None
+
+        # 使用 get_dawei_home() 获取统一的日志根目录
+        from dawei import get_dawei_home
+
+        log_dir = get_dawei_home() / "logs" / "http"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        # 生成唯一的日志文件名（基于时间戳）
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
+        request_log_file = log_dir / f"{timestamp}_request.json"
+        response_log_file = log_dir / f"{timestamp}_response.json"
+
+        return request_log_file, response_log_file
+
+    def _log_request(self, request_log_file: Path, endpoint: str, params: Dict[str, Any]) -> None:
+        """记录请求日志
+
+        Args:
+            request_log_file: 请求日志文件路径
+            endpoint: API端点
+            params: 请求参数
+
+        """
+        if not request_log_file:
+            return
+
+        request_data = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "url": f"{self.base_url}/{endpoint}",
+            "headers": dict(self._prepare_headers()),
+            "params": params,
+            "provider": self.provider,
+            "model": self.model,
+        }
+
+        with request_log_file.open("w", encoding="utf-8") as f:
+            json.dump(request_data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Request logged to: {request_log_file}")
+
+    @handle_errors(component="openai_compatible_api", operation="execute_http_request")
+    @log_performance("openai_compatible_api.execute_http_request")
+    async def _execute_http_request(
+        self,
+        workspace_root: str,
+        response_log_file: Path | None,
+        endpoint: str,
+        params: Dict[str, Any],
+        _url_suffix: str,
+        _original_url: str,
+    ) -> tuple[AsyncGenerator[bytes, None], int | None, Dict[str, str] | None, str | None]:
+        """Execute HTTP request and return streaming response generator (with protection layer).
+
+        Protection layers (outer to inner):
+        1. Rate limiter — checked before HTTP call; success recorded AFTER HTTP succeeds
+        2. Circuit breaker — retries with exponential backoff on failure
+        3. HTTP request itself
+
+        Key fix: HTTP request executes INSIDE circuit breaker, not inside a deferred
+        generator. The generator only yields from an already-established connection.
+
+        Args:
+            workspace_root: 工作空间路径
+            response_log_file: 响应日志文件路径
+            endpoint: API端点
+            params: 请求参数
+            url_suffix: URL后缀
+            original_url: 原始URL
+
+        Returns:
+            (response_stream, response_status, response_headers, url): 响应流生成器元组
+
+        """
+        circuit_breaker = self._get_circuit_breaker()
+        url = f"{self.base_url}/{endpoint}"
+        provider = self.get_provider_name()
+        model = getattr(self, "model", "unknown")
+
+        # 1. Rate limiter — acquire BEFORE circuit breaker so retry loop
+        # doesn't consume extra tokens on each retry attempt.
+        BaseClient._ensure_rate_limiter(self.config)
+        success, wait_time = await BaseClient._global_rate_limiter.acquire(timeout=30.0)
+        if not success:
+            raise Exception(f"Rate limit exceeded, wait time: {wait_time:.1f}s")
+
+        logger.info(f"✅ [RATE_LIMITER] Acquired token for {provider}:{model}")
+
+        # 2. Streaming 请求：把 response.content 的读取直接放在 session.post()
+        # 的 async with 块内，确保整个流读取过程在连接保持活跃的状态下完成，
+        # 避免 "Connection closed"。
+        #
+        # 关键：_execute_http_request 本身是普通 async function（不含 yield），
+        # 返回 (generator, None, None, url)。stream_with_connection() 在被调用时
+        # 立即返回一个**惰性** async generator（不执行任何代码），其 body（含
+        # async with session.post）只有在调用方开始迭代时才执行。因此连接在
+        # 整个迭代期间保持活跃，迭代结束/出错时 finally 才释放。
+        logger.info(f"🔄 [STREAM] Executing streaming request for {provider}:{model}")
+
+        async def stream_with_connection():
+            session = self._get_client_session()
+            request_kwargs = self._prepare_request_kwargs(params, url)
+
+            async with session.post(url, **request_kwargs) as response:
+                response_status_local = response.status
+                response_headers_local = dict(response.headers)
+
+                if response.status != 200:
+                    error_text = await response.text()
+
+                    if workspace_root and response_log_file:
+                        self._log_error_response(
+                            response_log_file,
+                            response_status_local,
+                            response_headers_local,
+                            error_text,
+                            url,
+                        )
+
+                    raise LLMError(
+                        self.provider,
+                        f"HTTP {response.status}: {error_text}",
+                    )
+
+                BaseClient._global_rate_limiter.record_success()
+                logger.info(f"✅ [RATE_LIMITER] Request completed successfully for {provider}:{model}")
+
+                response_chunks_for_logging: List[bytes] = []
+
+                try:
+                    async for chunk in response.content:
+                        response_chunks_for_logging.append(chunk)
+                        yield chunk
+                finally:
+                    if workspace_root and response_log_file:
+                        self._log_response(
+                            response_log_file,
+                            response_chunks_for_logging,
+                            response_status_local,
+                            response_headers_local,
+                            url,
+                        )
+
+                    self.logger.info(
+                        "HTTP request completed",
+                        context={
+                            "endpoint": endpoint,
+                            "status": response_status_local,
+                            "provider": self.provider,
+                            "component": "openai_compatible_api",
+                        },
+                    )
+                    increment_counter(
+                        "openai_compatible_api.http_requests",
+                        tags={
+                            "provider": self.provider,
+                            "status": "success" if response_status_local == 200 else "error",
+                        },
+                    )
+
+        return (
+            stream_with_connection(),
+            None,  # status — 流式响应不提前记录
+            None,  # headers
+            url,
+        )
+
+    def _log_error_response(
+        self,
+        response_log_file: Path,
+        status: int,
+        headers: Dict[str, str],
+        error_text: str,
+        url: str,
+    ) -> None:
+        """记录错误响应日志
+
+        Args:
+            response_log_file: 响应日志文件路径
+            status: HTTP状态码
+            headers: 响应头
+            error_text: 错误文本
+            url: 请求URL
+
+        Raises:
+            OSError: 文件写入失败
+            ValueError: 数据序列化失败
+
+        """
+        error_response_data = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "status": status,
+            "headers": headers,
+            "error": error_text,
+            "url": url,
+        }
+
+        with response_log_file.open("w", encoding="utf-8") as f:
+            json.dump(error_response_data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Error response logged to: {response_log_file}")
+
+    def _log_response(
+        self,
+        response_log_file: Path,
+        response_chunks: List[bytes],
+        status: int | None,
+        headers: Dict[str, str] | None,
+        url: str | None,
+    ) -> None:
+        """记录响应日志
+
+        Args:
+            response_log_file: 响应日志文件路径
+            response_chunks: 响应数据块列表
+            status: HTTP状态码
+            headers: 响应头
+            url: 请求URL
+
+        Raises:
+            OSError: 文件写入失败
+            ValueError: 数据序列化失败
+
+        """
+        if response_chunks:
+            # 有响应数据时的日志
+            combined_bytes = b"".join(response_chunks)
+            response_text = combined_bytes.decode("utf-8", errors="ignore")
+
+            response_data = {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "status": status or "unknown",
+                "headers": headers or {},
+                "url": url or "unknown",
+                "raw_response": response_text,
+                "chunks_count": len(response_chunks),
+                "total_bytes": len(combined_bytes),
+            }
+        else:
+            # 没有响应数据时的日志
+            response_data = {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "status": status or "unknown",
+                "headers": headers or {},
+                "url": url or "unknown",
+                "raw_response": "",
+                "chunks_count": 0,
+                "total_bytes": 0,
+                "note": "No response chunks captured",
+            }
+
+        with response_log_file.open("w", encoding="utf-8") as f:
+            json.dump(response_data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Response logged to: {response_log_file}")
+
+    def _log_non_streaming_response(
+        self,
+        response_log_file: Path,
+        response_data: Dict[str, Any],
+    ) -> None:
+        """记录非流式响应日志
+
+        Args:
+            response_log_file: 响应日志文件路径
+            response_data: 完整的响应数据字典
+        """
+        log_data = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "status": "non-streaming",
+            "raw_response": response_data,
+        }
+
+        with response_log_file.open("w", encoding="utf-8") as f:
+            json.dump(log_data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Non-streaming response logged to: {response_log_file}")
+
+    def get_num_tokens(self, text: str) -> int:
+        """估算文本的令牌数量（不使用tiktoken）"""
+        if not text:
+            return 0
+        return len(text) // 4
+
+    def get_num_tokens_from_messages(self, messages: List[Dict[str, Any]]) -> int:
+        """计算消息列表的总令牌数"""
+        total_tokens = 0
+        for message in messages:
+            content = message.get("content", "")
+            if isinstance(content, list):
+                # 处理多模态内容格式
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        text_content = item.get("text", "")
+                        total_tokens += self.get_num_tokens(text_content)
+            else:
+                # 处理纯文本内容
+                total_tokens += self.get_num_tokens(content)
+        return total_tokens
+
+    # LLM API 标准字段白名单，非标准字段（timestamp/id等）会导致部分提供商报错
+    _LLM_MESSAGE_ALLOWED_KEYS = {"role", "content", "name", "tool_calls", "tool_call_id"}
+
+    def _prepare_request_params(self, messages: List[LLMMessage], **kwargs) -> Dict[str, Any]:
+        """准备请求参数"""
+        params = {**self.default_params, **kwargs}
+
+        # 转换消息为字典格式，确保JSON序列化兼容
+        serialized_messages = []
+        for idx, message in enumerate(messages):
+            if hasattr(message, "to_dict"):
+                msg_dict = message.to_dict()
+            else:
+                msg_dict = message
+
+            # 剥离非标准字段（如 timestamp、id），避免严格校验的提供商（GLM等）报 400
+            filtered = {k: v for k, v in msg_dict.items() if k in self._LLM_MESSAGE_ALLOWED_KEYS}
+
+            serialized_messages.append(filtered)
+
+        params["messages"] = serialized_messages
+
+        params["stream"] = True
+        params["tool_stream"] = True
+
+        # 设置显式 max_tokens，防止模型输出过长导致 SSE 流被截断
+        # 如果配置了 max_output_tokens，使用配置值；否则不设置（使用模型默认值）
+        if self.max_output_tokens and self.max_output_tokens > 0:
+            params["max_tokens"] = self.max_output_tokens
+
+        return params
+
+    def _convert_response_to_chat_result(self, response_data: Dict[str, Any]) -> ChatResult:
+        """将API响应转换为ChatResult"""
+        choices = response_data.get("choices", [])
+        generations = []
+
+        for choice in choices:
+            message_data = choice.get("message", {})
+            content = message_data.get("content", "")
+
+            ai_message = AssistantMessage(content=content)
+
+            generation = ChatGeneration(
+                message=ai_message,
+                text=content,
+                finish_reason=choice.get("finish_reason"),
+                generation_info=choice.get("logprobs"),
+            )
+            generations.append(generation)
+
+        return ChatResult(
+            generations=generations,
+            llm_output=({"model_name": response_data.get("model")} if isinstance(response_data.get("model"), str) else response_data.get("model")),
+            usage=response_data.get("usage"),
+            response_metadata=response_data,
+        )
+
+    @handle_errors(component="openai_compatible_api", operation="make_http_request")
+    @log_performance("openai_compatible_api.make_http_request")
+    async def _make_http_request(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """执行单次HTTP请求"""
+        # 处理 Gemini 特殊情况
+        url_suffix = f"?key={self.api_key}" if self.provider == "gemini" else ""
+        original_url = self.base_url
+        if url_suffix:
+            self.base_url = self.base_url + url_suffix
+
+        # 直接调用，移除冗余错误处理
+        result = await super()._make_http_request(endpoint, params)
+
+        # 恢复原始 base_url
+        if url_suffix:
+            self.base_url = original_url
+
+        self.logger.info(
+            "HTTP request completed",
+            context={
+                "endpoint": endpoint,
+                "provider": self.provider,
+                "component": "openai_compatible_api",
+            },
+        )
+        increment_counter(
+            "openai_compatible_api.http_requests",
+            tags={"provider": self.provider, "status": "success"},
+        )
+
+        return result
+
+    @handle_errors(component="openai_compatible_api", operation="create_message")
+    @log_performance("openai_compatible_api.create_message")
+    async def create_message(
+        self,
+        messages: List[LLMMessage],
+        **kwargs,
+    ) -> AsyncGenerator[StreamMessages, None]:
+        """创建消息，支持推理过程、内容和工具调用的分别处理"""
+        # 验证输入
+        if not messages:
+            raise ValidationError("messages", messages, "must be non-empty list")
+
+        # 准备请求参数
+        params = self._prepare_request_params(messages, stream=True, **kwargs)
+
+        self.logger.info(
+            "Creating message",
+            context={
+                "model": self.model,
+                "message_count": len(messages),
+                "component": "openai_compatible_api",
+            },
+        )
+
+        endpoint = "chat/completions"
+
+        # 创建原始流数据生成器
+        async def raw_stream_generator():
+            # 处理 Gemini 特殊情况
+            url_suffix = f"?key={self.api_key}" if self.provider == "gemini" else ""
+            original_url = self.base_url
+            if url_suffix:
+                self.base_url = self.base_url + url_suffix
+
+            # 准备日志目录和文件
+            workspace_root = self.config.get("workspace_root", "")
+            request_log_file, response_log_file = self._prepare_log_files(workspace_root, endpoint)
+
+            # 记录请求日志
+            if request_log_file:
+                self._log_request(request_log_file, endpoint, params)
+
+            # 执行HTTP请求并获取流式响应生成器
+            (
+                response_stream,
+                _response_status,
+                _response_headers,
+                _url,
+            ) = await self._execute_http_request(
+                workspace_root,
+                response_log_file,
+                endpoint,
+                params,
+                url_suffix,
+                original_url,
+            )
+
+            # 恢复原始 base_url
+            if url_suffix:
+                self.base_url = original_url
+
+            try:
+                # 实时流式处理：直接 yield 流式响应中的每个数据块
+                async for chunk in response_stream:
+                    yield chunk
+            except ClientError as e:
+                # aiohttp 在迭代流的过程中连接被对端关闭（如上游中途断连），
+                # 会抛出 ClientError（子类如 ServerDisconnectedError）。
+                # 将其转为 LLMConnectionError，使其被 @handle_errors 捕获并重新
+                # 抛给 test_llm_provider，humanize_llm_test_error 就能正确翻译。
+                raise LLMConnectionError(
+                    message=f"Connection closed: {e!s}",
+                    details={"provider": self.get_provider_name()},
+                )
+            finally:
+                # 确保 response_stream generator 被关闭，触发其内部的 finally 块写入日志
+                await response_stream.aclose()
+
+        # 从 settings 读取流空闲超时，默认 120s（而非 stream_processor 的 60s 硬编码）
+        try:
+            from dawei.config.settings import get_settings
+            stream_idle_timeout = float(get_settings().agent_timeout.stream_idle_timeout)
+        except Exception:
+            stream_idle_timeout = 120.0
+
+        # 使用流式处理器处理数据并直接返回 BaseStreamMessage
+        stream_processor = StreamProcessor(provider=self.provider)
+        async for message in stream_processor.process_stream(raw_stream_generator(), idle_timeout=stream_idle_timeout):
+            yield message
+
+        increment_counter(
+            "openai_compatible_api.messages_created",
+            tags={"provider": self.provider, "message_count": len(messages)},
+        )
+
+    @handle_errors(component="openai_compatible_api", operation="chat_completion")
+    @log_performance("openai_compatible_api.chat_completion")
+    async def chat_completion(
+        self,
+        messages: List[LLMMessage],
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """非流式聊天完成，直接返回完整 JSON 响应
+
+        适用于批处理、知识图谱构建等不需要流式输出的场景。
+        不会污染 StreamState，不涉及流式拼接开销。
+
+        Args:
+            messages: 消息列表
+            **kwargs: 其他参数
+
+        Returns:
+            包含 content 的字典，格式与 process_message 一致:
+            {"content": str | None, "tool_calls": list | None}
+        """
+        if not messages:
+            raise ValidationError("messages", messages, "must be non-empty list")
+
+        # 准备请求参数（stream=False）
+        params = {**self.default_params, **kwargs}
+        serialized_messages = []
+        for message in messages:
+            if hasattr(message, "to_dict"):
+                serialized_messages.append(message.to_dict())
+            else:
+                serialized_messages.append(message)
+        params["messages"] = serialized_messages
+        params["stream"] = False
+
+        if self.max_output_tokens and self.max_output_tokens > 0:
+            params["max_tokens"] = self.max_output_tokens
+
+        self.logger.info(
+            "Non-streaming chat completion",
+            context={
+                "model": self.model,
+                "message_count": len(messages),
+                "component": "openai_compatible_api",
+            },
+        )
+
+        # 准备日志文件
+        endpoint = "chat/completions"
+        workspace_root = self.config.get("workspace_root", "")
+        request_log_file, response_log_file = self._prepare_log_files(workspace_root, endpoint)
+
+        # 记录请求日志
+        if request_log_file:
+            self._log_request(request_log_file, endpoint, params)
+
+        # 直接调用非流式 HTTP 请求
+        response_data = await self._make_http_request(endpoint, params)
+
+        # 记录响应日志
+        if response_log_file:
+            self._log_non_streaming_response(response_log_file, response_data)
+
+        # 提取内容
+        choices = response_data.get("choices", [])
+        content = None
+        if choices:
+            content = choices[0].get("message", {}).get("content") or None
+
+        increment_counter(
+            "openai_compatible_api.chat_completions",
+            tags={"provider": self.provider, "message_count": len(messages)},
+        )
+
+        return {"content": content, "tool_calls": None}
+
+    @handle_errors(component="openai_compatible_api", operation="astream_chat_completion")
+    @log_performance("openai_compatible_api.astream_chat_completion")
+    async def astream_chat_completion(
+        self,
+        messages: List[LLMMessage],
+        **kwargs,
+    ) -> AsyncGenerator[StreamMessages, None]:
+        """异步流式聊天完成，兼容旧接口
+
+        Args:
+            messages: 消息列表
+            **kwargs: 其他参数
+
+        Returns:
+            流式响应生成器
+
+        """
+        # 验证输入
+        if not messages:
+            raise ValidationError("messages", messages, "must be non-empty list")
+
+        # 直接调用 create_message 方法以保持兼容性
+        async for message in self.create_message(messages, **kwargs):
+            yield message
+
+        increment_counter(
+            "openai_compatible_api.stream_chat_completions",
+            tags={"provider": self.provider, "message_count": len(messages)},
+        )
+
+
+class OpenAICompatibleParser(StreamChunkParser):
+    """OpenAI兼容API的流式数据解析器，每次请求使用新的实例"""
+
+    def __init__(self):
+        self.reasoning_content = ""
+        self.content = ""
+        self.final_tool_calls = {}
+        self.tool_call_buffers = {}  # 为每个工具调用维护参数缓冲区
+        self.reasoning_started = False
+        self.content_started = False
+        self.final_usage = None
+
+    def parse_chunk(self, chunk: Dict[str, Any]) -> List[StreamMessages]:
+        """解析OpenAI兼容格式的数据块"""
+        messages = []
+
+        # 解析 chunk 顶层字段
+        chunk_id = chunk.get("id")
+        chunk_created = chunk.get("created")
+        chunk_object = chunk.get("object")
+        chunk_model = chunk.get("model")
+
+        # 检查是否有 usage 信息
+        if chunk.get("usage"):
+            usage_data = chunk.get("usage", {})
+            self.final_usage = usage_data
+            messages.append(
+                UsageMessage(
+                    user_message_id=local_context.get_message_id(),
+                    data=usage_data,
+                    id=chunk_id,
+                    created=chunk_created,
+                    object=chunk_object,
+                    model=chunk_model,
+                ),
+            )
+
+        if not chunk.get("choices"):
+            return messages
+
+        delta = chunk["choices"][0].get("delta", {})
+
+        # 处理流式推理过程输出
+        if delta.get("reasoning_content"):
+            reasoning_delta = delta["reasoning_content"]
+            # 【关键修复】只处理有实际内容的部分，完全跳过空白或仅包含空白字符的内容
+            # 过滤掉只有空格、换行符、制表符等空白字符的内容
+            if reasoning_delta and reasoning_delta.strip():
+                if not self.reasoning_started:
+                    self.reasoning_started = True
+                self.reasoning_content += reasoning_delta
+
+                messages.append(
+                    ReasoningMessage(
+                        user_message_id=local_context.get_message_id(),
+                        content=reasoning_delta,
+                        id=chunk_id,
+                        created=chunk_created,
+                        object=chunk_object,
+                        model=chunk_model,
+                    ),
+                )
+
+            # 记录被过滤的空推理内容（便于调试）
+            elif reasoning_delta:
+                logger.debug(f"Filtered empty reasoning content: {reasoning_delta!r}")
+
+        # 处理流式回答内容输出
+        if delta.get("content"):
+            content_delta = delta["content"]
+            # 【关键修复】只处理有实际内容的部分，完全跳过空白或仅包含空白字符的内容
+            # 过滤掉只有空格、换行符、制表符等空白字符的内容
+            if content_delta and content_delta.strip():
+                if not self.content_started:
+                    self.content_started = True
+                self.content += content_delta
+
+                messages.append(
+                    ContentMessage(
+                        user_message_id=local_context.get_message_id(),
+                        content=content_delta,
+                        id=chunk_id,
+                        created=chunk_created,
+                        object=chunk_object,
+                        model=chunk_model,
+                    ),
+                )
+            # 记录被过滤的空内容（便于调试）
+            elif content_delta:
+                logger.debug(f"Filtered empty content: {content_delta!r}")
+
+        # 处理流式工具调用信息
+        if delta.get("tool_calls"):
+            for tool_call in delta.get("tool_calls", []):
+                index = tool_call.get("index")
+
+                # 初始化工具调用缓冲区
+                if index not in self.tool_call_buffers:
+                    self.tool_call_buffers[index] = {
+                        "id": tool_call.get("id", ""),
+                        "type": tool_call.get("type", "function"),
+                        "function": {
+                            "name": tool_call.get("function", {}).get("name", ""),
+                            "arguments": "",  # 初始化空的参数缓冲区
+                        },
+                    }
+                    self.final_tool_calls[index] = self.tool_call_buffers[index].copy()
+
+                # 缓冲参数片段
+                arguments_delta = tool_call.get("function", {}).get("arguments", "")
+                if arguments_delta:
+                    self.tool_call_buffers[index]["function"]["arguments"] += arguments_delta
+
+                # 更新函数名（如果存在）
+                if tool_call.get("function", {}).get("name"):
+                    self.tool_call_buffers[index]["function"]["name"] = tool_call.get(
+                        "function",
+                        {},
+                    ).get("name")
+
+                # 同步到 final_tool_calls
+                self.final_tool_calls[index] = self.tool_call_buffers[index].copy()
+
+                # 创建当前数据块的 ToolCall 对象，使用缓冲的完整参数
+                current_arguments = self.tool_call_buffers[index]["function"]["arguments"]
+                tool_call_obj = ToolCall(
+                    tool_call_id=self.tool_call_buffers[index]["id"],
+                    type=self.tool_call_buffers[index]["type"],
+                    function=FunctionCall(
+                        name=self.tool_call_buffers[index]["function"]["name"],
+                        arguments=current_arguments,
+                    ),
+                )
+
+                # 将所有工具调用字典转换为 ToolCall 对象列表
+                all_tool_calls = []
+                for tc_dict in self.final_tool_calls.values():
+                    all_tool_calls.append(
+                        ToolCall(
+                            tool_call_id=tc_dict.get("id", ""),
+                            type=tc_dict.get("type", "function"),
+                            function=FunctionCall(
+                                name=tc_dict.get("function", {}).get("name", ""),
+                                arguments=tc_dict.get("function", {}).get("arguments", "{}"),
+                            ),
+                        ),
+                    )
+
+                messages.append(
+                    ToolCallMessage(
+                        user_message_id=local_context.get_message_id(),
+                        tool_call=tool_call_obj,
+                        all_tool_calls=all_tool_calls,
+                        id=chunk_id,
+                        created=chunk_created,
+                        object=chunk_object,
+                        model=chunk_model,
+                    ),
+                )
+
+        return messages
+
+    def complete(self, chunk: Dict[str, Any]) -> CompleteMessage:
+        """创建完成消息"""
+        # 将工具调用字典转换为 ToolCall 对象列表，使用缓冲的完整参数
+        tool_calls = []
+        for tc_dict in self.final_tool_calls.values():
+            # 【关键修复】优先使用缓冲区中的完整参数
+            arguments = tc_dict.get("function", {}).get("arguments", "{}")
+            if not arguments or arguments == "{}":
+                # 如果参数为空，尝试从缓冲区获取
+                index = None
+                for idx, buffered_tc in self.tool_call_buffers.items():
+                    if buffered_tc["id"] == tc_dict.get("id"):
+                        index = idx
+                        break
+                if index is not None and self.tool_call_buffers[index]["function"]["arguments"]:
+                    arguments = self.tool_call_buffers[index]["function"]["arguments"]
+
+            tool_calls.append(
+                ToolCall(
+                    tool_call_id=tc_dict.get("id", ""),
+                    type=tc_dict.get("type", "function"),
+                    function=FunctionCall(
+                        name=tc_dict.get("function", {}).get("name", ""),
+                        arguments=arguments,
+                    ),
+                ),
+            )
+
+        # 获取完成原因，如果chunk为空或没有choices，则默认为"stop"
+        finish_reason = "stop"
+        if chunk and chunk.get("choices"):
+            finish_reason = chunk["choices"][0].get("finish_reason", "stop")
+
+        # 【关键修复】当content为空但reasoning_content有内容时，将reasoning_content复制到content
+        # 这是为了处理GLM等模型将所有文本放在reasoning_content中的情况
+        final_content = self.content
+        if (not final_content or not final_content.strip()) and self.reasoning_content and self.reasoning_content.strip():
+            logger.info(
+                f"Copying reasoning_content to content as content field is empty. Reasoning length: {len(self.reasoning_content)}",
+            )
+            final_content = self.reasoning_content
+
+        return CompleteMessage(
+            reasoning_content=self.reasoning_content,
+            content=final_content,
+            tool_calls=tool_calls,
+            finish_reason=finish_reason,
+            usage=self.final_usage,
+        )

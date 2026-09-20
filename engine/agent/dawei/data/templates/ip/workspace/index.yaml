@@ -1,0 +1,280 @@
+templates:
+  ip-idea-vault:
+    - slug: idea-evaluation
+      name: "创新点可专利性评估（通用）"
+      version: "1.0"
+      estimated_time: "10-15 分钟"
+      description: "对技术创意进行专利可专利性和商业价值快速评估"
+    - slug: idea-evaluation-ai
+      name: "AI/软件创新可专利性评估"
+      version: "1.0"
+      estimated_time: "10-15 分钟"
+      description: "针对人工智能、算法、软件方法类创新的客体适格性与三性评估"
+    - slug: idea-evaluation-electronics
+      name: "电子/通信创新可专利性评估"
+      version: "1.0"
+      estimated_time: "10-15 分钟"
+      description: "针对电路、通信系统、半导体器件等领域的三性与标准相关性评估"
+    - slug: idea-evaluation-mechanical
+      name: "机械/制造创新可专利性评估"
+      version: "1.0"
+      estimated_time: "10-15 分钟"
+      description: "针对机械结构、制造工艺、自动化设备等领域的三性与保护类型评估"
+    - slug: idea-evaluation-biotech
+      name: "生物/医药创新可专利性评估"
+      version: "1.0"
+      estimated_time: "15-20 分钟"
+      description: "针对药物、生物序列、医疗器械等领域的客体合规与充分公开评估"
+    - slug: idea-evaluation-chemistry
+      name: "化学/材料创新可专利性评估"
+      version: "1.0"
+      estimated_time: "10-15 分钟"
+      description: "针对化学组合物、新材料、化工工艺等领域的组分新颖性与创造性评估"
+
+  ip-disclosure:
+    - slug: disclosure-drafting
+      name: "技术交底书撰写（通用）"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "根据技术创意撰写完整专利技术交底书（8 章节）"
+    - slug: disclosure-ai
+      name: "AI/软件技术交底书"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "针对算法、模型架构、数据流向的交底书，突出技术效果量化"
+    - slug: disclosure-electronics
+      name: "电子/通信技术交底书"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "针对电路拓扑、协议流程、信号处理链路的交底书"
+    - slug: disclosure-mechanical
+      name: "机械/制造技术交底书"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "针对结构组成、运动原理、工艺步骤的交底书"
+    - slug: disclosure-biotech
+      name: "生物/医药技术交底书"
+      version: "1.0"
+      estimated_time: "20-30 分钟"
+      description: "针对化合物结构、生物序列、实验数据的交底书，关注客体合规"
+    - slug: disclosure-chemistry
+      name: "化学/材料技术交底书"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "针对组分配方、合成工艺、性能测试数据的交底书"
+
+  ip-draft:
+    - slug: patent-draft
+      name: "专利草案撰写（通用）"
+      version: "1.0"
+      estimated_time: "30-45 分钟"
+      description: "撰写管辖中立的专利草案——确定保护范围、阐述技术方案、编写实施例"
+    - slug: patent-draft-ai
+      name: "AI/软件专利草案"
+      version: "1.0"
+      estimated_time: "30-45 分钟"
+      description: "针对算法、软件方法的草案，突出客体适格性和方法+装置+介质权利要求布局"
+    - slug: patent-draft-electronics
+      name: "电子/通信专利草案"
+      version: "1.0"
+      estimated_time: "30-45 分钟"
+      description: "针对电路结构、通信协议的草案，突出信号处理步骤和标准相关性"
+    - slug: patent-draft-mechanical
+      name: "机械/制造专利草案"
+      version: "1.0"
+      estimated_time: "30-45 分钟"
+      description: "针对机械结构、制造工艺的草案，突出结构特征限定和产品+方法布局"
+    - slug: patent-draft-biotech
+      name: "生物/医药专利草案"
+      version: "1.0"
+      estimated_time: "35-50 分钟"
+      description: "针对化合物、生物序列的草案，突出马库什结构和制药用途权利要求"
+    - slug: patent-draft-chemistry
+      name: "化学/材料专利草案"
+      version: "1.0"
+      estimated_time: "30-45 分钟"
+      description: "针对组合物、化工工艺的草案，突出组分范围限定和制备方法步骤"
+
+  ip-application:
+    - slug: cn-invention
+      name: "中国发明专利申请"
+      version: "1.0"
+      estimated_time: "20-30 分钟"
+      description: "基于草案生成中国发明专利五书"
+      i18n:
+        en:
+          name: "CN Invention Patent Application"
+          description: "Generate CNIPA-format invention patent application (five documents)"
+    - slug: us-utility
+      name: "美国发明专利申请"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "生成 USPTO 格式的 specification + claims + abstract"
+      i18n:
+        en:
+          name: "US Utility Patent Application"
+          description: "Generate USPTO-format specification + claims + abstract"
+    - slug: pct-application
+      name: "PCT 国际申请"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "生成 WIPO PCT 格式的 request + description + claims + abstract"
+      i18n:
+        en:
+          name: "PCT International Application"
+          description: "Generate WIPO PCT-format request + description + claims + abstract"
+    - slug: cn-utility-model
+      name: "中国实用新型申请"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "生成中国实用新型专利申请文件"
+    - slug: cn-design
+      name: "中国外观设计申请"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "生成中国外观设计专利申请文件"
+    - slug: us-provisional
+      name: "美国临时申请"
+      version: "1.0"
+      estimated_time: "15-20 分钟"
+      description: "生成美国临时申请（Provisional Application）"
+    - slug: ep-application
+      name: "欧洲专利申请"
+      version: "1.0"
+      estimated_time: "25-35 分钟"
+      description: "生成 EPO 格式的 description + claims + abstract"
+    - slug: jp-application
+      name: "日本特許出願"
+      version: "1.0"
+      estimated_time: "25-35 分钟"
+      description: "生成 JPO 格式的特許出願文件"
+    - slug: kr-application
+      name: "韓国特許出願"
+      version: "1.0"
+      estimated_time: "25-35 分钟"
+      description: "生成 KIPO 格式的特許出願文件"
+
+  ip-filing:
+    - slug: filing-strategy-comparison
+      name: "海外申请路径决策分析"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "PCT vs 巴黎公约 vs 直接申请的路径决策分析，基于目标国家、预算、商业策略推荐最优路径"
+    - slug: pct-route
+      name: "PCT 国际申请路径"
+      version: "2.0"
+      estimated_time: "20-30 分钟"
+      description: "PCT 全流程规划：国际阶段时间线、各国国家阶段进入策略、费用预算、翻译需求"
+    - slug: paris-route
+      name: "巴黎公约申请路径"
+      version: "2.0"
+      estimated_time: "15-25 分钟"
+      description: "巴黎公约多国直接申请路径：12个月期限计算、各国截止日、费用对比、翻译安排"
+    - slug: pct-national-phase
+      name: "PCT 国家阶段进入规划"
+      version: "1.0"
+      estimated_time: "20-30 分钟"
+      description: "基于 ISR/WO-ISA 结果制定各国进入策略：期限管理、PPH 利用、翻译安排、费用优化"
+    - slug: cn-filing
+      name: "中国专利申请策略"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "CNIPA 申请规划：申请类型、费用减免、PPH/优先审查、发明+实用新型双报策略"
+    - slug: us-filing
+      name: "美国专利申请策略"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "USPTO 申请规划：实体折扣（大/小/微实体）、Track One 加速、临时申请、继续申请策略"
+    - slug: ep-filing
+      name: "欧洲专利申请策略"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "EPO 申请规划：Euro-Direct/Euro-PCT 路径、Unitary Patent 单一专利、PACE 加速、验证国选择"
+    - slug: jp-filing
+      name: "日本专利申请策略"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "JPO 申请规划：特許/実用新案/意匠、スーパー早い審査超级加速、中小企业减免、权利要求优化"
+
+  ip-oa-reply:
+    - slug: oa-reply
+      name: "OA 审查意见答复"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "分析驳回理由、制定答复策略、撰写答复意见"
+
+  ip-reverse-detection:
+    - slug: reverse-detection
+      name: "反向侵权探测（通用）"
+      version: "2.0"
+      estimated_time: "20-35 分钟"
+      description: "检测市场产品是否侵犯我方专利权，逐项特征对比，生成侵权分析报告和警告函草稿"
+    - slug: reverse-detection-software
+      name: "AI/软件反向侵权探测"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "针对算法、软件方法的侵权探测：API/SDK分析、开源代码检测、黑盒推理、模型架构推断"
+    - slug: reverse-detection-electronics
+      name: "电子/通信反向侵权探测"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "芯片拆解逆向、信号抓取分析、协议一致性测试、SEP标准必要专利对比"
+    - slug: reverse-detection-mechanical
+      name: "机械/制造反向侵权探测"
+      version: "1.0"
+      estimated_time: "20-35 分钟"
+      description: "产品拆解测量、三维扫描对比、制造工艺分析、材料成分检测"
+    - slug: reverse-detection-biotech
+      name: "生物/医药反向侵权探测"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "药品上市信息分析、处方/成分检测、生物序列比对、Bolar豁免与专利链接评估"
+    - slug: reverse-detection-chemistry
+      name: "化学/材料反向侵权探测"
+      version: "1.0"
+      estimated_time: "20-35 分钟"
+      description: "成分分析/色谱质谱、晶型/XRD检测、配方逆向、数值范围侵权判定"
+
+  ip-portfolio:
+    - slug: portfolio-analysis
+      name: "IP 资产组合分析"
+      version: "1.0"
+      estimated_time: "20-30 分钟"
+      description: "专利/商标组合 KPI 统计、健康度评分、续费提醒"
+
+  ip-trademark:
+    - slug: trademark-clearance-search
+      name: "商标预检索与侵权清除分析"
+      version: "1.0"
+      estimated_time: "15-25 分钟"
+      description: "提交注册前的全面预检索（相同+近似+跨类三层漏斗），识别潜在冲突，输出清除策略"
+    - slug: trademark-registration
+      name: "商标可注册性评估与注册方案"
+      version: "2.0"
+      estimated_time: "20-30 分钟"
+      description: "显著性分析、尼斯分类精确推荐、绝对理由与相对理由审查、多管辖地注册策略"
+    - slug: trademark-opposition
+      name: "商标异议与无效宣告"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "异议/无效/撤销提起与答辩，含理由分析、证据链构建、程序时间线管理"
+    - slug: trademark-infringement-analysis
+      name: "商标侵权分析与维权策略"
+      version: "1.0"
+      estimated_time: "25-40 分钟"
+      description: "混淆可能性多因素分析、侵权行为定性、维权路径选择、损害赔偿计算、证据收集方案"
+    - slug: trademark-portfolio
+      name: "商标组合管理与续展规划"
+      version: "1.0"
+      estimated_time: "20-30 分钟"
+      description: "商标资产全面审计：健康度评分、续展时间线、使用合规审查、防御布局评估、费用优化"
+    - slug: trademark-madrid
+      name: "马德里国际商标注册规划"
+      version: "1.0"
+      estimated_time: "20-30 分钟"
+      description: "马德里体系国际注册全流程：指定国选择、费用计算、中心打击防御、临时驳回应对"
+    - slug: trademark-licensing
+      name: "商标许可与转让方案"
+      version: "1.0"
+      estimated_time: "20-35 分钟"
+      description: "独占/排他/普通许可、商标转让、特许经营体系，含合同条款起草、质量控制、备案登记"

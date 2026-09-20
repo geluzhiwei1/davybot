@@ -1,0 +1,437 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""流式消息处理器"""
+
+import asyncio
+import contextlib
+import json
+import logging
+import time
+from collections.abc import AsyncGenerator
+from typing import List, Dict, Any
+
+from dawei.core.errors import LLMError
+from dawei.core.events import TaskEventType
+from dawei.core.exceptions import LLMContextOverflowError
+from dawei.entity.lm_messages import ToolCall
+from dawei.entity.stream_message import (
+    ContentMessage,
+    StreamMessages,
+    ToolCallMessage,
+    UsageMessage,
+)
+from dawei.entity.task_types import TokenUsage
+from dawei.llm_api.base_llm_api import StreamChunkParser
+from dawei.task_graph.task_node_data import TaskContext
+
+logger = logging.getLogger(__name__)
+
+
+class StreamProcessor:
+    """流式消息处理器
+
+    新增功能（从适配器合并）：
+    - 实现 IStreamProcessor 接口
+    - 基本的状态管理和统计功能
+    - 事件处理支持
+    """
+
+    def __init__(self, provider: str = "openai"):
+        """初始化流式处理器
+
+        Args:
+            provider: LLM提供商类型，支持 openai、deepseek、moonshot、ollama
+
+        """
+        self.provider = provider.lower()
+        self.parser = self._create_parser()
+
+        # 从适配器合并的功能
+        self.is_streaming_flag = False
+        self.token_usage = None
+        self.processing_state: Dict[str, bool | str | Dict[str, ToolCall]] = {
+            "is_processing": False,
+            "current_content": "",
+            "current_tool_calls": {},
+        }
+        self.event_handlers = {}
+
+    def _create_parser(self) -> StreamChunkParser:
+        """根据提供商类型创建解析器"""
+        if self.provider == "deepseek":
+            try:
+                from .deepseek_api import DeepSeekParser
+
+                return DeepSeekParser()
+            except ImportError:
+                pass
+        if self.provider == "moonshot":
+            try:
+                from .moonshot_api import MoonshotParser
+
+                return MoonshotParser()
+            except ImportError:
+                pass
+
+        # 默认使用OpenAI兼容解析器
+        from .openai_compatible_api import OpenAICompatibleParser
+
+        return OpenAICompatibleParser()
+
+    async def process_message(
+        self,
+        stream_response: AsyncGenerator,
+        task_id: str,
+        context: Any,
+    ) -> List[Any]:
+        """处理流式消息（实现 IStreamProcessor 接口）
+
+        Args:
+            stream_response: 流式响应生成器
+            task_id: 任务ID
+            context: 任务上下文
+
+        Returns:
+            处理后的内容块列表
+
+        Raises:
+            ValueError: 如果上下文类型无效
+            RuntimeError: 如果流式处理失败
+
+        """
+        # 确保上下文是 TaskContext 类型
+        if not isinstance(context, TaskContext):
+            if isinstance(context, dict):
+                context = TaskContext.from_dict(context)
+            else:
+                raise ValueError(
+                    f"Invalid context type: expected TaskContext or dict, got {type(context).__name__}",
+                )
+
+        # 简化的流式消息处理实现
+        result = []
+        self.is_streaming_flag = True
+        self.processing_state["is_processing"] = True
+
+        try:
+            async for chunk in stream_response:
+                # 处理流式块
+                processed_chunks = await self.handle_stream_chunk(chunk, context)
+                result.extend(processed_chunks)
+        except Exception as e:
+            # 清理状态
+            self.is_streaming_flag = False
+            self.processing_state["is_processing"] = False
+            raise RuntimeError(f"Failed to process stream message for task {task_id}: {e}")
+        finally:
+            self.is_streaming_flag = False
+            self.processing_state["is_processing"] = False
+
+        return result
+
+    def get_token_usage(self) -> TokenUsage:
+        """获取 Token 使用统计（实现 IStreamProcessor 接口）
+
+        Returns:
+            Token 使用统计对象
+
+        Note:
+            如果未设置 token_usage，返回空的 TokenUsage 对象
+
+        """
+        return self.token_usage or TokenUsage()
+
+    def get_stream_statistics(self) -> Dict[str, Any]:
+        """获取流统计信息（实现 IStreamProcessor 接口）
+
+        Returns:
+            流统计信息字典
+
+        """
+        return {
+            "is_streaming": self.is_streaming_flag,
+            "token_usage": self.token_usage.__dict__ if self.token_usage else {},
+            "processing_statistics": self.processing_state,
+            "provider": self.provider,
+        }
+
+    def reset_stream_state(self) -> None:
+        """重置流式处理状态（实现 IStreamProcessor 接口）"""
+        self.is_streaming_flag = False
+        self.token_usage = None
+        self.processing_state: Dict[str, bool | str | Dict[str, ToolCall]] = {
+            "is_processing": False,
+            "current_content": "",
+            "current_tool_calls": {},
+        }
+
+    def is_streaming(self) -> bool:
+        """检查是否正在流式处理（实现 IStreamProcessor 接口）
+
+        Returns:
+            是否正在流式处理
+
+        """
+        return self.is_streaming_flag
+
+    def get_processing_state(self) -> Dict[str, bool | str | Dict[str, ToolCall]]:
+        """获取处理状态（实现 IStreamProcessor 接口）
+
+        Returns:
+            处理状态字典
+
+        """
+        return self.processing_state.copy()
+
+    def set_event_handler(self, event_type: str, handler: Any) -> None:
+        """设置事件处理器（实现 IStreamProcessor 接口）
+
+        Args:
+            event_type: 事件类型
+            handler: 事件处理器
+
+        Raises:
+            ValueError: 如果 event_type 为空
+            TypeError: 如果 handler 不是可调用对象
+
+        """
+        if not event_type:
+            raise ValueError("event_type cannot be empty")
+
+        if not callable(handler):
+            raise TypeError(f"handler must be callable, got {type(handler).__name__}")
+
+        # 尝试将字符串转换为 TaskEventType，如果失败则使用原始字符串
+        with contextlib.suppress(ValueError):
+            TaskEventType(event_type)
+
+        # 设置事件处理器
+        self.event_handlers[event_type] = handler
+
+    async def handle_stream_chunk(self, chunk: Any, _context: Any) -> List[Any]:
+        """处理单个流式块（实现 IStreamProcessor 接口）
+
+        Args:
+            chunk: 流式块数据
+            context: 任务上下文
+
+        Returns:
+            处理后的内容块列表
+
+        Raises:
+            ValueError: 如果 chunk 类型无效
+            RuntimeError: 如果解析失败
+
+        """
+        result = []
+
+        # 如果是字符串，尝试解析为JSON
+        if isinstance(chunk, str):
+            try:
+                chunk = json.loads(chunk)
+            except json.JSONDecodeError:
+                # 如果不是有效的JSON，直接作为内容处理
+                # 但要过滤掉空白字符串
+                if chunk.strip():  # 只处理非空白内容
+                    # ⚠️ Fallback: 纯文本chunk没有metadata，无法获取message_id
+                    # 这通常意味着上游代码没有正确处理LLM响应
+                    logger.warning(f"[STREAM_PROCESSOR] Received raw string chunk (no metadata). This indicates the chunk was not parsed from OpenAI format. Content preview: {chunk[:100]!r}")
+                    result.append(ContentMessage(content=chunk))
+                return result
+
+        # 如果是字典，使用解析器处理
+        if isinstance(chunk, dict):
+            try:
+                messages = self.parser.parse_chunk(chunk)
+                result.extend(messages)
+
+                # 更新处理状态
+                for message in messages:
+                    if isinstance(message, ContentMessage):
+                        self.processing_state["current_content"] += message.content
+                    elif isinstance(message, ToolCallMessage):
+                        tool_call = message.tool_call
+                        # 直接使用 ToolCall 对象
+                        self.processing_state["current_tool_calls"][tool_call.tool_call_id] = tool_call
+                    elif isinstance(message, UsageMessage):
+                        self.token_usage = message.data
+            except Exception as e:
+                raise RuntimeError(f"Failed to parse chunk: {e}")
+        else:
+            raise ValueError(
+                f"Invalid chunk type: expected str or dict, got {type(chunk).__name__}",
+            )
+
+        return result
+
+    async def process_stream(
+        self,
+        stream: AsyncGenerator[str, None],
+        idle_timeout: float = 60.0,
+    ) -> AsyncGenerator[StreamMessages, None]:
+        """处理流式数据
+
+        Args:
+            stream: 原始流式数据生成器
+            idle_timeout: 空闲超时时间（秒），默认60秒。如果超过此时间没有收到任何数据，抛出超时错误。
+
+        Yields:
+            解析后的流式消息
+
+        Raises:
+            ValueError: 如果数据格式无效
+            RuntimeError: 如果流式处理失败
+            UnicodeDecodeError: 如果字节解码失败
+            asyncio.TimeoutError: 如果空闲超时
+
+        """
+        last_chunk = None
+        last_data_time = time.monotonic()
+        idle_timeout_event = asyncio.Event()
+        stream_done_received = False
+        chunk_count = 0
+        content_yielded = False  # 跟踪是否有实际内容被 yield（防止空流静默完成）
+
+        async def check_idle_timeout_task():
+            """后台任务：定期检查空闲超时"""
+            while not idle_timeout_event.is_set():
+                await asyncio.sleep(1)
+                if time.monotonic() - last_data_time > idle_timeout:
+                    idle_timeout_event.set()
+
+        idle_task: asyncio.Task | None = None
+
+        try:
+            # 启动 idle 超时检测后台任务
+            idle_task = asyncio.create_task(check_idle_timeout_task())
+
+            async for line in stream:
+                # 检查是否有空闲超时
+                if idle_timeout_event.is_set():
+                    raise asyncio.TimeoutError(f"No data received for {idle_timeout}s (idle timeout)")
+
+                # 每次收到数据，重置空闲计时器
+                last_data_time = time.monotonic()
+                # 重置超时事件（如果之前设置过）
+                idle_timeout_event.clear()
+
+                # 解码字节行
+                try:
+                    line = line.decode("utf-8").strip() if isinstance(line, bytes) else line.strip()
+                except UnicodeDecodeError as e:
+                    raise ValueError(f"Failed to decode line as UTF-8: {e}")
+
+                # 跳过空行和注释
+                if not line or line.startswith(":"):
+                    continue
+
+                if line.startswith("data: "):
+                    data = line[6:]
+                    if data == "[DONE]":
+                        stream_done_received = True
+                        break
+
+                    # 解析 JSON
+                    try:
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        raise ValueError(f"Invalid JSON in stream data: {data[:100]}...")
+
+                    last_chunk = chunk
+                    chunk_count += 1
+
+                    # 【关键修复】检测 SSE error 事件 — 网关将 Provider 错误包装为
+                    # data: {"error": {"message": "...", "code": 400}} 的 SSE 事件，
+                    # 使用 HTTP 200 状态码发送。如果不检测，parse_chunk 会因没有
+                    # choices 字段而静默返回空列表，导致流以 0 内容"成功"完成，
+                    # 触发 _run_task_loop 的无限重试循环（60 次/26 秒）。
+                    if isinstance(chunk, dict) and "error" in chunk:
+                        err = chunk["error"]
+                        err_msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
+                        err_code = err.get("code", "unknown") if isinstance(err, dict) else "unknown"
+                        logger.error(
+                            f"SSE error event received from gateway (HTTP 200, code={err_code}): {err_msg}"
+                        )
+                        # 避免双重包装：网关消息本身已含 "Provider error (400): ..." 前缀时直接使用
+                        if err_msg.startswith("Provider error"):
+                            raise LLMError("openai", err_msg)
+                        raise LLMError(
+                            "openai",
+                            f"Provider error ({err_code}): {err_msg}",
+                        )
+
+                    # 解析数据块
+                    try:
+                        messages = self.parser.parse_chunk(chunk)
+                        for message in messages:
+                            content_yielded = True
+                            yield message
+                    except Exception as e:
+                        raise RuntimeError(f"Failed to parse stream chunk: {e}")
+
+            # 检测 SSE 流是否异常结束（无 [DONE] 标记）
+            if not stream_done_received and last_chunk is not None:
+                last_finish_reason = "unknown"
+                choices = last_chunk.get("choices", [])
+                if choices:
+                    last_finish_reason = choices[0].get("finish_reason", "unknown")
+                logger.warning(
+                    f"SSE stream ended WITHOUT [DONE] marker after {chunk_count} chunks. "
+                    f"Last finish_reason={last_finish_reason}. "
+                    f"Response may be TRUNCATED - tool calls with incomplete JSON arguments are likely.",
+                )
+
+            # 检测 context overflow — 立即抛异常，阻止无效重试
+            if last_chunk is not None:
+                choices = last_chunk.get("choices", [])
+                if choices:
+                    raw_reason = choices[0].get("finish_reason", "")
+                    if raw_reason in ("model_context_window_exceeded", "context_overflow"):
+                        logger.error(
+                            f"LLM context window exceeded after {chunk_count} chunks. "
+                            f"finish_reason={raw_reason}. "
+                            f"Caller MUST truncate context before retrying.",
+                        )
+                        raise LLMContextOverflowError(
+                            f"Model context window exceeded (finish_reason={raw_reason}). "
+                            f"Truncate conversation context and retry.",
+                            {"chunk_count": chunk_count, "finish_reason": raw_reason},
+                        )
+
+            # 【关键修复】检测空流 — 流以 [DONE] "成功"完成但没有产出任何内容。
+            # 这通常发生在网关返回 SSE error 事件（HTTP 200 + data: {"error":{...}}）
+            # 但 error 事件已被上面的检测拦截。如果由于其他原因导致空流，也需要
+            # 主动报错，防止 _run_task_loop 因看不到 assistant 回复而无限重试。
+            if not content_yielded and chunk_count > 0:
+                logger.error(
+                    f"SSE stream completed with [DONE] but NO content was yielded "
+                    f"(chunks={chunk_count}). This indicates a silent provider failure. "
+                    f"Last chunk keys: {list(last_chunk.keys()) if last_chunk else 'None'}."
+                )
+                raise LLMError(
+                    "openai",
+                    "Stream completed with no content (silent provider failure — "
+                    "possibly unsupported parameters or model name mismatch).",
+                )
+
+            # 流式结束后，发送完成消息
+            try:
+                complete_message = self.parser.complete(last_chunk)
+                yield complete_message
+            except Exception as e:
+                raise RuntimeError(f"Failed to generate complete message: {e}")
+
+        except asyncio.TimeoutError:
+            # 空闲超时 - 重新抛出
+            logger.warning(f"Idle timeout: no data received for {idle_timeout}s")
+            raise
+        except Exception:
+            # 重新抛出已处理的异常
+            raise
+        finally:
+            # 确保 idle 超时检测任务被取消
+            if idle_task is not None:
+                idle_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await idle_task

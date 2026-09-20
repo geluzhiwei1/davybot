@@ -1,0 +1,78 @@
+# 沙箱网络策略模板 (§沙箱系统升级 v2 — N4 eBPF)
+#
+# 使用方式:
+#   DAWEI_SANDBOX_NETWORK_POLICY=/path/to/this/file.yaml
+#
+# 策略: deny-all + 白名单域名
+# 未匹配任何 allow 规则的流量将被 deny
+
+version: "1.0"
+default_action: deny
+
+rules:
+  # DNS 必须放行 (否则白名单域名无法解析)
+  - name: allow-dns
+    action: allow
+    protocol: udp
+    port: 53
+    destinations:
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+      - "127.0.0.11"
+
+  # Python 包管理器
+  - name: allow-pypi
+    action: allow
+    protocol: tcp
+    port: 443
+    domains:
+      - "pypi.org"
+      - "files.pythonhosted.org"
+      - "pypi.python.org"
+
+  # npm 包管理器
+  - name: allow-npm-registry
+    action: allow
+    protocol: tcp
+    port: 443
+    domains:
+      - "registry.npmjs.org"
+      - "registry.npmmirror.com"
+
+  # GitHub (git clone / git pull)
+  - name: allow-github
+    action: allow
+    protocol: tcp
+    port: 443
+    domains:
+      - "github.com"
+      - "raw.githubusercontent.com"
+      - "objects.githubusercontent.com"
+      - "codeload.github.com"
+
+  # 内部服务 (nn-bot, nn-kb-searcher, nn-flow 等)
+  - name: allow-internal-services
+    action: allow
+    protocol: tcp
+    port: 8010-8022
+    destinations:
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+
+  # 显式拒绝: 已知数据外泄目标
+  - name: deny-pastebin
+    action: deny
+    domains:
+      - "pastebin.com"
+      - "paste.ee"
+      - "dpaste.org"
+
+  - name: deny-cloud-storage
+    action: deny
+    domains:
+      - "drive.google.com"
+      - "dropbox.com"
+      - "*.s3.amazonaws.com"
+      - "transfer.sh"

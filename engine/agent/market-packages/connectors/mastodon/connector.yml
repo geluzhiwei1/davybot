@@ -1,0 +1,37 @@
+platform: mastodon
+display_name: Mastodon
+version: 0.1.0
+capability:
+  publish: api
+  publish_modes: []
+  trending: none
+  metrics: api
+constraints:
+  char_limit: 500
+  max_files: 4
+  max_video_seconds: 0
+  rich_text: false
+domains:
+- mastodon.social
+# API 轨:Mastodon REST。凭据(oauth_code)= 访问令牌(mastodon.social → Preferences → Development → New application → access token)
+# adapter:app/connectors/mastodon.py(POST /api/v1/statuses);实例可用 SC_MASTODON_BASE 覆盖
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - DE
+  - US
+  - JP
+  - FR
+  - GB
+  languages:
+  - en
+  - de
+  - ja
+  - fr
+  - es
+  - pt
+  - zh
+  - ru
+  - ko

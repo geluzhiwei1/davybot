@@ -1,0 +1,298 @@
+# 合规工作区模板: 绩效管理与解聘合规评估
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# 覆盖维度：④ 绩效管理(Ch9-10) + 解聘合规(Ch18)
+# 状态码：STATUS_403(CRITICAL_LOCK) / STATUS_401(ILLEGAL) / STATUS_402(REJECT) /
+#         STATUS_406(NOT_ACCEPTABLE) / STATUS_408(TIMEOUT) /
+#         STATUS_500(MANDATORY_LOCK) / STATUS_200(OK)
+
+template:
+  slug: labor-termination-assessment
+  name: "绩效管理与解聘合规评估"
+  version: "1.0"
+  team_slug: labor
+
+  description: >-
+    评估绩效管理体系、PIP程序合规性、解聘方案合法性风险，
+    覆盖10国解聘强行法专项校验与补偿金计算。
+
+  applicable_scenarios:
+    - "解聘风险评估"
+    - "PIP程序审查"
+    - "经济性裁员"
+    - "绩效体系设计"
+
+  estimated_time: "30-45 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入贵司全称"
+        store: "input/company_info.json"
+
+      - key: assessment_type
+        label: "评估类型"
+        type: select
+        options:
+          - { value: "performance_system", label: "绩效管理体系审查" }
+          - { value: "specific_termination", label: "特定员工解聘风险评估" }
+          - { value: "mass_layoff", label: "经济性裁员方案审查" }
+          - { value: "pip_assessment", label: "PIP 程序合规评估" }
+          - { value: "full_review", label: "绩效+解聘全体系审查" }
+        store: "input/task_parameters.json"
+
+      - key: target_jurisdictions
+        label: "适用法区"
+        type: multiselect
+        options:
+          - "中国内地"
+          - "美国（含加州）"
+          - "英国"
+          - "德国"
+          - "法国"
+          - "西班牙"
+          - "日本"
+          - "新加坡"
+          - "阿联酋"
+          - "澳大利亚"
+          - "南非"
+          - "巴西"
+          - "韩国"
+          - "其他（请在备注说明）"
+        store: "input/task_parameters.json"
+
+      - key: policy_documents
+        label: "绩效/解聘制度文件"
+        type: file
+        accept: ".pdf,.docx,.xlsx,.txt"
+        store: "input/"
+        description: "上传绩效管理制度、PIP 流程、解聘审批制度、培训服务期协议等"
+
+    optional:
+      - key: specific_case_details
+        label: "特定解聘案件详情"
+        type: text
+        visible_when: "assessment_type in ['specific_termination', 'pip_assessment']"
+        placeholder: |
+          若评估特定员工解聘风险，请提供：
+          - 员工工龄、职级、合同类型
+          - 拟解聘理由（过错/不胜任/经济性）
+          - 已有的绩效记录、PIP 日志
+          - 是否处于特殊保护期（孕/病/工伤）
+        store: "input/specific_case.json"
+
+      - key: pip_records
+        label: "PIP 执行记录"
+        type: file
+        accept: ".pdf,.docx,.xlsx"
+        visible_when: "assessment_type in ['specific_termination', 'pip_assessment']"
+        store: "input/"
+        description: "上传 PIP 计划、面谈记录、考核数据等"
+
+      - key: severance_calculation
+        label: "经济补偿计算方案"
+        type: text
+        visible_when: "assessment_type in ['specific_termination', 'mass_layoff', 'full_review']"
+        placeholder: "描述拟定的补偿方案（N、N+1、2N 等）及计算基数"
+        store: "input/task_parameters.json"
+
+      - key: existing_labor_disputes
+        label: "既有劳动争议"
+        type: text
+        visible_when: "assessment_type in ['specific_termination', 'mass_layoff']"
+        placeholder: "描述该员工或团队已有的劳动仲裁/诉讼情况"
+        store: "input/task_parameters.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：XX员工解聘风险评估"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/labor-termination-assessment"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置绩效管理制度、PIP记录、解聘审批文件等。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 状态码体系
+
+    | 状态码 | 等级 | 含义 |
+    |--------|------|------|
+    | STATUS_403 (CRITICAL_LOCK) | 🔴 全线阻断 | 末位淘汰制（全球主要法区绝对违法）/ 未经 CLO 授权的越权解雇 |
+    | STATUS_401 (ILLEGAL) | 🟠 违法 | PIP 周期不足 30 天或缺失调岗/培训前置 / 撞击特定法区强行法（日本四支柱/阿联酋 Gratuity 等） |
+    | STATUS_402 (REJECT) | 🟡 不合规 | 培训费追索未套用等比例递减公式 |
+    | STATUS_406 (NOT_ACCEPTABLE) | 🟠 不达标 | 德国社会选择/西班牙补偿金计算不达标 |
+    | STATUS_408 (TIMEOUT) | 🟠 超时 | 最终发薪超时触犯欠薪强行法 |
+    | STATUS_500 (MANDATORY_LOCK) | 🔴 强制锁死 | 特殊保护期（孕/病/工伤/吹哨人）解雇禁止 |
+    | STATUS_200 (OK) | 🟢 通过 | 解聘方案通过 |
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解评估类型和适用法区范围
+    - 根据 assessment_type 确定审查范围：
+      - performance_system: 仅绩效体系审查（Ch9-10）
+      - specific_termination: 特定员工解聘风险评估（Ch9-10 + Ch18）
+      - mass_layoff: 经济性裁员方案审查（Ch18 为主）
+      - pip_assessment: PIP 程序合规评估（Ch9-10 为主）
+      - full_review: 绩效+解聘全体系审查（Ch9-10 + Ch18 全覆盖）
+    - 制定多法域解聘合规审查方案
+    - 向用户展示计划，等待确认
+
+    ### Do — 维度一：绩效管理体系（第九/十章）
+
+    a. 绩效制度审查 → `output/performance_system_review.md`
+       - 末位淘汰制绝对红线扫描 [CODE: PER-01]
+       - KPI 双向数字证书签收完备性
+       - 绩效考核周期与申诉机制合规性
+
+    b. PIP 程序审查 → `output/pip_procedure_review.md`
+       - PIP 改进期时限与程序刚性校验（≥30 天） [CODE: PER-02]
+       - 调岗/培训前置单据完备性
+       - PIP 期间绩效沟通记录链
+
+    c. 培训服务期审查 → `output/training_bond_review.md`
+       - 培训费追索全额买断条款过滤 [CODE: PER-03]
+       - 天数等比例递减公式校验
+       - 服务期协议与劳动合同衔接合规性
+
+    ### Do — 维度二：解聘合规（第十八章）
+
+    d. 解雇审批集权控制 → `output/termination_approval_review.md`
+       - CLO 数字签名授权校验 [CODE: TERM-01]
+       - 解聘审批权限层级合规性
+
+    e. 目标国家强行法专项校验 → `output/country_specific_termination.md`
+       逐法域专项校验（仅针对 target_jurisdictions 选定法区）：
+       - 日本四支柱 [JPN-REDUNDANCY-4PILLARS]
+       - 阿联酋 Gratuity 累进公式 [UAE-GRATUITY-CALC]
+       - 德国社会选择/西班牙 33 天 [SOCIAL-SELECTION]
+       - 中国 2N 双倍补偿/强制复职 [CN-2N-REINSTATEMENT]
+       - 英国 Selection Pool 程序 [UK-SELECTION-POOL]
+       - 美国 At-Will 默示契约 [US-IMPLIED-CONTRACT]
+       - 澳大利亚推定解雇 [AU-CONSTRUCTIVE-DISMISSAL]
+       - 南非 LIFO 后进先出 [ZA-LIFO]
+       [CODE: TERM-02]
+
+    f. 最终发薪结算时效 → `output/final_settlement_review.md`
+       - 本地法定最后清算时效校验 [CODE: TERM-03]
+       - 经济补偿金/代通知金计算核验
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 解聘证据链闭环检查（PIP → 警告 → 审批 → 发单 → 结算）
+    - 特殊保护期（孕/病/工伤/吹哨人）交叉检索
+    - 补偿金计算公式与法定标准比对
+    - 各法域审查结果一致性核验
+
+    ### Act (输出)
+    - 生成绩效管理与解聘合规评估报告 → `reports/termination_assessment.docx`
+    - 报告必须包含：执行摘要、绩效体系审查结果、解聘方案合法性评估、
+      法域专项风险分析、补偿金计算校验、证据链完整性评估、
+      状态码判定矩阵、缓释建议
+    - 如发现 STATUS_403/STATUS_500，在报告末尾附言：
+      "⚠️ 检测到绝对红线/强制锁死风险，建议立即停止解聘流程并启动法务复核。"
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 所有审查结果必须记录时间戳和法规版本，以备审计追溯
+    - 多法域劳动法差异巨大，AI 审查结果仅供参考
+    - 任何 STATUS_403/STATUS_500 结论建议人工二次确认
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - performance_review
+      - termination_legality
+      - country_specific_risk
+      - compensation_verification
+      - evidence_chain
+      - status_code_matrix
+      - mitigation_recommendations
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_performance
+      label: "绩效体系审查"
+      progress: 20
+    - name: do_termination_country
+      label: "解聘法域校验"
+      progress: 25
+    - name: do_settlement
+      label: "结算审查"
+      progress: 10
+    - name: check
+      label: "证据链审查"
+      progress: 15
+    - name: act
+      label: "报告生成"
+      progress: 20
+
+  # ── 对话采集模式配置 ──
+  chat_collection:
+    opening: |
+      你好！我是绩效管理与解聘合规评估顾问。接下来我会引导你提供评估所需的信息。
+
+      整个过程大约需要 10-15 分钟。你可以一次提供所有信息，也可以逐步回答。
+    groups:
+      - name: "案件概况"
+        intro: "请告诉我基本情况。"
+        fields:
+          - company_name
+          - assessment_type
+          - target_jurisdictions
+      - name: "绩效/PIP"
+        intro: "请提供绩效管理和PIP相关的文件和记录。"
+        fields:
+          - policy_documents
+          - pip_records
+      - name: "解聘方案"
+        intro: "请提供解聘方案和补偿相关细节。"
+        fields:
+          - severance_calculation
+          - existing_labor_disputes
+      - name: "补充信息"
+        intro: "如有其他补充信息请在此提供。"
+        fields:
+          - task_subject

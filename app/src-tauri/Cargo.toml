@@ -1,0 +1,50 @@
+[package]
+name = "normnomos"
+version = "0.2.11-post.1.dev.45"
+description = "NormNomos — AI Native 全球合规风控引擎"
+authors = ["NormNomos Team"]
+license = "Apache-2.0"
+edition = "2021"
+
+# Mobile (Android/iOS) loads the app as a library (cdylib/staticlib); the
+# desktop binary in src/main.rs is a thin wrapper over the lib's run().
+[lib]
+name = "normnomos_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-http = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# rustls-tls instead of default native-tls: native-tls pulls openssl-sys on
+# Android, which requires a cross-compiled OpenSSL against the NDK. rustls
+# builds cleanly on every desktop + mobile target.
+reqwest = { version = "0.12", default-features = false, features = ["json", "charset", "http2", "rustls-tls"] }
+dirs = "6"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+
+# Desktop-only plugin (single-instance has no meaning on Android/iOS).
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2"
+
+# Windows-only: Job Object (kill-on-close) so the bundled sidecar's whole
+# process tree dies even if normnomos.exe crashes or is force-killed (where the
+# tauri://destroy handler never runs). Reuses a version already in the tree.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

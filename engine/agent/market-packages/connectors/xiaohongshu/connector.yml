@@ -1,0 +1,58 @@
+platform: xiaohongshu
+display_name: 小红书
+version: 0.2.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  - direct
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 1000
+  max_files: 18
+  max_video_seconds: 300
+  rich_text: true
+domains:
+- creator.xiaohongshu.com
+publish:
+  compose_url: https://creator.xiaohongshu.com/publish/publish
+  selectors:
+    compose_box:
+      primary: div[contenteditable="true"].c-input__inner
+      fallback: div[contenteditable="true"]
+    publish_button:
+      primary: button:has-text("发布")
+      fallback: button.publishBtn
+      wait_after_click_ms: 3000
+    media_upload:
+      primary: input[type="file"][accept*="image"]
+      max_files: 18
+      max_video_seconds: 300
+    success_indicator:
+      method: url_change
+      pattern: creator.xiaohongshu.com/publish/success
+    title_input:
+      primary: input[placeholder*="标题"]
+      fallback: input.max-length-input
+  login_check:
+    url: https://creator.xiaohongshu.com/publish/publish
+    indicator: .user-info, .creator-avatar
+trending:
+  url: https://www.xiaohongshu.com/explore
+  container: section.note-item a.cover
+  topic: div.title span
+  pagination: scroll
+metrics:
+  likes: span.like-count, .like-wrapper span.count
+  comments: span.comment-count, .comment-wrapper span.count
+  collects: span.collect-count, .collect-wrapper span.count
+  shares: span.share-count, .share-wrapper span.count
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

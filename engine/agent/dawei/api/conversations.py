@@ -1,0 +1,399 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""对话管理 API 路由"""
+
+import json
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from dawei.api.workspaces._deps import require_workspace_access
+from dawei.logg.logging import get_logger
+from dawei.workspace import workspace_manager
+
+logger = get_logger(__name__)
+
+router = APIRouter(
+    prefix="/api/workspaces/{workspace_id}/conversations",
+    tags=["conversations"],
+    # 消息读写路径统一归属校验：防止仅凭 workspace_id 跨账号读写消息（IDOR）
+    dependencies=[Depends(require_workspace_access)],
+)
+
+
+def get_chat_history_dir_for_workspace(workspace_id: str) -> Path:
+    """获取给定工作区ID的.dawei/conversations目录的路径。"""
+    workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
+    if not workspace_info:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Workspace with ID '{workspace_id}' not found.",
+        )
+
+    base_path = Path(workspace_info["path"])
+
+    if not base_path.is_dir():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Workspace path '{base_path}' not found or is not a directory.",
+        )
+
+    # 使用新的.dawei/conversations目录（重构后的持久化路径）
+    chat_history_dir = base_path / ".dawei" / "conversations"
+
+    # 如果.dawei/conversations不存在，则创建它
+    if not chat_history_dir.exists():
+        chat_history_dir.mkdir(parents=True, exist_ok=True)
+
+    return chat_history_dir
+
+
+def load_conversation_file(file_path: Path) -> Dict[str, Any]:
+    """加载单个对话文件"""
+    with Path(file_path).open(encoding="utf-8") as f:
+        data = json.load(f)
+
+    conversation_id = file_path.stem
+    title = data.get("title", f"对话 {conversation_id}")
+    last_updated = datetime.fromtimestamp(file_path.stat().st_mtime)
+
+    # 时间戳 — 会话文件存在两种键风格：旧 camelCase（createdAt/updatedAt）与新 snake_case
+    # （created_at/updated_at，agent 持久化层当前写入格式）。两者都读，避免 createdAt=None。
+    created = data.get("createdAt") or data.get("created_at")
+    updated = data.get("updatedAt") or data.get("updated_at")
+
+    return {
+        "id": conversation_id,
+        "title": title,
+        "lastUpdated": last_updated,
+        "messageCount": len(data.get("messages", [])),
+        "path": str(file_path),
+        # 新增：任务类型字段
+        "task_type": data.get("task_type", "user"),
+        "source_task_id": data.get("source_task_id"),
+        # 元数据
+        "metadata": data.get("metadata", {}),
+        # 时间戳（camelCase 兼容旧消费方；snake_case 供前端 store.ts 读取）
+        "createdAt": created,
+        "updatedAt": updated,
+        "created_at": created,
+        "updated_at": updated,
+    }
+
+
+@router.get("")
+async def get_workspace_conversations(
+    workspace_id: str,
+    request: Request,
+    page: int = 1,
+    limit: int = 50,
+    sort_by: str = "updatedAt",
+    sort_order: str = "desc",
+    task_type: str | None = None,  # 新增：按任务类型过滤
+):
+    """Get conversations from a workspace with pagination and filtering support.
+
+    Args:
+        workspace_id: Workspace identifier
+        request: FastAPI request (for JWT-based user/tenant authorization)
+        page: Page number (default: 1)
+        limit: Items per page (default: 50)
+        sort_by: Sort field (default: updatedAt)
+        sort_order: Sort order asc/desc (default: desc)
+        task_type: Filter by task type - "user", "scheduled", or None for all (default: None)
+    """
+    # 鉴权说明：归属校验由 router 级依赖 require_workspace_access 统一完成
+    # （owner_user_id + tenant_id 复核），此处仅校验 workspace 存在性。
+    workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
+    if not workspace_info:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Workspace with ID '{workspace_id}' not found.",
+        )
+
+    chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
+
+    conversation_files = list(chat_history_dir.glob("*.json"))
+
+    conversations = []
+    for file_path in conversation_files:
+        conversation = load_conversation_file(file_path)
+        if conversation:
+            # 按 task_type 过滤
+            if task_type is None or conversation.get("task_type") == task_type:
+                conversations.append(conversation)
+
+    # Sort conversations
+    reverse_order = sort_order == "desc"
+    conversations.sort(key=lambda x: x["lastUpdated"], reverse=reverse_order)
+
+    # Pagination
+    total = len(conversations)
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
+
+    # Apply pagination
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    paginated_conversations = conversations[start_idx:end_idx]
+
+    workspace_name = workspace_info.get("name", "default") if workspace_info else "default"
+
+    return {
+        "success": True,
+        "workspace_name": workspace_name,
+        "conversations": paginated_conversations,
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "totalPages": total_pages,
+    }
+
+
+@router.post("")
+async def save_or_create_workspace_conversations(workspace_id: str, request: Request):
+    """Create a single conversation or bulk-save conversations to a workspace.
+
+    Supports two request body formats:
+    - **Single object** (create): ``{"title": "新任务", ...}`` — generates an id, returns the created conversation.
+    - **Array** (bulk save): ``[{"id": "...", ...}, ...]`` — existing bulk-save behavior.
+    """
+    body = await request.json()
+    chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
+    workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
+    workspace_name = workspace_info.get("name") if workspace_info else "default"
+
+    # Single conversation creation: body is a dict without being wrapped in a list
+    if isinstance(body, dict):
+        conversation_id_val = body.get("id") or str(uuid.uuid4())
+        title = body.get("title", "新对话")
+        now = datetime.now(UTC).isoformat()
+
+        conversation_data = {
+            "id": conversation_id_val,
+            "title": title,
+            "messages": body.get("messages", []),
+            "messageCount": body.get("messageCount", 0),
+            "metadata": body.get("metadata", {}),
+            "createdAt": body.get("createdAt", now),
+            "updatedAt": body.get("updatedAt", now),
+        }
+        # Merge with any extra fields from the request body
+        for key, value in body.items():
+            if key not in conversation_data:
+                conversation_data[key] = value
+
+        file_path = chat_history_dir / f"{conversation_id_val}.json"
+        with file_path.open("w", encoding="utf-8") as f:
+            json.dump(conversation_data, f, ensure_ascii=False, indent=2)
+
+        return {
+            "success": True,
+            "message": "对话创建成功",
+            "workspace_name": workspace_name,
+            "id": conversation_id_val,
+            "title": title,
+            "createdAt": conversation_data["createdAt"],
+            "updatedAt": conversation_data["updatedAt"],
+        }
+
+    # Bulk save: body is a list of conversation dicts
+    if isinstance(body, list):
+        saved_count = 0
+        for conversation in body:
+            conversation_id_val = conversation.get("id")
+            if not conversation_id_val:
+                continue
+
+            file_path = chat_history_dir / f"{conversation_id_val}.json"
+
+            existing_data = {}
+            if file_path.exists():
+                with Path(file_path).open(encoding="utf-8") as f:
+                    existing_data = json.load(f)
+
+            existing_data.update(conversation)
+
+            with file_path.open("w", encoding="utf-8") as f:
+                json.dump(existing_data, f, ensure_ascii=False, indent=2)
+
+            saved_count += 1
+
+        return {
+            "success": True,
+            "message": f"成功保存 {saved_count} 个对话",
+            "workspace_name": workspace_name,
+            "saved_count": saved_count,
+        }
+
+    raise HTTPException(status_code=422, detail="Request body must be a JSON object or array")
+
+
+@router.get("/{conversation_id}")
+async def get_workspace_conversation(
+    workspace_id: str,
+    conversation_id: str,
+    skip: int = 0,
+    limit: int | None = None,
+    include_metadata: bool = True,
+    order: str = "asc",  # 'asc' = oldest first, 'desc' = newest first
+):
+    """Get a specific conversation from a workspace with pagination support.
+
+    Args:
+        workspace_id: Workspace identifier
+        conversation_id: Conversation identifier
+        skip: Number of messages to skip (for pagination, default: 0)
+        limit: Maximum number of messages to return (default: None = all messages)
+        include_metadata: Whether to include conversation metadata (default: True)
+        order: Message order - 'asc' for oldest first, 'desc' for newest first (default: 'asc')
+
+    """
+    chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
+    conversation_file = chat_history_dir / f"{conversation_id}.json"
+
+    if not conversation_file.exists():
+        # New conversation with no history yet — return empty response
+        return {
+            "success": True,
+            "conversation": {
+                "id": conversation_id,
+                "title": "",
+                "messages": [],
+                "messageCount": 0,
+                "pagination": {
+                    "skip": 0,
+                    "limit": limit,
+                    "returned": 0,
+                    "total": 0,
+                    "hasMore": False,
+                },
+            },
+            "message": "No conversation history yet",
+        }
+
+    with Path(conversation_file).open(encoding="utf-8") as f:
+        conversation_data = json.load(f)
+
+    # Extract messages
+    messages = conversation_data.get("messages", [])
+    total_messages = len(messages)
+
+    # Apply pagination based on order
+    if order == "desc":
+        # Load newest messages first (from the end)
+        # skip=0, limit=50 -> returns last 50 messages
+        # Messages are returned in chronological order (oldest first, newest last)
+        end_index = total_messages - skip
+        start_index = end_index - limit if limit is not None else 0
+        start_index = max(start_index, 0)
+        paginated_messages = messages[start_index:end_index]
+        # Keep messages in chronological order (newest at the end of array)
+        # This ensures frontend can display them correctly (newest at bottom)
+    else:
+        # Load oldest messages first (from the beginning)
+        paginated_messages = messages[skip : skip + limit] if limit is not None else messages[skip:] if skip > 0 else messages
+        skip + len(paginated_messages) < total_messages
+
+    # Build response
+    response_data = {
+        "success": True,
+        "conversation": {
+            "id": conversation_data.get("id", conversation_id),
+            "title": conversation_data.get("title", ""),
+            "messages": paginated_messages,
+            "messageCount": total_messages,
+            "pagination": {
+                "skip": skip,
+                "limit": limit,
+                "returned": len(paginated_messages),
+                "total": total_messages,
+                "hasMore": skip + len(paginated_messages) < total_messages,
+            },
+        },
+        "message": f"Loaded {len(paginated_messages)}/{total_messages} messages",
+    }
+
+    # Include metadata if requested
+    if include_metadata:
+        response_data["conversation"]["metadata"] = conversation_data.get("metadata", {})
+        response_data["conversation"]["createdAt"] = conversation_data.get("createdAt")
+        response_data["conversation"]["updatedAt"] = conversation_data.get("updatedAt")
+
+    return response_data
+
+
+@router.post("/{conversation_id}")
+async def save_workspace_conversation(workspace_id: str, conversation_id: str, conversation: dict):
+    """Save a specific conversation to a workspace."""
+    chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
+    conversation_file = chat_history_dir / f"{conversation_id}.json"
+
+    existing_data = {}
+    if conversation_file.exists():
+        with Path(conversation_file).open(encoding="utf-8") as f:
+            existing_data = json.load(f)
+
+    existing_data.update(conversation)
+
+    with conversation_file.open("w", encoding="utf-8") as f:
+        json.dump(existing_data, f, ensure_ascii=False, indent=2)
+
+    workspace_info = workspace_manager.get_workspace_by_id(workspace_id)
+    workspace_name = workspace_info.get("name") if workspace_info else "default"
+
+    return {
+        "success": True,
+        "message": "对话保存成功",
+        "workspace_name": workspace_name,
+        "conversation_id": conversation_id,
+    }
+
+
+@router.delete("/{conversation_id}")
+async def delete_workspace_conversation(workspace_id: str, conversation_id: str):
+    """Delete a specific conversation from a workspace."""
+    chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
+    conversation_file = chat_history_dir / f"{conversation_id}.json"
+
+    if not conversation_file.exists():
+        raise HTTPException(status_code=404, detail=f"Conversation '{conversation_id}' not found")
+
+    conversation_file.unlink()
+
+    return {
+        "success": True,
+        "conversation_id": conversation_id,
+        "message": "Conversation deleted successfully",
+    }
+
+
+@router.delete("")
+async def delete_all_workspace_conversations(workspace_id: str):
+    """Delete all conversations from a workspace."""
+    chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
+
+    if not chat_history_dir.exists():
+        return {
+            "success": True,
+            "deletedCount": 0,
+            "message": "No conversations to delete",
+        }
+
+    # 获取所有对话文件
+    conversation_files = list(chat_history_dir.glob("*.json"))
+    deleted_count = 0
+
+    # 删除所有对话文件
+    for conversation_file in conversation_files:
+        conversation_file.unlink()
+        deleted_count += 1
+
+    return {
+        "success": True,
+        "deletedCount": deleted_count,
+        "message": f"Successfully deleted {deleted_count} conversations",
+    }

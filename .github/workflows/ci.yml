@@ -1,0 +1,174 @@
+name: CI
+
+# 拆库方案 §6 开源仓 CI 矩阵（engine × app × tui × server 零外呼冒烟）。
+# 门禁策略（沿 backend-ci.yml 惯例 + E5 收口）:
+#   BLOCKING: 云默认守卫(E5) / 工具系统门禁 / app lint+typecheck+vitest+核心构建 / server 冒烟断言
+#   NON-BLOCKING: 全量 unit（存量环境型失败未清零前只出报告）、ruff format / mypy
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20.19.0"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  engine:
+    name: Engine tests & guards
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine/agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Ruff format check (non-blocking)
+        run: ruff format --check dawei/ || true
+
+      - name: Mypy (non-blocking)
+        run: mypy dawei/ || true
+
+      # 拆库方案 §5.1 E5：代码字符串出现云端默认地址即 fail（docstring 豁免）
+      - name: Cloud-default guard (BLOCKING)
+        run: pytest tests/unit/test_no_cloud_defaults.py -v --tb=short
+
+      - name: Tool system gate (BLOCKING)
+        run: pytest tests/test_tool_contract.py tests/test_tool_system_health.py tests/test_smart_file_edit.py -v --tb=short
+
+      - name: Unit tests (non-blocking until legacy env-dependent failures triaged)
+        run: pytest -m unit -q --tb=short || true
+
+  cli:
+    name: CLI / TUI smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine/agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
+        run: uv pip install --system -e ".[dev,tui]"
+
+      - run: dawei --help
+      - run: dawei server --help
+      - run: dawei tui --help
+
+  app:
+    name: App lint / typecheck / test / build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run ci:lint
+
+      - name: TypeScript type check
+        run: npm run ci:typecheck
+
+      # 核心形态 vitest（含 F7b biz 隔离守卫 biz-isolation.test.ts）
+      - name: Unit tests
+        run: npm run ci:test
+
+      - name: Core server build
+        run: npm run build:server
+
+  # 拆库方案 §5.1 E5 / §9.5 尾巴收口：无任何云 env 冷启 server 形态，
+  # runtime-info 必须报 local + [relay]（零外部服务矩阵的 CI 化）。
+  server-smoke:
+    name: Server zero-cloud smoke (E5)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build core web UI
+        working-directory: app
+        run: |
+          npm ci
+          npm run build:server
+
+      - name: Stage frontend into engine
+        run: rsync -a --delete app/dist/ engine/agent/dawei/frontend/
+
+      - name: Install engine
+        working-directory: engine/agent
+        env:
+          UV_SYSTEM_PYTHON: 1
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Boot server with NO cloud env & assert local/relay
+        run: |
+          cd engine/agent
+          dawei server start --host 127.0.0.1 --port 8931 > /tmp/dawei-smoke.log 2>&1 &
+          SRV=$!
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8931/api/runtime-info > /dev/null && break
+            sleep 2
+          done
+          python3 - <<'EOF'
+          import json, urllib.request
+          info = json.load(urllib.request.urlopen("http://127.0.0.1:8931/api/runtime-info"))
+          assert info.get("deployment_class") == "local", f"deployment_class: {info}"
+          assert info.get("capabilities") == ["relay"], f"capabilities: {info}"
+          print("runtime-info OK:", info)
+          EOF
+          UI_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8931/app-ui/)
+          [ "$UI_CODE" = "200" ] || { echo "app-ui HTTP $UI_CODE"; tail -50 /tmp/dawei-smoke.log; exit 1; }
+          kill $SRV || true

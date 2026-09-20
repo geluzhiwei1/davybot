@@ -1,0 +1,24 @@
+{
+  "slug": "labor-termination-assessment",
+  "name": "绩效管理与解聘合规评估清单",
+  "category": "劳动用工",
+  "description": "绩效体系审查、PIP程序评估、10国解聘强行法专项、补偿金计算",
+  "applicable_scenarios": ["解聘风险评估", "PIP程序审查", "经济性裁员", "绩效体系设计"],
+  "items": [
+    { "task": "末位淘汰制绝对红线扫描", "category": "绩效" },
+    { "task": "KPI 双向数字证书签收完备性", "category": "绩效" },
+    { "task": "PIP 改进期时限与程序刚性校验（≥30天+调岗/培训前置）", "category": "绩效" },
+    { "task": "培训服务期等比例递减公式校验", "category": "绩效" },
+    { "task": "解雇审批最高集权控制流过滤（CLO授权）", "category": "解聘" },
+    { "task": "日本四支柱校验（解雇回避努力/人选合理/程序妥当）", "category": "解聘-法域专项" },
+    { "task": "阿联酋 Gratuity 终结金多层累进公式校验", "category": "解聘-法域专项" },
+    { "task": "德国社会选择/西班牙 Improcedente 校验", "category": "解聘-法域专项" },
+    { "task": "中国 2N 双倍补偿/强制复职风险校验", "category": "解聘-法域专项" },
+    { "task": "美国 At-Will 默示契约/英国 Selection Pool 校验", "category": "解聘-法域专项" },
+    { "task": "澳大利亚推定解雇/南非 LIFO 校验", "category": "解聘-法域专项" },
+    { "task": "特殊保护期交叉检索（孕/病/工伤/吹哨）", "category": "解聘" },
+    { "task": "最终发薪结算时效校验", "category": "解聘" },
+    { "task": "状态码分类输出（PER/TERM）", "category": "分析" },
+    { "task": "证据链完整性检查", "category": "合规记录" }
+  ]
+}

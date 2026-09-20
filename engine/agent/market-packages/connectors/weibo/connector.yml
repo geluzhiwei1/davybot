@@ -1,0 +1,53 @@
+platform: weibo
+display_name: 微博
+version: 0.2.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 2000
+  max_files: 9
+  max_video_seconds: 300
+  rich_text: false
+domains:
+- weibo.com
+publish:
+  compose_url: https://weibo.com/
+  selectors:
+    compose_box:
+      primary: textarea[class*="input"]
+      fallback: '[node-type="textEl"]'
+    publish_button:
+      primary: a[action-type="submit"]
+      fallback: a[node-type="submitBtn"]
+      wait_after_click_ms: 2000
+    media_upload:
+      primary: input[type="file"][accept*="image"]
+      max_files: 9
+      max_video_seconds: 300
+    success_indicator:
+      method: url_change
+      pattern: weibo.com/
+  login_check:
+    url: https://weibo.com/
+    indicator: .woo-avatar-img
+trending:
+  url: https://s.weibo.com/top/summary
+  container: tbody tr
+  topic: td a
+  pagination: none
+metrics:
+  likes: button[action-type="feed_list_like"] span
+  reposts: button[action-type="feed_list_forward"] span
+  replies: button[action-type="feed_list_comment"] span
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

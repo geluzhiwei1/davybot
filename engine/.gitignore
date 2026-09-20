@@ -1,0 +1,46 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env*
+!.env.example
+!.env.*.example
+.vercel
+logs/
+.roo/
+.github/
+.vscode/
+node_modules/
+dist/
+build/
+coverage/
+*.log
+*.out
+*.pid
+*.seed
+*.pid.lock
+*.egg-info/
+config/system-config/
+services/agent-api/tests/data-files/
+
+# Note: tests/ is NOT globally ignored. Tests should be in VCS.
+# Only ignore test artifacts in deps and temp dirs
+deps/*/tests/
+deps/*
+
+.playwright-cli/
+.claude/
+.dawei/
+
+# Local development configuration (mirrors, etc.)
+.uvrc
+uv.toml
+.pip/
+.piprc
+.npmrc
+.pypirc
+.cargo/config.toml.local-e 
+# Tauri build resources (generated)
+webui/src-tauri/resources/assets/
+webui/src-tauri/resources/drawio/
+agent/dawei/_version.py

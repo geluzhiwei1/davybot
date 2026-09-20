@@ -1,0 +1,180 @@
+# 合规工作区模板: 反垄断合规体系建设
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: antitrust-compliance-program
+  name: "反垄断合规体系建设"
+  version: "1.0"
+  team_slug: antitrust
+
+  description: |
+    基于全球主要法域反垄断法规，对企业现有合规政策和内控体系
+    进行全面评估，识别风险敞口并制定系统性整改方案。
+
+  applicable_scenarios:
+    - "反垄断合规自查"
+    - "合规政策更新"
+    - "员工反垄断培训"
+    - "黎明突袭 (Dawn Raid) 应对准备"
+
+  estimated_time: "45-60 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入待评估企业全称"
+        store: "input/company_info.json"
+
+      - key: industry
+        label: "所属行业"
+        type: select
+        options:
+          - { value: tech, label: "科技/互联网" }
+          - { value: pharma, label: "医药/医疗" }
+          - { value: manufacturing, label: "制造业" }
+          - { value: retail, label: "零售/消费品" }
+          - { value: finance, label: "金融服务" }
+          - { value: energy, label: "能源/化工" }
+          - { value: other, label: "其他" }
+        store: "input/task_parameters.json"
+
+      - key: operating_jurisdictions
+        label: "运营法域"
+        type: multiselect
+        options: ["中国", "欧盟", "美国", "英国", "日本", "韩国", "东南亚", "其他"]
+        store: "input/task_parameters.json"
+
+      - key: has_existing_program
+        label: "是否有既有反垄断合规政策"
+        type: boolean
+        default: false
+        store: "input/company_info.json"
+
+    optional:
+      - key: existing_policies_doc
+        label: "既有反垄断合规政策文件"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: previous_violations
+        label: "过往反垄断调查/处罚记录"
+        type: text
+        placeholder: "描述过往反垄断执法经历..."
+        store: "input/company_info.json"
+
+      - key: market_share_concern
+        label: "是否存在高市场份额业务线 (>30%)"
+        type: boolean
+        default: false
+        store: "input/task_parameters.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：反垄断合规体系建设评估-2026"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/antitrust-compliance-program"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的反垄断合规信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解企业业务结构和风险特征
+    - 根据合规清单制定反垄断合规体系评估计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 既有政策文件审查 → `output/policy_review.md`
+    b. 水平/纵向协议风险评估 → `output/agreement_risk_assessment.md`
+    c. 滥用市场支配地位风险评估 → `output/dominance_risk_assessment.md`
+    d. 培训与内部举报机制评估 → `output/training_whistleblower_assessment.md`
+    e. 黎明突袭应对预案评估 → `output/dawn_raid_readiness.md`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证评估覆盖所有运营法域
+    - 确认风险评级一致性
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成反垄断合规体系建设报告 → `reports/antitrust_compliance_program.docx`
+    - 报告必须包含：执行摘要、风险矩阵（按法域和风险类型）、合规政策差距分析、整改优先级路线图、培训方案建议、执法趋势预警
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 合规建议需区分各法域具体要求
+    - 高风险领域标注"建议寻求专业法律意见"
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - risk_matrix
+      - policy_gap_analysis
+      - remediation_roadmap
+      - training_recommendations
+      - enforcement_trends
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_policy
+      label: "政策审查"
+      progress: 20
+    - name: do_risk
+      label: "风险评估"
+      progress: 30
+    - name: do_procedures
+      label: "程序评估"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

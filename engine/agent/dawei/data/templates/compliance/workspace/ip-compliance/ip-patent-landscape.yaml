@@ -1,0 +1,159 @@
+# 合规工作区模板: 专利全景分析
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: ip-patent-landscape
+  name: "专利全景分析"
+  version: "1.0"
+  team_slug: ip-compliance
+
+  description: |
+    对竞争对手的专利布局进行全面分析，识别技术空白和机会，
+    为企业制定 PCT 申请策略和研发方向提供数据支持。
+
+  applicable_scenarios:
+    - "制定技术研发路线图"
+    - "评估市场竞争格局"
+    - "PCT 专利申请策略规划"
+    - "M&A 技术尽职调查 — IP 部分"
+
+  estimated_time: "30-45 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入本企业全称"
+        store: "input/company_info.json"
+
+      - key: tech_field
+        label: "技术领域"
+        type: select
+        options:
+          - { value: ai_ml, label: "人工智能/机器学习" }
+          - { value: semiconductor, label: "半导体" }
+          - { value: pharma, label: "医药/生物技术" }
+          - { value: telecom, label: "通信/5G" }
+          - { value: automotive, label: "汽车/自动驾驶" }
+          - { value: consumer_electronics, label: "消费电子" }
+          - { value: software, label: "软件/互联网" }
+          - { value: new_energy, label: "新能源" }
+          - { value: other, label: "其他" }
+        store: "input/task_parameters.json"
+
+      - key: competitors
+        label: "竞争对手"
+        type: text
+        placeholder: "请输入竞争对手企业名称，多个用逗号分隔..."
+        store: "input/task_parameters.json"
+
+      - key: target_markets
+        label: "目标市场"
+        type: multiselect
+        options: ["中国", "美国", "欧盟", "日本", "韩国", "东南亚", "全球"]
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: known_patents
+        label: "已知相关专利号（可选）"
+        type: text
+        placeholder: "如已掌握某些关键专利号，可填入以辅助分析"
+        store: "input/task_parameters.json"
+
+      - key: analysis_focus
+        label: "分析侧重点"
+        type: text
+        placeholder: "如：技术空白识别 / 专利布局方向 / 竞争对手动向..."
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/ip-patent-landscape"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入和分析参数"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n专利全景分析输入参数将保存在此目录。"
+    - dir: output
+      description: "分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\n竞争对手分析、技术空白识别等中间结果。"
+    - dir: reports
+      description: "最终报告"
+    - dir: references
+      description: "参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    1. `input/task_parameters.json` — 分析参数
+    2. `input/company_info.json` — 企业信息
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan
+    - 解析技术领域和竞争对手列表
+    - 制定专利检索策略（IPC分类号、申请人、关键词组合）
+
+    ### Do
+    a. 竞争对手专利布局分析 → `output/competitor_patent_map.csv`
+    b. 技术趋势与热点分析 → `output/technology_trends.md`
+    c. 技术空白识别 → `output/technology_white_spaces.md`
+    d. PCT 申请策略建议 → `output/pct_strategy.md`
+
+    ### Check
+    - 验证检索覆盖主要竞争对手
+    - 确认关键 IPC 分类号无遗漏
+
+    ### Act
+    - 生成专利全景分析报告 → `reports/patent_landscape_report.docx`
+
+    ## 重要提示
+    - 检索使用 paper-search-mcp 工具
+    - 结合专利文献和非专利文献（论文、技术标准）
+    - 分析报告不替代专业专利代理人意见
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - technology_overview
+      - competitor_patent_analysis
+      - technology_trends
+      - white_space_identification
+      - pct_strategy
+      - recommendations
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_search
+      label: "专利检索"
+      progress: 30
+    - name: do_analysis
+      label: "竞争格局分析"
+      progress: 30
+    - name: do_landscape
+      label: "技术空白识别"
+      progress: 15
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 5

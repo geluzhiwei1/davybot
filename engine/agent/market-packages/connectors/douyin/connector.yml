@@ -1,0 +1,61 @@
+platform: douyin
+display_name: 抖音
+version: 1.0.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  - direct
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 1000
+  max_files: 1
+  max_video_seconds: 900
+  rich_text: false
+domains:
+- creator.douyin.com
+- www.douyin.com
+publish:
+  compose_url: https://creator.douyin.com/aweme/publish
+  selectors:
+    title_input:
+      primary: textarea[placeholder*='标题']
+      fallback: "[data-e2e='video-title'] textarea"
+    compose_box:
+      primary: div[data-e2e='video-desc'] > div.ql-editor
+      fallback: "[contenteditable='true']"
+    media_upload:
+      primary: input[type='file'][accept*='video']
+      fallback: input[type='file']
+    save_draft_button:
+      primary: "[data-e2e='draft-btn']"
+      fallback: button:has-text('存草稿')
+      wait_after_click_ms: 1500
+    publish_button:
+      primary: "[data-e2e='publish-btn']"
+      fallback: button:has-text('发布')
+      wait_after_click_ms: 2000
+    success_indicator:
+      method: url_change
+      pattern: /creator/publish/success
+  login_check:
+    url: https://creator.douyin.com/aweme/publish
+    indicator: "[data-e2e='user-info'], .avatar"
+trending:
+  url: https://www.douyin.com/hot
+  container: div.feed-list-item
+  topic: a.title
+  pagination: click
+metrics:
+  likes: "[data-e2e='video-like-count']"
+  comments: "[data-e2e='video-comment-count']"
+  shares: "[data-e2e='video-share-count']"
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

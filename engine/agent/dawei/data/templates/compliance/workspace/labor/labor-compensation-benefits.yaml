@@ -1,0 +1,272 @@
+# 合规工作区模板: 工时休假与薪酬福利合规审查
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# 覆盖维度：Ch 5-8（工作时间/考勤/休假/薪酬/福利）
+# 状态码：STATUS_403(年假清零) / STATUS_401(工时撞线) / STATUS_402(登记不精确) / STATUS_302(加班缺审批) / STATUS_200(通过)
+
+template:
+  slug: labor-compensation-benefits
+  name: "工时休假与薪酬福利合规审查"
+  version: "1.0"
+  team_slug: labor
+
+  description: |
+    对企业工时考勤制度、加班审批机制、休假政策、薪酬结构与社保缴纳
+    进行多法域合规审查，覆盖四维度交叉验证与证据链核查。
+
+  applicable_scenarios:
+    - "工时制度审查"
+    - "加班管理"
+    - "休假政策"
+    - "薪酬结构"
+    - "社保合规"
+
+  estimated_time: "35-50 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入贵司全称"
+        store: "input/company_info.json"
+
+      - key: policy_documents
+        label: "工时/休假/薪酬制度文件"
+        type: file
+        accept: ".pdf,.docx,.xlsx,.txt"
+        store: "input/"
+        description: "上传考勤制度、加班审批制度、休假制度、薪酬制度、社保政策等文件"
+
+      - key: target_jurisdictions
+        label: "适用法区"
+        type: multiselect
+        options:
+          - "中国内地"
+          - "美国（含加州）"
+          - "英国"
+          - "德国"
+          - "法国"
+          - "西班牙"
+          - "日本"
+          - "新加坡"
+          - "阿联酋/沙特"
+          - "韩国"
+          - "中国台湾"
+          - "其他（请在备注说明）"
+        store: "input/task_parameters.json"
+
+      - key: review_focus
+        label: "审查重点"
+        type: multiselect
+        options:
+          - "工作时间与加班制度"
+          - "休假制度（年假/病假/产假等）"
+          - "薪酬结构与发放"
+          - "社会保险与公积金"
+          - "跨境发薪/税务"
+          - "全部审查"
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: overtime_records_sample
+        label: "加班审批记录样本"
+        type: file
+        accept: ".pdf,.xlsx,.csv"
+        store: "input/"
+        description: "上传最近 3 个月的加班申请/审批记录样本"
+
+      - key: payroll_sample
+        label: "薪资单样本（脱敏）"
+        type: file
+        accept: ".pdf,.xlsx"
+        store: "input/"
+        description: "上传脱敏后的薪资单样本，用于审查薪酬结构合规性"
+
+      - key: attendance_system_info
+        label: "考勤系统信息"
+        type: text
+        placeholder: "描述当前使用的考勤系统、打卡方式、数据保留年限"
+        store: "input/task_parameters.json"
+
+      - key: social_insurance_status
+        label: "社保缴纳现状"
+        type: text
+        placeholder: "描述当前社保/公积金缴纳情况（全员足额/部分补缴/跨境互免等）"
+        store: "input/task_parameters.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：全球工时休假薪酬合规审查"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/labor-compensation-benefits"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要审查的工时/休假/薪酬制度文件和相关信息。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 状态码体系
+
+    | 状态码 | 等级 | 含义 |
+    |--------|------|------|
+    | STATUS_403 (CRITICAL_LOCK) | 🔴 全线阻断 | 年假清零触犯中国 300% 清算金及欧洲红线 / 单方扣款触犯日本全额支付原则 |
+    | STATUS_401 (ILLEGAL) | 🟠 违法 | 最高工时撞线 / 医疗期解雇触犯核心劳工法 / 跨境发薪非法渠道 / 社保未足额 |
+    | STATUS_402 (REJECT) | 🟡 不达标 | 考勤系统不满足精确登记 / 缺失特种假导致行政断档 |
+    | STATUS_302 (WARNING) | 🟢 预警 | 缺乏加班预审批，暴露加班费追索风险 |
+    | STATUS_200 (OK) | ✅ 通过 | 四维度全部通过 |
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，识别工时/休假/薪酬/社保各模块合规状态
+    - 制定多法域审查方案（工时 + 休假 + 薪酬 + 社保四维度）
+    - 向用户展示计划，等待确认
+
+    ### Do — 维度一：工作时间与考勤（Ch 5）
+    a. 加班预审批制度审查 → `output/overtime_approval_review.md`
+       - 扫描是否缺乏加班预审批网闸 [CODE: TIM-01]
+    b. 最高工时红线校验 → `output/working_hours_check.md`
+       - 加州/日本/新加坡/中国台湾等法区最高工时硬红线撞线 [CODE: TIM-02]
+    c. 精确工时登记完备度 → `output/attendance_system_review.md`
+       - 西班牙/中国台湾精确到分钟登记审计 [CODE: TIM-03]
+
+    ### Do — 维度二：休假与福利假期（Ch 6）
+    d. 年假结转清零条款审查 → `output/leave_policy_review.md`
+       - 一刀切跨年清零触犯中国/欧洲红线 [CODE: LEA-01]
+    e. 医疗期解雇防火墙校验 → `output/sick_leave_protection.md`
+       - 病假/医疗期解雇绝对免疫 [CODE: LEA-02]
+    f. 特种假审查 → `output/special_leave_review.md`
+       - 穆斯林朝觐假等高度本地化特种假 [CODE: LEA-03]
+
+    ### Do — 维度三：薪酬结构（Ch 7）
+    g. 薪酬结构分离审查 → `output/salary_structure_review.md`
+       - 基本薪资作为排他性唯一基数
+       - 抵销截留限制校验 [CODE: FIN-01 / SOC-01]
+    h. 跨境发薪审查 → `output/cross_border_payroll_review.md`
+       - 拆分合规、双重税务、反洗钱
+
+    ### Do — 维度四：法定福利（Ch 8）
+    i. 社保法定义务审查 → `output/social_insurance_review.md`
+       - 全额按时申报缴纳
+       - 禁止"补贴现金化"或"假外包"规避
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 四维度交叉验证（如：工时超标 + 加班未批 = 双重红旗）
+    - 证据链完整性检查
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成工时休假薪酬福利合规审查报告 → `reports/compensation_benefits_review.docx`
+    - 报告必须包含：工时考勤审查结果、休假制度合规评估、薪酬结构审查、
+      社保缴纳合规评估、状态码判定、整改路线图
+    - 如发现工时超标，附言："⚠️ 建议进一步审查加班费追索风险。"
+    - 如发现薪酬结构缺陷，附言："⚠️ 建议启动「跨境用工与外派合规评估」模板 (labor-cross-border) 审查跨境发薪。"
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 工时审查必须覆盖所有适用法区的最高工时强行法
+    - 薪酬结构审查关注基本薪资是否作为排他性唯一基数
+    - 社保缴纳为公法强行规定，不可通过协议规避
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - review_scope
+      - working_hours_review
+      - leave_policy_review
+      - salary_structure_review
+      - social_insurance_review
+      - cross_dimension_analysis
+      - status_code_matrix
+      - remediation_roadmap
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_working_hours
+      label: "工时考勤审查"
+      progress: 20
+    - name: do_leave
+      label: "休假制度审查"
+      progress: 20
+    - name: do_compensation
+      label: "薪酬结构审查"
+      progress: 20
+    - name: do_social_insurance
+      label: "社保审查"
+      progress: 10
+    - name: check
+      label: "交叉验证"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10
+
+  # ── 对话采集模式配置 ──
+  chat_collection:
+    opening: |
+      你好！我是工时休假与薪酬福利合规审查顾问。我会逐步引导你提供审查所需的信息。
+
+      整个过程大约需要 8-12 分钟。
+    groups:
+      - name: "工时制度"
+        intro: "首先请提供企业基本信息和工时制度文件。"
+        fields:
+          - company_name
+          - policy_documents
+          - target_jurisdictions
+          - review_focus
+          - attendance_system_info
+      - name: "加班管理"
+        fields:
+          - overtime_records_sample
+      - name: "休假制度"
+        fields:
+          - social_insurance_status
+      - name: "薪酬结构"
+        fields:
+          - payroll_sample
+      - name: "补充信息"
+        fields:
+          - task_subject

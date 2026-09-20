@@ -1,0 +1,7 @@
+{
+  "totalWarnings": 211,
+  "rules": {
+    "react-hooks/exhaustive-deps": 187,
+    "react-refresh/only-export-components": 24
+  }
+}

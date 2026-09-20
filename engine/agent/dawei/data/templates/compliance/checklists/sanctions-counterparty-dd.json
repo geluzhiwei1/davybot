@@ -1,0 +1,24 @@
+{
+  "slug": "sanctions-counterparty-dd",
+  "name": "交易对手深度尽调清单",
+  "category": "制裁合规",
+  "description": "穿透式 KYC/UBO 尽调 — 股权穿透图谱、OFAC 50% Rule 聚合计算、信托/代持拆解、实质控制权刺破",
+  "applicable_scenarios": ["签约前尽调", "并购交易尽调", "增强尽调 (EDD)", "年度合规复查"],
+  "items": [
+    { "task": "交易对手名称与注册信息交叉校验", "category": "身份校验" },
+    { "task": "地址与实际经营地一致性检查", "category": "身份校验" },
+    { "task": "股权穿透图谱构建（逐层标注持股比例）", "category": "股权穿透" },
+    { "task": "OFAC 50% Rule 聚合计算（逐级属性传递法）", "category": "股权穿透", "guidance": "禁止全局相乘稀释" },
+    { "task": "离岸法区实体识别（BVI/Cayman/Seychelles/Cyprus）", "category": "股权穿透" },
+    { "task": "UBO 最终受益人识别（穿透至自然人/信托委托人）", "category": "UBO" },
+    { "task": "PEP 政治公众人物关联度标记", "category": "UBO" },
+    { "task": "核心管理层 SDN 比对 + U.S. Person 标记", "category": "管理层" },
+    { "task": "签字授权代表背景审查", "category": "管理层" },
+    { "task": "EU 实质控制权 (De Facto Control) 审计", "category": "实质控制" },
+    { "task": "表决权/AB股/财务纽带/技术授权依赖度审查", "category": "实质控制" },
+    { "task": "全主体（本体+股东+UBO+高管）制裁名单匹配", "category": "名单筛查" },
+    { "task": "状态码分类输出（STATUS_403/401/406/200）", "category": "名单筛查" },
+    { "task": "EU 实质控制 vs OFAC 50% Rule 差异标注", "category": "状态码输出" },
+    { "task": "中国《反外国制裁法》双向合规冲突标注", "category": "状态码输出" }
+  ]
+}

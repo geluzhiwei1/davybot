@@ -1,0 +1,338 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""MCP (Model Context Protocol) Tools
+
+提供真实的MCP工具调用和资源访问功能。
+依赖MCP Python SDK和已配置的MCP服务器。
+"""
+
+import json
+import logging
+from pathlib import Path
+from typing import List, Dict, Any
+
+from pydantic import BaseModel, Field
+
+from dawei.core.decorators import safe_tool_operation
+from dawei.tools.custom_base_tool import CustomBaseTool
+from dawei.tools.custom_tools.async_utils import run_async, run_on_main_loop
+from dawei.tools.mcp_tool_manager import MCPToolManager, get_or_create_mcp_manager
+
+logger = logging.getLogger(__name__)
+
+
+def _get_shared_mcp_manager(workspace_root: str | None, user_id: str = "default_user") -> MCPToolManager:
+    """获取 (workspace_root, user_id) 对应的共享 MCPToolManager。
+
+    优先返回 WorkspaceContext 持有的实例；查不到（典型场景：ctx 正在 initialize()、
+    尚未注册进 _contexts）时退回进程级注册表 get_or_create_mcp_manager()。
+    fallback 绝不能再各自 new 私有实例 —— 否则 connect_mcp_server 与 use_mcp_tool
+    操作不同 manager，出现「连接成功但调用时报 disconnected」的状态分裂。
+    """
+    if workspace_root:
+        try:
+            from dawei.workspace.workspace_service import WorkspaceService
+
+            ctx = WorkspaceService.get_context_if_initialized(workspace_root, user_id)
+            if ctx and getattr(ctx, "mcp_tool_manager", None):
+                return ctx.mcp_tool_manager
+        except Exception:
+            # FAST FAIL：共享实例查找失败必须可见，不允许静默吞掉后各自为政
+            logger.warning(
+                "WorkspaceService shared MCPToolManager lookup failed, falling back to process registry",
+                exc_info=True,
+            )
+    return get_or_create_mcp_manager(workspace_root, user_id)
+
+
+# Use MCP Tool
+class UseMCPToolInput(BaseModel):
+    """Input for UseMCPTool."""
+
+    server_name: str = Field(..., description="Name of the MCP server providing the tool.")
+    tool_name: str = Field(..., description="Name of the tool to execute.")
+    arguments: Dict[str, Any] = Field(
+        ...,
+        description="JSON object containing the tool's input parameters.",
+    )
+
+
+class UseMCPTool(CustomBaseTool):
+    """Tool for using tools provided by MCP servers."""
+
+    name: str = "use_mcp_tool"
+    description: str = "Uses a tool from a connected MCP server. Use list_mcp_servers first to discover available servers and their tools. Requires MCP server to be configured and connected."
+    args_schema: type[BaseModel] = UseMCPToolInput
+
+    def __init__(self, workspace_root: str | None = None, user_id: str = "default_user"):
+        super().__init__()
+        self.mcp_manager = _get_shared_mcp_manager(workspace_root, user_id)
+
+    @safe_tool_operation(
+        "use_mcp_tool",
+        fallback_value='{"status": "error", "message": "Failed to execute MCP tool"}',
+    )
+    def _run(self, server_name: str, tool_name: str, arguments: Dict[str, Any]) -> str:
+        """Use MCP tool (real implementation using MCP SDK)."""
+        try:
+            # Execute tool call on the main loop (bug#5: session/owner task live
+            # there; bounded timeout keeps the worker thread from hanging forever)
+            result = run_on_main_loop(
+                self.mcp_manager.call_tool(server_name, tool_name, arguments), timeout=300
+            )
+            return json.dumps(result, indent=2, ensure_ascii=False)
+
+        except Exception as e:
+            return json.dumps(
+                {
+                    "server_name": server_name,
+                    "tool_name": tool_name,
+                    "arguments": arguments,
+                    "status": "error",
+                    "message": f"Failed to execute MCP tool: {e!s}",
+                },
+                indent=2,
+            )
+
+
+# Access MCP Resource
+class AccessMCPResourceInput(BaseModel):
+    """Input for AccessMCPResource."""
+
+    server_name: str = Field(..., description="Name of the MCP server providing the resource.")
+    uri: str = Field(..., description="URI identifying the specific resource to access.")
+
+
+class AccessMCPResource(CustomBaseTool):
+    """Tool for accessing resources provided by MCP servers."""
+
+    name: str = "access_mcp_resource"
+    description: str = "Accesses a resource provided by a connected MCP server using its URI. Requires MCP server to be configured and connected."
+    args_schema: type[BaseModel] = AccessMCPResourceInput
+
+    def __init__(self, workspace_root: str | None = None, user_id: str = "default_user"):
+        super().__init__()
+        self.mcp_manager = _get_shared_mcp_manager(workspace_root, user_id)
+
+    @safe_tool_operation(
+        "access_mcp_resource",
+        fallback_value='{"status": "error", "message": "Failed to access MCP resource"}',
+    )
+    def _run(self, server_name: str, uri: str) -> str:
+        """Access MCP resource (real implementation using MCP SDK)."""
+        try:
+            # Execute resource access on the main loop (bug#5; bounded)
+            result = run_on_main_loop(self.mcp_manager.access_resource(server_name, uri), timeout=90)
+            return json.dumps(result, indent=2, ensure_ascii=False)
+
+        except Exception as e:
+            return json.dumps(
+                {
+                    "server_name": server_name,
+                    "uri": uri,
+                    "status": "error",
+                    "message": f"Failed to access MCP resource: {e!s}",
+                },
+                indent=2,
+            )
+
+
+# List MCP Servers
+class ListMCPServersInput(BaseModel):
+    """Input for ListMCPServers."""
+
+    show_details: bool = Field(False, description="Whether to show detailed server information.")
+
+
+class ListMCPServers(CustomBaseTool):
+    """Tool for listing available MCP servers."""
+
+    name: str = "list_mcp_servers"
+    description: str = "Lists all configured MCP servers and their connection status."
+    args_schema: type[BaseModel] = ListMCPServersInput
+
+    def __init__(self, workspace_root: str | None = None, user_id: str = "default_user"):
+        super().__init__()
+        self.mcp_manager = _get_shared_mcp_manager(workspace_root, user_id)
+
+    @safe_tool_operation(
+        "list_mcp_servers",
+        fallback_value='{"status": "error", "message": "Failed to list MCP servers"}',
+    )
+    def _run(self, show_details: bool = False) -> str:
+        """List MCP servers."""
+        try:
+            servers = []
+            all_servers = self.mcp_manager.get_all_servers()
+
+            for name, server_info in all_servers.items():
+                server_dict = {
+                    "name": name,
+                    "status": server_info.status,
+                    "connected_at": server_info.connected_at.isoformat() if server_info.connected_at else None,
+                }
+
+                if show_details:
+                    config = server_info.config.to_dict()
+                    server_dict.update(
+                        {
+                            "command": config.get("command"),
+                            "args": config.get("args", []),
+                            "tools_count": len(server_info.tools),
+                            "resources_count": len(server_info.resources),
+                            "tools": server_info.tools[:5],  # Show first 5 tools
+                            "resources": server_info.resources[:5],  # Show first 5 resources
+                        }
+                    )
+                else:
+                    server_dict.update(
+                        {
+                            "tools_count": len(server_info.tools),
+                            "resources_count": len(server_info.resources),
+                        }
+                    )
+
+                servers.append(server_dict)
+
+            return json.dumps(
+                {
+                    "total_servers": len(servers),
+                    "servers": servers,
+                },
+                indent=2,
+            )
+
+        except Exception as e:
+            return json.dumps(
+                {"status": "error", "message": f"Error listing MCP servers: {e!s}"},
+                indent=2,
+            )
+
+
+# Connect MCP Server
+class ConnectMCPServerInput(BaseModel):
+    """Input for ConnectMCPServer."""
+
+    server_name: str = Field(..., description="Name of the MCP server to connect.")
+
+
+class ConnectMCPServer(CustomBaseTool):
+    """Tool for connecting to an MCP server."""
+
+    name: str = "connect_mcp_server"
+    description: str = "Connects to a configured MCP server and initializes its tools/resources."
+    args_schema: type[BaseModel] = ConnectMCPServerInput
+
+    def __init__(self, workspace_root: str | None = None, user_id: str = "default_user"):
+        super().__init__()
+        self.mcp_manager = _get_shared_mcp_manager(workspace_root, user_id)
+
+    @safe_tool_operation(
+        "connect_mcp_server",
+        fallback_value='{"status": "error", "message": "Failed to connect to MCP server"}',
+    )
+    def _run(self, server_name: str) -> str:
+        """Connect to MCP server."""
+        try:
+            # Execute connection on the main loop (bug#5: connect 有界 90s ——
+            # manager 内部 initialize 再有 30s 上限，双重 FAST FAIL）
+            success = run_on_main_loop(self.mcp_manager.connect_server(server_name), timeout=90)
+
+            if success:
+                server_info = self.mcp_manager.get_server_info(server_name)
+                return json.dumps(
+                    {
+                        "server_name": server_name,
+                        "status": "connected",
+                        "tools_count": len(server_info.tools) if server_info else 0,
+                        "resources_count": len(server_info.resources) if server_info else 0,
+                        "message": f"Successfully connected to MCP server: {server_name}",
+                    },
+                    indent=2,
+                )
+            server_info = self.mcp_manager.get_server_info(server_name)
+            return json.dumps(
+                {
+                    "server_name": server_name,
+                    "status": "error",
+                    "message": server_info.last_error if server_info else "Unknown error",
+                },
+                indent=2,
+            )
+
+        except Exception as e:
+            return json.dumps(
+                {
+                    "server_name": server_name,
+                    "status": "error",
+                    "message": f"Failed to connect to MCP server: {e!s}",
+                },
+                indent=2,
+            )
+
+
+# Disconnect MCP Server
+class DisconnectMCPServerInput(BaseModel):
+    """Input for DisconnectMCPServer."""
+
+    server_name: str = Field(..., description="Name of the MCP server to disconnect.")
+
+
+class DisconnectMCPServer(CustomBaseTool):
+    """Tool for disconnecting from an MCP server."""
+
+    name: str = "disconnect_mcp_server"
+    description: str = "Disconnects from a connected MCP server."
+    args_schema: type[BaseModel] = DisconnectMCPServerInput
+
+    def __init__(self, workspace_root: str | None = None, user_id: str = "default_user"):
+        super().__init__()
+        self.mcp_manager = _get_shared_mcp_manager(workspace_root, user_id)
+
+    @safe_tool_operation(
+        "disconnect_mcp_server",
+        fallback_value='{"status": "error", "message": "Failed to disconnect from MCP server"}',
+    )
+    def _run(self, server_name: str) -> str:
+        """Disconnect from MCP server."""
+        try:
+            # Execute disconnection on the main loop (bug#5; bounded)
+            success = run_on_main_loop(self.mcp_manager.disconnect_server(server_name), timeout=30)
+
+            if success:
+                return json.dumps(
+                    {
+                        "server_name": server_name,
+                        "status": "disconnected",
+                        "message": f"Successfully disconnected from MCP server: {server_name}",
+                    },
+                    indent=2,
+                )
+            return json.dumps(
+                {
+                    "server_name": server_name,
+                    "status": "error",
+                    "message": "Failed to disconnect from MCP server",
+                },
+                indent=2,
+            )
+
+        except Exception as e:
+            return json.dumps(
+                {
+                    "server_name": server_name,
+                    "status": "error",
+                    "message": f"Failed to disconnect from MCP server: {e!s}",
+                },
+                indent=2,
+            )
+
+
+__all__ = [
+    "UseMCPTool",
+    "AccessMCPResource",
+    "ListMCPServers",
+    "ConnectMCPServer",
+    "DisconnectMCPServer",
+]

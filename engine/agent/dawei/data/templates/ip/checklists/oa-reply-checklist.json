@@ -1,0 +1,78 @@
+{
+  "slug": "oa-reply-checklist",
+  "name": "OA审查意见答复检查清单",
+  "version": "1.0",
+  "module": "ip-oa-reply",
+  "items": [
+    {
+      "id": "OA001",
+      "category": "驳回分析",
+      "check": "是否完整列出审查意见中的所有驳回理由",
+      "law_ref": null,
+      "severity": "critical"
+    },
+    {
+      "id": "OA002",
+      "category": "驳回分析",
+      "check": "是否识别对比文件及其引用的具体段落",
+      "law_ref": null,
+      "severity": "critical"
+    },
+    {
+      "id": "OA003",
+      "category": "驳回分析",
+      "check": "是否区分了绝对驳回和条件性驳回",
+      "law_ref": null,
+      "severity": "important"
+    },
+    {
+      "id": "OA004",
+      "category": "答复策略",
+      "check": "是否制定了答复策略（修改权利要求/争辩/提供证据）",
+      "law_ref": null,
+      "severity": "critical"
+    },
+    {
+      "id": "OA005",
+      "category": "答复策略",
+      "check": "权利要求修改是否超出原申请范围",
+      "law_ref": "专利法第33条",
+      "severity": "critical"
+    },
+    {
+      "id": "OA006",
+      "category": "答复策略",
+      "check": "是否考虑了修改后的权利要求是否克服了所有驳回理由",
+      "law_ref": null,
+      "severity": "critical"
+    },
+    {
+      "id": "OA007",
+      "category": "意见陈述",
+      "check": "是否针对每条驳回理由逐一答复",
+      "law_ref": null,
+      "severity": "critical"
+    },
+    {
+      "id": "OA008",
+      "category": "意见陈述",
+      "check": "争辩理由是否有法律依据和事实支撑",
+      "law_ref": null,
+      "severity": "important"
+    },
+    {
+      "id": "OA009",
+      "category": "意见陈述",
+      "check": "是否分析了修改后权利要求的可授权性",
+      "law_ref": null,
+      "severity": "important"
+    },
+    {
+      "id": "OA010",
+      "category": "时限",
+      "check": "答复期限是否在法定期限内",
+      "law_ref": "实施细则第58条",
+      "severity": "critical"
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+template:
+  slug: trademark-opposition
+  name: "商标异议与无效宣告"
+  version: "1.0"
+  module: ip-trademark
+  team_slug: ip-trademark
+
+  description: |
+    商标公告后提起异议、已注册商标的无效宣告/撤销、以及被异议/被无效后的答辩。
+    包含异议理由分析、证据链构建、答辩策略、程序时间线管理。
+
+  data_requirements:
+    required:
+      - key: case_type
+        label: "案件类型"
+        type: select
+        default: "opposition"
+        options:
+          - { value: "opposition", label: "提起异议（对公告期商标）" }
+          - { value: "invalidation", label: "无效宣告（对已注册商标）" }
+          - { value: "cancellation", label: "撤销连续三年不使用" }
+          - { value: "defense_opposition", label: "异议答辩（被他人异议）" }
+          - { value: "defense_invalidation", label: "无效答辩（被他人申请无效）" }
+        store: "input/task_params.json"
+      - key: target_trademark
+        label: "目标商标信息"
+        type: string
+        placeholder: "商标名称、注册号/初审公告号、类别"
+        store: "input/task_params.json"
+    optional:
+      - key: own_trademark
+        label: "我方在先权利商标"
+        type: string
+        placeholder: "我方商标名称、注册号、注册日期"
+        store: "input/task_params.json"
+      - key: jurisdiction
+        label: "管辖地"
+        type: select
+        default: "CN"
+        options:
+          - { value: "CN", label: "中国（CNIPA/国家知识产权局）" }
+          - { value: "US", label: "美国（TTAB）" }
+          - { value: "EU", label: "欧盟（EUIPO）" }
+          - { value: "JP", label: "日本（JPO）" }
+        store: "input/task_params.json"
+      - key: grounds
+        label: "主要理由"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "待分析" }
+          - { value: "prior_right", label: "在先权利冲突（近似商标）" }
+          - { value: "well_known", label: "驰名商标保护" }
+          - { value: "bad_faith", label: "恶意抢注" }
+          - { value: "non_use", label: "连续三年不使用" }
+          - { value: "genericide", label: "退化为通用名称" }
+          - { value: "absolute", label: "绝对理由（商标法第10/11条）" }
+        store: "input/task_params.json"
+      - key: evidence_available
+        label: "现有证据"
+        type: string
+        placeholder: "已有证据描述（使用证据、知名度证据、恶意证据等）"
+        store: "input/task_params.json"
+      - key: deadline
+        label: "期限日期"
+        type: string
+        placeholder: "如：初审公告期满日 / 收到通知日期"
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/trademark-law
+
+  checklists:
+    - ref: "checklist/trademark-opposition"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/evidence
+      description: "证据材料"
+    - dir: input/checklists
+      description: "程序检查清单"
+    - dir: output
+      description: "分析产出"
+    - dir: drafts
+      description: "异议/答辩书草稿"
+    - dir: references
+      description: "法规与判例参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入商标异议/无效工作区，请按照 PDCA 工作流执行。
+
+    ## 程序时间线
+
+    ### 中国异议程序（CNIPA）
+    | 阶段 | 期限 | 说明 |
+    |------|------|------|
+    | 初审公告期 | 公告日起 3 个月 | 可提起异议 |
+    | 异议答辩 | 收到通知后 30 天 | 被异议人答辩 |
+    | 补充证据 | 答辩期内 | 可补充证据 |
+    | 审查决定 | 12-18 个月 | 商标局作出决定 |
+    | 复审 | 收到决定后 15 天 | 向商评委申请复审 |
+
+    ### 中国无效宣告程序
+    | 阶段 | 期限 | 说明 |
+    |------|------|------|
+    | 提起无效 | 注册后任何时候（绝对理由）/ 5年内（相对理由） | 向商评委申请 |
+    | 答辩 | 收到通知后 30 天 | 被申请人答辩 |
+    | 口审 | 视需要 | 口头审理（可选） |
+    | 裁定 | 6-12 个月 | 商评委作出裁定 |
+
+    ### 撤销连续三年不使用
+    | 阶段 | 期限 | 说明 |
+    |------|------|------|
+    | 提起撤销 | 注册满3年后任何时间 | 向商标局申请 |
+    | 使用证据答辩 | 收到通知后 2 个月 | 注册人提供使用证据 |
+    | 决定 | 6-9 个月 | 商标局作出决定 |
+
+    ## 异议/无效理由体系
+
+    ### 相对理由（Relative Grounds）
+    | 理由 | 法条（中国） | 要件 | 举证要点 |
+    |------|------------|------|---------|
+    | 近似商标 | 商标法第30/31条 | 在先注册/申请+近似+类似商品 | 在先商标注册证、近似分析 |
+    | 驰名商标 | 商标法第13条 | 驰名+跨类+误导/损害 | 知名度证据（销售/广告/获奖） |
+    | 被代理人抢注 | 商标法第15条 | 代理/代表关系+未经授权 | 代理合同、业务往来证明 |
+    | 在先使用+有一定影响 | 商标法第32条 | 在先使用+一定影响+恶意 | 使用时间线、地域范围、影响证据 |
+    | 在先权利（商号/著作权/外观设计等） | 商标法第32条 | 在先权利存在+冲突 | 权属证明、创作/登记证据 |
+
+    ### 绝对理由（Absolute Grounds）
+    | 理由 | 法条（中国） | 要件 |
+    |------|------------|------|
+    | 缺乏显著性 | 第11条 | 通用/描述/无显著性 |
+    | 禁用条款 | 第10条 | 国旗国徽/欺骗性/不良影响等 |
+    | 恶意抢注 | 第44条第1款 | 以欺骗/不正当手段取得注册 |
+
+    ## 驰名商标保护特殊规则
+
+    | 驰名程度 | 保护范围 | 认定标准 |
+    |---------|---------|---------|
+    | 已注册驰名商标 | 跨全类保护 | 第13条第3款 |
+    | 未注册驰名商标 | 同类/类似保护 | 第13条第2款 |
+
+    驰名商标证据体系：
+    1. **使用证据**：最早使用时间、持续使用
+    2. **知名度证据**：市场份额、销售区域、销售额
+    3. **广告宣传**：广告投入额、媒体报道
+    4. **获奖荣誉**：行业排名、政府表彰
+    5. **保护记录**：曾被认定为驰名商标的记录
+
+    ## 分析方法论
+
+    ### Step 1: 案件定性
+    1. 确认案件类型（异议/无效/撤销/答辩）
+    2. 确认程序阶段和期限
+    3. 确认管辖地和适用法律
+
+    ### Step 2: 理由分析
+    针对具体案情选择最有力的理由组合：
+
+    | 理由选择策略 | 适用场景 |
+    |------------|---------|
+    | 近似商标为主 | 我方有在先同类注册 |
+    | 驰名商标为主 | 我方商标高知名度+跨类 |
+    | 恶意抢注为主 | 对方有明显的抢注恶意 |
+    | 绝对理由为主 | 对方商标缺乏显著性 |
+
+    ### Step 3: 证据链构建
+
+    | 证据类型 | 证明目的 | 证据形式 |
+    |---------|---------|---------|
+    | 在先权利证据 | 证明我方权利在先 | 商标注册证、申请记录 |
+    | 近似分析证据 | 证明近似关系 | 音形义对比分析、消费者调查 |
+    | 知名度证据 | 证明驰名或有一定影响 | 销售/广告/获奖/报道 |
+    | 恶意证据 | 证明对方恶意 | 抢注历史、业务关系、囤积行为 |
+    | 使用证据（撤销） | 证明对方未使用 | 市场调查、购买测试、网络检索 |
+
+    ### Step 4: 答辩策略（被异议/被无效时）
+
+    常见答辩要点：
+    1. **不近似**：从音形义三维度论证差异
+    2. **商品不类似**：从功能/渠道/消费群体差异论证
+    3. **在先权利不成立**：质疑对方权利基础
+    4. **善意使用**：证明自身注册的正当性
+    5. **使用证据充分**（撤销答辩）：提供完整使用证据链
+
+    ### Step 5: 胜诉概率评估
+
+    | 因素 | 权重 | 评估 |
+    |------|------|------|
+    | 理由充分性 | 30% | |
+    | 证据强度 | 30% | |
+    | 法律适用准确性 | 20% | |
+    | 在先判例支持 | 10% | |
+    | 期限合规 | 10% | |
+
+    ## 输入数据
+    1. `input/task_params.json` — 案件类型、目标商标、理由、证据
+    2. `input/evidence/` — 证据材料
+    3. `input/checklists/` — 程序检查清单
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 案件定性，确认期限，选择理由组合
+    ### Do:
+    - 理由分析（逐条法条匹配+要件满足度评估）
+    - 证据链构建（分类+关联+缺口识别）
+    - 起草异议/无效/答辩书
+    ### Check: 交叉验证理由完整性，检查证据充分性，评估胜诉概率
+    ### Act: 输出完整申请/答辩文件 + 证据清单 + 策略建议
+
+  deliverables:
+    - file: "drafts/opposition_invalidation_draft.md"
+      name: "异议/无效/答辩书草稿"
+      format: markdown
+    - file: "output/case_analysis.md"
+      name: "案件分析报告"
+      format: markdown
+    - file: "output/evidence_chain.md"
+      name: "证据链目录与说明"
+      format: markdown
+    - file: "output/timeline.md"
+      name: "程序时间线与期限管理"
+      format: markdown
+    - file: "output/win_probability.md"
+      name: "胜诉概率评估"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "案件定性与理由选择"
+      progress: 15
+    - name: do_legal
+      label: "法条匹配与要件分析"
+      progress: 25
+    - name: do_evidence
+      label: "证据链构建"
+      progress: 25
+    - name: do_draft
+      label: "起草文书"
+      progress: 20
+    - name: check
+      label: "复核与胜诉评估"
+      progress: 10
+    - name: act
+      label: "输出文件"
+      progress: 5

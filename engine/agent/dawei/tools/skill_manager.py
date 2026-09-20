@@ -1,0 +1,453 @@
+# Copyright (c) 2025 格律至微
+from typing import List, Dict
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""Skills管理器 - 实现渐进式skills功能
+
+支持渐进式加载：
+1. Discovery - 读取frontmatter的name和description
+2. Instructions - 加载完整SKILL.md内容
+3. Resources - 访问额外资源文件
+
+优先级（从高到低）：
+1. Workspace: {workspace}/.dawei/skills/
+2. User: ~/.dawei/skills/ (DAWEI_HOME)
+3. Roo Code: ~/.roo/skills/
+
+"""
+
+import logging
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from dawei import get_dawei_home
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Skill:
+    """表示一个skill"""
+
+    name: str
+    description: str
+    path: Path
+    content: str | None = None  # 完整的SKILL.md内容（延迟加载）
+    mode: str | None = None  # mode-specific skill
+    scope: str = "global"  # "global" or "project"
+    is_loaded: bool = False  # 是否已加载完整内容
+    resources: List[Path] = field(default_factory=list)  # 额外资源文件
+
+    def __hash__(self):
+        return hash((self.name, self.mode, self.scope, self.path))
+
+    def __eq__(self, other):
+        if not isinstance(other, Skill):
+            return False
+        return (self.name, self.mode, self.scope, self.path) == (
+            other.name,
+            other.mode,
+            other.scope,
+            other.path,
+        )
+
+    def load_content(self) -> str:
+        """加载完整的SKILL.md内容"""
+        if self.is_loaded and self.content:
+            return self.content
+
+        try:
+            with Path(self.path).open(encoding="utf-8") as f:
+                self.content = f.read()
+            self.is_loaded = True
+            return self.content
+        except Exception as e:
+            logger.exception(f"Failed to load skill content from {self.path}: {e}")
+            return ""
+
+    def get_resources(self) -> Dict[str, Path]:
+        """获取skill目录下的所有资源文件"""
+        if not self.resources:
+            skill_dir = self.path.parent
+            try:
+                self.resources = [f for f in skill_dir.iterdir() if f.is_file() and f.name != "SKILL.md"]
+            except OSError as e:
+                logger.exception(f"Failed to list resources in skill directory {skill_dir}: {e}")
+                self.resources = []
+        return {f.stem: f for f in self.resources}
+
+
+class SkillManager:
+    """Skills管理器
+
+    负责发现、管理和加载skills
+    """
+
+    def __init__(self, skills_roots: List[Path] | None = None, current_mode: str | None = None):
+        """初始化SkillManager - 支持多级加载
+
+        Args:
+            skills_roots: 包含.dawei目录的根路径列表（优先级从高到低）
+                          例如: [workspace_root, user_root]
+            current_mode: 当前模式（用于mode-specific skills）
+
+        """
+        # 默认roots：DAWEI_HOME目录
+        self.skills_roots = skills_roots or [get_dawei_home()]
+        self.current_mode = current_mode
+        # 记录 DAWEI_HOME，用于区分全局路径和工作空间路径
+        self._dawei_home = get_dawei_home()
+        # Roo Code兼容路径（最低优先级）
+        self._roo_home = Path.home() / ".roo"
+
+        # skill注册表: name -> List[Skill]
+        # 同一个name可能有多个Skill（不同scope/mode）
+        self._skills: Dict[str, List[Skill]] = {}
+
+        # 是否已初始化
+        self._initialized = False
+
+    def discover_skills(self, force: bool = False) -> None:
+        """发现所有skills（只读取frontmatter）
+
+        支持多级加载机制：
+        - Workspace级别 (最高优先级)
+        - User级别 (DAWEI_HOME)
+        - Roo Code兼容级别 (~/.roo, 最低优先级)
+
+        每个级别都尝试：
+        - .dawei/skills/ (市场安装的技能)
+        - .dawei/skills-{mode}/ (模式特定的技能)
+
+        Roo Code兼容路径：
+        - ~/.roo/skills/ (最低优先级)
+
+        Args:
+            force: 是否强制重新发现
+
+        """
+        if self._initialized and not force:
+            return
+
+        self._skills.clear()
+
+        # 按优先级顺序遍历所有roots
+        for priority, root in enumerate(self.skills_roots):
+            logger.debug(f"Scanning skills root (priority {priority}): {root}")
+
+            # 根据优先级确定scope: workspace > user
+            scope = "workspace" if priority == 0 else "user"
+
+            # DAWEI_HOME 下直接放 skills/，workspace 下放 .dawei/skills/
+            config_prefix = Path("") if root == self._dawei_home else Path(".dawei")
+
+            # 1. 通用的 skills/ (市场安装的技能)
+            market_skills_dir = root / config_prefix / "skills"
+            if market_skills_dir.exists() and market_skills_dir.is_dir():
+                self._discover_skills_in_dir(market_skills_dir, mode=None, scope=scope)
+
+            # 2. Mode-specific skills-{mode}/
+            if self.current_mode:
+                mode_skills_dir = root / config_prefix / f"skills-{self.current_mode}"
+                if mode_skills_dir.exists() and mode_skills_dir.is_dir():
+                    self._discover_skills_in_dir(
+                        mode_skills_dir,
+                        mode=self.current_mode,
+                        scope=scope,
+                    )
+
+            # 3. Roo Code 兼容: .roo/skills/ (workspace/user级别下)
+            roo_skills_dir = root / ".roo" / "skills"
+            if roo_skills_dir.exists() and roo_skills_dir.is_dir():
+                self._discover_skills_in_dir(roo_skills_dir, mode=None, scope=scope)
+
+            # 4. Roo Code 兼容: .roo/skills-{mode}/ (workspace/user级别下)
+            if self.current_mode:
+                roo_mode_skills_dir = root / ".roo" / f"skills-{self.current_mode}"
+                if roo_mode_skills_dir.exists() and roo_mode_skills_dir.is_dir():
+                    self._discover_skills_in_dir(
+                        roo_mode_skills_dir,
+                        mode=self.current_mode,
+                        scope=scope,
+                    )
+
+        # 最低优先级: ~/.roo/skills/ (Roo Code全局兼容路径)
+        roo_skills_dir = self._roo_home / "skills"
+        if roo_skills_dir.exists() and roo_skills_dir.is_dir():
+            self._discover_skills_in_dir(roo_skills_dir, mode=None, scope="roo")
+
+        if self.current_mode:
+            roo_mode_skills_dir = self._roo_home / f"skills-{self.current_mode}"
+            if roo_mode_skills_dir.exists() and roo_mode_skills_dir.is_dir():
+                self._discover_skills_in_dir(
+                    roo_mode_skills_dir,
+                    mode=self.current_mode,
+                    scope="roo",
+                )
+
+        self._initialized = True
+        logger.info(
+            f"Discovered {len(self._skills)} unique skills from {len(self.skills_roots)} root(s)",
+        )
+
+    def _discover_skills_in_dir(self, skills_dir: Path, mode: str | None, scope: str) -> None:
+        """在指定目录递归发现skills
+
+        如果当前子目录包含SKILL.md则注册为skill，
+        否则递归遍历其子目录继续查找。
+        """
+        if not skills_dir.exists() or not skills_dir.is_dir():
+            logger.debug(f"Skills directory not found: {skills_dir}")
+            return
+
+        try:
+            for child in skills_dir.iterdir():
+                if not child.is_dir():
+                    continue
+
+                skill_file = child / "SKILL.md"
+                if skill_file.exists():
+                    self._register_skill(child, skill_file, mode, scope)
+                else:
+                    # 当前目录没有SKILL.md，递归查找子目录
+                    self._discover_skills_in_dir(child, mode, scope)
+        except OSError as e:
+            logger.exception(f"Failed to iterate skills directory {skills_dir}: {e}")
+            return
+
+    def _register_skill(self, skill_path: Path, skill_file: Path, mode: str | None, scope: str) -> None:
+        """解析并注册单个skill"""
+        # 解析frontmatter
+        name, description = self._parse_frontmatter(skill_file)
+        if not name:
+            logger.warning(f"Invalid frontmatter (missing name) in {skill_file}")
+            return
+
+        # 允许空的 description，使用默认值
+        if not description:
+            description = f"{name} skill"
+            logger.debug(f"Empty description for {name}, using default")
+
+        # 验证name匹配目录名
+        if name != skill_path.name:
+            logger.warning(
+                f"Skill name '{name}' does not match directory '{skill_path.name}', skipping",
+            )
+            return
+
+        skill = Skill(
+            name=name,
+            description=description,
+            path=skill_file,
+            mode=mode,
+            scope=scope,
+        )
+
+        # 添加到注册表（使用覆盖逻辑）
+        if name not in self._skills:
+            self._skills[name] = []
+
+        # 检查是否已存在相同配置的skill
+        exists = any(s.mode == mode and s.scope == scope for s in self._skills[name])
+        if not exists:
+            self._skills[name].append(skill)
+            logger.debug(f"Discovered skill: {name} (mode={mode}, scope={scope})")
+
+    def _parse_frontmatter(self, skill_file: Path) -> tuple[str | None, str | None]:
+        """解析SKILL.md的frontmatter
+
+        Returns:
+            (name, description) 或 (None, None) 如果解析失败
+
+        """
+        try:
+            with Path(skill_file).open(encoding="utf-8") as f:
+                content = f.read(4096)  # 只读取前4KB用于解析frontmatter
+
+            # 匹配frontmatter: ---\nname: xxx\ndescription: xxx\n---
+            # description可能跨多行，所以使用非贪婪匹配直到下一个---或文件结束
+            match = re.search(
+                r"^---\s*\nname:\s*(.+?)\s*\ndescription:\s*(.+?)\s*\n---",
+                content,
+                re.MULTILINE | re.DOTALL,
+            )
+
+            if match:
+                name = match.group(1).strip().strip('"').strip("'")
+                description = match.group(2).strip().strip('"').strip("'")
+                # 移除description中的换行符，保持单行
+                description = " ".join(description.split())
+                return name, description
+
+            return None, None
+
+        except Exception as e:
+            logger.exception(f"Failed to parse frontmatter from {skill_file}: {e}")
+            return None, None
+
+    def get_all_skills(self, reload: bool = False) -> List[Skill]:
+        """获取所有可用的skills（只包含元数据）
+
+        Args:
+            reload: 是否重新发现skills
+
+        Returns:
+            按优先级排序的skill列表（workspace > user > roo, mode-specific > generic）
+
+        """
+        if reload or not self._initialized:
+            self.discover_skills(force=True)
+
+        # 收集所有skills，按优先级排序
+        all_skills: List[Skill] = []
+        seen: set[tuple[str, str | None]] = set()
+
+        # 按优先级顺序添加
+        # 优先级：workspace > user > roo, mode-specific > generic
+        priorities = [
+            ("workspace", self.current_mode),
+            ("user", self.current_mode),
+            ("roo", self.current_mode),
+            ("workspace", None),
+            ("user", None),
+            ("roo", None),
+        ]
+
+        for scope, mode in priorities:
+            for skill_list in self._skills.values():
+                for skill in skill_list:
+                    key = (skill.name, skill.mode)
+                    if key not in seen and skill.scope == scope and skill.mode == mode:
+                        all_skills.append(skill)
+                        seen.add(key)
+
+        return all_skills
+
+    def find_matching_skills(self, query: str, reload: bool = False) -> List[Skill]:
+        """根据查询语句找到匹配的skills
+
+        Args:
+            query: 用户查询语句
+            reload: 是否重新发现skills
+
+        Returns:
+            匹配的skill列表（按匹配度排序）
+
+        """
+        import re
+
+        all_skills = self.get_all_skills(reload=reload)
+        query_lower = query.lower()
+
+        # 将连字符替换为空格，再分割（例如 "frontend-design" -> "frontend design"）
+        query_cleaned = re.sub(r"[-_:]", " ", query_lower)
+        query_words = set(query_cleaned.split())
+
+        scored_skills = []
+        for skill in all_skills:
+            desc_lower = skill.description.lower()
+            # 计算匹配分数：关键词重叠度
+            desc_cleaned = re.sub(r"[-_:]", " ", desc_lower)
+            desc_words = set(desc_cleaned.split())
+
+            overlap = len(query_words & desc_words)
+            if overlap > 0:
+                scored_skills.append((skill, overlap))
+
+        # 按分数排序
+        scored_skills.sort(key=lambda x: x[1], reverse=True)
+
+        return [skill for skill, _ in scored_skills]
+
+    def get_skill_content(self, skill_name: str) -> str | None:
+        """获取指定skill的完整内容
+
+        Args:
+            skill_name: skill名称
+
+        Returns:
+            SKILL.md的完整内容，如果skill不存在则返回None
+
+        """
+        if skill_name not in self._skills:
+            return None
+
+        # 获取优先级最高的skill
+        skills_list = self._skills[skill_name]
+        if not skills_list:
+            return None
+
+        # 按优先级排序
+        priorities = [
+            ("workspace", self.current_mode),
+            ("user", self.current_mode),
+            ("roo", self.current_mode),
+            ("workspace", None),
+            ("user", None),
+            ("roo", None),
+        ]
+
+        for scope, mode in priorities:
+            for skill in skills_list:
+                if skill.scope == scope and skill.mode == mode:
+                    return skill.load_content()
+
+        # 【2026-09-14 串台修复】不再兜底返回 skills_list[0]: 同名 skill 可能是
+        # 其它业务模式的 mode-specific 版本, 静默加载 = 提示词串台。优先级未命中
+        # (只剩其它 mode 的变体)时返回 None, 由调用方按"不存在"处理。
+        return None
+
+    def get_skill_resources(self, skill_name: str) -> Dict[str, Path]:
+        """获取指定skill的资源文件
+
+        Args:
+            skill_name: skill名称
+
+        Returns:
+            资源文件字典 {filename: Path}
+
+        """
+        if skill_name not in self._skills:
+            return {}
+
+        skills_list = self._skills[skill_name]
+        if not skills_list:
+            return {}
+
+        # 获取优先级最高的skill
+        priorities = [
+            ("workspace", self.current_mode),
+            ("user", self.current_mode),
+            ("roo", self.current_mode),
+            ("workspace", None),
+            ("user", None),
+            ("roo", None),
+        ]
+
+        for scope, mode in priorities:
+            for skill in skills_list:
+                if skill.scope == scope and skill.mode == mode:
+                    return skill.get_resources()
+
+        return {}
+
+    def get_skills_summary(self, reload: bool = False) -> str:
+        """获取所有skills的摘要信息
+
+        Args:
+            reload: 是否重新发现skills
+
+        Returns:
+            格式化的skills摘要
+
+        """
+        skills = self.get_all_skills(reload=reload)
+
+        lines = [f"# Available Skills ({len(skills)})", "", "## Skills List", ""]
+
+        for skill in skills:
+            mode_str = f" [{skill.mode}]" if skill.mode else ""
+            lines.append(f"- **{skill.name}**{mode_str}: {skill.description}")
+
+        return "\n".join(lines)

@@ -1,0 +1,262 @@
+# 合规工作区模板: 红旗预警与危机响应（新增）
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# 覆盖维度：⑤ 红旗预警 + ⑥ 突发压力迹象
+# 状态码：STATUS_403(EVASION_MELTDOWN) / STATUS_406(SHELL_COMPANY) / STATUS_401(THIRD_PARTY_PAYER)
+#         STATUS_503(BANK_RFI_LOCKED) / STATUS_500(REGULATORY_SUBPOENA) / STATUS_302(AVALANCHE_RISK)
+
+template:
+  slug: sanctions-red-flag-radar
+  name: "红旗预警与危机响应"
+  version: "1.0"
+  team_slug: sanctions
+
+  description: |
+    捕获交易异常红旗（第三方代付、去标识化包装、空壳公司特征）、
+    应对银行 RFI/监管传票、评估供应链连带雪崩风险，
+    生成分级危机响应方案和时间线。
+
+  applicable_scenarios:
+    - "交易异常红旗捕获"
+    - "银行合规问询 (RFI) 响应"
+    - "监管传票/调查函应对"
+    - "客户被列入 SDN 后应急处理"
+    - "供应链连带风险评估"
+
+  estimated_time: "30-45 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        store: "input/company_info.json"
+
+      - key: alert_type
+        label: "预警/危机类型"
+        type: multiselect
+        options:
+          - "第三方代付异常"
+          - "收款账户/中转行突变"
+          - "客户拒绝披露最终目的地"
+          - "要求去标识化/中性包装"
+          - "疑似空壳公司特征"
+          - "银行合规问询 (RFI)"
+          - "银行退单/拒绝清算"
+          - "银行账户被冻结/限制"
+          - "收到境外监管传票/调查函"
+          - "核心客户/供应商被列入 SDN"
+          - "其他异常行为"
+        store: "input/task_parameters.json"
+
+      - key: alert_description
+        label: "异常情况描述"
+        type: text
+        placeholder: |
+          请详细描述遇到的异常情况，包括：
+          - 何时发现
+          - 涉及的交易对手
+          - 具体异常表现
+          - 目前已采取的措施
+        store: "input/alert_details.json"
+
+      - key: counterparty_involved
+        label: "涉及的交易对手"
+        type: text
+        placeholder: "交易对手全称、注册地"
+        store: "input/alert_details.json"
+
+    optional:
+      - key: bank_rfi_document
+        label: "银行问询函/退单通知"
+        type: file
+        accept: ".pdf,.jpg,.png"
+        store: "input/"
+
+      - key: subpoena_document
+        label: "监管传票/调查通知"
+        type: file
+        accept: ".pdf"
+        store: "input/"
+
+      - key: transaction_records
+        label: "相关交易记录"
+        type: file
+        accept: ".pdf,.xlsx,.csv"
+        store: "input/"
+
+      - key: communication_records
+        label: "相关邮件/沟通记录"
+        type: file
+        accept: ".pdf,.eml,.txt"
+        store: "input/"
+
+      - key: newly_sanctioned_entity
+        label: "新被制裁的客户/供应商名称"
+        type: text
+        placeholder: "最近被列入 SDN/实体清单的关联方全称"
+        store: "input/alert_details.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：XX银行RFI危机响应"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/sanctions-red-flags"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置异常事件相关文件（银行函件、传票、交易记录等）。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+    **紧急模式**：本模板涉及实时危机响应，时效性优先。
+
+    ## 状态码体系
+
+    **红旗预警（维度⑤）：**
+    - STATUS_403 (EVASION_MELTDOWN) → 🔴 最高级，一票否决熔断
+    - STATUS_406 (SHELL_COMPANY) → 🟡 高风险，转入 EDD
+    - STATUS_401 (THIRD_PARTY_PAYER) → 🟠 严禁代付，原路退回
+
+    **突发压力（维度⑥）：**
+    - STATUS_503 (BANK_RFI_LOCKED) → 🟠 锁死关联账户，0.5h 内直报 CLO
+    - STATUS_500 (REGULATORY_SUBPOENA) → 🔴 触发 Litigation Hold，5年数据保全
+    - STATUS_302 (AVALANCHE_RISK) → 🟡 挂起相关 ERP 订单
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 预警类型
+    2. `input/alert_details.json` — 异常情况描述
+    3. `input/company_info.json` — 企业信息
+    4. `input/` 目录下的所有用户上传文件（银行函件、传票等）
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 分析预警类型，确定危机等级（LEVEL 1/2/3）
+    - 制定分级响应方案
+    - **紧急提示**：如果涉及银行 RFI 或监管传票，优先输出即时行动指令
+
+    ### Do — 维度⑤ 红旗预警分析
+
+    a. 红旗模式匹配与分类 → `output/red_flag_classification.json`
+       - 财务类：第三方代付 (FLAG-FIN-01)、路径突变
+       - 物流类：模糊目的地 (FLAG-LOG-03)、去标识化要求
+       - 信用类：空壳公司特征 (FLAG-INFO-02)、公共邮箱
+
+    b. 红旗严重度判定：
+       - STATUS_403 (EVASION_MELTDOWN) → 最高级，一票否决熔断
+       - STATUS_406 (SHELL_COMPANY) → 高风险，转入 EDD
+       - STATUS_401 (THIRD_PARTY_PAYER) → 严禁代付，原路退回
+
+    ### Do — 维度⑥ 突发压力响应
+
+    c. 银行 RFI 响应方案 → `output/bank_rfi_response_plan.md`
+       - STATUS_503 (BANK_RFI_LOCKED) → 锁死关联账户，0.5h 内直报 CLO
+
+    d. 监管传票应对方案 → `output/subpoena_response_plan.md`
+       - STATUS_500 (REGULATORY_SUBPOENA) → 触发 Litigation Hold，5年数据保全
+
+    e. 连带雪崩影响评估 → `output/avalanche_impact.json`
+       - STATUS_302 (AVALANCHE_RISK) → 挂起相关 ERP 订单
+
+    ### Check (验证)
+    - 中国《反外国制裁法》合规冲突审查
+    - 确保响应方案不触发境内违法
+    - 时效性检查：危机响应方案的时间线是否合理
+
+    ### Act (输出)
+    - 生成红旗预警与危机响应报告 → `reports/red_flag_crisis_response.docx`
+    - 包含：预警分类与严重度判定、危机等级评估、分级行动方案（含时间线）、
+      证据保全指引、法律抗辩路径、需提交的证据清单
+    - 附言："⚠️ 危机事件结束后，建议启动「制裁风险综合评估」(sanctions-risk-assessment) + 「内控体系(ICP)成熟度审计」(sanctions-icp-audit) 进行事后复盘。"
+
+    ## 重要提示
+    - **时效性优先**：银行 RFI 和监管传票场景，立即输出即时行动指令
+    - 中国《反外国制裁法》冲突必须显式标注"⚠️ 双向合规冲突"
+    - 危机响应文书必须包含明确的时间线和责任人
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - red_flag_classification
+      - crisis_level_assessment
+      - response_plan
+      - evidence_preservation
+      - legal_defense_path
+      - timeline
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "危机评估"
+      progress: 10
+    - name: do_red_flags
+      label: "红旗分析"
+      progress: 25
+    - name: do_crisis
+      label: "危机响应"
+      progress: 25
+    - name: check
+      label: "冲突审查"
+      progress: 15
+    - name: act
+      label: "报告生成"
+      progress: 25
+
+  # ── 对话采集模式配置 ──
+  chat_collection:
+    opening: |
+      ⚠️ **紧急模式已激活**
+
+      我是制裁合规危机响应顾问。请描述你遇到的异常情况，我会立即评估危机等级并给出行动方案。
+
+      如果你有银行问询函、监管传票或相关文件，请直接上传。
+    groups:
+      - name: "异常类型"
+        intro: "请选择你遇到的异常类型。"
+        fields:
+          - company_name
+          - alert_type
+      - name: "事件描述"
+        intro: "请详细描述异常情况。"
+        fields:
+          - alert_description
+          - counterparty_involved
+          - newly_sanctioned_entity
+      - name: "材料上传"
+        intro: "请上传相关文件（银行函件、传票、交易记录等）。"
+        fields:
+          - bank_rfi_document
+          - subpoena_document
+          - transaction_records
+          - communication_records
+          - task_subject

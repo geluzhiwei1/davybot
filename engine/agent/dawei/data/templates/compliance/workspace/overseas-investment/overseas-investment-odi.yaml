@@ -1,0 +1,186 @@
+# 合规工作区模板: ODI 备案分析
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: overseas-investment-odi
+  name: "ODI 备案分析"
+  version: "1.0"
+  team_slug: overseas-investment
+
+  description: |
+    基于中国境外投资管理法规体系，对企业境外投资项目进行
+    ODI (对外直接投资) 备案/核准流程合规分析和材料准备指导。
+
+  applicable_scenarios:
+    - "境外新设/并购 ODI 备案"
+    - "境外投资额度变更"
+    - "敏感行业/地区境外投资"
+    - "商务部/发改委备案流程"
+
+  estimated_time: "25-35 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "投资方企业名称"
+        type: string
+        placeholder: "请输入投资方企业全称"
+        store: "input/company_info.json"
+
+      - key: target_country
+        label: "投资目的地国家/地区"
+        type: string
+        placeholder: "如：越南、德国、美国"
+        store: "input/task_parameters.json"
+
+      - key: investment_amount
+        label: "投资金额（万美元）"
+        type: string
+        placeholder: "如：5000"
+        store: "input/task_parameters.json"
+
+      - key: investment_type
+        label: "投资类型"
+        type: select
+        options:
+          - { value: new_entity, label: "新设境外企业" }
+          - { value: m_and_a, label: "并购境外企业" }
+          - { value: capital_increase, label: "增资" }
+          - { value: project_investment, label: "项目投资" }
+        store: "input/task_parameters.json"
+
+      - key: industry
+        label: "投资行业"
+        type: select
+        options:
+          - { value: manufacturing, label: "制造业" }
+          - { value: technology, label: "科技" }
+          - { value: energy, label: "能源/资源" }
+          - { value: infrastructure, label: "基础设施" }
+          - { value: real_estate, label: "房地产" }
+          - { value: services, label: "服务业" }
+          - { value: finance, label: "金融" }
+          - { value: other, label: "其他" }
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: is_sensitive
+        label: "是否涉及敏感国家/地区/行业"
+        type: boolean
+        default: false
+        store: "input/task_parameters.json"
+
+      - key: existing_documents
+        label: "既有投资项目文件"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：越南XX项目ODI备案分析"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/overseas-investment-odi"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的境外投资信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解投资项目结构和规模
+    - 根据合规清单制定 ODI 备案分析执行计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 投资项目性质判定 (鼓励/限制/禁止类) → `output/investment_classification.md`
+    b. 备案 vs 核准路径判定 → `output/filing_vs_approval.md`
+    c. 审批层级判定 (国/省/市) → `output/approval_level.md`
+    d. 申请材料清单准备 → `output/application_checklist.md`
+    e. 关键时间节点规划 → `output/timeline_plan.md`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证投资分类准确
+    - 确认备案/核准路径判定与现行规定一致
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成 ODI 备案分析报告 → `reports/odi_filing_analysis.docx`
+    - 报告必须包含：执行摘要、投资项目概述、备案/核准路径分析、审批层级及主管部门、材料清单与准备指引、关键时间节点、注意事项与风险提示
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - ODI 涉及发改、商务、外汇等多部门，需注意审批衔接
+    - 敏感行业和地区实行核准管理，审查更为严格
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - investment_overview
+      - filing_path_analysis
+      - approval_level
+      - application_checklist
+      - timeline
+      - risk_notes
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_classification
+      label: "投资分类判定"
+      progress: 20
+    - name: do_path
+      label: "备案路径分析"
+      progress: 25
+    - name: do_materials
+      label: "材料清单准备"
+      progress: 25
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

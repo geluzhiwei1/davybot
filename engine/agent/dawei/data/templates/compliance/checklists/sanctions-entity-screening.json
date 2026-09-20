@@ -1,0 +1,22 @@
+{
+  "slug": "sanctions-entity-screening",
+  "name": "制裁名单快捷筛查清单",
+  "category": "制裁合规",
+  "description": "多法域制裁名单快速筛查 — OFAC/EU/UN/UK/BIS/中国覆盖，含 50% Rule 风险提示与结构化状态码输出",
+  "applicable_scenarios": ["交易对手筛查", "KYC合规", "跨境支付", "供应商准入", "定期复筛"],
+  "items": [
+    { "task": "实体名称规范化与去重（中文/英文/拼音/曾用名）", "category": "数据准备" },
+    { "task": "OFAC SDN 名单筛查", "category": "筛查", "guidance": "OFAC 50% Rule 聚合计算" },
+    { "task": "OFAC Sectoral (SSI) 名单筛查", "category": "筛查" },
+    { "task": "OFAC Non-SDN (CAPTA/NS-MBS) 名单筛查", "category": "筛查" },
+    { "task": "欧盟制裁名单筛查", "category": "筛查" },
+    { "task": "UN 制裁名单筛查", "category": "筛查" },
+    { "task": "UK OFSI 制裁名单筛查", "category": "筛查" },
+    { "task": "BIS 实体清单筛查", "category": "筛查" },
+    { "task": "中国反外国制裁清单筛查", "category": "筛查" },
+    { "task": "命中结果去噪与分类标记（STATUS_403/401/200）", "category": "分析" },
+    { "task": "OFAC 50% Rule 间接控制风险提示", "category": "深度分析" },
+    { "task": "模糊匹配结果人工复核清单", "category": "复核" },
+    { "task": "筛查结果记录（含时间戳和名单版本）", "category": "合规记录" }
+  ]
+}

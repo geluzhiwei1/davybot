@@ -1,0 +1,140 @@
+template:
+  slug: patent-draft-chemistry
+  name: "化学/材料专利草案"
+  version: "1.0"
+  module: ip-draft
+  team_slug: ip-draft
+
+  description: |
+    针对化学组合物、新材料、化工工艺等领域的管辖中立专利草案撰写。
+    重点关注组分范围限定、制备方法步骤、性能测试数据、组合物+方法+用途权利要求布局。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "如：一种高导电柔性复合材料及其制备方法"
+        store: "input/task_params.json"
+      - key: tech_field
+        label: "技术领域"
+        type: select
+        options:
+          - { value: "", label: "请选择" }
+          - { value: "高分子材料", label: "高分子/聚合物材料" }
+          - { value: "无机材料", label: "无机非金属/陶瓷/玻璃" }
+          - { value: "金属材料", label: "金属合金/复合材料" }
+          - { value: "纳米材料", label: "纳米材料/二维材料" }
+          - { value: "电池/储能", label: "电池/电化学/储能" }
+          - { value: "催化剂", label: "催化剂/反应助剂" }
+          - { value: "化工工艺", label: "化工工艺/分离/合成" }
+          - { value: "涂层/薄膜", label: "涂层/薄膜/表面处理" }
+        default: ""
+        store: "input/task_params.json"
+      - key: draft_strategy
+        label: "撰写策略"
+        type: select
+        options:
+          - { value: "balanced", label: "均衡策略" }
+          - { value: "broad", label: "宽泛策略" }
+          - { value: "narrow", label: "保守策略" }
+        default: "balanced"
+        store: "input/task_params.json"
+    optional:
+      - key: composition_detail
+        label: "组分/配方详情"
+        type: string
+        placeholder: "各组分名称、比例范围、优选范围"
+        store: "input/task_params.json"
+      - key: process_detail
+        label: "制备工艺"
+        type: string
+        placeholder: "合成路线、工艺参数（温度/压力/时间）"
+        store: "input/task_params.json"
+      - key: applicant_name
+        label: "申请人名称"
+        type: string
+        store: "input/task_params.json"
+      - key: inventor_names
+        label: "发明人"
+        type: string
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+    - knowledge/patent-examination-guidelines
+
+  checklists:
+    - ref: "checklist/draft-completeness"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游交底书继承的文件"
+    - dir: input/checklists
+      description: "草案完整性清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: output/claims
+      description: "权利要求层次结构"
+    - dir: output/description
+      description: "技术方案阐述各部分"
+    - dir: drafts
+      description: "完整草案文件"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入化学/材料专利草案撰写工作区，请按照 PDCA 工作流执行。
+
+    ## 领域重点：化学/材料专利草案
+    化学材料类专利草案需特别关注以下方面：
+    1. **组分范围限定**：组合物权利要求用"按重量份计，包括X-Y份A、X-Y份B"格式，提供宽/窄/优选范围
+    2. **制备方法步骤**：方法权利要求按步骤编号，每步含具体参数（温度/压力/时间/pH/搅拌速度）
+    3. **性能参数限定**：可用性能参数限定产品（"密度为X-Y g/cm³""导电率≥X S/cm"）
+    4. **选择发明表达**：从已知范围中选择特定值时，强调"优选""最优选"和预料不到的效果
+    5. **等同替代**：说明书中提供组分等同替代方案（"可选地，A可替换为A'或A''"）
+    6. **权利要求布局**：组合物→制备方法→用途→产品（材料本身）
+
+    ## 核心原则：管辖中立
+    本草案产出的所有内容不限定任何国家的专利法格式。
+
+    ## 输入数据
+    1. `input/task_params.json` — 发明名称、技术领域、撰写策略、组分/工艺详情
+    2. `input/inherited/` — 技术交底书（从上游继承）
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 读取输入，列出组分/工艺特征清单，规划权利要求层次
+    ### Do: 撰写权利要求（组合物→方法→用途→产品）+ 技术方案阐述
+    ### Check: 核对清单（重点检查充分公开和组分范围合理性）
+    ### Act: 生成完整草案
+
+  deliverables:
+    - file: "drafts/patent_draft_full.md"
+      name: "化学/材料专利草案全文"
+      format: markdown
+    - file: "output/claims/claims_hierarchy.md"
+      name: "权利要求层次结构"
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 15
+    - name: do_claims
+      label: "撰写权利要求"
+      progress: 25
+    - name: do_description
+      label: "撰写技术方案"
+      progress: 30
+    - name: check
+      label: "质量审查"
+      progress: 20
+    - name: act
+      label: "生成草案文件"
+      progress: 10

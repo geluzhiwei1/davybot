@@ -1,0 +1,431 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+import inspect
+import logging
+import os
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any, Dict, List, get_type_hints
+
+from pydantic import BaseModel
+
+from dawei import get_dawei_home
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+
+class ToolProvider(ABC):
+    """An abstract base class for tool providers."""
+
+    @abstractmethod
+    def get_tools(self) -> list[dict[str, Any]]:
+        """Returns a list of tools in a standardized format.
+        Each tool is represented as a dictionary.
+        """
+
+
+class CustomToolProvider(ToolProvider):
+    """Provides custom-defined tools."""
+
+    def __init__(self, workspace_root: str | None = None, user_id: str = "default_user"):
+        """Initialize CustomToolProvider.
+
+        Args:
+            workspace_root: Optional workspace path for loading workspace-specific skills
+            user_id: 用户 ID（多租户：透传给 MCP 等需要 per-user 配置的工具）
+
+        """
+        self.workspace_root = workspace_root
+        self.user_id = user_id or "default_user"
+
+    def _instantiate_tool(self, tool_class, tool_name: str):
+        """Instantiate a tool class with appropriate parameters.
+
+        Args:
+            tool_class: The tool class to instantiate
+            tool_name: Name of the tool (for logging)
+
+        Returns:
+            Instantiated tool object
+
+        Raises:
+            TypeError: If tool instantiation fails
+
+        """
+        import inspect
+
+        # Get the __init__ signature
+        init_signature = inspect.signature(tool_class.__init__)
+        parameters = init_signature.parameters
+
+        # 收集可传参数：workspace_root / user_id（按签名是否接受决定）
+        kwargs: dict[str, Any] = {}
+        if "workspace_root" in parameters:
+            if self.workspace_root or parameters["workspace_root"].default == inspect.Parameter.empty:
+                kwargs["workspace_root"] = self.workspace_root
+        if "user_id" in parameters:
+            kwargs["user_id"] = self.user_id
+
+        if kwargs:
+            return tool_class(**kwargs)
+
+        # Default: instantiate with no parameters
+        return tool_class()
+
+    def get_tools(self) -> list[dict[str, Any]]:
+        """Load and parse tools from custom_tools package.
+
+        Returns:
+            List of tool dictionaries in standardized format.
+
+        """
+        tools = []
+
+        try:
+            # Import all tool modules explicitly to ensure they are loaded
+            from . import a2ui_tools, custom_tools
+
+            # workflow_tools are now imported directly in custom_tools.__init__.py from workflow_tools_fixed
+            from .custom_base_tool import CustomBaseTool
+            from .custom_tools import (
+                acp_tools,
+                command_tools,
+                cost_tools,
+                edit_tools,
+                knowledge_tool,
+                mcp_tools,
+                read_tools,
+                social_draft_tools,
+                timer_tools,
+            )
+
+            # Consolidate all modules to scan for tools
+            tool_modules = [
+                edit_tools,
+                read_tools,
+                command_tools,
+                acp_tools,
+                mcp_tools,
+                timer_tools,
+                a2ui_tools,
+                knowledge_tool,
+                cost_tools,
+                social_draft_tools,
+            ]
+
+            # Also check the top-level custom_tools __init__ for any directly defined/imported tools
+            tool_modules.append(custom_tools)
+
+            unique_tools = {}
+
+            for module in tool_modules:
+                for name in dir(module):
+                    obj = getattr(module, name)
+
+                    # Check if it's a class, a subclass of CustomBaseTool, and not the base class itself
+                    if inspect.isclass(obj) and obj is not CustomBaseTool and issubclass(obj, CustomBaseTool):
+                        # Avoid processing the same tool class twice
+                        if name in unique_tools:
+                            continue
+
+                        try:
+                            # Instantiate tool with workspace_path if needed
+                            tool_instance = self._instantiate_tool(obj, name)
+
+                            # Get tool information from instance
+                            tool_name = getattr(tool_instance, "name", name)
+                            tool_description = getattr(tool_instance, "description", "")
+
+                            # Get args schema
+                            tool_args_schema = getattr(tool_instance, "args_schema", None)
+                            if tool_args_schema is None:
+                                tool_args_schema = getattr(obj, "args_schema", None)
+
+                            # Convert Pydantic schema to JSON Schema if available.
+                            # 无 args_schema 的工具（如 sanctions_filters）必须给标准空 object
+                            # schema，否则严格校验的提供商（Deepseek/GLM）会因 parameters 缺少
+                            # type 而报 400 "got 'type: null'"。
+                            parameters = {"type": "object", "properties": {}, "required": []}
+                            if tool_args_schema and inspect.isclass(tool_args_schema) and issubclass(tool_args_schema, BaseModel):
+                                parameters = self._pydantic_to_json_schema(tool_args_schema)
+
+                            # Create a tool dictionary
+                            tool_dict = {
+                                "name": tool_name,
+                                "description": tool_description,
+                                "parameters": parameters,
+                                "callable": tool_instance,  # Pass the entire tool instance
+                                "original_tool": tool_instance,  # Pass the original instance for correct type checking
+                            }
+
+                            unique_tools[name] = tool_dict
+                            logger.info(f"Successfully loaded custom tool: {tool_name}")
+
+                        except Exception as e:
+                            # FAST FAIL: Log complete exception with stack trace
+                            # Use WARNING level for optional dependencies (e.g., market import)
+                            is_optional = isinstance(e, ImportError) or type(e).__name__ in ("MarketNotAvailableError",)
+
+                            log_level = logging.WARNING if is_optional else logging.ERROR
+                            logger.log(
+                                log_level,
+                                f"Error instantiating tool {name}: {e}",
+                                exc_info=True,
+                                extra={
+                                    "session_id": getattr(self, "session_id", "N/A"),
+                                    "message_id": "N/A",
+                                },
+                            )
+                            continue
+
+            tools = list(unique_tools.values())
+
+            # Load skills tools - always available as builtin tools
+            try:
+                from pathlib import Path
+
+                from .custom_tools.skills_tool import create_skills_tools
+
+                # Build skills_roots with workspace and global paths
+                skills_roots = []
+                dawei_home = get_dawei_home()
+
+                # Level 1: Workspace (优先级最高) - if workspace_path provided
+                if self.workspace_root:
+                    ws_path = Path(self.workspace_root)
+                    has_dawei_skills = (ws_path / ".dawei" / "skills").exists()
+                    has_roo_skills = (ws_path / ".roo" / "skills").exists()
+
+                    if has_dawei_skills or has_roo_skills:
+                        skills_roots.append(ws_path)
+                        sources = []
+                        if has_dawei_skills:
+                            sources.append(".dawei/skills/")
+                        if has_roo_skills:
+                            sources.append(".roo/skills/")
+                        logger.info(
+                            f"[Skills] ✓ Added workspace root: {ws_path} "
+                            f"(sources: {', '.join(sources)})",
+                        )
+
+                # Level 2: Global user (DAWEI_HOME) - always included
+                has_global_skills = (dawei_home / "skills").exists()
+                has_global_roo = (dawei_home / ".roo" / "skills").exists()
+
+                if has_global_skills or has_global_roo:
+                    if dawei_home not in skills_roots:
+                        skills_roots.append(dawei_home)
+                    sources = []
+                    if has_global_skills:
+                        sources.append("skills/")
+                    if has_global_roo:
+                        sources.append(".roo/skills/")
+                    logger.info(
+                        f"[Skills] ✓ Added global root: {dawei_home} "
+                        f"(sources: {', '.join(sources)})",
+                    )
+
+                # Always create skills tools, even if skills_roots is empty
+                # This allows list_skills to work as a discovery tool
+                if not skills_roots:
+                    # Use global home as default root for SkillManager
+                    skills_roots = [dawei_home]
+                    logger.info(f"[Skills] No skills found, using default root: {dawei_home}")
+
+                # Create skills tools (always available)
+                skills_tools = create_skills_tools(skills_roots)
+                for skill_tool in skills_tools:
+                    # Extract args_schema from skills tools
+                    tool_args_schema = getattr(skill_tool, "args_schema", None)
+                    parameters = {"type": "object", "properties": {}, "required": []}
+                    if tool_args_schema and inspect.isclass(tool_args_schema) and issubclass(tool_args_schema, BaseModel):
+                        parameters = self._pydantic_to_json_schema(tool_args_schema)
+
+                    tool_dict = {
+                        "name": skill_tool.name,
+                        "description": skill_tool.description,
+                        "parameters": parameters,
+                        "callable": skill_tool,
+                        "original_tool": skill_tool,
+                    }
+                    tools.append(tool_dict)
+                    logger.info(f"Successfully loaded skills tool: {skill_tool.name}")
+
+            except ImportError as e:
+                logger.warning(f"Failed to import skills_tool module: {e}")
+            except Exception:
+                logger.exception("Error loading skills tools: ")
+
+        except ImportError as e:
+            # Import errors should not fail the entire loading process
+            # Return already loaded tools
+            logger.warning(f"Import error during tool loading: {e}")
+            logger.info(f"Returning {len(tools)} successfully loaded tools despite import error")
+            return tools
+        except Exception as e:
+            # Unexpected errors - return what we have
+            logger.error(f"Unexpected error loading custom tools: {e}", exc_info=True)
+            logger.info(f"Returning {len(tools)} successfully loaded tools despite error")
+            return tools
+
+        logger.info(f"Loaded {len(tools)} tools from CustomToolProvider")
+        return tools
+
+    def _pydantic_to_json_schema(self, schema_class: type[BaseModel]) -> dict[str, Any]:
+        """Convert a Pydantic model to JSON Schema format.
+
+        Args:
+            schema_class: The Pydantic model class
+
+        Returns:
+            JSON Schema dictionary
+
+        """
+        try:
+            # Get the schema from Pydantic (using model_json_schema for Pydantic v2)
+            try:
+                schema = schema_class.model_json_schema()
+            except AttributeError:
+                # Fallback to deprecated schema() method for older Pydantic
+                schema = schema_class.schema()
+
+            # Inline definitions: expand $refs to actual schemas
+            properties = schema.get("properties", {})
+            defs = schema.get("$defs", {})
+
+            # Recursively resolve $refs in properties
+            def resolve_refs(obj):
+                if isinstance(obj, dict):
+                    # Handle anyOf/oneOf/allOf - resolve refs inside the array
+                    if "anyOf" in obj:
+                        resolved_anyof = [resolve_refs(item) for item in obj["anyOf"]]
+                        # If all items in anyOf are the same object (from $ref), simplify to object
+                        if len(resolved_anyof) == 1:
+                            return {**obj, "anyOf": resolved_anyof}
+                        # If we have objects with type information, merge them
+                        return {**obj, "anyOf": resolved_anyof}
+                    if "oneOf" in obj:
+                        return {
+                            **obj,
+                            "oneOf": [resolve_refs(item) for item in obj["oneOf"]],
+                        }
+                    if "allOf" in obj:
+                        return {
+                            **obj,
+                            "allOf": [resolve_refs(item) for item in obj["allOf"]],
+                        }
+
+                    if "$ref" in obj:
+                        # Get the reference path like "#/$defs/TimerSetInput"
+                        ref_path = obj["$ref"]
+                        # Extract the definition name
+                        if ref_path.startswith("#/$defs/"):
+                            def_name = ref_path[len("#/$defs/") :]
+                            ref_def = defs.get(def_name, {})
+                            # Recursively resolve refs in the referenced definition
+                            return resolve_refs(ref_def)
+                        return obj
+                    # Recursively process dict values
+                    return {k: resolve_refs(v) for k, v in obj.items()}
+                if isinstance(obj, list):
+                    return [resolve_refs(item) for item in obj]
+                return obj
+
+            # Resolve all $refs in properties
+            resolved_properties = resolve_refs(properties)
+
+            # Convert to the format expected by most LLM providers
+            return {
+                "type": "object",
+                "properties": resolved_properties,
+                "required": schema.get("required", []),
+            }
+
+        except Exception:
+            logger.exception("Error converting Pydantic schema to JSON Schema: ")
+            return {"type": "object", "properties": {}, "required": []}
+
+    def _parse_function_tool(self, func: callable, name: str) -> dict[str, Any]:
+        """Parse a function decorated with @tool into a standard format.
+
+        Args:
+            func: The function to parse
+            name: The name of the function
+
+        Returns:
+            Tool dictionary or None if parsing fails
+
+        """
+        try:
+            # Get function signature
+            sig = inspect.signature(func)
+
+            # Get docstring for description
+            description = inspect.getdoc(func) or f"Tool function: {name}"
+
+            # Parse parameters
+            parameters = {"type": "object", "properties": {}, "required": []}
+
+            type_hints = get_type_hints(func)
+
+            for param_name, param in sig.parameters.items():
+                if param_name == "self":
+                    continue
+
+                param_info = {"type": "string"}  # Default type
+
+                # Try to get type from type hints
+                if param_name in type_hints:
+                    param_type = type_hints[param_name]
+                    if hasattr(param_type, "__origin__"):
+                        # Handle generic types like List[str]
+                        origin = param_type.__origin__
+                        if origin is list:
+                            param_info["type"] = "array"
+                            if hasattr(param_type, "__args__") and param_type.__args__:
+                                item_type = param_type.__args__[0]
+                                if item_type is str:
+                                    param_info["items"] = {"type": "string"}
+                                elif item_type is int:
+                                    param_info["items"] = {"type": "integer"}
+                                elif item_type is float:
+                                    param_info["items"] = {"type": "number"}
+                                elif item_type is bool:
+                                    param_info["items"] = {"type": "boolean"}
+                    elif param_type is str:
+                        param_info["type"] = "string"
+                    elif param_type is int:
+                        param_info["type"] = "integer"
+                    elif param_type is float:
+                        param_info["type"] = "number"
+                    elif param_type is bool:
+                        param_info["type"] = "boolean"
+
+                # Check if parameter has a default value
+                if param.default != inspect.Parameter.empty:
+                    param_info["default"] = param.default
+                else:
+                    parameters["required"].append(param_name)
+
+                # Add description from docstring if available
+                # This is a simplified approach - in production, you might want more sophisticated parsing
+                if ":" in description:
+                    for line in description.split("\n"):
+                        if line.strip().startswith(f"{param_name}:"):
+                            param_info["description"] = line.split(":", 1)[1].strip()
+                            break
+
+                parameters["properties"][param_name] = param_info
+
+            return {
+                "name": getattr(func, "tool_name", name),
+                "description": getattr(func, "tool_description", description),
+                "parameters": parameters,
+                "callable": func,
+            }
+
+        except Exception as e:
+            logger.exception(f"Error parsing function tool {name}: {e}")
+            return None

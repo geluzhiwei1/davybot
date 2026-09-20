@@ -1,0 +1,189 @@
+# 合规工作区模板: 经营者集中申报评估
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: antitrust-merger-filing
+  name: "经营者集中申报评估"
+  version: "1.0"
+  team_slug: antitrust
+
+  description: |
+    基于反垄断法及经营者集中申报标准，对拟议并购/合资交易进行
+    申报义务评估和初步竞争分析。适用于涉及多法域申报的大型交易。
+
+  applicable_scenarios:
+    - "并购/合资交易"
+    - "多法域申报"
+    - "营业额达标评估"
+    - "竞争影响分析"
+
+  estimated_time: "30-45 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "申报方企业名称"
+        type: string
+        placeholder: "请输入申报方企业全称"
+        store: "input/company_info.json"
+
+      - key: target_name
+        label: "目标企业名称"
+        type: string
+        placeholder: "请输入目标/被收购企业全称"
+        store: "input/company_info.json"
+
+      - key: transaction_type
+        label: "交易类型"
+        type: select
+        options:
+          - { value: merger, label: "合并" }
+          - { value: acquisition, label: "股权收购" }
+          - { value: asset_acquisition, label: "资产收购" }
+          - { value: joint_venture, label: "合资经营" }
+          - { value: other, label: "其他" }
+        store: "input/task_parameters.json"
+
+      - key: jurisdictions
+        label: "需要评估的法域"
+        type: multiselect
+        options: ["中国", "欧盟", "美国", "英国", "日本", "韩国", "巴西", "其他"]
+        store: "input/task_parameters.json"
+
+      - key: acquiring_turnover
+        label: "申报方上年全球营业额（亿元人民币）"
+        type: string
+        placeholder: "如：150"
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: target_turnover
+        label: "目标企业上年营业额（亿元人民币）"
+        type: string
+        placeholder: "如：50"
+        store: "input/task_parameters.json"
+
+      - key: market_overlap
+        label: "双方业务是否存在横向重叠"
+        type: boolean
+        default: false
+        store: "input/task_parameters.json"
+
+      - key: vertical_relationship
+        label: "双方是否存在纵向关系"
+        type: boolean
+        default: false
+        store: "input/task_parameters.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：XX公司收购YY股权经营者集中申报"
+        store: "input/task_parameters.json"
+
+      - key: deal_documents
+        label: "交易文件上传"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+  checklists:
+    - ref: "checklist/antitrust-merger-filing"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的交易信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终申报评估报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 交易双方基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解交易结构和范围
+    - 根据合规清单制定分法域申报评估计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 营业额计算与达标分析 → `output/turnover_threshold_analysis.md`
+    b. 相关市场界定 → `output/relevant_market_definition.md`
+    c. 竞争影响初步评估 → `output/competitive_assessment.md`
+    d. 各法域申报义务判定 → `output/jurisdictional_analysis.csv`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证营业额数据准确性
+    - 确认未遗漏需要评估的法域
+    - 提交初步结论供用户审核
+
+    ### Act (输出)
+    - 生成经营者集中申报评估报告 → `reports/merger_filing_assessment.docx`
+    - 报告必须包含：执行摘要、交易概述、营业额达标分析（各法域）、相关市场界定、竞争影响初步评估、申报时间表和策略建议、法规依据索引
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 营业额数据请按照各法域法定计算口径
+    - 竞争分析为初步评估，复杂交易建议寻求专业反垄断律师意见
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - transaction_overview
+      - turnover_analysis
+      - relevant_market_definition
+      - competitive_assessment
+      - filing_strategy
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_threshold
+      label: "营业额达标分析"
+      progress: 25
+    - name: do_market
+      label: "市场界定与竞争分析"
+      progress: 30
+    - name: do_jurisdiction
+      label: "各法域申报判定"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 5

@@ -1,0 +1,200 @@
+# 产品调研模板（内置示例主题）
+# 设计: project/docs/PRD-gelu-diaoyan/prd-产品调研.md §6.3
+# 契约: ProductSurveyTemplate (slug/name/category/estimated_products/estimated_dimensions/
+#       estimated_minutes/tags/description/is_builtin/default_dao_path)
+# 消费: dawei/workspace/product_survey_service.py
+#
+# 每个模板提供:
+#   - 模板市场卡片数据（名称/分类/预估规模/耗时/标签）
+#   - 向导 Step 3 的维度清单（D1..Dn，含一句话边界描述）
+#   - 向导 Step 1/2 的默认值（主题、范围）
+#   - dao.md 生成素材（调研重点 goals_hints，供 GATE-0 预览）
+
+templates:
+  # 空白调研：不预设任何方向（default_topic 留空），主题由用户输入；
+  # 维度给 4 个通用分析维度（适用任意主题），GATE-0 需求确认阶段可增删调整。
+  - slug: blank
+    name: "空白调研"
+    category: "自定义"
+    icon: "🧭"
+    description: |
+      不预设任何调研方向：输入你关心的主题（任何 AI 产品赛道均可），
+      在 GATE-0 需求确认阶段与智能体一起细化范围、维度与成功标准。
+    estimated_products: 60
+    estimated_dimensions: 4
+    estimated_minutes: 120
+    tags: ["自定义", "自由主题"]
+    is_builtin: true
+    default_topic: ""
+    audience: ""
+    default_scope:
+      regions: ["中国大陆", "海外"]
+      industries: ["全部"]
+      time_window: "不限"
+      product_forms: ["不限"]
+    dimensions:
+      - { key: D1, name: "产品与功能", description: "产品形态、核心功能与差异化能力" }
+      - { key: D2, name: "技术路线", description: "AI 技术栈、实现路线与工程化程度" }
+      - { key: D3, name: "商业模式", description: "定价层级、计费模式与目标客群" }
+      - { key: D4, name: "市场格局", description: "头部玩家、区域分布与竞品对比" }
+    goals_hints:
+      - "按 4 个通用维度建立产品索引，GATE-0 阶段可增删维度"
+
+  - slug: ai-short-video
+    name: "AI 短视频生成"
+    category: "内容创作"
+    icon: "📊"
+    description: |
+      调研全球范围内 AI 短视频生成赛道：文本/图片生成视频、智能剪辑、
+      数字人播报、AI 配音配乐、营销分发与数据看板等维度，
+      覆盖海内外已上线的商业产品。
+    estimated_products: 80
+    estimated_dimensions: 8
+    estimated_minutes: 180
+    tags: ["AIGC", "视频", "营销", "出海"]
+    is_builtin: true
+    default_topic: "AI 短视频生成"
+    audience: "内容营销负责人 / MCN / 出海团队"
+    default_scope:
+      regions: ["中国大陆", "海外"]
+      industries: ["内容创作", "营销"]
+      time_window: "近 1 年新发布的产品优先"
+      product_forms: ["Web", "移动端", "API/SDK"]
+    dimensions:
+      - { key: D1, name: "内容生成", description: "文生视频、图生视频、脚本到成片的一站式生成" }
+      - { key: D2, name: "视频编辑", description: "AI 剪辑、自动字幕、智能转场与素材推荐" }
+      - { key: D3, name: "数字人", description: "数字人播报、口型同步、形象克隆" }
+      - { key: D4, name: "配音配乐", description: "AI 语音合成、声音克隆、智能配乐" }
+      - { key: D5, name: "营销分发", description: "多平台一键分发、批量混剪、投放素材工厂" }
+      - { key: D6, name: "数据分析", description: "播放数据回流、爆款拆解、内容优化建议" }
+      - { key: D7, name: "协作工具", description: "团队审片、品牌资产管理、工作流自动化" }
+      - { key: D8, name: "硬件/外设", description: "AI 拍摄硬件、云直播一体机、辅助外设" }
+    goals_hints:
+      - "摸清头部玩家与差异化机会（工具 vs 平台 vs Agent）"
+      - "对比国内（剪映/即创系）与海外（Runway/Pika 系）的产品路线"
+      - "识别广告主与 MCN 的真实采购决策因素（价格/版权/合规）"
+
+  - slug: ai-translation
+    name: "AI 翻译工具"
+    category: "效率工具"
+    icon: "🌐"
+    description: |
+      调研 AI 翻译与本地化赛道：通用机器翻译、专业领域翻译、
+      软件本地化工程、同传/口译、字幕翻译与企业术语管理，
+      覆盖海内外商业产品与 API 服务。
+    estimated_products: 60
+    estimated_dimensions: 6
+    estimated_minutes: 120
+    tags: ["翻译", "本地化", "出海", "API"]
+    is_builtin: true
+    default_topic: "AI 翻译工具"
+    audience: "出海团队 / 本地化经理 / 采购决策者"
+    default_scope:
+      regions: ["中国大陆", "海外"]
+      industries: ["全部"]
+      time_window: "不限（成熟产品为主）"
+      product_forms: ["Web", "API/SDK", "桌面端"]
+    dimensions:
+      - { key: D1, name: "通用机器翻译", description: "多语种文本/文档翻译，主打质量与价格" }
+      - { key: D2, name: "专业领域翻译", description: "法律/医学/金融等垂直领域翻译" }
+      - { key: D3, name: "本地化工程", description: "软件/i18n 资源文件、网站本地化流水线" }
+      - { key: D4, name: "实时口译", description: "会议同传、通话翻译、同声传译硬件" }
+      - { key: D5, name: "字幕翻译", description: "视频字幕自动生成、翻译与压制" }
+      - { key: D6, name: "企业术语管理", description: "术语库、翻译记忆库、多人协作审校" }
+    goals_hints:
+      - "对比 LLM 翻译与专用 NMT 引擎的质量/成本差异"
+      - "梳理企业级功能（术语库/记忆库/权限/审计）的覆盖情况"
+      - "识别 API 计费模式与单价区间"
+
+  - slug: ai-sentiment-monitoring
+    name: "AI 舆情监测"
+    category: "品牌与公关"
+    icon: "📡"
+    description: |
+      调研 AI 舆情监测与品牌声誉管理赛道：全网监测、情感分析、
+      危机预警、竞品追踪与自动报告生成，覆盖中海外主要商业产品。
+    estimated_products: 60
+    estimated_dimensions: 6
+    estimated_minutes: 150
+    tags: ["舆情", "公关", "品牌", "监测"]
+    is_builtin: true
+    default_topic: "AI 舆情监测"
+    audience: "公关负责人 / 品牌市场部 / 政企宣传"
+    default_scope:
+      regions: ["中国大陆", "海外"]
+      industries: ["全部"]
+      time_window: "不限（成熟产品为主）"
+      product_forms: ["Web", "API/SDK"]
+    dimensions:
+      - { key: D1, name: "全网监测", description: "新闻/社媒/短视频/论坛的多源聚合监测" }
+      - { key: D2, name: "情感分析", description: "情感倾向识别、话题聚类、立场分析" }
+      - { key: D3, name: "危机预警", description: "负面爆发预警、传播链路追踪、处置建议" }
+      - { key: D4, name: "竞品追踪", description: "竞品声量对比、营销活动监测" }
+      - { key: D5, name: "报告生成", description: "日报/周报自动生成、舆情简报 AI 写作" }
+      - { key: D6, name: "数据源覆盖", description: "国内外平台覆盖广度、历史数据回溯" }
+    goals_hints:
+      - "对比国内外数据源覆盖差异（微博/抖音 vs X/Reddit）"
+      - "梳理 AI 生成简报的成熟度与人工审校需求"
+      - "识别政企市场与中小企业市场的产品分层"
+
+  - slug: ai-legal-tools
+    name: "AI 法律工具"
+    category: "法律服务"
+    icon: "⚖️"
+    description: |
+      调研 AI 法律科技赛道：法律检索、合同审查、文书起草、
+      尽职调查、合规管理与智能法律咨询，覆盖海内外商业产品。
+    estimated_products: 60
+    estimated_dimensions: 6
+    estimated_minutes: 150
+    tags: ["法律", "LegalTech", "合规", "合同"]
+    is_builtin: true
+    default_topic: "AI 法律工具"
+    audience: "律所主任 / 企业法务 / 法务科技采购"
+    default_scope:
+      regions: ["中国大陆", "海外"]
+      industries: ["法律服务"]
+      time_window: "不限（成熟产品为主）"
+      product_forms: ["Web", "API/SDK"]
+    dimensions:
+      - { key: D1, name: "法律检索", description: "法规/案例/文献的语义检索与问答" }
+      - { key: D2, name: "合同审查", description: "合同风险识别、条款比对、修订建议" }
+      - { key: D3, name: "文书起草", description: "合同/诉状/法律意见书 AI 起草" }
+      - { key: D4, name: "尽职调查", description: "尽调材料审阅、风险要点提取" }
+      - { key: D5, name: "合规管理", description: "合规审查流程、制裁/数据合规筛查" }
+      - { key: D6, name: "智能咨询", description: "面向个人/企业的 AI 法律咨询对话" }
+    goals_hints:
+      - "对比通用大模型法律套壳与垂直法律模型的产品形态"
+      - "梳理律师工作流嵌入深度（检索 → 审查 → 起草 → 归档）"
+      - "识别责任边界与执业合规风险的产品化处理"
+
+  - slug: ai-customer-service
+    name: "AI 客服"
+    category: "客户服务"
+    icon: "💬"
+    description: |
+      调研 AI 客服与对话机器人赛道：全渠道机器人、知识库 RAG、
+      坐席辅助、语音客服、质检分析与多语言客服，覆盖海内外商业产品。
+    estimated_products: 60
+    estimated_dimensions: 6
+    estimated_minutes: 120
+    tags: ["客服", "对话机器人", "RAG", "企业服务"]
+    is_builtin: true
+    default_topic: "AI 客服"
+    audience: "客服负责人 / 数字化转型 / SaaS 采购"
+    default_scope:
+      regions: ["中国大陆", "海外"]
+      industries: ["全部"]
+      time_window: "不限（成熟产品为主）"
+      product_forms: ["Web", "API/SDK", "移动端"]
+    dimensions:
+      - { key: D1, name: "全渠道机器人", description: "网页/微信/APP/邮件等全渠道自动回复" }
+      - { key: D2, name: "知识库 RAG", description: "企业知识库构建、检索增强问答" }
+      - { key: D3, name: "坐席辅助", description: "人工坐席的话术推荐、实时质检" }
+      - { key: D4, name: "语音客服", description: "电话语音机器人、语音识别与合成" }
+      - { key: D5, name: "质检分析", description: "会话质检、满意度分析、坐席绩效" }
+      - { key: D6, name: "多语言客服", description: "跨语言自动应答、全球时区覆盖" }
+    goals_hints:
+      - "对比传统客服 SaaS 的 AI 化改造与 AI-native 新产品"
+      - "梳理按坐席/按会话/按 token 的计费分层"
+      - "识别知识库构建成本这一核心采购摩擦点"

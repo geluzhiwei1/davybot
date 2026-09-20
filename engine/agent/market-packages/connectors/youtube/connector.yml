@@ -1,0 +1,39 @@
+# YouTube —— API 轨(Data API v3 videos.insert;adapter 代码在 social-control)
+platform: youtube
+display_name: YouTube
+version: 1.0.0
+capability:
+  publish: api
+  publish_modes: []
+  trending: api
+  metrics: api
+constraints:
+  title_char_limit: 100
+  char_limit: 5000
+  max_files: 1
+  max_video_seconds: 43200
+  rich_text: false
+domains:
+- www.googleapis.com
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - IN
+  - BR
+  - JP
+  - ID
+  - MX
+  languages:
+  - en
+  - hi
+  - pt
+  - es
+  - ja
+  - id
+  - ko
+  - ru
+  - de
+  - ar

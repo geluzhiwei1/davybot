@@ -1,0 +1,70 @@
+platform: bilibili
+display_name: 哔哩哔哩
+version: 0.2.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  trending: none
+  metrics: browser
+constraints:
+  char_limit: 25000
+  max_files: 20
+  max_video_seconds: 0
+  rich_text: true
+domains:
+- member.bilibili.com
+publish:
+  compose_url: https://member.bilibili.com/platform/upload/text/edit
+  selectors:
+    title_input:
+      primary: textarea[placeholder*="标题"]
+      fallback: .bre-title-input textarea
+    compose_box:
+      primary: .tiptap.ProseMirror[contenteditable='true']
+      fallback: "[contenteditable='true']"
+    save_draft_button:
+      primary: button:has-text("存为草稿")
+      fallback: button:has-text("保存草稿")
+      wait_after_click_ms: 3000
+    publish_button:
+      primary: button:has-text("发布")
+      fallback: .btn-publish
+      wait_after_click_ms: 5000
+    media_upload:
+      primary: input[type="file"][accept*="image"]
+      max_files: 20
+      max_video_seconds: 0
+    success_indicator:
+      method: text_contains
+      pattern: 保存成功
+  rich_text:
+    enabled: true
+    content_format: html_semantic
+    inject_method: innerHTML
+    image_handling: file_upload
+    style:
+      heading_style: 'margin: 1.2em 0 0.6em; font-weight: bold;'
+      paragraph_style: 'margin: 0.8em 0; line-height: 1.8;'
+      image_style: 'max-width: 100%; margin: 10px auto; display: block;'
+      blockquote_style: 'margin: 1em 0; padding: 0.5em 1em; border-left: 4px solid #e7e7e7; color: #666;'
+      code_block_style: 'margin: 1em 0; padding: 12px 16px; background: #f6f8fa; border-radius: 3px; font-family:
+        monospace;'
+      list_style: 'margin: 0.8em 0; padding-left: 2em;'
+  login_check:
+    url: https://member.bilibili.com/platform/upload/text/edit
+    indicator: .bre-title-input, .ql-editor, .header-entry-mini
+metrics:
+  views: .view-text, span:has-text("阅读")
+  likes: .like-text, span:has-text("喜欢")
+  comments: .comment-text, span:has-text("评论")
+  coins: .coin-text, span:has-text("投币")
+  favorites: .favorite-text, span:has-text("收藏")
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

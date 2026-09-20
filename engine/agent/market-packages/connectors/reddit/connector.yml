@@ -1,0 +1,70 @@
+platform: reddit
+display_name: Reddit
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: none
+  metrics: none
+constraints:
+  char_limit: 40000
+  max_files: 20
+  max_video_seconds: 0
+  rich_text: true
+domains:
+- www.reddit.com
+- old.reddit.com
+publish:
+  compose_url: https://www.reddit.com/submit
+  selectors:
+    # v0.1.0 未真机验证:Reddit 2024+ 提交表单(sh.reddit.com 壳);Text 标签页切换后填正文
+    title_input:
+      primary: textarea[name="title"], input[name="title"]
+      fallback: "[placeholder*='Title']"
+      wait_timeout_ms: 15000
+    compose_box:
+      primary: textarea[name="text"]
+      fallback: ".DraftJS-editor-container [contenteditable='true'], [contenteditable='true']"
+      wait_timeout_ms: 15000
+    publish_button:
+      primary: button[type="submit"]:has-text("Post")
+      fallback: button:has-text("Post")
+      wait_after_click_ms: 6000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 20
+    success_indicator:
+      method: url_change
+      pattern: /comments/
+  rich_text:
+    enabled: false
+    content_format: markdown_plain
+    inject_method: fill
+    image_handling: file_upload
+  login_check:
+    url: https://www.reddit.com/submit
+    indicator: textarea[name="title"], [name="title"]
+    absent_indicator: "[class*='LoginButton'], a[href*='login']"
+    wait_timeout_ms: 12000
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - GB
+  - CA
+  - AU
+  - DE
+  languages:
+  - en
+  - de
+  - es
+  - fr
+  - pt
+  - it
+  - nl
+  - pl
+  - tr
+  - ru

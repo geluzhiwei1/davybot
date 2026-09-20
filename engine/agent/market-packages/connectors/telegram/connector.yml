@@ -1,0 +1,42 @@
+platform: telegram
+display_name: Telegram 频道
+version: 0.1.0
+capability:
+  publish: api
+  publish_modes: []
+  trending: none
+  metrics: api
+constraints:
+  char_limit: 4096
+  max_files: 10
+  max_video_seconds: 0
+  rich_text: false
+domains:
+- t.me
+# API 轨:Bot API。凭据(oauth_code)= "bot_token|chat_id"(| 分隔,bot token 自带冒号;
+# @BotFather 建 bot 并拉入频道为管理员;chat_id=@channelname 或数字)
+# adapter:app/connectors/telegram.py(sendMessage,纯文本最稳)
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - RU
+  - IN
+  - ID
+  - BR
+  - EG
+  - TR
+  - UA
+  languages:
+  - ru
+  - en
+  - es
+  - ar
+  - id
+  - hi
+  - tr
+  - uk
+  - de
+  - fa
+  - zh

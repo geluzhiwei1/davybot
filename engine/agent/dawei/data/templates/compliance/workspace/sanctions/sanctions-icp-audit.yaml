@@ -1,0 +1,295 @@
+# 合规工作区模板: 内控体系(ICP)成熟度审计（新增）
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# 覆盖维度：⑦ ICP 内控体系
+# 状态码：STATUS_406(FUZZY_THRESHOLD_INSECURE) / STATUS_500(HISTORICAL_VIOLATION) / STATUS_401(ARCHIVE_BREACH) / STATUS_200
+
+template:
+  slug: sanctions-icp-audit
+  name: "内控体系(ICP)成熟度审计"
+  version: "1.0"
+  team_slug: sanctions
+
+  description: |
+    基于 OFAC ICP 五要素测试框架评估企业制裁合规内控体系成熟度，
+    含模糊匹配阈值审计、5年回溯机制验证、档案留痕评估，
+    生成差距分析矩阵和整改路线图。
+
+  applicable_scenarios:
+    - "制裁合规内控体系评估"
+    - "OFAC ICP 五要素审计"
+    - "合规体系整改"
+    - "监管检查准备"
+
+  estimated_time: "45-60 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        store: "input/company_info.json"
+
+      - key: company_scale
+        label: "企业规模"
+        type: select
+        options:
+          - { value: "large", label: "大型企业（年营收 > 50亿）" }
+          - { value: "medium", label: "中型企业（年营收 5-50亿）" }
+          - { value: "small", label: "中小型企业（年营收 < 5亿）" }
+        store: "input/company_info.json"
+
+      - key: international_exposure
+        label: "跨境业务暴露度"
+        type: multiselect
+        options:
+          - "使用美元结算"
+          - "使用美国技术/软件/元器件"
+          - "与高风险国家有业务往来"
+          - "在海外设有子公司/办事处"
+          - "雇佣美国/欧盟国籍员工"
+          - "货物途经/停靠第三国"
+          - "无跨境业务（纯国内）"
+        store: "input/company_info.json"
+
+      - key: compliance_officer
+        label: "是否设有专职制裁合规官/合规总监"
+        type: boolean
+        store: "input/icp_info.json"
+
+      - key: screening_method
+        label: "当前筛查方式"
+        type: select
+        options:
+          - { value: "automated_db", label: "购买自动化筛查数据库" }
+          - { value: "manual_check", label: "人工在监管网站逐个检索" }
+          - { value: "outsourced", label: "外包给第三方合规服务商" }
+          - { value: "none", label: "目前没有系统化筛查" }
+        store: "input/icp_info.json"
+
+      - key: sanctions_lists_covered
+        label: "当前覆盖的制裁名单"
+        type: multiselect
+        options:
+          - "OFAC SDN"
+          - "EU Restrictive Measures"
+          - "UN Sanctions"
+          - "UK OFSI"
+          - "BIS Entity List"
+          - "中国反外国制裁清单"
+          - "均未覆盖"
+        store: "input/icp_info.json"
+
+    optional:
+      - key: fuzzy_match_threshold
+        label: "模糊匹配阈值（%）"
+        type: string
+        placeholder: "当前筛查工具设置的匹配阈值，如 80%"
+        store: "input/icp_info.json"
+
+      - key: compliance_manual_file
+        label: "制裁合规手册/制度文件"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: training_records
+        label: "合规培训记录"
+        type: file
+        accept: ".pdf,.xlsx"
+        store: "input/"
+
+      - key: screening_logs
+        label: "筛查历史日志样本"
+        type: file
+        accept: ".csv,.xlsx"
+        store: "input/"
+
+      - key: archive_retention_years
+        label: "合规档案保存年限"
+        type: select
+        options:
+          - { value: "5plus", label: "≥ 5 年" }
+          - { value: "3to5", label: "3-5 年" }
+          - { value: "below3", label: "< 3 年" }
+          - { value: "unknown", label: "不确定" }
+        store: "input/icp_info.json"
+
+      - key: veto_power
+        label: "合规是否具有一票否决权"
+        type: boolean
+        store: "input/icp_info.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：制裁合规ICP成熟度审计-2026"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/sanctions-icp-audit"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置合规制度文件、培训记录、筛查日志等。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 状态码体系
+
+    | 状态码 | 等级 | 含义 |
+    |--------|------|------|
+    | STATUS_406 (FUZZY_THRESHOLD_INSECURE) | 🟡 增强尽调 | 模糊匹配阈值 < 80% |
+    | STATUS_500 (HISTORICAL_VIOLATION) | 🔴 危机 | 5年回溯发现历史违规 |
+    | STATUS_401 (ARCHIVE_BREACH) | 🟠 限制 | 档案留痕不达标 |
+    | STATUS_200 (ICP_AUDIT_PASS) | 🟢 通过 | ICP 成熟度通过 |
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/company_info.json` — 企业规模、跨境暴露度
+    2. `input/icp_info.json` — 当前筛查方式和制度信息
+    3. `input/task_parameters.json` — 审计参数
+    4. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 根据企业规模和跨境暴露度确定 ICP 基准要求
+    - 制定 OFAC ICP 五要素测试框架
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+
+    a. 管理层承诺评估 (Tone from the Top) → `output/mgmt_commitment.md`
+       - 是否有合规一票否决权
+       - 高管合规宪章/决议书
+
+    b. 风险评估程序评估 → `output/risk_assessment_program.md`
+
+    c. 内部控制措施评估 → `output/internal_controls.md`
+       - 自动化筛查工具配置审查（模糊匹配阈值 ≥80%）
+       - 制裁名单覆盖广度
+       - 交易审批流程中的合规卡点
+
+    d. 审查与审计机制 → `output/audit_mechanism.md`
+       - 5年历史回溯能力 (ICP-LOOKBACK-02)
+       - 名单更新后的自动反向回溯
+
+    e. 专项培训评估 → `output/training_assessment.md`
+
+    f. 档案留痕评估 → `output/archive_retention.md`
+       - 5年档案保存 (ICP-ARCHIVE-03)
+       - 不可篡改审计线索
+
+    g. OFAC ICP 五要素差距矩阵 → `output/icp_gap_matrix.json`
+
+    ### Check (验证)
+    - 对照 OFAC Economic Sanctions Enforcement Guidelines
+    - 对照 EU Guidance on Internal Compliance Programmes
+    - 中国《反外国制裁法》合规要求交叉检查
+
+    ### Act (输出)
+    - 生成 ICP 成熟度审计报告 → `reports/icp_maturity_audit.docx`
+    - 包含：ICP 成熟度雷达图（五要素评分）、差距分析矩阵、
+      整改优先级路线图、模糊匹配阈值建议、筛查名单覆盖建议、
+      档案留痕制度建议、培训计划模板
+
+    ## 重要提示
+    - OFAC ICP 五要素评分标准：0=不存在, 1=严重不足, 2=基本达标, 3=充分有效
+    - 模糊匹配阈值安全线为 ≥80%
+    - 档案保存必须 ≥5 年
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - radar_chart
+      - gap_matrix
+      - remediation_roadmap
+      - fuzzy_threshold_recommendation
+      - screening_coverage
+      - archive_retention
+      - training_plan_template
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_mgmt
+      label: "管理层承诺"
+      progress: 15
+    - name: do_risk
+      label: "风险评估"
+      progress: 15
+    - name: do_controls
+      label: "内部控制"
+      progress: 20
+    - name: do_audit
+      label: "审查机制"
+      progress: 15
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 15
+
+  # ── 对话采集模式配置 ──
+  chat_collection:
+    opening: |
+      你好！我是制裁合规审计顾问。接下来我会引导你提供企业内控体系(ICP)审计所需的信息。
+
+      我们将从企业概况和当前筛查方式开始，然后逐步了解制度文件、培训和档案留痕。
+      整个过程大约需要 10-15 分钟。
+    groups:
+      - name: "企业概况"
+        intro: "首先，让我们了解企业的基本情况。"
+        fields:
+          - company_name
+          - company_scale
+          - international_exposure
+          - task_subject
+      - name: "筛查工具"
+        intro: "接下来了解你当前的筛查方式和工具。"
+        fields:
+          - screening_method
+          - sanctions_lists_covered
+          - fuzzy_match_threshold
+      - name: "制度文件"
+        intro: "请提供合规制度文件和培训记录。"
+        fields:
+          - compliance_officer
+          - veto_power
+          - compliance_manual_file
+          - training_records
+          - screening_logs
+      - name: "档案留痕"
+        intro: "最后确认档案保存情况。"
+        fields:
+          - archive_retention_years

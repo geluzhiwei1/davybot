@@ -1,0 +1,914 @@
+# Copyright (c) 2025 格律至微
+from typing import List, Dict
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""模式管理器 - 重构版本
+支持两级配置加载：builtin, workspace
+（user 层 ~/.normnomos/agents 已于 Phase 4 删除 — P9 死路径；个人定制一律走 workspace 覆盖）
+使用统一的模式定义格式：modes 有 mode 列表，.dawei 目录下是自定义的 rules markdown 文件
+"""
+
+import logging
+from datetime import datetime
+from dawei.core.datetime_compat import UTC
+from pathlib import Path
+
+import yaml
+
+from dawei.entity.mode import ModeConfig
+
+logger = logging.getLogger(__name__)
+
+
+class ModeConfigLoader:
+    """模式配置加载器 - 重构版本"""
+
+    def __init__(self):
+        self._cache: Dict[str, Dict[str, ModeConfig]] = {}
+        self._cache_timestamps: Dict[str, datetime] = {}
+        # 从配置系统读取缓存TTL，默认5分钟
+        from dawei.config.settings import get_settings
+
+        settings = get_settings()
+        self._cache_ttl = settings.agent_execution.mode_cache_ttl
+
+    def _get_cache_key(self, level: str, path: str | None = None) -> str:
+        """获取缓存键"""
+        return f"{level}:{path or 'default'}"
+
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """检查缓存是否有效"""
+        if cache_key not in self._cache_timestamps:
+            return False
+
+        age = (datetime.now(UTC) - self._cache_timestamps[cache_key]).total_seconds()
+        return age < self._cache_ttl
+
+    def _set_cache(self, cache_key: str, configs: Dict[str, ModeConfig]):
+        """设置缓存"""
+        self._cache[cache_key] = configs
+        self._cache_timestamps[cache_key] = datetime.now(UTC)
+
+    def _get_cache(self, cache_key: str) -> Dict[str, ModeConfig] | None:
+        """获取缓存"""
+        if self._is_cache_valid(cache_key):
+            return self._cache.get(cache_key)
+        return None
+
+    def clear_cache(self, level: str | None = None, path: str | None = None) -> None:
+        """清除模式缓存
+
+        Args:
+            level: 配置级别 ("builtin", "workspace", None = 清除所有)
+            path: 路径 (None = 清除所有)
+
+        Examples:
+            >>> # 清除所有缓存
+            >>> loader.clear_cache()
+            >>> # 清除工作区级缓存
+            >>> loader.clear_cache(level="workspace", path="/path/to/workspace")
+        """
+        if level is None and path is None:
+            # 清除所有缓存
+            self._cache.clear()
+            self._cache_timestamps.clear()
+            logger.info("All mode cache cleared")
+        else:
+            # 清除特定缓存
+            cache_key = self._get_cache_key(level, path)
+            if cache_key in self._cache:
+                del self._cache[cache_key]
+                del self._cache_timestamps[cache_key]
+                logger.info(f"Mode cache cleared: level={level}, path={path}")
+            else:
+                logger.debug(f"No cache found for: level={level}, path={path}")
+
+    def _load_modes_from_directory(self, config_dir: Path, level: str) -> Dict[str, ModeConfig]:
+        """通用的模式加载函数，从指定目录加载模式配置
+
+        Args:
+            config_dir: 配置目录路径
+            level: 配置级别 (builtin/workspace)
+
+        Returns:
+            Dict[str, ModeConfig]: 加载的模式配置
+
+        """
+        if not config_dir.exists():
+            logger.debug(f"{level.title()} config directory not found: {config_dir}")
+            return {}
+
+        cache_key = self._get_cache_key(level, str(config_dir))
+        cached = self._get_cache(cache_key)
+        if cached:
+            return cached
+
+        modes = {}
+
+        # 先加载 rules-* 规则目录
+        # 对于 builtin: config_dir = builtin/agents, 查找 rules-*
+        if config_dir.exists():
+            modes.update(self._load_dawei_directory(config_dir))
+
+        # 然后加载 modes 文件（这样可以覆盖规则加载器创建的默认配置）
+        # 对于 builtin: config_dir/.roomode 或 config_dir/modes.yaml
+        modes_file = config_dir / ".roomode"
+        if not modes_file.exists():
+            modes_file = config_dir / "modes.yaml"
+        if modes_file.exists():
+            modes.update(self._load_modes_file(modes_file, modes))
+
+        self._set_cache(cache_key, modes)
+        logger.info(f"Loaded {len(modes)} {level} modes from {config_dir}")
+        return modes
+
+    def load_builtin_modes(self) -> Dict[str, ModeConfig]:
+        """加载内置模式
+
+        扫描 ``builtin/agents/`` 顶层目录及其所有子目录（团队目录）。
+        子目录如 ``patent-team/`` 是系统级 agent，无须安装，始终存在。
+        """
+        builtin_dir = Path(__file__).parent / "builtin" / "agents"
+        modes = self._load_modes_from_directory(builtin_dir, "builtin")
+
+        # 扫描子目录（团队级 agent，如 patent-team/）
+        # 【2026-09-14 R9】iterdir 顺序未定 + modes.update 静默覆盖 → 同 slug 的
+        # 加载结果随文件系统顺序漂移(prepare/export 等通用 slug 在多团队重名)。
+        # 改为按目录名排序 + 冲突告警(仍覆盖, 但可诊断; 治本靠资源侧改名)。
+        if builtin_dir.exists():
+            for team_dir in sorted(builtin_dir.iterdir(), key=lambda p: p.name):
+                if team_dir.is_dir() and not team_dir.name.startswith(".") and not team_dir.name.startswith("_"):
+                    team_modes = self._load_modes_from_directory(team_dir, "builtin")
+                    for _slug in team_modes:
+                        if _slug in modes:
+                            logger.warning(
+                                "[MODE_MANAGER] builtin slug 冲突: %r (%s 覆盖已有定义) — 同名 slug 互相覆盖, 建议资源侧改名",
+                                _slug, team_dir.name,
+                            )
+                    modes.update(team_modes)
+                    logger.debug(f"Loaded {len(team_modes)} builtin modes from team directory: {team_dir.name}")
+
+        return modes
+
+    def load_workspace_modes(self, workspace_path: str) -> Dict[str, ModeConfig]:
+        """加载工作区级模式配置
+
+        支持四个加载路径：
+        1. {workspace}/.dawei/agents/ - 直接存放的 agents
+        2. {workspace}/.dawei/agents/{team-name}/ - 团队目录下的 agents
+        3. {workspace}/.roomodes - Roo Code 模式定义文件（YAML/JSON）
+        4. {workspace}/.roo/rules-{mode}/ - Roo Code 规则目录
+
+        Args:
+            workspace_path: 工作区路径
+
+        Returns:
+            Dict[str, ModeConfig]: 加载的模式配置
+        """
+        workspace_dir = Path(workspace_path)
+        modes = {}
+
+        # 路径1: {workspace}/.dawei/agents/
+        agents_dir = workspace_dir / ".dawei" / "agents"
+        if agents_dir.exists():
+            modes.update(self._load_modes_from_directory(agents_dir, "workspace"))
+
+        # 路径2: {workspace}/.dawei/agents/{team-name}/
+        # 扫描所有团队目录
+        if agents_dir.exists():
+            for team_dir in agents_dir.iterdir():
+                if team_dir.is_dir() and not team_dir.name.startswith("."):
+                    # 加载团队目录下的 modes
+                    team_modes = self._load_modes_from_directory(team_dir, "workspace")
+                    modes.update(team_modes)
+                    logger.debug(f"Loaded {len(team_modes)} modes from team directory: {team_dir.name}")
+
+        # 路径3: {workspace}/.roomodes, .roomodes 或 modes.yaml (Roo Code 兼容)
+        roomodes_file = workspace_dir / ".roomode"
+        if not roomodes_file.exists():
+            roomodes_file = workspace_dir / ".roomodes"
+        if not roomodes_file.exists():
+            roomodes_file = workspace_dir / "modes.yaml"
+        if roomodes_file.exists():
+            roo_modes = self._load_modes_file(roomodes_file, modes)
+            modes.update(roo_modes)
+            logger.debug(f"Loaded {len(roo_modes)} modes from modes file")
+
+        # 路径4: {workspace}/.roo/rules-{mode}/ (Roo Code 规则目录)
+        roo_dir = workspace_dir / ".roo"
+        if roo_dir.exists() and roo_dir.is_dir():
+            roo_rules = self._load_dawei_directory(roo_dir)
+            if roo_rules:
+                # 合并规则到已有模式，或创建新模式
+                for slug, roo_config in roo_rules.items():
+                    if slug in modes:
+                        modes[slug].rules.update(roo_config.rules)
+                    else:
+                        modes[slug] = roo_config
+                logger.debug(f"Loaded {len(roo_rules)} mode rules from .roo/rules-*")
+
+        return modes
+
+    def _load_modes_file(
+        self,
+        file_path: Path,
+        existing_modes: Dict[str, ModeConfig] | None = None,
+    ) -> Dict[str, ModeConfig]:
+        """加载 modes 文件"""
+        modes = {}
+        try:
+            with Path(file_path).open(encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+        except yaml.YAMLError:
+            logger.exception("YAML parsing error in {file_path}: ")
+            return {}
+
+        if data and "customModes" in data and data["customModes"]:
+            # 确保 customModes 是一个列表
+            custom_modes = data["customModes"]
+            if isinstance(custom_modes, list):
+                for mode_data in custom_modes:
+                    if mode_data and "slug" in mode_data:
+                        mode_config = ModeConfig.from_dict(mode_data)
+                        # 如果已存在该模式，保留其规则
+                        if existing_modes and mode_config.slug in existing_modes:
+                            mode_config.rules = existing_modes[mode_config.slug].rules
+                        modes[mode_config.slug] = mode_config
+            else:
+                logger.warning(f"customModes in {file_path} is not a list: {type(custom_modes)}")
+
+        logger.debug(f"Loaded {len(modes)} modes from {file_path}")
+
+        return modes
+
+    def _load_roomodes_file(
+        self,
+        file_path: Path,
+        existing_modes: Dict[str, ModeConfig] | None = None,
+    ) -> Dict[str, ModeConfig]:
+        """加载 Roo Code 格式的 .roomodes 文件
+
+        .roomodes 支持 YAML 和 JSON 两种格式，包含 customModes 列表。
+        字段映射：slug, name, description, roleDefinition -> role_definition,
+        whenToUse -> when_to_use, customInstructions -> custom_instructions, groups
+
+        Args:
+            file_path: .roomodes 文件路径
+            existing_modes: 已有的模式配置（用于保留规则）
+
+        Returns:
+            Dict[str, ModeConfig]: 加载的模式配置
+
+        """
+        modes = {}
+        try:
+            content = file_path.read_text(encoding="utf-8").strip()
+
+            # 尝试 JSON 解析（Roo Code 也支持 JSON 格式）
+            if content.startswith("{") or content.startswith("["):
+                import json
+
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError:
+                    logger.warning(f"JSON parsing error in {file_path}, trying YAML")
+                    data = None
+            else:
+                data = None
+
+            # 如果 JSON 解析失败或不是 JSON，尝试 YAML
+            if data is None:
+                try:
+                    data = yaml.safe_load(content)
+                except yaml.YAMLError:
+                    logger.exception(f"YAML parsing error in {file_path}: ")
+                    return {}
+
+        except (OSError, UnicodeDecodeError) as e:
+            logger.error(f"Failed to read {file_path}: {e}")
+            return {}
+
+        if not data or "customModes" not in data:
+            return {}
+
+        custom_modes = data.get("customModes")
+        if not isinstance(custom_modes, list):
+            logger.warning(f"customModes in {file_path} is not a list: {type(custom_modes)}")
+            return {}
+
+        for mode_data in custom_modes:
+            if not mode_data or "slug" not in mode_data:
+                continue
+
+            # 将 Roo Code 的 camelCase 字段映射到 snake_case
+            mode_config = ModeConfig.from_dict(mode_data)
+
+            # 如果已存在该模式，保留其规则
+            if existing_modes and mode_config.slug in existing_modes:
+                mode_config.rules = existing_modes[mode_config.slug].rules
+
+            # 标记来源为 roo
+            mode_config.source = "roo"
+
+            modes[mode_config.slug] = mode_config
+            logger.debug(f"Loaded Roo Code mode: {mode_config.slug} from {file_path}")
+
+        return modes
+
+    def _load_dawei_directory(self, dawei_dir: Path) -> Dict[str, ModeConfig]:
+        """加载 .dawei 目录下的规则"""
+        modes = {}
+
+        # 查找 rules-{mode} 目录
+        for rules_dir in dawei_dir.glob("rules-*"):
+            mode_slug = rules_dir.name.replace("rules-", "")
+            rules_files = list(rules_dir.glob("*.md"))
+
+            if rules_files:
+                try:
+                    rules_dict = {}
+                    # 从多个 .md 文件加载规则
+                    for rules_file in rules_files:
+                        with Path(rules_file).open(encoding="utf-8") as f:
+                            rules_content = f.read()
+                        # 使用文件名（含扩展名）作为 key
+                        file_key = rules_file.name
+                        rules_dict[file_key] = rules_content
+                        logger.debug(
+                            f"Loaded rules file {file_key} for mode {mode_slug} from {rules_file}",
+                        )
+
+                    # 如果模式已存在，添加规则；否则创建新模式
+                    if mode_slug in modes:
+                        existing_config = modes[mode_slug]
+                        # 合并规则到现有配置
+                        existing_config.rules.update(rules_dict)
+                        modes[mode_slug] = existing_config
+                    else:
+                        # 创建一个临时的模式配置，等待 modes 文件来覆盖
+                        mode_config = ModeConfig(
+                            slug=mode_slug,
+                            name=mode_slug.replace("-", " ").title(),
+                            description=f"Custom mode: {mode_slug}",
+                            role_definition="",
+                            when_to_use="",
+                            source="custom",
+                            custom_instructions="",
+                            rules=rules_dict,
+                        )
+                        modes[mode_slug] = mode_config
+
+                    logger.debug(f"Loaded {len(rules_dict)} rules files for mode {mode_slug}")
+
+                except (OSError, UnicodeDecodeError):
+                    logger.exception("Failed to load rules from {rules_dir}: ")
+                except yaml.YAMLError:
+                    logger.exception("Failed to parse YAML rules from {rules_dir}: ")
+                except KeyError:
+                    logger.exception("Missing required key in rules from {rules_dir}: ")
+                except ValueError:
+                    logger.exception("Invalid value in rules from {rules_dir}: ")
+
+        return modes
+
+    def clear_cache(self):
+        """清除缓存"""
+        self._cache.clear()
+        self._cache_timestamps.clear()
+        logger.info("Mode config cache cleared")
+
+    def set_cache_ttl(self, ttl_seconds: int):
+        """设置缓存TTL
+
+        Args:
+            ttl_seconds: 缓存过期时间（秒）
+        """
+        if ttl_seconds < 60:
+            logger.warning(f"Cache TTL too small ({ttl_seconds}s), using minimum 60s")
+            ttl_seconds = 60
+        self._cache_ttl = ttl_seconds
+        logger.info(f"Mode config cache TTL set to {ttl_seconds}s")
+
+
+class ModeManager:
+    """模式管理器 - 重构版本"""
+
+    def __init__(self, workspace_path: str | None = None):
+        self.loader = ModeConfigLoader()
+        self.workspace_path = workspace_path
+
+        # 两级配置缓存（user 层已删除 — P9 死路径，Phase 4）
+        self._builtin_modes: Dict[str, ModeConfig] = {}
+        self._workspace_modes: Dict[str, ModeConfig] = {}
+
+        # 合并后的模式配置
+        self._merged_modes: Dict[str, ModeConfig] = {}
+
+        # 初始化配置
+        self._load_all_configs()
+
+    def _load_all_configs(self):
+        """加载所有级别的配置"""
+        # 按优先级顺序加载（user 层已删除 — Phase 4/P9）
+        self._builtin_modes = self.loader.load_builtin_modes()
+
+        if self.workspace_path:
+            self._workspace_modes = self.loader.load_workspace_modes(self.workspace_path)
+
+        # 合并配置
+        self._merge_configs()
+
+        logger.info(f"ModeManager initialized with {len(self._merged_modes)} total modes")
+
+    def _merge_configs(self):
+        """合并两级配置，支持同名 slug 的完全覆盖"""
+        self._merged_modes.clear()
+
+        # 按优先级顺序合并：builtin -> workspace
+        # 后面的会完全覆盖前面的同名配置
+
+        # 1. 从 builtin 开始
+        for slug, config in self._builtin_modes.items():
+            self._merged_modes[slug] = config
+
+        # 2. 合并 workspace 配置（完全覆盖）
+        for slug, config in self._workspace_modes.items():
+            self._merged_modes[slug] = config
+
+        logger.debug(f"Merged configurations: {len(self._merged_modes)} modes")
+
+    def set_workspace_path(self, workspace_path: str):
+        """设置工作区路径并重新加载配置"""
+        self.workspace_path = workspace_path
+        self._workspace_modes = self.loader.load_workspace_modes(workspace_path)
+        self._merge_configs()
+        logger.info(f"Workspace path set to {workspace_path}, configs reloaded")
+
+    def get_mode_info(self, mode_slug: str) -> ModeConfig:
+        """获取模式信息，包含规则
+
+        FAST FAIL（mode工具解耦方案 D1）：未知 slug 抛 ModeNotFoundError，
+        不再静默合成默认 ModeConfig（历史事故：别名 slug → groups=[] → tools=[] →
+        模型裸吐 DSML 工具调用，conv d1eae353 2026-09-19）。
+        """
+        if mode_slug in self._merged_modes:
+            return self._merged_modes[mode_slug]
+        from dawei.mode.registry import ModeNotFoundError
+
+        raise ModeNotFoundError(mode_slug, available=sorted(self._merged_modes.keys()))
+
+    def get_all_modes(self) -> Dict[str, ModeConfig]:
+        """获取所有可用模式，包含规则"""
+        return dict(self._merged_modes.items())
+
+    def is_valid_mode(self, mode_slug: str) -> bool:
+        """检查模式是否有效"""
+        return mode_slug in self._merged_modes
+
+    def get_mode_groups(self, mode_slug: str) -> List[str]:
+        """已废弃：mode 与工具解耦后无工具组语义，恒返回空列表"""
+        return []
+
+    def reload_configs(self):
+        """重新加载所有配置"""
+        self.loader.clear_cache()
+        self._load_all_configs()
+        logger.info("All mode configurations reloaded")
+
+    async def load_all_modes(self):
+        """异步重新加载所有模式配置（供 API 调用）
+
+        这个方法与 reload_configs() 相同,但是异步的,
+        便于在异步 API 端点中调用。
+        """
+        self.loader.clear_cache()
+        self._load_all_configs()
+        logger.info("All mode configurations reloaded (async)")
+
+    def get_config_sources(self, mode_slug: str) -> Dict[str, bool]:
+        """获取模式配置来源信息（user 层已删除，仅 builtin/workspace 两级）"""
+        return {
+            "builtin": mode_slug in self._builtin_modes,
+            "workspace": mode_slug in self._workspace_modes,
+        }
+
+    def get_mode_by_level(self, mode_slug: str, level: str) -> ModeConfig | None:
+        """获取指定级别的模式配置"""
+        level_configs = {
+            "builtin": self._builtin_modes,
+            "workspace": self._workspace_modes,
+        }
+
+        return level_configs.get(level, {}).get(mode_slug)
+
+    def get_provider_for_mode(self, mode: str) -> str | None:
+        """获取与指定模式关联的 LLM 提供者名称
+
+        Args:
+            mode: 模式名称
+
+        Returns:
+            LLM 提供者名称，如果没有关联的提供者则返回 None
+
+        """
+        # 获取模式信息（未知 mode 视为无关联提供者，返回 None）
+        from dawei.mode.registry import ModeNotFoundError
+
+        try:
+            mode_info = self.get_mode_info(mode)
+        except ModeNotFoundError:
+            return None
+
+        # 检查模式信息中是否有关联的 LLM 提供者
+        if hasattr(mode_info, "llm_provider") and mode_info.llm_provider:
+            return mode_info.llm_provider
+
+        # 如果模式信息中没有直接指定提供者，返回 None
+        # 调用方需要使用其他逻辑来确定合适的提供者
+        return None
+
+    def delete_mode(self, mode_slug: str, level: str = "workspace") -> bool:
+        """删除指定级别的自定义模式
+
+        Args:
+            mode_slug: 要删除的模式 slug
+            level: 配置级别（仅 "workspace"；user 层已删除）
+
+        Returns:
+            bool: 删除成功返回 True，失败返回 False
+
+        Raises:
+            ValueError: 如果尝试删除内置模式或级别无效
+            OSError: 如果文件系统操作失败
+
+        """
+        # 验证级别（user 层已删除 — Phase 4/P9）
+        if level != "workspace":
+            raise ValueError(f"Invalid level: {level}. Must be 'workspace' (user layer removed)")
+
+        # 检查是否为内置模式
+        if mode_slug in self._builtin_modes:
+            raise ValueError(f"Cannot delete builtin mode: {mode_slug}")
+
+        # 确定配置目录
+        if not self.workspace_path:
+            raise ValueError("Workspace path not set for workspace-level mode deletion")
+        config_dir = Path(self.workspace_path) / ".dawei" / "agents"
+
+        # 删除规则目录 (rules-{mode_slug})
+        rules_dir = config_dir / f"rules-{mode_slug}"
+        if rules_dir.exists():
+            import shutil
+
+            shutil.rmtree(rules_dir)
+            logger.info(f"Deleted rules directory: {rules_dir}")
+
+        # 从 .roomode 中删除模式定义（支持 customModes 和直接列表）
+        modes_file = config_dir / ".roomode"
+        mode_removed = False
+
+        if modes_file.exists():
+            try:
+                with modes_file.open(encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+
+                # 处理 customModes 格式
+                if "customModes" in data and isinstance(data["customModes"], list):
+                    # 过滤掉要删除的模式
+                    original_count = len(data["customModes"])
+                    data["customModes"] = [mode for mode in data["customModes"] if mode.get("slug") != mode_slug]
+
+                    # 如果有删除，写回文件
+                    if len(data["customModes"]) < original_count:
+                        with modes_file.open("w", encoding="utf-8") as f:
+                            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+                        logger.info(f"Removed mode {mode_slug} from customModes in {modes_file}")
+                        mode_removed = True
+                    else:
+                        logger.debug(f"Mode {mode_slug} not found in customModes in {modes_file}")
+
+                # 处理直接列表格式（市场安装的代理可能使用这种格式）
+                elif isinstance(data, list):
+                    original_count = len(data)
+                    data = [mode for mode in data if mode.get("slug") != mode_slug]
+
+                    if len(data) < original_count:
+                        with modes_file.open("w", encoding="utf-8") as f:
+                            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+                        logger.info(f"Removed mode {mode_slug} from modes list in {modes_file}")
+                        mode_removed = True
+                    else:
+                        logger.debug(f"Mode {mode_slug} not found in modes list in {modes_file}")
+
+            except (yaml.YAMLError, OSError) as e:
+                logger.error(f"Failed to update modes file {modes_file}: {e}")
+                raise
+
+        # 如果在主 .roomode 中没有找到，检查市场安装的代理包
+        if not mode_removed and config_dir.exists():
+            for agent_dir in config_dir.iterdir():
+                if agent_dir.is_dir() and (agent_dir / ".roomode").exists():
+                    agent_modes_file = agent_dir / ".roomode"
+                    try:
+                        with agent_modes_file.open(encoding="utf-8") as f:
+                            agent_data = yaml.safe_load(f) or {}
+
+                        # 检查 customModes 格式
+                        if isinstance(agent_data, dict) and "customModes" in agent_data:
+                            custom_modes = agent_data["customModes"]
+                            if isinstance(custom_modes, list):
+                                original_count = len(custom_modes)
+                                agent_data["customModes"] = [mode for mode in custom_modes if mode.get("slug") != mode_slug]
+
+                                if len(agent_data["customModes"]) < original_count:
+                                    with agent_modes_file.open("w", encoding="utf-8") as f:
+                                        yaml.dump(agent_data, f, allow_unicode=True, default_flow_style=False)
+                                    logger.info(f"Removed mode {mode_slug} from market agent package customModes: {agent_modes_file}")
+                                    mode_removed = True
+                                    break
+
+                        # 检查是否是直接列表格式
+                        elif isinstance(agent_data, list):
+                            original_count = len(agent_data)
+                            agent_data = [mode for mode in agent_data if mode.get("slug") != mode_slug]
+
+                            if len(agent_data) < original_count:
+                                with agent_modes_file.open("w", encoding="utf-8") as f:
+                                    yaml.dump(agent_data, f, allow_unicode=True, default_flow_style=False)
+                                logger.info(f"Removed mode {mode_slug} from market agent package: {agent_modes_file}")
+                                mode_removed = True
+                                break
+                    except Exception as e:
+                        logger.warning(f"Failed to check agent package {agent_dir}: {e}")
+
+        # 删除对应的 rules 目录（可能在市场包中）
+        if not mode_removed and config_dir.exists():
+            for agent_dir in config_dir.iterdir():
+                if agent_dir.is_dir():
+                    agent_rules_dir = agent_dir / f"rules-{mode_slug}"
+                    if agent_rules_dir.exists():
+                        import shutil
+
+                        shutil.rmtree(agent_rules_dir)
+                        logger.info(f"Deleted rules directory from market agent package: {agent_rules_dir}")
+                        mode_removed = True
+                        break
+
+        # 清除缓存并重新加载配置
+        self.loader.clear_cache()
+        self._load_all_configs()
+
+        if not mode_removed:
+            logger.warning(f"Mode {mode_slug} was not found in any configuration files")
+
+        logger.info(f"Successfully deleted mode {mode_slug} from {level} level")
+        return True
+
+    def update_mode(self, mode_slug: str, mode_data: dict, level: str = "workspace") -> ModeConfig:
+        """更新指定级别的自定义模式
+
+        Args:
+            mode_slug: 要更新的模式 slug
+            mode_data: 模式数据字典（包含 name, description, roleDefinition 等）
+            level: 配置级别（仅 "workspace"；user 层已删除）
+
+        Returns:
+            ModeConfig: 更新后的模式配置
+
+        Raises:
+            ValueError: 如果尝试更新内置模式或级别无效
+            OSError: 如果文件系统操作失败
+
+        """
+        # 验证级别（user 层已删除 — Phase 4/P9）
+        if level != "workspace":
+            raise ValueError(f"Invalid level: {level}. Must be 'workspace' (user layer removed)")
+
+        # 检查是否为内置模式
+        if mode_slug in self._builtin_modes:
+            raise ValueError(f"Cannot update builtin mode: {mode_slug}")
+
+        # 确定配置目录
+        if not self.workspace_path:
+            raise ValueError("Workspace path not set for workspace-level mode update")
+        config_dir = Path(self.workspace_path) / ".dawei" / "agents"
+
+        # 确保配置目录存在
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        # 加载或创建 .roomode
+        modes_file = config_dir / ".roomode"
+        if modes_file.exists():
+            try:
+                with modes_file.open(encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+            except (yaml.YAMLError, OSError) as e:
+                logger.error(f"Failed to load modes file {modes_file}: {e}")
+                raise
+        else:
+            data = {"customModes": []}
+
+        # 确保 customModes 存在
+        if "customModes" not in data or not isinstance(data["customModes"], list):
+            data["customModes"] = []
+
+        # 查找并更新或添加模式
+        mode_found = False
+        for i, mode in enumerate(data["customModes"]):
+            if isinstance(mode, dict) and mode.get("slug") == mode_slug:
+                # 更新现有模式
+                data["customModes"][i] = mode_data
+                mode_found = True
+                logger.info(f"Updating existing mode {mode_slug} in {modes_file}")
+                break
+
+        if not mode_found:
+            # 添加新模式
+            data["customModes"].append(mode_data)
+            logger.info(f"Adding new mode {mode_slug} to {modes_file}")
+
+        # 写回文件
+        try:
+            with modes_file.open("w", encoding="utf-8") as f:
+                yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+            logger.info(f"Successfully updated modes file: {modes_file}")
+        except (yaml.YAMLError, OSError) as e:
+            logger.error(f"Failed to write modes file {modes_file}: {e}")
+            raise
+
+        # 清除缓存并重新加载配置
+        self.loader.clear_cache()
+        self._load_all_configs()
+
+        # 返回更新后的配置
+        return self._merged_modes.get(mode_slug)
+
+    def update_mode_rules(self, mode_slug: str, rules_content: str, rules_filename: str = "mode", level: str = "workspace") -> bool:
+        """更新指定级别的模式规则文件
+
+        Args:
+            mode_slug: 模式 slug
+            rules_content: 规则内容（markdown 字符串）
+            rules_filename: 规则文件名（默认 "mode"，会保存为 mode.md）
+            level: 配置级别（仅 "workspace"；user 层已删除）
+
+        Returns:
+            bool: 更新成功返回 True
+
+        Raises:
+            ValueError: 如果尝试更新内置模式的规则或级别无效
+            OSError: 如果文件系统操作失败
+
+        """
+        # 验证级别（user 层已删除 — Phase 4/P9）
+        if level != "workspace":
+            raise ValueError(f"Invalid level: {level}. Must be 'workspace' (user layer removed)")
+
+        # 检查是否为内置模式
+        if mode_slug in self._builtin_modes:
+            raise ValueError(f"Cannot update rules for builtin mode: {mode_slug}")
+
+        # 确定配置目录
+        if not self.workspace_path:
+            raise ValueError("Workspace path not set for workspace-level mode update")
+        config_dir = Path(self.workspace_path) / ".dawei" / "agents"
+
+        # 创建或更新规则目录
+        rules_dir = config_dir / f"rules-{mode_slug}"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+
+        # 写入规则文件
+        rules_file = rules_dir / f"{rules_filename}.md"
+        try:
+            with rules_file.open("w", encoding="utf-8") as f:
+                f.write(rules_content)
+            logger.info(f"Successfully updated rules file: {rules_file}")
+        except OSError as e:
+            logger.error(f"Failed to write rules file {rules_file}: {e}")
+            raise
+
+        # 清除缓存并重新加载配置
+        self.loader.clear_cache()
+        self._load_all_configs()
+
+        return True
+
+    def get_mode_rules(self, mode_slug: str, rules_filename: str = "mode") -> str | None:
+        """获取模式的规则文件内容
+
+        Args:
+            mode_slug: 模式 slug
+            rules_filename: 规则文件名（默认 "mode"，读取 mode.md）
+
+        Returns:
+            str | None: 规则文件内容，如果不存在返回 None
+
+        """
+        content, _ = self.get_mode_rules_with_path(mode_slug, rules_filename)
+        return content
+
+    def get_mode_rules_with_path(self, mode_slug: str, rules_filename: str = "mode") -> tuple[str | None, str | None]:
+        """获取模式的规则文件内容和路径
+
+        Args:
+            mode_slug: 模式 slug
+            rules_filename: 规则文件名（默认 "mode"，读取 mode.md）
+
+        Returns:
+            tuple[str | None, str | None]: (规则文件内容, 规则文件路径)，如果不存在返回 (None, None)
+
+        """
+        # 从合并后的配置中获取规则
+        mode_info = self._merged_modes.get(mode_slug)
+        if not mode_info or not mode_info.rules:
+            return None, None
+
+        # 返回指定的规则文件内容
+        content = mode_info.rules.get(rules_filename)
+        if content is None:
+            return None, None
+
+        # 查找规则文件的实际路径
+        rules_path = self._find_rules_file_path(mode_slug, rules_filename)
+
+        return content, rules_path
+
+    def _find_rules_file_path(self, mode_slug: str, rules_filename: str) -> str | None:
+        """查找规则文件的实际路径
+
+        Args:
+            mode_slug: 模式 slug
+            rules_filename: 规则文件名
+
+        Returns:
+            str | None: 规则文件的绝对路径，如果找不到返回 None
+
+        """
+        # 构建可能的规则目录名称
+        rules_dir_name = f"rules-{mode_slug}"
+        rules_file_name = f"{rules_filename}.md"
+
+        # 按优先级搜索：workspace > builtin（user 层已删除）
+        search_paths = []
+
+        # 1. 工作区级别的 agents 目录
+        if self.workspace_path:
+            workspace_agents = Path(self.workspace_path) / ".dawei" / "agents"
+            # 工作区根目录的 rules-{mode}
+            search_paths.append(workspace_agents / rules_dir_name / rules_file_name)
+            # 市场包的 rules-{mode}
+            if workspace_agents.exists():
+                for agent_dir in workspace_agents.iterdir():
+                    if agent_dir.is_dir():
+                        search_paths.append(agent_dir / rules_dir_name / rules_file_name)
+
+        # 2. 内置模式
+        builtin_agents = Path(__file__).parent / "builtin" / "agents"
+        if builtin_agents.exists():
+            search_paths.append(builtin_agents / rules_dir_name / rules_file_name)
+
+        # 返回第一个存在的文件路径
+        for path in search_paths:
+            if path.exists() and path.is_file():
+                return str(path.absolute())
+
+        return None
+
+    def _find_rules_directory(self, mode_slug: str) -> str | None:
+        """查找规则目录的路径
+
+        Args:
+            mode_slug: 模式 slug
+
+        Returns:
+            str | None: 规则目录的绝对路径，如果找不到返回 None
+
+        """
+        # 构建可能的规则目录名称
+        rules_dir_name = f"rules-{mode_slug}"
+
+        # 按优先级搜索：workspace > builtin（user 层已删除）
+        search_dirs = []
+
+        # 1. 工作区级别的 agents 目录
+        if self.workspace_path:
+            workspace_agents = Path(self.workspace_path) / ".dawei" / "agents"
+            # 工作区根目录的 rules-{mode}
+            search_dirs.append(workspace_agents / rules_dir_name)
+            # 市场包的 rules-{mode}
+            if workspace_agents.exists():
+                for agent_dir in workspace_agents.iterdir():
+                    if agent_dir.is_dir():
+                        search_dirs.append(agent_dir / rules_dir_name)
+
+        # 2. 内置模式
+        builtin_agents = Path(__file__).parent / "builtin" / "agents"
+        if builtin_agents.exists():
+            search_dirs.append(builtin_agents / rules_dir_name)
+
+        # 返回第一个存在的目录路径
+        for dir_path in search_dirs:
+            if dir_path.exists() and dir_path.is_dir():
+                return str(dir_path.absolute())
+
+        return None

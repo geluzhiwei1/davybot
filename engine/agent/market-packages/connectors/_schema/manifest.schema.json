@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "social-connector-manifest",
+  "title": "Social Connector Manifest",
+  "description": "平台连接器能力声明(与 social-control OpenAPI ConnectorManifest 对齐)。市场包仅含声明式资产,不含可执行代码(PRD §11.3)。",
+  "type": "object",
+  "required": ["platform", "display_name", "publish", "trending", "metrics", "selectors_version"],
+  "additionalProperties": false,
+  "properties": {
+    "platform": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "平台 slug,全局唯一,如 xiaohongshu / wechat_mp / x"
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "publish": { "enum": ["api", "browser", "none"] },
+    "publish_modes": {
+      "type": "array",
+      "items": { "enum": ["direct", "draft_box"] },
+      "uniqueItems": true,
+      "description": "browser 发布支持的模式;draft_box=平台草稿箱(推荐)"
+    },
+    "trending": { "enum": ["api", "browser", "none"] },
+    "metrics": { "enum": ["api", "browser", "none"] },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "char_limit": { "type": "integer", "minimum": 1 },
+        "max_files": { "type": "integer", "minimum": 1 },
+        "max_video_seconds": { "type": "integer", "minimum": 1 },
+        "rich_text": { "type": "boolean" }
+      }
+    },
+    "selectors_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "selectors.yml 语义版本;不兼容变更升主版本触发钉扎提醒"
+    },
+    "compose_domain_whitelist": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "浏览器轨 compose URL 域名白名单(防注入导航,PRD §11.4)"
+    },
+    "adapter": {
+      "enum": ["none", "api"],
+      "default": "none",
+      "description": "api=代码适配器位于 social-control app/connectors/{platform}/,此处仅标记"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "identifier": "com.normnomos.app",
+  "build": {
+    "beforeBuildCommand": "npm run build:mobile",
+    "beforeDevCommand": "npm run dev:mobile"
+  },
+  "bundle": {
+    "externalBin": []
+  }
+}

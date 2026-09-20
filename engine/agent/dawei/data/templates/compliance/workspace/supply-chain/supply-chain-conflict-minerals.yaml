@@ -1,0 +1,168 @@
+# 合规工作区模板: 冲突矿产合规
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: supply-chain-conflict-minerals
+  name: "冲突矿产合规"
+  version: "1.0"
+  team_slug: supply-chain
+
+  description: |
+    基于 Dodd-Frank 1502 条款和欧盟冲突矿产法规，对企业供应链中的
+    3TG (锡、钽、钨、金) 进行溯源和合规报告。
+
+  applicable_scenarios:
+    - "美国 SEC 披露义务"
+    - "欧盟冲突矿产法规"
+    - "供应商 CMRT 调查"
+    - "负责任矿产采购"
+
+  estimated_time: "20-30 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入待评估企业全称"
+        store: "input/company_info.json"
+
+      - key: is_sec_registrant
+        label: "是否为 SEC 注册发行人"
+        type: boolean
+        default: false
+        store: "input/company_info.json"
+
+      - key: minerals_involved
+        label: "涉及的冲突矿产"
+        type: multiselect
+        options: ["锡 (Sn)", "钽 (Ta)", "钨 (W)", "金 (Au)", "钴 (Co)", "云母"]
+        store: "input/task_parameters.json"
+
+      - key: supply_tier_depth
+        label: "供应链追溯深度"
+        type: select
+        options:
+          - { value: tier1, label: "Tier 1 (直接供应商)" }
+          - { value: tier2, label: "Tier 2 (次级供应商)" }
+          - { value: tier3, label: "Tier 3+ (原始冶炼)" }
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: previous_cmrt
+        label: "过往 CMRT 报告"
+        type: file
+        accept: ".xlsx,.csv,.pdf"
+        store: "input/"
+
+      - key: smelter_list
+        label: "已知冶炼厂清单"
+        type: text
+        placeholder: "列出已知冶炼厂/精炼厂名称..."
+        store: "input/company_info.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：2025年度冲突矿产合规报告"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/supply-chain-conflict-minerals"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的冲突矿产数据和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解冲突矿产合规义务范围
+    - 根据合规清单制定 RCOI (原产国调查) 执行计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 产品/物料 3TG 成分识别 → `output/materials_3tg_inventory.json`
+    b. 供应商 RCOI 调查模板填充 → `output/rcoi_survey_template.md`
+    c. 冶炼厂/精炼厂合规性核查 → `output/smelter_compliance_check.csv`
+    d. 冲突矿产报告 (CMR) 框架填充 → `output/cmr_draft.md`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证追溯链条完整性
+    - 确认冶炼厂是否在 RMI 合规清单中
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成最终冲突矿产合规报告 → `reports/conflict_minerals_report.docx`
+    - 报告必须包含：执行摘要、产品3TG成分清单、RCOI调查结果、冶炼厂合规状态、SEC Form SD 披露建议、改进建议（按优先级）
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - CMRT 表格使用 RMI 标准模板格式
+    - 不确定的冶炼厂信息标注"待确认"
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - product_3tg_inventory
+      - rcoi_results
+      - smelter_compliance
+      - form_sd_recommendations
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_inventory
+      label: "3TG 成分识别"
+      progress: 25
+    - name: do_rcoi
+      label: "原产国调查"
+      progress: 30
+    - name: do_smelter
+      label: "冶炼厂核查"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 5

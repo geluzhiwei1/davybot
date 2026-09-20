@@ -1,0 +1,109 @@
+template:
+  slug: idea-evaluation-ai
+  name: "AI/软件创新可专利性评估"
+  version: "1.0"
+  module: ip-idea-vault
+  team_slug: ip-idea-vault
+
+  description: |
+    针对人工智能、算法、软件方法类技术创新的可专利性评估。
+    重点关注算法的新颖性、技术效果、以及客体适格性（专利法第二条）。
+
+  data_requirements:
+    required:
+      - key: description
+        label: "技术创意描述"
+        type: string
+        placeholder: "请描述您的AI/软件创新（算法原理、技术方案、应用场景，200字以上）"
+        store: "input/task_params.json"
+    optional:
+      - key: tech_field
+        label: "技术领域"
+        type: select
+        placeholder: "选择子领域"
+        default: ""
+        options:
+          - value: ""
+            label: "请选择"
+          - value: "机器学习"
+            label: "机器学习/深度学习"
+          - value: "自然语言处理"
+            label: "自然语言处理 (NLP)"
+          - value: "计算机视觉"
+            label: "计算机视觉"
+          - value: "推荐系统"
+            label: "推荐系统/搜索算法"
+          - value: "系统软件"
+            label: "操作系统/数据库/中间件"
+          - value: "软件架构"
+            label: "软件架构/微服务"
+        store: "input/task_params.json"
+      - key: prior_art
+        label: "已知的现有技术"
+        type: string
+        placeholder: "已有专利、论文、开源项目等"
+        store: "input/task_params.json"
+      - key: technical_effect
+        label: "技术效果"
+        type: string
+        placeholder: "如：推理速度提升、准确率提高、资源占用降低"
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+
+  checklists:
+    - ref: "checklist/patentability-check"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/checklists
+      description: "可专利性检查清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入 AI/软件创新可专利性评估工作区，请按照 PDCA 工作流执行。
+
+    ## 评估重点
+    本模板专注于**人工智能与软件方法类**创新，需特别关注：
+    1. **客体适格性**：是否符合专利法第二条（技术方案三要素）
+    2. **智力活动规则排除**：是否仅为算法/数学方法/商业规则（专利法第二十五条）
+    3. **技术特征**：算法与技术手段的结合是否产生技术效果
+    4. **新颖性与创造性**：与现有AI技术的区别技术特征
+
+    ## 输入数据
+    1. `input/task_params.json` — 技术创意描述、技术子领域、技术效果
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 理解AI/软件创意，确定评估维度
+    ### Do: 客体适格性分析、新颖性分析、创造性分析、技术效果评估
+    ### Check: 核对可专利性清单（重点关注AI专利审查指南）
+    ### Act: 生成评估报告 → `output/patentability_report.md`
+
+  deliverables:
+    - file: "output/patentability_report.md"
+      name: "AI创新可专利性评估报告"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "理解创意"
+      progress: 15
+    - name: do
+      label: "三性+客体分析"
+      progress: 50
+    - name: check
+      label: "核验清单"
+      progress: 20
+    - name: act
+      label: "生成报告"
+      progress: 15

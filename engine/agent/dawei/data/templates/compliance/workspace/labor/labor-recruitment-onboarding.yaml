@@ -1,0 +1,247 @@
+# 合规工作区模板: 招聘与入职管理合规审查
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# 覆盖维度：Ch 4 招聘与入职管理
+# 状态码：STATUS_403(歧视性JD) / STATUS_401(试用期超限) / STATUS_406(Offer缩水) / STATUS_200(通过)
+
+template:
+  slug: labor-recruitment-onboarding
+  name: "招聘与入职管理合规审查"
+  version: "1.0"
+  team_slug: labor
+
+  description: |
+    基于 EEO 非歧视铁律、多法域试用期强行法、Offer 跨境穿透校验，
+    对企业招聘全流程进行合规审查，覆盖 JD 歧视性扫描、Offer 条款审查、
+    试用期量化考核及背景调查数据最小化。
+
+  applicable_scenarios:
+    - "JD 合规审查"
+    - "Offer 发放"
+    - "试用期制度"
+    - "招聘流程审计"
+
+  estimated_time: "25-35 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入贵司全称"
+        store: "input/company_info.json"
+
+      - key: recruitment_documents
+        label: "招聘相关文件"
+        type: file
+        accept: ".pdf,.docx,.txt,.xlsx"
+        store: "input/"
+        description: "上传招聘简章(JD)、Offer Letter、劳动合同模板、试用期考核标准等文件"
+
+      - key: target_jurisdictions
+        label: "招聘目标法区"
+        type: multiselect
+        options:
+          - "中国内地"
+          - "美国（含加州）"
+          - "英国"
+          - "德国"
+          - "法国"
+          - "日本"
+          - "新加坡"
+          - "阿联酋"
+          - "澳大利亚"
+          - "印度"
+          - "其他（请在备注说明）"
+        store: "input/task_parameters.json"
+
+      - key: hiring_stage
+        label: "当前招聘阶段"
+        type: select
+        options:
+          - { value: "jd_drafting", label: "JD 起草阶段" }
+          - { value: "interviewing", label: "面试进行中" }
+          - { value: "offer_stage", label: "Offer 发放阶段" }
+          - { value: "onboarding", label: "入职/试用期阶段" }
+          - { value: "full_audit", label: "全流程审查" }
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: job_posting_url
+        label: "招聘发布链接/截图"
+        type: text
+        placeholder: "粘贴招聘网站链接，或描述发布平台的名称"
+        store: "input/task_parameters.json"
+
+      - key: probation_policy
+        label: "试用期制度说明"
+        type: text
+        placeholder: "描述当前试用期时长、考核标准、转正流程"
+        store: "input/task_parameters.json"
+
+      - key: background_check_policy
+        label: "背景调查政策"
+        type: text
+        placeholder: "描述当前的背调流程和范围（如学历验证、前雇主核实、犯罪记录查询）"
+        store: "input/task_parameters.json"
+
+      - key: past_recruitment_issues
+        label: "过往招聘合规问题"
+        type: text
+        placeholder: "是否有因歧视性招聘被投诉、试用期解雇败诉等经历"
+        store: "input/task_parameters.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：海外招聘流程合规审查"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/labor-recruitment-onboarding"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要审查的招聘文件和相关信息。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 状态码体系
+
+    | 状态码 | 等级 | 含义 |
+    |--------|------|------|
+    | STATUS_403 (CRITICAL_LOCK) | 🔴 全线阻断 | JD 包含歧视性限制，触犯全球核心劳工法 |
+    | STATUS_401 (ILLEGAL) | 🟠 违法 | 试用期时限超出法定上限 / Offer 条件缩水 |
+    | STATUS_302 (WARNING) | 🟢 预警 | 试用期解雇举证断档，败诉风险高达 95% |
+    | STATUS_406 (NOT_ACCEPTABLE) | 🟡 不合格 | 阿联酋 Offer 福利缩水触发 MOHRE 强行法 |
+    | STATUS_200 (OK) | ✅ 通过 | 招聘入职流程通过 |
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，识别 JD/Offer/合同/考核标准各环节
+    - 制定多法域招聘合规审查方案
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 招聘简章(JD)歧视性红线扫描 → `output/jd_discrimination_scan.md`
+       - 年龄、性别、地域、婚姻状况等非业务客观因素过滤 [CODE: REC-01]
+       - 美国 ADEA、德国 AGG、中国就业促进法交叉审查
+    b. 试用期制度审查 → `output/probation_review.md`
+       - 试用期最高时限本地强行法校验 [CODE: REC-02]
+       - 试用期量化考核标准完备性
+       - 入职 5 日内 KPI 确认书签收
+    c. Offer/合同跨境穿透审查 → `output/offer_contract_review.md`
+       - 阿联酋 Offer 福利不得缩水校验 [CODE: REC-03]
+       - 跨境多发 Offer 的法律一致性
+    d. 背景调查合规性审查 → `output/background_check_review.md`
+       - 数据收集最小化原则
+       - GDPR/PIPL 候选人知情同意
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 各法区招聘全流程无歧视盲点
+    - 试用期解雇举证链闭环
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成招聘与入职合规审查报告 → `reports/recruitment_onboarding_review.docx`
+    - 报告必须包含：JD 歧视性扫描结果、Offer 条款审查、试用期制度合规评估、
+      状态码判定、整改建议
+    - 如发现 STATUS_403 级歧视性 JD，在报告末尾附言："⚠️ 建议修正后重新提交审查。"
+    - 如发现试用期制度缺陷，附言："⚠️ 建议进一步启动「绩效管理与解聘合规评估」模板 (labor-termination-assessment) 审查 PIP 程序。"
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - JD 歧视性审查必须覆盖所有适用法区的反歧视法规
+    - 阿联酋 MOHRE 规定 Offer 条件不得低于劳动合同
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - recruitment_overview
+      - jd_discrimination_scan
+      - probation_review
+      - offer_contract_review
+      - background_check_review
+      - status_code_matrix
+      - remediation_recommendations
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_jd_scan
+      label: "JD 歧视性扫描"
+      progress: 25
+    - name: do_probation
+      label: "试用期审查"
+      progress: 25
+    - name: do_offer_review
+      label: "Offer 审查"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10
+
+  # ── 对话采集模式配置 ──
+  chat_collection:
+    opening: |
+      你好！我是招聘与入职合规审查顾问。接下来我会引导你提供招聘流程审查所需的信息。
+
+      整个过程大约需要 5-8 分钟。你可以一次提供所有信息，也可以逐步回答。
+    groups:
+      - name: "招聘概况"
+        intro: "首先，请告诉我基本信息和招聘文件。"
+        fields:
+          - company_name
+          - hiring_stage
+          - recruitment_documents
+          - job_posting_url
+      - name: "JD/Offer 审查"
+        intro: "请确认招聘目标法区和相关制度。"
+        fields:
+          - target_jurisdictions
+          - probation_policy
+          - past_recruitment_issues
+      - name: "补充信息"
+        fields:
+          - background_check_policy
+          - task_subject

@@ -1,0 +1,270 @@
+template:
+  slug: trademark-madrid
+  name: "马德里国际商标注册规划"
+  version: "1.0"
+  module: ip-trademark
+  team_slug: ip-trademark
+
+  description: |
+    马德里体系国际商标注册全流程规划：基础申请评估、指定国选择、
+    期限管理、临时驳回应对、中心打击防御。支持 130+ 成员国。
+
+  data_requirements:
+    required:
+      - key: trademark_name
+        label: "商标名称/图样描述"
+        type: string
+        placeholder: "商标名称（需与基础申请一致）"
+        store: "input/task_params.json"
+      - key: basic_application
+        label: "基础申请信息"
+        type: string
+        placeholder: "基础申请国+申请号/注册号（如：CN, 12345678）"
+        store: "input/task_params.json"
+      - key: target_countries
+        label: "目标指定国"
+        type: string
+        placeholder: "如：US, EU, JP, KR, RU, IN, BR, AU（逗号分隔）"
+        store: "input/task_params.json"
+    optional:
+      - key: goods_services
+        label: "商品/服务清单"
+        type: string
+        placeholder: "尼斯分类商品/服务描述（将用于国际注册）"
+        store: "input/task_params.json"
+      - key: color_claim
+        label: "颜色主张"
+        type: select
+        default: "no"
+        options:
+          - { value: "no", label: "不主张颜色（黑白）" }
+          - { value: "yes", label: "主张颜色（需注明具体颜色）" }
+        store: "input/task_params.json"
+      - key: priority_claim
+        label: "优先权主张"
+        type: string
+        placeholder: "首次申请国+日期（如：CN, 2024-03-15）"
+        store: "input/task_params.json"
+      - key: budget_range
+        label: "预算约束"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "不限" }
+          - { value: "low", label: "经济型（优先核心市场）" }
+          - { value: "medium", label: "标准型" }
+          - { value: "high", label: "充裕型（广泛指定）" }
+        store: "input/task_params.json"
+      - key: basic_status
+        label: "基础申请状态"
+        type: select
+        default: "pending"
+        options:
+          - { value: "pending", label: "已申请未注册（可基于申请提交）" }
+          - { value: "registered", label: "已注册（基于注册提交更稳定）" }
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/trademark-law
+
+  checklists:
+    - ref: "checklist/madrid-filing"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "基础申请文件"
+    - dir: input/checklists
+      description: "马德里申请清单"
+    - dir: output
+      description: "规划产出"
+    - dir: drafts
+      description: "注册规划方案"
+    - dir: references
+      description: "马德里体系参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入马德里国际商标注册规划工作区，请按照 PDCA 工作流执行。
+
+    ## 马德里体系基本规则
+
+    ### 体系概述
+    - **主管局**：WIPO 国际局
+    - **成员**：130+ 个国家/地区（覆盖世界贸易的80%+）
+    - **语言**：英语、法语、西班牙语（三选一）
+    - **一件申请**：通过原属局向 WIPO 提交一份国际申请，指定多个成员国
+
+    ### 基础申请/注册要求（Home Base）
+    | 基础类型 | 说明 | 风险 |
+    |---------|------|------|
+    | 基于申请（Section 1） | 基础国申请号即可，无需等到注册 | 中心打击风险高 |
+    | 基于注册（Section 2） | 基础国注册证 | 更稳定，推荐 |
+
+    **中心打击（Central Attack）风险**：
+    - 国际注册前5年内，基础申请/注册被驳回/撤销/放弃 → 国际注册随之失效
+    - **防御措施**：可将国际注册转化为各指定国的国内申请（Transformation），但有期限
+
+    ## 指定国策略
+
+    ### 指定国选择因素
+
+    | 因素 | 说明 | 权重 |
+    |------|------|------|
+    | 主要市场 | 产品/服务的主要销售市场 | 最高 |
+    | 制造地 | 生产加工所在地（防假冒） | 高 |
+    - 竞争对手所在地 | 需在竞争对手所在国防御 | 中 |
+    | 物流中转地 | 贸易中转/仓储地 | 中 |
+    | 投资目的地 | 未来计划进入的市场 | 中低 |
+    | 费用效率 | 各国单独申请费 vs 马德里指定费对比 | 经济因素 |
+
+    ### 主要指定国费用与审查特点
+
+    | 指定国 | 指定费（CHF） | 审查期限 | 实质审查 | 特别注意 |
+    |-------|-------------|---------|---------|---------|
+    | 美国 US | 301（3类以内） | 18个月 | 是 | 需提交使用证据/意图使用声明 |
+    | 欧盟 EU | 897（3类以内） | 18个月 | 仅绝对理由 | 一件保护27国 |
+    | 日本 JP | 301（3类以内） | 18个月 | 是 | — |
+    | 韩国 KR | 301（3类以内） | 18个月 | 是 | — |
+    | 英国 GB | 301（3类以内） | 18个月 | 是 | 脱欧后单独指定 |
+    | 俄罗斯 RU | 301（3类以内） | 18个月 | 是 | — |
+    | 印度 IN | 301（3类以内） | 18个月 | 是 | — |
+    | 巴西 BR | 752（3类以内） | 18个月 | 是 | 费用较高 |
+    | 澳大利亚 AU | 301（3类以内） | 18个月 | 是 | — |
+    | 加拿大 CA | 226（3类以内） | 18个月 | 是 | 费用较低 |
+
+    *注：费用以 WIPO 官网最新标准为准，可能有调整。*
+
+    ### 马德里 vs 逐一国家申请
+
+    | 对比维度 | 马德里体系 | 逐一国家申请 |
+    |---------|-----------|------------|
+    | 申请数量 | 一件申请指定多国 | 每国一件申请 |
+    | 费用（5国以上） | 通常更经济 | 费用较高 |
+    | 费用（2-3国） | 可能不经济 | 可能更便宜 |
+    | 语言 | 统一（英/法/西） | 各国语言 |
+    | 代理人 | 原属局一个代理人 | 每国需当地代理人 |
+    | 灵活性 | 受基础申请约束 | 独立 |
+    | 中心打击风险 | 有（前5年） | 无 |
+    | 管理便利性 | 集中管理 | 分散管理 |
+
+    ## 国际注册时间线
+
+    | 阶段 | 时间 | 说明 |
+    |------|------|------|
+    | 提交国际申请 | T+0 | 通过原属局向 WIPO 提交 |
+    | 形式审查 | 2-4周 | WIPO 形式审查 |
+    - 国际注册公告 | T+1~2月 | WIPO 国际注册公告 |
+    | 通知指定国 | T+2~3月 | WIPO 通知各指定国商标局 |
+    | 指定国审查 | 12-18个月 | 各指定国在18个月内决定 |
+    | 临时驳回（如有） | 审查期内 | 指定国发出临时驳回通知 |
+    | 最终保护/驳回 | 18个月后 | 未驳回则视为保护 |
+
+    **关键期限**：
+    - 指定国审查期限：**18个月**（从国际公告之日起）
+    - 18个月内未发出临时驳回 → 视为在该国获得保护
+    - 临时驳回后答辩期限：各国不同（通常6个月起）
+
+    ## 临时驳回（Provisional Refusal）应对
+
+    | 驳回理由 | 常见国家 | 应对策略 |
+    |---------|---------|---------|
+    | 绝对理由（显著性不足） | 多数国家 | 修改/答辩/提供使用证据 |
+    | 相对理由（近似商标） | 美国、日本、韩国 | 答辩/共存协议/无效在先商标 |
+    - 商品/服务描述不规范 | 美国（最常见） | 修改描述以符合美国习惯 |
+    | 使用证据不足（美国） | 美国 | 提交使用证据或转为意图使用 |
+
+    美国临时驳回（Office Action）特殊处理：
+    - 美国是马德里申请中**最容易临时驳回**的国家
+    - 常见驳回：商品描述不规范、需要使用证据
+    - 答辩需通过美国当地代理人
+    - 未答辩 → 该国保护失效
+
+    ## 分析方法论
+
+    ### Step 1: 基础申请评估
+    - 确认基础申请/注册的有效性
+    - 评估中心打击风险
+    - 确认基础申请覆盖的商品/服务范围
+
+    ### Step 2: 指定国选择
+    1. 根据市场战略确定候选国
+    2. 计算马德里指定费用 vs 逐一申请费用
+    3. 考虑各国审查特点（美国使用证据要求等）
+    4. 确定最终指定国清单
+
+    ### Step 3: 费用估算
+    | 费用项 | 金额（CHF） | 备注 |
+    |-------|-----------|------|
+    | 基础费 | 653 | 固定 |
+    | 指定费 | 各国累计 | 按指定国数量 |
+    | 附加费（超3类） | 100/类 | 超过3个类别时 |
+    | 原属局传送费 | 各国不同 | 中国：不另收 |
+    - 代理人费用 | 各代理所报价 | — |
+    | **合计** | | |
+
+    ### Step 4: 期限管理与风险防御
+    - 制定中心打击防御方案（如有必要，准备转化申请）
+    - 预判各国临时驳回可能性
+    - 准备各国答辩材料清单
+
+    ## 输入数据
+    1. `input/task_params.json` — 商标信息、基础申请、目标国、预算
+    2. `input/inherited/` — 基础申请文件
+    3. `input/checklists/` — 马德里申请检查清单
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 评估基础申请，确认指定国，制定注册策略
+    ### Do:
+    - 指定国选择与费用计算
+    - 商品/服务描述国际化
+    - 中心打击风险评估
+    - 临时驳回预案制定
+    - 各国特殊要求准备
+    ### Check: 核对费用计算，验证商品描述一致性，确认期限管理
+    ### Act: 生成注册规划方案 + 费用明细 + 时间线
+
+  deliverables:
+    - file: "drafts/madrid_registration_plan.md"
+      name: "马德里国际注册规划方案"
+      format: markdown
+    - file: "output/designated_countries.md"
+      name: "指定国分析与选择"
+      format: markdown
+    - file: "output/fee_estimate.md"
+      name: "费用估算明细"
+      format: markdown
+    - file: "output/timeline_management.md"
+      name: "时间线与期限管理"
+      format: markdown
+    - file: "output/central_attack_defense.md"
+      name: "中心打击防御方案"
+      format: markdown
+    - file: "output/provisional_refusal_prep.md"
+      name: "临时驳回应对预案"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "评估基础申请"
+      progress: 10
+    - name: do_countries
+      label: "指定国选择"
+      progress: 25
+    - name: do_fees
+      label: "费用计算"
+      progress: 20
+    - name: do_risk
+      label: "风险评估与防御"
+      progress: 20
+    - name: check
+      label: "核对验证"
+      progress: 15
+    - name: act
+      label: "输出方案"
+      progress: 10

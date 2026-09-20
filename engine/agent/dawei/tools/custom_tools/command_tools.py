@@ -1,0 +1,598 @@
+# Copyright (c) 2025 格律至微
+from typing import List, Dict
+# SPDX-License-Identifier: AGPL-3.0-only
+
+import json
+import os
+import platform
+import subprocess
+import sys
+from pathlib import Path
+
+from pydantic import BaseModel, Field
+
+from dawei.core.decorators import safe_tool_operation
+from dawei.tools.custom_base_tool import CustomBaseTool
+
+# ============================================================================
+# Shared Utilities
+# ============================================================================
+
+# Dangerous commands that require special handling
+# - Commands that are dangerous when used as the primary command
+# - Parameters that are dangerous in any context
+DANGEROUS_COMMANDS = {
+    "primary_commands": {
+        # Commands that are dangerous when used as the first word
+        "format": "Windows format command (erases disk data)",
+        "mkfs": "Create filesystem (destroys data)",
+    },
+    "dangerous_patterns": {
+        # Patterns that are dangerous anywhere in the command
+        "rm -rf": "Recursive delete without confirmation",
+        "rm -rf/": "Recursive delete from root",
+        "rm -fr": "Force recursive delete",
+        "chmod 777": "Set wide-open permissions (security risk)",
+        "dd if=": "Direct disk write (data destruction)",
+        "sudo": "Super user mode (elevated privileges)",
+    },
+}
+
+# OS-specific safe command whitelists (read-only / non-destructive)
+_ALLOWED_POSIX_COMMANDS = sorted([
+    # File inspection
+    "ls", "pwd", "cat", "file", "stat",
+    # Text processing
+    "grep", "find", "wc", "head", "tail", "sort", "uniq",
+    "cut", "tr", "diff", "comm", "paste", "fmt",
+    # System info (read-only)
+    "uname", "hostname", "whoami", "id", "date", "uptime",
+    "env", "printenv", "which", "whereis", "type",
+    # Disk / memory / process (read-only)
+    "df", "du", "free", "ps", "lsof",
+    # Hashing / encoding
+    "md5sum", "sha256sum", "sha1sum", "base64", "xxd", "od",
+    # Path utilities
+    "basename", "dirname", "realpath", "readlink",
+    # Network (read-only diagnostics)
+    "ping", "ip", "ss", "dig", "nslookup", "curl",
+    # Misc
+    "echo", "true", "false", "test", "printf",
+])
+
+_ALLOWED_WINDOWS_COMMANDS = sorted([
+    # File inspection
+    "cmd", "dir", "type", "where",
+    # Text processing
+    "findstr", "sort", "more",
+    # System info (read-only)
+    "hostname", "whoami", "ver", "systeminfo", "date", "time",
+    "set", "echo",
+    # Disk / network (read-only)
+    "fsutil", "ipconfig", "ping", "nslookup",
+    # Misc
+    "certutil",
+])
+
+
+def _get_allowed_shell_commands() -> list[str]:
+    """Detect OS and return the appropriate safe command whitelist."""
+    system = sys.platform
+    if system == "win32" or system == "cygwin":
+        return _ALLOWED_WINDOWS_COMMANDS
+    # linux, darwin (macOS), freebsd, etc.
+    return _ALLOWED_POSIX_COMMANDS
+
+
+# Resolve at import time
+ALLOWED_SHELL_COMMANDS = _get_allowed_shell_commands()
+
+
+def _check_dangerous_command(command: str) -> str | None:
+    """Check if command contains dangerous patterns.
+
+    Uses context-aware detection to avoid false positives:
+    - Only blocks 'format' when it's the first word (Windows command)
+    - Allows 'format' as a parameter (e.g., 'ruff format', 'git log --format')
+    - Blocks other dangerous patterns regardless of position
+
+    Args:
+        command: Command string to check
+
+    Returns:
+        Error message if dangerous, None otherwise
+
+    """
+    # SUPER MODE: Bypass dangerous command checks
+    from dawei.core.super_mode import is_super_mode_enabled, log_security_bypass
+
+    if is_super_mode_enabled():
+        log_security_bypass("_check_dangerous_command", f"command={command}")
+        return None
+
+    command_lower = command.lower()
+    command_parts = command_lower.strip().split()
+
+    if not command_parts:
+        return None
+
+    # Check primary dangerous commands (first word only)
+    first_command = command_parts[0]
+
+    # Check for format (exact match)
+    if first_command == "format":
+        reason = DANGEROUS_COMMANDS["primary_commands"]["format"]
+        return f"Command blocked for security reasons: '{first_command}' is dangerous ({reason}). If you're sure this is safe, use --super flag to bypass security checks."
+
+    # Check for mkfs (can have extensions like mkfs.ext4, mkfs.xfs, etc.)
+    if first_command.startswith("mkfs"):
+        reason = DANGEROUS_COMMANDS["primary_commands"]["mkfs"]
+        return f"Command blocked for security reasons: '{first_command}' is dangerous ({reason}). If you're sure this is safe, use --super flag to bypass security checks."
+
+    # Check dangerous patterns (can appear anywhere)
+    for pattern, reason in DANGEROUS_COMMANDS["dangerous_patterns"].items():
+        if pattern in command_lower:
+            return f"Command blocked for security reasons: contains '{pattern}' ({reason}). If you're sure this is safe, use --super flag to bypass security checks."
+
+    return None
+
+
+def _build_command_result(
+    command: str,
+    exit_code: int,
+    stdout: str,
+    stderr: str,
+    cwd: str | None = None,
+) -> str:
+    """Build standardized JSON result for command execution.
+
+    Inner-layer governance: truncates stdout/stderr to prevent context explosion.
+    The outer governor (OutputGovernor) provides a second safety net.
+
+    Args:
+        command: Executed command
+        exit_code: Process exit code
+        stdout: Standard output
+        stderr: Standard error
+        cwd: Working directory
+
+    Returns:
+        JSON string with execution result
+
+    """
+    # Inner-layer governance: truncate large outputs at field level
+    # (preserves JSON structure — governor's blob_window would break it)
+    _MAX_STDOUT = 8000  # ~2000 tokens
+    _MAX_STDERR = 4000  # ~1000 tokens
+
+    stdout_truncated = False
+    stderr_truncated = False
+
+    if len(stdout) > _MAX_STDOUT:
+        # Keep head + tail for stdout
+        head = stdout[: int(_MAX_STDOUT * 0.6)]
+        tail = stdout[-int(_MAX_STDOUT * 0.3) :]
+        omitted = len(stdout) - len(head) - len(tail)
+        stdout = f"{head}\n...(省略 {omitted} 字符)...\n{tail}"
+        stdout_truncated = True
+
+    if len(stderr) > _MAX_STDERR:
+        head = stderr[: int(_MAX_STDERR * 0.6)]
+        tail = stderr[-int(_MAX_STDERR * 0.3) :]
+        omitted = len(stderr) - len(head) - len(tail)
+        stderr = f"{head}\n...(省略 {omitted} 字符)...\n{tail}"
+        stderr_truncated = True
+
+    output = {
+        "command": command,
+        "exit_code": exit_code,
+        "stdout": stdout,
+        "stderr": stderr,
+        "status": "success" if exit_code == 0 else "error",
+    }
+
+    if stdout_truncated:
+        output["stdout_truncated"] = True
+    if stderr_truncated:
+        output["stderr_truncated"] = True
+
+    if cwd:
+        output["cwd"] = cwd
+
+    if exit_code == 0:
+        output["message"] = "Command executed successfully"
+    else:
+        output["message"] = f"Command failed with exit code {exit_code}"
+
+    return json.dumps(output, indent=2)
+
+
+def _build_enhanced_env() -> dict[str, str]:
+    """Build environment variables with DAWEI_* paths added to PATH.
+
+    This function collects all DAWEI_* environment variables that contain paths
+    and adds them (and their common bin subdirectories) to the PATH variable.
+
+    The DAWEI paths are added to the beginning of PATH for higher priority.
+
+    Platform-specific behavior:
+    - Windows: Adds PATH, PATHEXT, and Appended PATH
+    - Unix/Linux/macOS: Adds PATH and preserves existing variables
+
+    Returns:
+        Enhanced environment dictionary with updated PATH
+
+    """
+    import sys
+
+    env = os.environ.copy()
+
+    # Security: strip sensitive environment variables before passing to subprocesses.
+    # DAWEI_* paths are explicitly preserved (added to PATH below).
+    _SENSITIVE_ENV_PREFIXES = (
+        "DAWEI_SUPER_MODE",
+        "JWT_SECRET",
+        "JWT_",
+        "API_KEY",
+        "OPENAI_API_KEY",
+        "DASHSCOPE_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "REDIS_PASSWORD",
+        "MONGODB_URI",
+        "MONGODB_PASSWORD",
+        "NEO4J_PASSWORD",
+        "SECRET",
+        "TOKEN",
+        "PASSWORD",
+        "CREDENTIAL",
+        "PRIVATE_KEY",
+        "AWS_ACCESS_KEY",
+        "AWS_SECRET_KEY",
+    )
+    for key in list(env.keys()):
+        if key.upper().startswith(_SENSITIVE_ENV_PREFIXES):
+            del env[key]
+
+    dawei_paths = []
+
+    # Platform-specific bin subdirectories
+    if sys.platform == "win32":
+        # Windows-specific bin directories
+        bin_subdirs = [
+            "bin",
+            "Scripts",
+            "scripts",
+            ".local/bin",
+            "Library/bin",
+        ]
+    else:
+        # Unix/Linux/macOS bin directories
+        bin_subdirs = [
+            "bin",
+            "sbin",
+            "scripts",
+            ".local/bin",
+        ]
+
+    # Collect all DAWEI_* environment variables that contain paths
+    for key, value in os.environ.items():
+        if key.startswith("DAWEI_") and isinstance(value, str):
+            # Check if it looks like a path (handles both Unix and Windows paths)
+            if "/" in value or "\\" in value:
+                try:
+                    expanded_path = Path(value).expanduser()
+                    if expanded_path.is_dir():
+                        # Add the path itself
+                        dawei_paths.append(str(expanded_path))
+
+                        # Add platform-specific bin subdirectories
+                        for bin_subdir in bin_subdirs:
+                            bin_path = expanded_path / bin_subdir
+                            if bin_path.is_dir():
+                                dawei_paths.append(str(bin_path))
+                except (OSError, ValueError):
+                    # Skip invalid paths
+                    continue
+
+    # Update PATH with DAWEI_* paths (platform-aware)
+    if dawei_paths:
+        path_separator = os.pathsep  # ":" on Unix, ";" on Windows
+        current_path = env.get("PATH", "")
+
+        # Add DAWEI paths to the beginning of PATH (higher priority)
+        dawei_path_str = path_separator.join(dawei_paths)
+        if current_path:
+            env["PATH"] = f"{dawei_path_str}{path_separator}{current_path}"
+        else:
+            env["PATH"] = dawei_path_str
+
+    return env
+
+
+# ============================================================================
+# Execute Command Tool
+# ============================================================================
+
+
+# Execute Command Tool
+class ExecuteCommandInput(BaseModel):
+    """Input schema for ExecuteCommandTool."""
+
+    command: str = Field(..., description="Command to execute")
+    cwd: str | None = Field(
+        None,
+        description="Working directory (ignored, always uses workspace)",
+    )
+    timeout: int = Field(30, description="Timeout in seconds")
+    shell: bool = Field(True, description="Whether to use shell for command execution")
+
+
+class ExecuteCommandTool(CustomBaseTool):
+    """Tool for executing system commands with security checks.
+
+    Note: This tool ALWAYS executes in the workspace directory. The cwd parameter is ignored.
+    """
+
+    name: str = "execute_command"
+    description: str = "Runs system commands and programs with optional working directory and timeout. Always executes in the workspace directory for security."
+    args_schema: type[BaseModel] = ExecuteCommandInput
+
+    @safe_tool_operation(
+        "execute_command",
+        fallback_value='{"status": "error", "message": "Failed to execute command"}',
+    )
+    def _run(
+        self,
+        command: str,
+        cwd: str | None = None,
+        timeout: int = 30,
+        shell: bool = False,  # SECURITY: default to False — prevents shell injection
+    ) -> str:
+        """Execute system command with security checks.
+
+        Uses v2 SandboxFacade (Provider auto-detected: subprocess/docker/e2b).
+        TrustedContext constructed from current workspace path.
+
+        Args:
+            command: Command string to execute
+            cwd: Ignored (always uses workspace directory)
+            timeout: Execution timeout in seconds
+            shell: Whether to use shell
+
+        Returns:
+            JSON string with execution result
+
+        """
+        # Security check (additional layer — SandboxFacade also validates whitelist)
+        error_msg = _check_dangerous_command(command)
+        if error_msg:
+            return json.dumps({"status": "error", "message": error_msg}, indent=2)
+
+        # Get current working directory (tool_executor has already switched to workspace)
+        actual_cwd = os.getcwd()
+
+        # v2: 构造 TrustedContext 并通过 SandboxFacade 执行
+        # user_id 用当前会话真实用户 (2026-09-14 修复: 旧硬编码 "tool-executor"
+        # 是无 security.json 的服务身份 → provider 恒按缺省 ro 挂载 + 绕过配额)
+        from dawei.core.security_manager import current_user_id
+        from dawei.sandbox.base import from_user_workspace
+        from dawei.sandbox.sandbox_facade import SandboxFacade
+
+        ctx = from_user_workspace(current_user_id(), actual_cwd)
+        # timeout 透传给 provider (2026-09-14 修复: 旧代码丢弃入参 → 60s 命令
+        # 撞 30s 缺省超时误报失败, 而沙箱内进程实际继续跑完)
+        result = SandboxFacade.execute_command(command, ctx, timeout=timeout)
+
+        return _build_command_result(
+            command=command,
+            exit_code=result.exit_code,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            cwd=actual_cwd,
+        )
+
+
+# ============================================================================
+# Run Slash Command Tool
+# ============================================================================
+
+
+class RunSlashCommandInput(BaseModel):
+    """Input schema for RunSlashCommandTool."""
+
+    command: str = Field(..., description="Slash command to execute (e.g., '/help', '/commit')")
+    args: str | None = Field(None, description="Optional arguments for the slash command")
+
+
+class RunSlashCommandTool(CustomBaseTool):
+    """Tool for executing predefined slash commands with 3-tier priority system.
+
+    Supports built-in commands, user commands, and workspace-specific commands.
+    """
+
+    name: str = "run_slash_command"
+    description: str = "Execute predefined slash commands for templated workflows and instructions. Supports built-in commands, user commands, and workspace-specific commands (3-tier priority). Returns JSON with the command's content, description, mode, and source. Use '/help' to discover available commands."
+    args_schema: type[BaseModel] = RunSlashCommandInput
+
+    def __init__(self, command_manager=None):
+        """Initialize RunSlashCommandTool.
+
+        Args:
+            command_manager: CommandManager instance (optional, will create if not provided)
+
+        """
+        super().__init__()
+        from dawei.tools.command_manager import CommandManager
+
+        self.command_manager = command_manager or CommandManager()
+        self.command_manager.create_default_builtin_commands()
+        self.command_manager.scan_commands()
+
+    @safe_tool_operation(
+        "run_slash_command",
+        fallback_value='{"status": "error", "message": "Failed to execute slash command"}',
+    )
+    def _run(self, command: str, args: str | None = None) -> str:
+        """Execute slash command.
+
+        Args:
+            command: Command name (e.g., '/help', 'help', '/commit')
+            args: Optional arguments for the command
+
+        Returns:
+            JSON string with command execution result
+
+        """
+        # Strip leading / if present
+        command_name = command.strip().lstrip("/")
+        cmd = self.command_manager.get_command(command_name)
+
+        if not cmd:
+            available_commands = self.command_manager.get_command_names()
+            return json.dumps(
+                {
+                    "command": f"/{command_name}",
+                    "status": "error",
+                    "message": f"Unknown slash command: /{command_name}",
+                    "available_commands": available_commands,
+                    "hint": "Type /help to see all available commands",
+                },
+                indent=2,
+            )
+
+        # Build formatted result
+        formatted_parts = [
+            f"# Command: /{cmd.name}",
+        ]
+
+        if cmd.description:
+            formatted_parts.append(f"**Description**: {cmd.description}")
+        if cmd.argument_hint:
+            formatted_parts.append(f"**Arguments**: {cmd.argument_hint}")
+        if cmd.mode:
+            formatted_parts.append(f"**Mode**: {cmd.mode}")
+
+        formatted_parts.append(f"**Source**: {cmd.source}")
+
+        if args:
+            formatted_parts.append(f"**Provided Arguments**: {args}")
+
+        formatted_parts.append("\n--- Command Content ---\n")
+        formatted_parts.append(cmd.content)
+
+        return json.dumps(
+            {
+                "command": f"/{cmd.name}",
+                "status": "success",
+                "description": cmd.description,
+                "mode": cmd.mode,
+                "source": cmd.source,
+                "content": cmd.content,
+                "formatted": "\n".join(formatted_parts),
+            },
+            indent=2,
+        )
+
+    def list_commands(self) -> str:
+        """List all available commands.
+
+        Returns:
+            JSON string with all commands
+
+        """
+        commands = self.command_manager.get_all_commands()
+        commands_list = [
+            {
+                "name": f"/{name}",
+                "description": cmd.description,
+                "argument_hint": cmd.argument_hint,
+                "mode": cmd.mode,
+                "source": cmd.source,
+            }
+            for name, cmd in commands.items()
+        ]
+
+        return json.dumps({"total": len(commands_list), "commands": commands_list}, indent=2)
+
+
+# ============================================================================
+# Shell Command Tool (Secure Version)
+# ============================================================================
+
+
+class ShellCommandInput(BaseModel):
+    """Input schema for ShellCommandTool."""
+
+    command: str = Field(..., description="Command to execute")
+    args: List[str] = Field(..., description="Command arguments as list")
+    cwd: str | None = Field(
+        None,
+        description="Working directory (ignored, always uses workspace)",
+    )
+
+
+class ShellCommandTool(CustomBaseTool):
+    """Tool for executing shell commands with argument list for better security.
+
+    Only allows a predefined set of safe commands (OS-specific whitelist).
+    Always executes in the workspace directory.
+
+    Note: This tool ALWAYS executes in the workspace directory. The cwd parameter is ignored.
+    """
+
+    name: str = "shell_command"
+    # description is built lazily in __init__ to use the runtime ALLOWED_SHELL_COMMANDS
+    description: str = ""
+
+    def __init__(self):
+        super().__init__()
+        self.description = (
+            "Executes shell commands with argument list for better security. "
+            f"OS: {platform.system()}. "
+            f"Allowed commands: {', '.join(ALLOWED_SHELL_COMMANDS)}"
+        )
+    args_schema: type[BaseModel] = ShellCommandInput
+
+    @safe_tool_operation(
+        "shell_command",
+        fallback_value='{"status": "error", "message": "Failed to execute shell command"}',
+    )
+    def _run(self, command: str, args: List[str], cwd: str | None = None) -> str:
+        """Execute shell command with arguments.
+
+        Args:
+            command: Command to execute
+            args: Command arguments as list
+            cwd: Ignored (always uses workspace directory)
+
+        Returns:
+            JSON string with execution result
+
+        """
+        # Security check - only allow whitelisted commands
+        if command not in ALLOWED_SHELL_COMMANDS:
+            return json.dumps(
+                {
+                    "command": command,
+                    "status": "error",
+                    "message": f"Command '{command}' not in allowed list: {ALLOWED_SHELL_COMMANDS}",
+                },
+                indent=2,
+            )
+
+        # Get current working directory (tool_executor has already switched to workspace)
+        actual_cwd = os.getcwd()
+
+        env = _build_enhanced_env()
+
+        result = subprocess.run([command, *args], cwd=actual_cwd, capture_output=True, text=True, env=env)
+
+        return _build_command_result(
+            command=str([command, *args]),
+            exit_code=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            cwd=actual_cwd,
+        )

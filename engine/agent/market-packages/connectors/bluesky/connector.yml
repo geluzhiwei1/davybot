@@ -1,0 +1,37 @@
+platform: bluesky
+display_name: Bluesky
+version: 0.1.0
+capability:
+  publish: api
+  publish_modes: []
+  trending: none
+  metrics: api
+constraints:
+  char_limit: 300
+  max_files: 4
+  max_video_seconds: 60
+  rich_text: false
+domains:
+- bsky.app
+- bsky.social
+# API 轨:AT Protocol。凭据(oauth_code)= "handle:app-password"(应用专用密码,settings → App passwords)
+# adapter:app/connectors/bluesky.py(createSession → createRecord app.bsky.feed.post)
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - JP
+  - GB
+  - DE
+  - CA
+  languages:
+  - en
+  - ja
+  - de
+  - es
+  - fr
+  - pt
+  - ko
+  - zh

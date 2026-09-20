@@ -1,0 +1,87 @@
+template:
+  slug: portfolio-analysis
+  name: "IP 资产组合分析"
+  version: "1.0"
+  module: ip-portfolio
+  team_slug: ip-portfolio
+
+  description: |
+    专利/商标组合 KPI 统计、健康度评分、续费提醒、竞争对手分析。
+    聚合所有 IP 工作区数据，提供资产仪表盘级别的汇总报告。
+
+  data_requirements:
+    required: []
+    optional:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        store: "input/task_params.json"
+      - key: analysis_scope
+        label: "分析范围"
+        type: select
+        options:
+          - { value: "all", label: "全部 IP 资产" }
+          - { value: "patents_only", label: "仅专利" }
+          - { value: "trademarks_only", label: "仅商标" }
+        default: "all"
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+
+  checklists: []
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: output
+      description: "Agent 产出"
+    - dir: drafts
+      description: "组合分析报告"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入 IP 资产组合分析工作区，请按照 PDCA 工作流执行。
+
+    ## 核心原则：数据驱动
+    所有评分和结论必须基于可量化的数据指标。
+
+    ## 输入数据
+    1. `input/task_params.json` — 企业名称、分析范围
+
+    ## 工作流 (PDCA)
+    ### Plan: 收集所有 IP 工作区数据，确定分析维度
+    ### Do: KPI 统计 + 健康度评分 + 续费提醒 + 竞争对手分析
+    ### Check: 数据一致性校验
+    ### Act: 生成组合分析报告
+
+  deliverables:
+    - file: "drafts/portfolio_report.md"
+      name: "IP 资产组合分析报告"
+      format: markdown
+    - file: "output/portfolio_kpis.md"
+      name: "KPI 统计数据"
+      format: markdown
+    - file: "output/renewal_reminders.md"
+      name: "续费提醒列表"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "收集资产数据"
+      progress: 20
+    - name: do_kpi
+      label: "KPI 统计"
+      progress: 25
+    - name: do_health
+      label: "健康度评分"
+      progress: 25
+    - name: do_renewals
+      label: "续费提醒"
+      progress: 15
+    - name: act
+      label: "生成报告"
+      progress: 15

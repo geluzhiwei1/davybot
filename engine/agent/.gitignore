@@ -1,0 +1,22 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env*
+!.env.example
+!.env.*.example
+.vercel
+logs/
+.roo/
+-*/
+# frontend/ directory contains CI-built frontend artifacts
+# (do NOT ignore - it needs to be packaged in the wheel)
+# dawei/frontend/
+dist/
+build/
+*.egg-info/
+# *.spec — PyInstaller regenerates these from scripts/build-binary.py (--specpath),
+# including cross-arch variants (dawei-x86_64.spec). They are build output, not source.
+*.spec
+
+frontend/

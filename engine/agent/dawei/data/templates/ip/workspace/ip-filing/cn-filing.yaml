@@ -1,0 +1,158 @@
+template:
+  slug: cn-filing
+  name: "中国专利申请策略"
+  version: "1.0"
+  module: ip-filing
+  team_slug: ip-filing
+
+  description: |
+    向 CNIPA（中国国家知识产权局）提交专利申请的完整策略规划。
+    包含申请类型选择、费用减免、加速审查（PPH/优先审查）、双报策略。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "请输入发明名称"
+        store: "input/task_params.json"
+      - key: application_type
+        label: "申请类型"
+        type: select
+        default: "invention"
+        options:
+          - { value: "invention", label: "发明专利" }
+          - { value: "utility_model", label: "实用新型" }
+          - { value: "design", label: "外观设计" }
+          - { value: "dual_filing", label: "发明+实用新型双报" }
+        store: "input/task_params.json"
+    optional:
+      - key: applicant_type
+        label: "申请人类型"
+        type: select
+        default: "enterprise"
+        options:
+          - { value: "enterprise", label: "企业（无减免）" }
+          - { value: "small_enterprise", label: "小微企业（减缴70%）" }
+          - { value: "individual", label: "个人（减缴85%）" }
+          - { value: "university", label: "高校/科研院所（减缴70%）" }
+        store: "input/task_params.json"
+      - key: acceleration
+        label: "加速策略"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "普通审查（约2-3年）" }
+          - { value: "pph", label: "PPH（专利审查高速路）" }
+          - { value: "priority_exam", label: "优先审查（约6个月）" }
+          - { value: "pre_exam", label: "预审查（地方保护中心）" }
+        store: "input/task_params.json"
+      - key: has_foreign_filing
+        label: "是否已有外国申请"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "否" }
+          - { value: "yes_pph", label: "是，希望利用 PPH" }
+          - { value: "yes_priority", label: "是，要求优先权" }
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+
+  checklists:
+    - ref: "checklist/filing-requirements"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游申请书继承的文件"
+    - dir: input/checklists
+      description: "申请要求清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: drafts
+      description: "完整策略方案"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入中国专利申请策略规划工作区，请按照 PDCA 工作流执行。
+
+    ## CNIPA 申请核心规则
+
+    ### 申请类型与审查周期
+    | 类型 | 审查制 | 平均授权周期 | 保护期 |
+    |------|--------|-------------|--------|
+    | 发明 | 实质审查 | 2-3 年 | 20 年 |
+    | 实用新型 | 形式审查 | 6-12 月 | 10 年 |
+    | 外观设计 | 形式审查 | 4-8 月 | 15 年 |
+
+    ### 费用减免政策（2024 标准）
+    - **减缴比例**：小微企业/高校/科研院所减缴 70%，个人减缴 85%
+    - **适用费用**：申请费、审查费、年费（前6年）、恢复费等
+    - **年收入≤100万**：可认定为小微
+
+    ### 加速审查途径
+    1. **PPH（专利审查高速路）**：已有外国申请获准检索/审查，可向 CNIPA 提出 PPH，审查周期缩短至 6-12 月
+    2. **优先审查**：符合国家重点发展产业（AI、新能源、生物医药等），审查周期约 6 个月
+    3. **预审查**：通过地方知识产权保护中心，审查周期可缩至 3-6 月（需符合地方产业目录）
+    4. **实用新型双报**：发明+实用新型同时申请，实用新型快速获得保护，发明授权后放弃实用新型
+
+    ### 双报策略要点
+    - 同日提交发明和实用新型申请
+    - 实用新型 6-12 个月获得授权（快速保护）
+    - 发明审查期间保留实用新型保护
+    - 发明授权时需放弃实用新型
+    - **关键**：必须同日申请，否则无法享受双报
+
+    ### CNIPA 官费参考（发明专利，无减免）
+    - 申请费：¥900
+    - 公开费：¥50
+    - 实质审查费：¥2,500
+    - 授权登记费：¥200 + 印花税 ¥5
+    - 年费：第1-3年 ¥900/年，逐年递增
+
+    ## 输入数据
+    1. `input/task_params.json` — 发明名称、申请类型、申请人类型、加速策略
+    2. `input/inherited/` — 专利草案/申请书
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 确认申请类型、申请人类型、加速途径可行性
+    ### Do: 申请时间线 + 费用预算（含减免）+ 加速策略建议
+    ### Check: 核对申请要求清单、双报合规检查
+    ### Act: 生成完整策略方案
+
+  deliverables:
+    - file: "drafts/cn_filing_strategy.md"
+      name: "中国专利申请策略方案"
+      format: markdown
+    - file: "output/filing_timeline.md"
+      name: "申请时间线"
+      format: markdown
+    - file: "output/fee_breakdown.md"
+      name: "费用明细（含减免计算）"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "分析申请需求"
+      progress: 15
+    - name: do_strategy
+      label: "制定申请策略"
+      progress: 30
+    - name: do_fees
+      label: "费用预算"
+      progress: 25
+    - name: check
+      label: "核验清单"
+      progress: 20
+    - name: act
+      label: "输出方案"
+      progress: 10

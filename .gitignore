@@ -1,0 +1,13 @@
+# Root-level hygiene; engine/ and app/ carry their own .gitignore
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+dist/
+build/
+target/
+*.log
+.DS_Store
+# 会话/构建残留（历史拷贝中出现过，防再入）
+.playwright-mcp/
+.assemble/

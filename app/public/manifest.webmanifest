@@ -1,0 +1,26 @@
+{
+  "name": "NormNomos — AI 法律智能体平台",
+  "short_name": "NormNomos",
+  "description": "NormNomos AI 法律智能体平台(移动端 Web / PWA)",
+  "lang": "zh",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f1622",
+  "theme_color": "#0f1622",
+  "icons": [
+    {
+      "src": "icons/icon-256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

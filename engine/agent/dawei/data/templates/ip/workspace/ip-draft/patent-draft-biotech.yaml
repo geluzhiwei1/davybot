@@ -1,0 +1,139 @@
+template:
+  slug: patent-draft-biotech
+  name: "生物/医药专利草案"
+  version: "1.0"
+  module: ip-draft
+  team_slug: ip-draft
+
+  description: |
+    针对药物化合物、生物序列、医疗器械等领域的管辖中立专利草案撰写。
+    重点关注马库什结构、序列列表、实验数据引用、组合物+方法+用途权利要求布局。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "如：一种靶向抗肿瘤化合物及其制备方法和应用"
+        store: "input/task_params.json"
+      - key: tech_field
+        label: "技术领域"
+        type: select
+        options:
+          - { value: "", label: "请选择" }
+          - { value: "药物化合物", label: "药物化合物/药物组合物" }
+          - { value: "生物序列", label: "基因/蛋白质/核酸序列" }
+          - { value: "医疗器械", label: "医疗器械/植入物" }
+          - { value: "诊断方法", label: "诊断/检测方法" }
+          - { value: "疫苗", label: "疫苗/免疫制剂" }
+          - { value: "细胞工程", label: "细胞工程/基因编辑" }
+          - { value: "中药", label: "中药/天然产物" }
+        default: ""
+        store: "input/task_params.json"
+      - key: draft_strategy
+        label: "撰写策略"
+        type: select
+        options:
+          - { value: "balanced", label: "均衡策略" }
+          - { value: "broad", label: "宽泛策略" }
+          - { value: "narrow", label: "保守策略" }
+        default: "balanced"
+        store: "input/task_params.json"
+    optional:
+      - key: sequence_info
+        label: "序列/结构信息"
+        type: string
+        placeholder: "化学结构式/SEQ ID NO/晶体结构"
+        store: "input/task_params.json"
+      - key: experimental_summary
+        label: "实验数据摘要"
+        type: string
+        placeholder: "已有实验类型和关键数据"
+        store: "input/task_params.json"
+      - key: applicant_name
+        label: "申请人名称"
+        type: string
+        store: "input/task_params.json"
+      - key: inventor_names
+        label: "发明人"
+        type: string
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+    - knowledge/patent-examination-guidelines
+
+  checklists:
+    - ref: "checklist/draft-completeness"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游交底书继承的文件"
+    - dir: input/checklists
+      description: "草案完整性清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: output/claims
+      description: "权利要求层次结构"
+    - dir: output/description
+      description: "技术方案阐述各部分"
+    - dir: drafts
+      description: "完整草案文件"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入生物/医药专利草案撰写工作区，请按照 PDCA 工作流执行。
+
+    ## 领域重点：生物/医药专利草案
+    生物医药类专利草案需特别关注以下方面：
+    1. **马库什结构**：通式化合物权利要求用马库什结构表达取代基范围，限定优选和更优选范围
+    2. **序列列表**：涉及氨基酸/核苷酸序列时，引用SEQ ID NO编号，确保与序列表一致
+    3. **实验数据支撑**：权利要求范围必须有实验数据支撑，不能超出说明书公开的范围
+    4. **用途限定**：化合物/组合物权利要求可加用途限定（"用于治疗X疾病的用途"）
+    5. **客体规避**：避免将疾病诊断/治疗方法写入权利要求（改为"化合物在制备药物中的用途"）
+    6. **权利要求布局**：化合物→组合物（含载体/辅料/剂量）→制备方法→用途（制药用途）
+
+    ## 核心原则：管辖中立
+    本草案产出的所有内容不限定任何国家的专利法格式。
+
+    ## 输入数据
+    1. `input/task_params.json` — 发明名称、技术领域、撰写策略、序列/结构信息
+    2. `input/inherited/` — 技术交底书（从上游继承）
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 读取输入，列出化合物/序列特征清单，规划权利要求层次
+    ### Do: 撰写权利要求（化合物→组合物→方法→用途）+ 技术方案阐述
+    ### Check: 核对清单（重点检查充分公开和客体合规）
+    ### Act: 生成完整草案
+
+  deliverables:
+    - file: "drafts/patent_draft_full.md"
+      name: "生物/医药专利草案全文"
+      format: markdown
+    - file: "output/claims/claims_hierarchy.md"
+      name: "权利要求层次结构"
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 15
+    - name: do_claims
+      label: "撰写权利要求"
+      progress: 25
+    - name: do_description
+      label: "撰写技术方案"
+      progress: 30
+    - name: check
+      label: "质量审查"
+      progress: 20
+    - name: act
+      label: "生成草案文件"
+      progress: 10

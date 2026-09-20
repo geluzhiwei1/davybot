@@ -1,0 +1,338 @@
+# 合规工作区模板: 制裁风险综合评估（升级版 v2.0）
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+# 覆盖维度：①-⑦ 全维度
+# 状态码：七维度各自输出，最终汇总
+
+template:
+  slug: sanctions-risk-assessment
+  name: "制裁风险综合评估"
+  version: "2.0"
+  team_slug: sanctions
+
+  description: |
+    基于七维度框架（KYC/UBO穿透、KYT交易链、标的物属性、地理连接点、
+    红旗预警、突发压力、ICP内控）的全面制裁合规风险评估，
+    生成多法域风险矩阵和分优先级缓释路线图。
+
+  applicable_scenarios:
+    - "年度制裁合规审计"
+    - "新业务线制裁风险评估"
+    - "并购交易制裁尽职调查"
+    - "合规体系设计"
+    - "监管检查准备"
+
+  estimated_time: "90-120 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        store: "input/company_info.json"
+
+      - key: industry_sector
+        label: "所属行业"
+        type: select
+        options:
+          - { value: "trade", label: "国际贸易/进出口" }
+          - { value: "finance", label: "金融服务/银行" }
+          - { value: "shipping", label: "航运/物流" }
+          - { value: "tech", label: "科技/半导体/通信" }
+          - { value: "energy", label: "能源/石化" }
+          - { value: "manufacturing", label: "制造业" }
+          - { value: "other", label: "其他" }
+        store: "input/company_info.json"
+
+      - key: business_activities
+        label: "涉及制裁风险的经营活动"
+        type: multiselect
+        options:
+          - "国际贸易"
+          - "美元结算"
+          - "美国技术/软件使用"
+          - "涉伊朗/朝鲜/叙利亚/克里米亚业务"
+          - "涉俄罗斯/白俄罗斯业务"
+          - "涉缅甸/委内瑞拉/古巴业务"
+          - "跨境投资/并购"
+          - "金融服务/跨境汇款"
+          - "航运/物流/货代"
+          - "技术转让/许可"
+        store: "input/task_parameters.json"
+
+      - key: operating_regions
+        label: "业务覆盖的高风险地区"
+        type: multiselect
+        options:
+          - "俄罗斯/白俄罗斯"
+          - "伊朗"
+          - "朝鲜"
+          - "叙利亚"
+          - "克里米亚/顿涅茨克/卢甘斯克"
+          - "委内瑞拉"
+          - "古巴"
+          - "缅甸"
+          - "苏丹"
+          - "中东地区"
+          - "非洲地区"
+          - "其他（请在备注说明）"
+        store: "input/task_parameters.json"
+
+      - key: assessment_scope
+        label: "评估范围"
+        type: select
+        options:
+          - { value: "full", label: "全维度综合评估（七维度）" }
+          - { value: "counterparty_focus", label: "聚焦交易对手风险（维度①②）" }
+          - { value: "transaction_focus", label: "聚焦交易链风险（维度②③④）" }
+          - { value: "icp_focus", label: "聚焦内控体系（维度⑦）" }
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: has_us_nexus
+        label: "业务是否涉及美国连接点"
+        type: boolean
+        default: false
+        store: "input/company_info.json"
+
+      - key: key_customers_suppliers
+        label: "核心客户/供应商清单"
+        type: text
+        placeholder: "列出主要跨境交易对手名称，每行一个"
+        store: "input/key_counterparties.json"
+
+      - key: existing_compliance_program
+        label: "既有制裁合规制度文件"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: screening_tool_info
+        label: "现有筛查工具信息"
+        type: text
+        placeholder: "当前使用的制裁名单筛查工具/数据库、模糊匹配阈值设置"
+        store: "input/icp_info.json"
+
+      - key: past_incidents
+        label: "过往制裁合规事件"
+        type: text
+        placeholder: "是否有过银行问询(RFI)、监管调查、账户冻结等经历"
+        store: "input/company_info.json"
+
+      - key: subsidiary_list
+        label: "子公司/分支机构清单"
+        type: text
+        placeholder: "海外子公司、办事处、分支机构名称和所在国"
+        store: "input/company_info.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：制裁合规风险综合评估-2026"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/sanctions-risk-assessment"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的制裁合规信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 七维度分析框架
+
+    | 维度 | 输出文件 |
+    |------|----------|
+    | ① KYC/UBO 穿透 | `output/dim1_kyc_ubo.json` |
+    | ② KYT 交易链 | `output/dim2_kyt.json` |
+    | ③ 标的物属性 | `output/dim3_goods.json` |
+    | ④ 地理连接点 | `output/dim4_nexus.json` |
+    | ⑤ 红旗预警 | `output/dim5_red_flags.json` |
+    | ⑥ 突发压力 | `output/dim6_triggers.json` |
+    | ⑦ ICP 内控 | `output/dim7_icp.json` |
+
+    ## 状态码体系
+
+    | 状态码 | 等级 | 含义 |
+    |--------|------|------|
+    | STATUS_403 | 🔴 全线阻断 | SDN确认命中/资产冻结/禁运品/USD+Nexus双重命中 |
+    | STATUS_401 | 🟠 限制 | 高管命中/行业制裁/含美量超标/U.S. Person参与 |
+    | STATUS_406 | 🟡 增强尽调 | EU实质控制/空壳公司/地理围栏触碰 |
+    | STATUS_500 | 🔴 危机 | 监管传票/历史违规发现 |
+    | STATUS_503 | 🟠 银行锁定 | 银行RFI/退单 |
+    | STATUS_302 | 🟡 连带风险 | 供应链雪崩波及 |
+    | STATUS_200 | 🟢 通过 | 对应维度通过 |
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解企业制裁风险暴露面
+    - 根据 `assessment_scope` 确定维度覆盖范围
+    - 制定七维度渐进式评估计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行) — 按维度逐一展开
+
+    **维度① KYC/UBO** → `output/dim1_kyc_ubo.json`
+    - 核心客户/供应商的股权穿透风险评估
+    - OFAC 50% Rule 聚合计算（逐级属性传递，禁止全局相乘稀释）
+    - 离岸结构/信托/代持红旗扫描
+
+    **维度② KYT** → `output/dim2_kyt.json`
+    - 交易链条参与方筛查
+    - 最终用户/最终用途风险
+
+    **维度③ 标的物** → `output/dim3_goods.json`
+    - HS 编码/ECCN 风险
+    - 技术含美量评估（BIS De Minimis ≥25% 通用阈值）
+
+    **维度④ 地理连接点** → `output/dim4_nexus.json`
+    - USD 清算/管辖连接
+    - U.S. Person 人身管辖
+    - 物流路径风险
+
+    **维度⑤ 红旗预警** → `output/dim5_red_flags.json`
+    - 第三方代付/路径突变
+    - 去标识化包装/拒绝披露最终目的地
+    - 空壳公司特征
+
+    **维度⑥ 突发压力** → `output/dim6_triggers.json`
+    - 银行 RFI/退单历史
+    - 监管传票/调查
+    - 供应链连带雪崩
+
+    **维度⑦ ICP 内控** → `output/dim7_icp.json`
+    - 筛查工具成熟度
+    - 模糊匹配阈值（≥80% 安全线）
+    - 5年回溯机制
+    - 档案留痕
+
+    每完成一个维度写入对应 output 文件。
+
+    ### Check (验证)
+    - 七维度交叉验证（如：实体命中 + USD 结算 = 双重红旗）
+    - 中国《反外国制裁法》双向合规冲突审查
+    - 证据链完整性检查
+
+    ### Act (输出)
+    - 制裁风险综合评估报告 → `reports/sanctions_comprehensive_assessment.docx`
+    - 包含：执行摘要、七维度评估结果（每维度独立章节）、综合风险矩阵（可能性 × 影响力）、
+      多法域合规要求差距、缓释优先级路线图、ICP 改进建议、证据链核查清单
+    - 如发现 ICP 体系缺陷，在报告末尾附言："⚠️ 建议进一步启动「内控体系(ICP)成熟度审计」模板 (sanctions-icp-audit) 进行专项审计。"
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 中国《反外国制裁法》冲突情况必须显式标注"⚠️ 双向合规冲突"
+    - OFAC 50% Rule 必须使用逐级属性传递法（禁止全局相乘稀释）
+    - 关注 OFAC 制裁的域外效力（美国连接点判定）
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - dim1_kyc_ubo
+      - dim2_kyt
+      - dim3_goods
+      - dim4_nexus
+      - dim5_red_flags
+      - dim6_triggers
+      - dim7_icp
+      - risk_matrix
+      - mitigation_roadmap
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 5
+    - name: do_dim1
+      label: "维度① KYC/UBO"
+      progress: 15
+    - name: do_dim2
+      label: "维度② KYT"
+      progress: 10
+    - name: do_dim3
+      label: "维度③ 标的物"
+      progress: 10
+    - name: do_dim4
+      label: "维度④ 地理连接"
+      progress: 10
+    - name: do_dim5
+      label: "维度⑤ 红旗预警"
+      progress: 10
+    - name: do_dim6
+      label: "维度⑥ 突发压力"
+      progress: 10
+    - name: do_dim7
+      label: "维度⑦ ICP内控"
+      progress: 10
+    - name: check
+      label: "交叉验证"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10
+
+  # ── 对话采集模式配置 ──
+  chat_collection:
+    opening: |
+      你好！我是制裁合规评估顾问。接下来我会引导你提供企业制裁风险综合评估所需的信息。
+
+      我们将从企业概况开始，然后逐步了解您的风险暴露面和既有合规控制。整个过程大约需要 15-20 分钟。
+    groups:
+      - name: "企业概况"
+        intro: "首先，让我们了解您企业的基本情况。"
+        fields:
+          - company_name
+          - industry_sector
+          - subsidiary_list
+          - task_subject
+      - name: "风险暴露"
+        intro: "接下来了解您的业务中涉及制裁风险的方面。"
+        fields:
+          - business_activities
+          - operating_regions
+          - has_us_nexus
+          - key_customers_suppliers
+      - name: "既有控制"
+        intro: "现在了解您目前的合规控制措施。"
+        fields:
+          - existing_compliance_program
+          - screening_tool_info
+          - past_incidents
+      - name: "评估范围"
+        intro: "最后确认评估范围。"
+        fields:
+          - assessment_scope

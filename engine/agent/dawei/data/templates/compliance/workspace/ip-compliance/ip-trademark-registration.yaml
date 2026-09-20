@@ -1,0 +1,175 @@
+# 合规工作区模板: 商标注册策略
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: ip-trademark-registration
+  name: "商标注册策略"
+  version: "1.0"
+  team_slug: ip-compliance
+
+  description: |
+    针对跨境商标注册策略进行合规评估，涵盖商标检索、
+    注册路径建议和侵权风险评估，制定品牌保护方案。
+
+  applicable_scenarios:
+    - "跨境商标注册策略"
+    - "新品牌上市前商标评估"
+    - "马德里体系注册评估"
+    - "商标侵权风险审查"
+
+  estimated_time: "25-35 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入申请企业全称"
+        store: "input/company_info.json"
+
+      - key: mark_type
+        label: "商标类型"
+        type: select
+        options:
+          - { value: word, label: "文字商标" }
+          - { value: device, label: "图形/标志" }
+          - { value: combined, label: "组合商标（文字+图形）" }
+          - { value: three_d, label: "立体商标" }
+          - { value: sound, label: "声音商标" }
+          - { value: color, label: "颜色商标" }
+        store: "input/task_parameters.json"
+
+      - key: target_markets
+        label: "目标注册市场"
+        type: multiselect
+        options: ["中国", "欧盟", "美国", "英国", "日本", "韩国", "东南亚", "中东", "南美", "非洲"]
+        store: "input/task_parameters.json"
+
+      - key: goods_services
+        label: "指定商品/服务类别"
+        type: text
+        placeholder: "请描述商标将使用的商品/服务和尼斯分类..."
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: existing_registrations
+        label: "既有商标注册证"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: trademark_usage
+        label: "商标使用情况说明"
+        type: text
+        placeholder: "是否已实际使用、使用时间、使用范围..."
+        store: "input/company_info.json"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：XX品牌跨境商标注册策略"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/ip-trademark-registration"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的商标注册信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解商标特征和目标市场
+    - 根据合规清单制定商标注册策略评估执行计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 商标显著性/可注册性初步评估 → `output/distinctiveness_assessment.md`
+    b. 各市场在先权利冲突筛查 → `output/prior_rights_screening.md`
+    c. 注册路径推荐 (单一国 vs 马德里) → `output/registration_pathway.md`
+    d. 商品/服务类别选择策略 → `output/class_selection_strategy.md`
+    e. 商标侵权风险评估 → `output/infringement_risk_assessment.md`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证在先权利筛查覆盖全部目标市场
+    - 确认注册路径成本效益分析合理
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成商标注册策略报告 → `reports/trademark_registration_strategy.docx`
+    - 报告必须包含：执行摘要、商标概述、可注册性分析、在先权利冲突筛查、推荐注册路径及理由、商品/服务类别建议、时间线及成本估算、侵权风险预警
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - 商标遵循地域性原则，需在每个目标市场单独保护
+    - 马德里体系提供便利但并非万能（需考虑中心打击风险）
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - mark_overview
+      - registrability_analysis
+      - prior_rights_screening
+      - registration_pathway
+      - class_strategy
+      - timeline_cost
+      - infringement_risk
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_assessment
+      label: "可注册性分析"
+      progress: 20
+    - name: do_screening
+      label: "在先权利筛查"
+      progress: 25
+    - name: do_strategy
+      label: "注册策略制定"
+      progress: 25
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

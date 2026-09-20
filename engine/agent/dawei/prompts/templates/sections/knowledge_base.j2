@@ -1,0 +1,50 @@
+{#
+  Knowledge Base Usage Template
+  This section is rendered when knowledge bases are selected by the user
+  UPDATED: Strong enforcement to ensure LLM MUST call knowledge base tools
+#}
+{% if knowledge_base_ids and knowledge_base_ids|length > 0 %}
+====
+
+CRITICAL: USER SELECTED KNOWLEDGE BASES
+The user has selected {{ knowledge_base_ids|length }} knowledge base(s) for this conversation: {{ knowledge_base_ids|join(', ') }}.
+
+⚠️ **MANDATORY REQUIREMENT - YOU MUST FOLLOW THIS PROTOCOL:**
+
+1. **FIRST ACTION - ALWAYS SEARCH KNOWLEDGE BASE:**
+   - Before answering ANY user question, you MUST call `search_user_knowledge_base` tool
+   - This is NOT optional - it is a REQUIRED first step
+   - Even if you think you know the answer, you MUST still search the knowledge base first
+
+2. **WHEN TO USE KNOWLEDGE BASE TOOLS:**
+   - EVERY user message requires knowledge base search (no exceptions)
+   - Questions requiring factual information
+   - Questions about specific topics, concepts, or terminology
+   - Requests for explanations, definitions, or procedures
+   - ANY query where the selected knowledge bases might contain relevant information
+
+3. **HOW TO SEARCH:**
+   - Call `search_user_knowledge_base` with relevant search terms from the user's question
+   - Use the user's exact keywords and related terms
+   - Review the search results carefully
+   - If you need comprehensive context for complex questions, call `query_user_knowledge_base`
+
+4. **ANSWERING PROTOCOL:**
+   - ALWAYS base your answer on knowledge base search results
+   - Cite the knowledge base sources in your responses
+   - If no relevant information found in knowledge base, explicitly state this
+   - Prioritize knowledge base information over general knowledge
+
+**⛔ DO NOT:**
+- Skip knowledge base search under any circumstances
+- Answer from general knowledge without searching first
+- Assume you already know the answer without checking the knowledge base
+
+**✓ DO:**
+- ALWAYS search knowledge base first for every user message
+- Use multiple search queries with different terms if needed
+- Combine information from multiple search results
+- Explicitly mention you searched the user's knowledge base
+
+**REMEMBER**: The user explicitly selected these knowledge bases for a reason. They expect you to use them. Failing to search the knowledge base first is a violation of the user's explicit intent.
+{% endif %}

@@ -1,0 +1,158 @@
+# 合规工作区模板: 开源合规审查
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: ip-open-source-compliance
+  name: "开源合规审查"
+  version: "1.0"
+  team_slug: ip-compliance
+
+  description: |
+    对企业软件产品中的开源组件进行合规审查，分析许可证兼容性，
+    识别传染性许可证风险，并制定合规整改方案。
+
+  applicable_scenarios:
+    - "产品发布前开源合规审查"
+    - "M&A 中软件 IP 尽职调查"
+    - "开源许可证迁移/升级评估"
+    - "自研代码开源策略制定"
+
+  estimated_time: "20-30 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入企业全称"
+        store: "input/company_info.json"
+
+      - key: product_name
+        label: "产品/项目名称"
+        type: string
+        placeholder: "请输入待审查产品或项目名称"
+        store: "input/task_parameters.json"
+
+      - key: product_type
+        label: "产品类型"
+        type: select
+        options:
+          - { value: saas, label: "SaaS/云服务" }
+          - { value: onprem, label: "本地部署软件" }
+          - { value: embedded, label: "嵌入式/固件" }
+          - { value: mobile, label: "移动应用" }
+          - { value: library, label: "开源库/SDK" }
+        store: "input/task_parameters.json"
+
+      - key: distribution_model
+        label: "分发模式"
+        type: select
+        options:
+          - { value: internal, label: "仅内部使用" }
+          - { value: distribution, label: "对外分发/销售" }
+          - { value: open_source, label: "计划开源" }
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: sbom_file
+        label: "SBOM / 依赖清单文件（可选）"
+        type: file
+        accept: ".json,.xml,.txt,.csv"
+        store: "input/"
+
+      - key: known_components
+        label: "已知开源组件列表（可选）"
+        type: text
+        placeholder: "列出已知的开源依赖名称和版本..."
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/ip-open-source-compliance"
+
+  workspace_structure:
+    - dir: input
+      description: "审查输入材料"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n开源合规审查参数和物料。"
+    - dir: output
+      description: "分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\n许可证分析、兼容性矩阵等中间结果。"
+    - dir: reports
+      description: "合规报告"
+    - dir: references
+      description: "许可证文本和法规参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    1. `input/task_parameters.json`
+    2. `input/company_info.json`
+    3. `input/` 下所有上传文件（SBOM等）
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan
+    - 根据产品类型和分发模式确定适用许可证规则
+    - 解读 SBOM 或依赖清单
+
+    ### Do
+    a. 组件许可证识别与分类 → `output/license_inventory.md`
+    b. 许可证兼容性矩阵分析 → `output/compatibility_matrix.md`
+    c. 传染性许可证风险识别（GPL/AGPL）→ `output/copyleft_risk_analysis.md`
+    d. 合规整改方案 → `output/remediation_plan.md`
+
+    ### Check
+    - 验证许可证分类准确
+    - 确保传染性分析覆盖所有依赖链
+
+    ### Act
+    - 生成开源合规审查报告 → `reports/open_source_compliance_report.docx`
+
+    ## 重要提示
+    - GPL/AGPL/LGPL/MPL 等 copyleft 许可证需重点分析传染链
+    - 区分静态链接、动态链接、网络调用三种使用场景
+    - 本报告不替代专业开源法律顾问意见
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - license_inventory
+      - compatibility_analysis
+      - copyleft_risk_assessment
+      - remediation_plan
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "审查规划"
+      progress: 10
+    - name: do_inventory
+      label: "许可证识别"
+      progress: 25
+    - name: do_compatibility
+      label: "兼容性分析"
+      progress: 25
+    - name: do_copyleft
+      label: "传染性分析"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

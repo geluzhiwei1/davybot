@@ -1,0 +1,27 @@
+platform: mockweb
+display_name: 本地演练站
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  trending: none
+  metrics: none
+constraints: {}
+domains:
+- 127.0.0.1
+publish:
+  compose_url: http://127.0.0.1:8123/publish
+  selectors:
+    title_input:
+      primary: input#title
+    compose_box:
+      primary: div#editor
+      fallback: textarea#editor-fallback
+    save_draft_button:
+      primary: button#save-draft
+    publish_button:
+      primary: button#publish
+    success_indicator:
+      method: url_change
+      pattern: /success

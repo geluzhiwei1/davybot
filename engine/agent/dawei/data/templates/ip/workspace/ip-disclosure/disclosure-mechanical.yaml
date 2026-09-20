@@ -1,0 +1,147 @@
+template:
+  slug: disclosure-mechanical
+  name: "机械/制造技术交底书"
+  version: "1.0"
+  module: ip-disclosure
+  team_slug: ip-disclosure
+
+  description: |
+    针对机械结构、制造工艺、自动化设备等领域的交底书撰写。
+    重点关注结构组成、运动原理、工艺步骤、装配关系。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "如：一种精密齿轮传动机构及加工方法"
+        store: "input/task_params.json"
+      - key: description
+        label: "技术创意描述"
+        type: string
+        placeholder: "描述机械结构/工艺流程/运动原理（200字以上）"
+        store: "input/task_params.json"
+    optional:
+      - key: tech_field
+        label: "技术领域"
+        type: select
+        placeholder: "选择子领域"
+        default: ""
+        options:
+          - value: ""
+            label: "请选择"
+          - value: "精密机械"
+            label: "精密机械/传动机构"
+          - value: "制造工艺"
+            label: "制造工艺/加工方法"
+          - value: "自动化设备"
+            label: "自动化设备/工业机器人"
+          - value: "汽车工程"
+            label: "汽车/轨道交通"
+          - value: "航空航天"
+            label: "航空航天/船舶"
+          - value: "模具/夹具"
+            label: "模具/夹具/检具"
+          - value: "流体机械"
+            label: "流体机械/液压/气动"
+        store: "input/task_params.json"
+      - key: structure_detail
+        label: "结构/工艺细节"
+        type: string
+        placeholder: "关键部件组成、连接关系、工艺参数等"
+        store: "input/task_params.json"
+      - key: material_spec
+        label: "材料规格"
+        type: string
+        placeholder: "关键部件材料、热处理要求、表面处理等"
+        store: "input/task_params.json"
+      - key: inventor_names
+        label: "发明人"
+        type: string
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+    - knowledge/patent-examination-guidelines
+
+  checklists:
+    - ref: "checklist/patentability-check"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游评估继承的文件"
+    - dir: input/checklists
+      description: "交底书检查清单"
+    - dir: output
+      description: "各章节输出"
+    - dir: drafts
+      description: "完整交底书文件"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入机械/制造技术交底书撰写工作区，请按照 PDCA 工作流执行。
+
+    ## 领域重点：机械/制造交底书
+    机械制造类交底书需特别关注以下方面：
+    1. **结构组成详述**：每个部件的名称、形状、数量、位置、连接关系
+    2. **运动/工作原理**：各部件的运动配合关系、动力传递路径、工作循环
+    3. **工艺步骤**：加工工序、工艺参数（温度/压力/速度/时间）、工装夹具
+    4. **装配关系**：部件间的配合方式（间隙配合/过渡配合/过盈配合）
+    5. **材料与处理**：关键部件的材料选择及热处理/表面处理要求
+    6. **可替代方案**：不同材料/尺寸/结构的等同替换
+
+    ## 交底书 8 章节
+    1. 技术领域（明确机械/制造子领域）
+    2. 背景技术（现有结构/工艺的不足）
+    3. 发明目的（要解决的技术问题）
+    4. 技术方案（结构组成 + 连接关系 + 工作/运动原理）
+    5. 有益效果（精度/效率/成本/可靠性改善）
+    6. 具体实施方式（至少2个结构或工艺实施例）
+    7. 附图说明（结构爆炸图/剖视图/工艺流程图/运动轨迹图）
+    8. 权利要求概要（产品+方法+设备+系统）
+
+    ## 输入数据
+    1. `input/task_params.json` — 发明名称、结构/工艺描述、材料规格
+    2. `input/inherited/` — 可选的上游评估报告
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 读取输入，确认机械结构/工艺核心创新点
+    ### Do: 逐章节撰写，重点描述结构组成和运动原理
+    ### Check: 核对交底书完整性清单
+    ### Act: 汇总输出完整交底书
+
+  deliverables:
+    - file: "drafts/disclosure_full.md"
+      name: "机械制造技术交底书全文"
+      format: markdown
+    - file: "output/disclosure_sections.md"
+      name: "各章节结构化数据"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "理解结构方案"
+      progress: 10
+    - name: do_core
+      label: "撰写技术方案"
+      progress: 25
+    - name: do_embodiments
+      label: "撰写实施方式"
+      progress: 25
+    - name: do_remaining
+      label: "撰写其他章节"
+      progress: 20
+    - name: check
+      label: "完整性审查"
+      progress: 15
+    - name: act
+      label: "汇总输出"
+      progress: 5

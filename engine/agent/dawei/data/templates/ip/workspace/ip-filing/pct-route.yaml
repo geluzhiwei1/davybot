@@ -1,0 +1,171 @@
+template:
+  slug: pct-route
+  name: "PCT 国际申请路径规划"
+  version: "2.0"
+  module: ip-filing
+  team_slug: ip-filing
+
+  description: |
+    基于 PCT（专利合作条约）的国际申请路径全流程规划。
+    包含国际阶段时间线、各国国家阶段进入策略、费用预算、翻译需求。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "请输入发明名称"
+        store: "input/task_params.json"
+      - key: target_countries
+        label: "目标国家/地区"
+        type: string
+        placeholder: "如：CN, US, EP, JP, KR（逗号分隔）"
+        store: "input/task_params.json"
+      - key: filing_type
+        label: "PCT 申请类型"
+        type: select
+        default: "invention"
+        options:
+          - { value: "invention", label: "发明专利" }
+          - { value: "utility_model", label: "实用新型（部分国家）" }
+        store: "input/task_params.json"
+    optional:
+      - key: priority_date
+        label: "优先权日"
+        type: string
+        placeholder: "YYYY-MM-DD（首个申请的提交日）"
+        store: "input/task_params.json"
+      - key: receiving_office
+        label: "受理局"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "自动选择" }
+          - { value: "CN", label: "CNIPA（中国）" }
+          - { value: "US", label: "USPTO（美国）" }
+          - { value: "EP", label: "EPO（欧洲）" }
+          - { value: "JP", label: "JPO（日本）" }
+        store: "input/task_params.json"
+      - key: budget_range
+        label: "预算范围"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "不限" }
+          - { value: "low", label: "经济型（< 10 万 RMB）" }
+          - { value: "medium", label: "标准型（10-30 万 RMB）" }
+          - { value: "high", label: "充裕型（> 30 万 RMB）" }
+        store: "input/task_params.json"
+      - key: language_concern
+        label: "翻译需求"
+        type: string
+        placeholder: "是否需要翻译服务，目标语言"
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+
+  checklists:
+    - ref: "checklist/filing-requirements"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游申请书继承的文件"
+    - dir: input/checklists
+      description: "申请要求清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: drafts
+      description: "完整路径方案"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入 PCT 国际申请路径规划工作区，请按照 PDCA 工作流执行。
+
+    ## PCT 路径核心时间线
+    - **T0**：优先权日（首次申请日）
+    - **T+12月**：PCT 国际申请提交截止日
+    - **T+16月**：国际检索报告（ISR）+ 书面意见（WO/ISA）发布
+    - **T+18月**：国际公布（除非要求提前公布）
+    - **T+22月**：国际初步审查请求截止日（可选，Chapter II）
+    - **T+30月**：大部分国家国家阶段进入截止日（CN/US/JP/KR/EP 均为30月）
+    - **T+31月**：EPO 区域阶段进入截止日
+
+    ## 各国国家阶段进入要点
+    ### 中国（CNIPA）
+    - 进入期限：30 个月
+    - 翻译：中文翻译件必须
+    - 费用：申请费 + 审查费 + 可能的恢复费
+    - 加速：可利用 PPH 或优先审查
+
+    ### 美国（USPTO）
+    - 进入期限：30 个月
+    - 翻译：英文翻译件（如原始非英文）
+    - 费用：申请费 + 检索费 + 审查费（小实体/微实体折扣）
+    - 加速：Track One 优先审查（$1000-2000）
+
+    ### 欧洲（EPO）
+    - 进入期限：31 个月
+    - 翻译：英/法/德语
+    - 费用：指定费 + 搜索费（如未做国际检索）+ 审查费
+    - 授权后：需在各指定国验证（翻译+缴费）
+
+    ### 日本（JPO）
+    - 进入期限：30 个月
+    - 翻译：日文翻译件
+    - 费用：申请费 + 审查费（按权利要求数加收）
+
+    ## 输入数据
+    1. `input/task_params.json` — 目标国家、优先权日、预算、申请类型
+    2. `input/inherited/` — 专利草案/申请书
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 确认目标国家、优先权日，检查 PCT 缔约国资格，规划受理局
+    ### Do:
+    - 国际阶段时间线（T0 → 国际检索 → 国际公布 → 可选初步审查）
+    - 各国国家阶段进入策略（期限、翻译、费用、本地代理）
+    - 费用预算（国际费 + 各国国家阶段费 + 翻译费 + 代理费）
+    ### Check: 核对申请要求清单、各截止日计算（使用优先权日精确推算）
+    ### Act: 生成完整路径方案文件
+
+  deliverables:
+    - file: "drafts/pct_filing_plan.md"
+      name: "PCT 路径规划方案"
+      format: markdown
+    - file: "output/filing_timeline.md"
+      name: "申请时间线（含关键截止日）"
+      format: markdown
+    - file: "output/fee_breakdown.md"
+      name: "费用明细（按国家分列）"
+      format: markdown
+    - file: "output/national_phase_strategy.md"
+      name: "各国国家阶段进入策略"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "确认目标与资格"
+      progress: 15
+    - name: do_timeline
+      label: "国际阶段时间线"
+      progress: 20
+    - name: do_national
+      label: "各国进入策略"
+      progress: 25
+    - name: do_fees
+      label: "计算费用预算"
+      progress: 20
+    - name: check
+      label: "核验清单与期限"
+      progress: 10
+    - name: act
+      label: "输出方案"
+      progress: 10

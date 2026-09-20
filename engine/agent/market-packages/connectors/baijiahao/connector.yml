@@ -1,0 +1,84 @@
+platform: baijiahao
+display_name: 百度百家号
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  trending: none
+  metrics: browser
+constraints:
+  char_limit: 20000
+  max_files: 20
+  max_video_seconds: 0
+  rich_text: true
+domains:
+- baijiahao.baidu.com
+publish:
+  compose_url: https://baijiahao.baidu.com/builder/rc/edit?type=news
+  selectors:
+    # 真机核实 2026-08-30(Chrome CDP 实测):
+    # - 标题是 FeEditorApp contenteditable(非 input/textarea),组件类名稳定,fill 可用
+    # - 正文是 UEditor iframe(body.news-editor-pc, contenteditable),主页面无匹配 →
+    #   执行器 frames 兜底命中;绝不可用通用 [contenteditable](会先命中标题编辑器)
+    # - 平台用 CSS Modules 哈希类名(--lZVgU 型),类名选择器会腐坏 → 一律文本/属性定位
+    title_input:
+      primary: .client_pages_edit_components_titleInput [contenteditable="true"]
+      fallback: "[class*='FeEditorApp'][class*='-editor']"
+      wait_timeout_ms: 15000
+    compose_box:
+      primary: body.news-editor-pc
+      fallback: body.view[contenteditable="true"]
+      wait_timeout_ms: 20000
+    save_draft_button:
+      primary: button:has-text("存草稿")
+      fallback: "[class*='op-btn'] button:has-text('存草稿')"
+      # 真机时间线:点击后 ~1s 出现「已保存」徽标,~3s 翻转为「内容已存入草稿」toast
+      # ——等 3.5s 后以 toast 为准(「已保存」届时已消失,勿用作指示器)
+      wait_after_click_ms: 3500
+    publish_button:
+      primary: button.cheetah-btn-primary:has-text("发布")
+      fallback: button:has-text("发 布")
+      wait_after_click_ms: 5000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 20
+    success_indicator:
+      # 真机:存草稿确认 toast「内容已存入草稿」(~3s 出现,常驻>3s);
+      # 勿用「已保存」(3s 时翻转为本 toast)或「存草稿」(按钮常驻假绿)
+      method: text_contains
+      pattern: 内容已存入草稿
+  rich_text:
+    enabled: true
+    content_format: html_semantic
+    # UEditor iframe:ownerDocument 感知修复后 insertHTML(iframe doc)→ innerHTML 直写兜底;
+    # 真机已验 innerHTML 直写 + input 事件 → 存草稿 → 预览正文结构完整(h2/strong/em/ul/a/code)
+    inject_method: innerHTML
+    image_handling: file_upload
+    style:
+      heading_style: 'margin: 1.2em 0 0.6em; font-weight: bold;'
+      paragraph_style: 'margin: 0.8em 0; line-height: 1.75;'
+      image_style: 'max-width: 100%; margin: 10px auto; display: block;'
+      blockquote_style: 'margin: 1em 0; padding: 0.5em 1em; border-left: 4px solid #2932e1; color: #666; background: #f7f7f7;'
+      code_block_style: 'margin: 1em 0; padding: 12px 16px; background: #f6f8fa; border-radius: 3px; font-family: monospace;'
+      list_style: 'margin: 0.8em 0; padding-left: 2em;'
+  login_check:
+    url: https://baijiahao.baidu.com/builder/rc/edit?type=news
+    # 未登录 → 跳 builder/theme/bjh/login(「登录/注册百家号」按钮在场)
+    indicator: .client_pages_edit_components_titleInput
+    absent_indicator: button:has-text("注册百家号")
+    # SPA 冷启渲染慢:navigate 后 indicator 迟到,立即判会误报 login_required(真机复现)
+    wait_timeout_ms: 12000
+metrics:
+  # 内容管理列表页(builder/rc/content):阅读/推荐/评论列(行级数据,采集轨后续接入)
+  reads: "[class*='read'] span, span:has-text('阅读')"
+  comments: "[class*='comment'] span, span:has-text('评论')"
+  recommends: "[class*='recommend'] span, span:has-text('推荐')"
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

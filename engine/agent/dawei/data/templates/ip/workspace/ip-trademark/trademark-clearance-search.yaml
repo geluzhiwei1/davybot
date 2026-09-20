@@ -1,0 +1,241 @@
+template:
+  slug: trademark-clearance-search
+  name: "商标预检索与侵权清除分析"
+  version: "1.0"
+  module: ip-trademark
+  team_slug: ip-trademark
+
+  description: |
+    提交商标注册申请前的全面预检索（Clearance Search），识别潜在近似商标冲突，
+    评估注册可行性和侵权风险。覆盖相同检索、近似检索、跨类检索，
+    输出风险矩阵和清除策略建议。
+
+  data_requirements:
+    required:
+      - key: trademark_name
+        label: "待检索商标名称"
+        type: string
+        placeholder: "如：SKYTECH 或 中文'天启科技'"
+        store: "input/task_params.json"
+      - key: goods_services
+        label: "商品/服务项目"
+        type: string
+        placeholder: "如：第9类计算机软件、第42类SaaS服务"
+        store: "input/task_params.json"
+    optional:
+      - key: search_scope
+        label: "检索范围"
+        type: select
+        default: "comprehensive"
+        options:
+          - { value: "identical", label: "相同检索（仅完全相同的商标）" }
+          - { value: "similar", label: "近似检索（音/形/义近似）" }
+          - { value: "comprehensive", label: "全面检索（相同+近似+跨类）" }
+          - { value: "global", label: "全球检索（含马德里/各国）" }
+        store: "input/task_params.json"
+      - key: jurisdictions
+        label: "目标管辖地"
+        type: string
+        placeholder: "如：CN, US, EU, JP（逗号分隔）"
+        store: "input/task_params.json"
+      - key: nice_classes
+        label: "目标尼斯类别"
+        type: string
+        placeholder: "如：9, 35, 42（逗号分隔）"
+        store: "input/task_params.json"
+      - key: cross_class_search
+        label: "跨类检索范围"
+        type: select
+        default: "related"
+        options:
+          - { value: "none", label: "仅目标类别" }
+          - { value: "related", label: "关联类别（类似群组）" }
+          - { value: "broad", label: "广泛（全部45类）" }
+        store: "input/task_params.json"
+      - key: include_international
+        label: "是否包含国际检索"
+        type: select
+        default: "yes"
+        options:
+          - { value: "yes", label: "包含（WIPO Madrid Express + 各国数据库）" }
+          - { value: "no", label: "仅国内" }
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/trademark-law
+
+  checklists:
+    - ref: "checklist/trademark-clearance"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/checklists
+      description: "预检索清单"
+    - dir: output
+      description: "检索结果与分析"
+    - dir: drafts
+      description: "清除策略报告"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入商标预检索工作区，请按照 PDCA 工作流执行。
+
+    ## 预检索（Clearance Search）核心原则
+
+    预检索是商标注册前的**风险排查**环节，目标是在提交申请前发现潜在冲突，
+    避免申请被驳回、异议或侵权诉讼。
+
+    ### 预检索三层漏斗
+
+    | 层级 | 检索范围 | 目的 | 风险阈值 |
+    |------|---------|------|---------|
+    | 第一层：相同检索 | 完全相同的商标 | 排除致命冲突 | 高风险直接放弃 |
+    | 第二层：近似检索 | 音/形/义近似 | 评估注册可行性 | 中高风险需修改 |
+    | 第三层：跨类检索 | 关联/防御类别 | 评估保护策略 | 低风险可监控 |
+
+    ## 检索方法论
+
+    ### Step 1: 商标拆解与检索式构建
+
+    将待检索商标拆解为可检索的要素：
+
+    | 要素类型 | 拆解方式 | 检索策略 |
+    |---------|---------|---------|
+    | 中文文字 | 拆字、谐音、近音、近义 | 模糊+精确组合 |
+    | 英文文字 | 前缀/后缀/词根变化 | 通配符检索 |
+    | 图形要素 | 维也纳分类编号 | 图形编码检索 |
+    | 数字部分 | 完全匹配+近似数字 | 精确检索 |
+
+    中文检索维度：
+    - **音近**：同音字、近音字、谐音（如"天启"vs"天齐"）
+    - **形近**：字形相近（如"己/已/巳"、"未/末"）
+    - **义近**：含义相近（如"太阳"vs"日"）
+    - **排序变化**：文字顺序调换（如"东方"vs"方东"）
+
+    英文检索维度：
+    - **前缀/后缀变化**：TECH/TEKNO/TECHNOLOGY
+    - **字母替换**：C/K 替换（CAT/KAT）、PH/F 替换
+    - **复数/词性变化**：SUN/SUNS/SUNNY
+    - **翻译对应**：中英互译（如"龙"vs"DRAGON"）
+
+    ### Step 2: 检索执行
+
+    按优先级执行检索：
+
+    1. **相同检索**（Exact Match）
+       - 目标类别中完全相同的商标
+       - 包括：相同文字、相同图形、相同组合
+
+    2. **近似检索**（Similarity Search）
+       - 同类别中的近似商标
+       - 关联类似群组中的近似商标
+       - 使用音/形/义三维交叉检索
+
+    3. **跨类检索**（Cross-Class Search）
+       - 关联类别中的相同/近似商标
+       - 驰名商标跨类保护排查
+       - 防御性注册排查
+
+    ### Step 3: 冲突分析
+
+    对每个检索命中的商标进行冲突评估：
+
+    | 在先商标 | 注册号 | 类别 | 相似度评分 | 商品类似度 | 法律状态 | 冲突等级 |
+    |---------|-------|------|-----------|-----------|---------|---------|
+
+    冲突等级判定：
+    - **红色（高冲突）**：相同或高度近似 + 同类商品 → 注册极可能被驳回
+    - **橙色（中高冲突）**：中等近似 + 同类/类似商品 → 有被异议/驳回风险
+    - **黄色（中等冲突）**：弱近似或跨类 → 需进一步评估
+    - **绿色（低冲突）**：不近似或已失效 → 可安全推进
+
+    ### Step 4: 清除策略
+
+    对高冲突商标制定清除方案：
+
+    1. **商标修改方案**
+       - 增加显著要素（添加独创词/图形）
+       - 改变外观印象（字体/排列/颜色组合）
+       - 缩小指定商品范围
+
+    2. **共存策略**
+       - 评估共存协议可能性
+       - 分析市场隔离程度
+       - 准备同意函
+
+    3. **法律挑战方案**
+       - 评估在先商标的可无效性（连续3年不使用等）
+       - 评估在先商标的可撤销性
+       - 准备异议/无效申请
+
+    4. **替代方案**
+       - 更换商标（准备 2-3 个备选）
+       - 收购在先商标
+       - 获取许可/转让
+
+    ## 各国检索数据库
+
+    | 管辖地 | 官方数据库 | 检索特点 |
+    |-------|-----------|---------|
+    | 中国 | CNIPA商标网 / 商标局查询系统 | 支持中文模糊检索 |
+    | 美国 | TESS (USPTO) | 支持设计编码检索 |
+    | 欧盟 | EUIPO eSearch plus | 支持多语言检索 |
+    | 日本 | J-PlatPat | 支持日文/英文检索 |
+    | 国际 | WIPO Global Brand Database | 整合多国数据 |
+
+    ## 输入数据
+    1. `input/task_params.json` — 商标名称、商品服务、检索范围、管辖地
+    2. `input/checklists/` — 预检索检查清单
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 拆解商标要素，构建检索式，确认检索范围
+    ### Do:
+    - 执行三层漏斗检索（相同→近似→跨类）
+    - 逐个分析命中商标的冲突等级
+    - 标记高冲突商标
+    ### Check: 交叉验证冲突分析，评估清除可行性
+    ### Act: 生成检索报告 + 风险矩阵 + 清除策略建议
+
+  deliverables:
+    - file: "drafts/clearance_search_report.md"
+      name: "预检索综合报告"
+      format: markdown
+    - file: "output/conflict_matrix.md"
+      name: "冲突风险矩阵"
+      format: markdown
+    - file: "output/search_results_detail.md"
+      name: "检索命中详情"
+      format: markdown
+    - file: "output/clearance_strategy.md"
+      name: "冲突清除策略建议"
+      format: markdown
+    - file: "output/alternative_marks.md"
+      name: "备选商标建议（如有需要）"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "构建检索策略"
+      progress: 15
+    - name: do_identical
+      label: "相同检索"
+      progress: 20
+    - name: do_similar
+      label: "近似检索"
+      progress: 25
+    - name: do_cross_class
+      label: "跨类检索"
+      progress: 20
+    - name: check
+      label: "冲突分析"
+      progress: 12
+    - name: act
+      label: "输出清除策略"
+      progress: 8

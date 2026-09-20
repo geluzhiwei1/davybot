@@ -1,0 +1,66 @@
+platform: devto
+display_name: DEV Community
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - draft_box
+  - direct
+  trending: none
+  metrics: none
+constraints:
+  char_limit: 200000
+  max_files: 20
+  max_video_seconds: 0
+  rich_text: true
+domains:
+- dev.to
+publish:
+  compose_url: https://dev.to/enter
+  selectors:
+    # v0.1.0 未真机验证:Forem 编辑器(标题 input + 正文 CodeMirror/textarea markdown)
+    title_input:
+      primary: "#article-form-title"
+      fallback: "input[placeholder*='Title']"
+      wait_timeout_ms: 15000
+    compose_box:
+      primary: "#article_body_markdown"
+      fallback: ".CodeMirror textarea, textarea[placeholder*='markdown']"
+      wait_timeout_ms: 15000
+    save_draft_button:
+      primary: button:has-text("Save draft")
+      fallback: "button[data-testid='article-save-draft']"
+      wait_after_click_ms: 4000
+    publish_button:
+      primary: button:has-text("Publish")
+      fallback: "input[value='Publish']"
+      wait_after_click_ms: 6000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 20
+    success_indicator:
+      method: url_change
+      pattern: /dev-to-
+  rich_text:
+    enabled: false
+    content_format: markdown_plain
+    inject_method: fill
+    image_handling: file_upload
+  login_check:
+    url: https://dev.to/enter
+    indicator: "#article-form-title, #article_body_markdown"
+    absent_indicator: "a[href*='/enter']"
+    wait_timeout_ms: 12000
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - IN
+  - GB
+  - DE
+  - CA
+  - BR
+  languages:
+  - en

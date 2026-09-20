@@ -1,0 +1,66 @@
+platform: threads
+display_name: Threads
+version: 0.1.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: none
+  metrics: none
+constraints:
+  char_limit: 500
+  max_files: 10
+  max_video_seconds: 300
+  rich_text: false
+domains:
+- www.threads.net
+publish:
+  compose_url: https://www.threads.net/intent/post
+  selectors:
+    # v0.1.0 未真机验证:intent/post 直达 composer;正文 contenteditable(Draft.js 系)
+    compose_box:
+      primary: "[contenteditable='true']"
+      fallback: "div[role='textbox']"
+      wait_timeout_ms: 20000
+    publish_button:
+      primary: "div[role='button']:has-text('Post')"
+      fallback: "button:has-text('Post')"
+      wait_after_click_ms: 6000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 10
+    success_indicator:
+      method: url_change
+      pattern: /post/
+  rich_text:
+    enabled: false
+    content_format: plain
+    inject_method: fill
+    image_handling: file_upload
+  login_check:
+    url: https://www.threads.net/intent/post
+    indicator: "[contenteditable='true'], div[role='textbox']"
+    absent_indicator: "a[href*='/login'], [class*='Login']"
+    wait_timeout_ms: 15000
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - JP
+  - IN
+  - BR
+  - GB
+  languages:
+  - en
+  - ja
+  - es
+  - pt
+  - de
+  - fr
+  - it
+  - ko
+  - zh
+  - tr
+  - ru

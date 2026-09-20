@@ -1,0 +1,75 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""Workspace API模块
+
+Workspace API的模块化实现，将原本3,291行的单一文件拆分为8个子模块
+"""
+
+from fastapi import APIRouter
+
+# 导入记忆系统API
+from . import memory as memory_api
+from .checkpoints import router as checkpoints_router
+
+# 导入各子模块的路由器
+from .config import router as config_router
+from .config_reload import router as config_reload_router
+from .core import get_user_workspace
+from .core import router as core_router
+from .crud import router as crud_router
+from .evolution import router as evolution_router
+from .files import router as files_router
+from .graphs import router as graphs_router
+from .llm import router as llm_router
+from .mcp_servers import router as mcp_servers_router
+from .models import *
+from .plugin_config import router as plugin_config_router
+from .plugins import router as plugins_router
+from .ui_settings import router as ui_settings_router
+from .acp_agents import router as acp_agents_router
+from .channels import router as channels_router
+from .collections import router as collections_router
+from .diagnostics import router as diagnostics_router
+from .traces import router as traces_router
+from .subtasks import router as subtasks_router
+from . import security as security_api
+
+# 创建主路由器
+router = APIRouter(prefix="/api/workspaces")
+
+# 注册所有子路由器
+# 注意：collections_router 必须在 crud_router 之前注册，
+# 因为 crud_router 的 /{workspace_id} 路径会匹配 "collections"
+router.include_router(collections_router)  # 工作区集合管理 API
+router.include_router(crud_router)
+router.include_router(core_router)
+router.include_router(files_router)
+router.include_router(llm_router)
+router.include_router(graphs_router)
+router.include_router(checkpoints_router)
+router.include_router(config_reload_router)  # 新增:配置重新加载 API
+router.include_router(config_router)
+router.include_router(ui_settings_router)
+router.include_router(plugins_router)
+router.include_router(plugin_config_router)
+router.include_router(mcp_servers_router)  # 新增:MCP服务器管理 API
+router.include_router(evolution_router)  # 新增:Evolution功能 API
+router.include_router(acp_agents_router)  # 新增:ACP Agent管理 API
+router.include_router(channels_router)    # 新增:Channel管理 API
+router.include_router(diagnostics_router)  # 新增:Agent诊断 API (capability matrix)
+router.include_router(traces_router)       # 新增:Trace查询 API (span persistence + query)
+router.include_router(subtasks_router)     # 新增:子任务委派 API (§6.2 UI 协议层)
+
+# 注册记忆系统路由器
+# Note: Memory router has its own prefix with workspace_id: /api/workspaces/{workspace_id}/memory
+router.include_router(memory_api.router)
+
+# 注册安全配置路由器
+# Canonical path: /api/workspaces/{workspace_id}/security (对齐前端 nn-bot-app securityApi)
+# 旧路径 /security-settings 作为别名保留，向后兼容（遗留 webui 仍引用）
+router.include_router(security_api.router, prefix="/{workspace_id}/security")
+router.include_router(security_api.router, prefix="/{workspace_id}/security-settings")
+
+# 导出
+__all__ = ["router"]

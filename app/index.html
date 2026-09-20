@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Web SPA entry (vite build): served at BASE_URL (e.g. /app-ui/) via nginx.
+     Uses index.html as entry; Tauri desktop build uses index.tauri.html instead.
+     See vite.config.ts for the base path and SPA fallback middleware. -->
+<html lang="zh" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <!-- viewport-fit=cover: let content extend under notch/home-indicator (safe-area handled in styles) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="icon" href="/favicon.ico" />
+    <!-- Mobile web fundamentals (移动端可用性提升方案.md Phase 0) -->
+    <meta name="theme-color" content="#0f1622" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/icon-256.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>NormNomos — AI 法律智能体平台</title>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tauri.tsx"></script>
+  </body>
+</html>

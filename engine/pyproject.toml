@@ -1,0 +1,14 @@
+# NOTE: This is a vestigial root pyproject.toml kept for compatibility with
+# monorepo tooling. The real project configuration lives at agent/pyproject.toml
+# (package name: "davybot", entry point: "dawei = dawei.cli.dawei:main").
+#
+# Do NOT add project dependencies here; use agent/pyproject.toml instead.
+[project]
+name = "nn-bot"
+version = "0.1.0"
+description = "Vestigial root config — see agent/pyproject.toml"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "playwright>=1.58.0",
+]

@@ -1,0 +1,90 @@
+name: Build Server Binary
+
+# 构建 dawei server 单文件二进制 (PyInstaller): 前端 → 打包 → 零云冒烟 → 产物。
+# 同一产物服务两种形态: 独立 server 部署 (:8431) 与 Tauri 桌面 sidecar。
+#
+# 模式盖戳 (多模式统一方案 §L1): 开源仓多用途入口不盖死模式 —
+# DAWEI_RUNTIME_STAMP=desktop,server,tui (saas 盖戳走闭源侧 build-saas.sh)。
+#
+# 触发: 手动 + tag v* (与 build-desktop.yml 的发布通道对齐)。
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: build-server-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20.19.0"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    name: Build & smoke-test server binary
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0: setuptools_scm 版本推导需要完整 git 历史
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # 前端先行: PyInstaller --collect-all dawei 打包 engine/agent/dawei/frontend/
+      - name: Build core web UI
+        working-directory: app
+        run: |
+          npm ci
+          npm run build:server
+
+      - name: Stage frontend into engine
+        run: rsync -a --delete app/dist/ engine/agent/dawei/frontend/
+
+      - name: "Build binary (mode stamp: desktop,server,tui)"
+        env:
+          DAWEI_RUNTIME_STAMP: "desktop,server,tui"
+        run: bash scripts/build-server-binary.sh
+
+      # 冒烟 (E5 零云矩阵): 冷启二进制 → /api/health 轮询 → runtime-info 断言。
+      # 抓 PyInstaller 缺模块/编码类打包事故 (Windows 侧 Test-Sidecar 的 CI 对应物)。
+      - name: Smoke-test binary (zero-cloud)
+        run: |
+          cd engine/agent
+          ./dist/dawei server start --host 127.0.0.1 --port 8931 > /tmp/dawei-binary-smoke.log 2>&1 &
+          SRV=$!
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:8931/api/health > /dev/null && break
+            sleep 2
+          done
+          python3 - <<'EOF'
+          import json, urllib.request
+          info = json.load(urllib.request.urlopen("http://127.0.0.1:8931/api/runtime-info"))
+          assert info.get("deployment_class") == "local", f"deployment_class: {info}"
+          assert info.get("capabilities") == ["relay"], f"capabilities: {info}"
+          print("runtime-info OK:", info)
+          EOF
+          UI_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8931/app-ui/)
+          [ "$UI_CODE" = "200" ] || { echo "app-ui HTTP $UI_CODE"; tail -50 /tmp/dawei-binary-smoke.log; exit 1; }
+          kill $SRV || true
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: dawei-server-linux-x86_64
+          path: engine/agent/dist/dawei
+          if-no-files-found: error

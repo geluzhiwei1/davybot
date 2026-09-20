@@ -1,0 +1,71 @@
+platform: linkedin
+display_name: LinkedIn
+version: 0.2.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 3000
+  max_files: 9
+  max_video_seconds: 600
+  rich_text: false
+domains:
+- www.linkedin.com
+publish:
+  compose_url: https://www.linkedin.com/feed/
+  selectors:
+    compose_box:
+      primary: '[data-testid="share-post-dialog__content-editor"]'
+      fallback: .ql-editor[contenteditable="true"]
+    publish_button:
+      primary: '[data-testid="share-post-dialog__submit-button"]'
+      fallback: button.share-actions__primary-action
+      wait_after_click_ms: 3000
+    media_upload:
+      primary: input[type="file"]
+      max_files: 9
+      max_video_seconds: 600
+    success_indicator:
+      method: url_change
+      pattern: /activity/
+  login_check:
+    url: https://www.linkedin.com/feed/
+    indicator: .global-nav
+trending:
+  url: https://www.linkedin.com/feed/
+  container: .update-components-anchor
+  topic: h3.update-components-update-title
+  pagination: scroll
+metrics:
+  likes: button[aria-label*="Like"] span
+  reposts: button[aria-label*="Repost"] span
+  replies: button[aria-label*="Comment"] span
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: global
+  countries:
+  - US
+  - IN
+  - GB
+  - BR
+  - FR
+  - DE
+  - NL
+  languages:
+  - en
+  - de
+  - fr
+  - es
+  - pt
+  - it
+  - nl
+  - pl
+  - tr
+  - hi
+  - ja
+  - ko
+  - zh

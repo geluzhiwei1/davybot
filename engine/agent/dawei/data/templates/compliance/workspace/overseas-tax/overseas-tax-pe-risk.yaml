@@ -1,0 +1,178 @@
+# 合规工作区模板: PE 风险评估
+# Layer 1: Workspace Template (YAML) — 定义 HOW
+
+template:
+  slug: overseas-tax-pe-risk
+  name: "PE 风险评估"
+  version: "1.0"
+  team_slug: overseas-tax
+
+  description: |
+    基于 OECD 税收协定范本和各国国内税法，对跨境业务活动
+    是否构成常设机构 (PE) 进行风险评估和防范方案设计。
+
+  applicable_scenarios:
+    - "跨境经营活动 PE 风险评估"
+    - "派驻人员 PE 风险分析"
+    - "代理 PE 判定"
+    - "数字 PE / 虚拟 PE 评估"
+
+  estimated_time: "25-35 分钟"
+
+  data_requirements:
+    required:
+      - key: company_name
+        label: "企业名称"
+        type: string
+        placeholder: "请输入待评估企业全称"
+        store: "input/company_info.json"
+
+      - key: host_country
+        label: "东道国 (业务所在国)"
+        type: string
+        placeholder: "如：德国、新加坡、巴西"
+        store: "input/task_parameters.json"
+
+      - key: activity_type
+        label: "在东道国的业务活动类型"
+        type: multiselect
+        options: ["设立办公场所", "派驻常驻人员", "项目施工/安装", "通过代理人开展业务", "数字平台运营", "仓储/物流", "市场推广/客户支持"]
+        store: "input/task_parameters.json"
+
+      - key: activity_duration
+        label: "业务活动持续时长"
+        type: select
+        options:
+          - { value: under_3m, label: "不足 3 个月" }
+          - { value: 3m_to_6m, label: "3-6 个月" }
+          - { value: 6m_to_12m, label: "6-12 个月" }
+          - { value: over_12m, label: "超过 12 个月" }
+          - { value: ongoing, label: "长期持续" }
+        store: "input/task_parameters.json"
+
+    optional:
+      - key: personnel_count
+        label: "派驻东道国人员数量"
+        type: string
+        placeholder: "如：5"
+        store: "input/company_info.json"
+
+      - key: has_contract_authority
+        label: "东道国人员是否有签订合同的权力"
+        type: boolean
+        default: false
+        store: "input/company_info.json"
+
+      - key: relevant_agreements
+        label: "相关合同/协议文件"
+        type: file
+        accept: ".pdf,.docx"
+        store: "input/"
+
+      - key: task_subject
+        label: "分析主题"
+        type: string
+        placeholder: "如：德国业务PE风险评估"
+        store: "input/task_parameters.json"
+
+  checklists:
+    - ref: "checklist/overseas-tax-pe-risk"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据和上传文件"
+      initial_files:
+        - path: "input/README.md"
+          content: "# 输入数据目录\n\n请在此放置需要分析的PE风险信息和文件。"
+    - dir: output
+      description: "Agent 分析中间结果"
+      initial_files:
+        - path: "output/README.md"
+          content: "# 分析输出目录\n\nAgent 分析过程输出将保存在此目录。"
+    - dir: reports
+      description: "最终合规报告"
+    - dir: references
+      description: "法规参考材料"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入合规工作区，请按照以下工作流执行分析。
+
+    ## 你的角色
+    当前模式：compliance-analyst
+    执行权限：read + edit + command
+
+    ## 输入数据
+    请首先读取以下文件：
+    1. `input/task_parameters.json` — 用户提交的分析参数
+    2. `input/company_info.json` — 企业基本信息
+    3. `input/` 目录下的所有用户上传文件
+
+    ## 工作区路径
+    {workspace_path}
+
+    ## 关联合规清单
+    以下合规清单已加载到 `input/checklists/` 目录，请逐项对照执行：
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+
+    ### Plan (规划)
+    - 阅读所有输入文件，理解跨境业务活动模式和东道国税法
+    - 根据合规清单制定 PE 风险评估执行计划
+    - 向用户展示计划，等待确认
+
+    ### Do (执行)
+    a. 固定场所 PE 风险判定 → `output/fixed_place_pe_analysis.md`
+    b. 建筑/安装工程 PE 风险判定 → `output/construction_pe_analysis.md`
+    c. 代理 PE 风险判定 → `output/agency_pe_analysis.md`
+    d. 准备/辅助活动豁免分析 → `output/preparatory_auxiliary_analysis.md`
+    e. 综合 PE 风险评级 → `output/pe_risk_rating.json`
+
+    每完成一项写入 output/ 对应文件。
+
+    ### Check (验证)
+    - 验证所有 PE 类型覆盖
+    - 确认税收协定条款适用正确
+    - 提交中间结果供用户审核
+
+    ### Act (输出)
+    - 生成 PE 风险评估报告 → `reports/pe_risk_assessment.docx`
+    - 报告必须包含：执行摘要、业务活动描述、各类型PE风险分析、综合风险评级、防范方案建议、合规行动清单
+
+    ## 重要提示
+    - 所有文件操作限制在本工作区路径内
+    - PE 判定高度依赖具体事实和东道国税法
+    - 准备/辅助活动豁免在各国的适用标准不一致
+
+  report_template:
+    format: docx
+    sections:
+      - executive_summary
+      - activity_description
+      - pe_risk_analysis
+      - risk_rating
+      - mitigation_recommendations
+      - action_checklist
+      - legal_references
+
+  phases:
+    - name: plan
+      label: "分析规划"
+      progress: 10
+    - name: do_fixed_place
+      label: "固定场所PE分析"
+      progress: 25
+    - name: do_other_pe
+      label: "其他PE类型分析"
+      progress: 25
+    - name: do_rating
+      label: "综合风险评级"
+      progress: 20
+    - name: check
+      label: "质量审查"
+      progress: 10
+    - name: act
+      label: "报告生成"
+      progress: 10

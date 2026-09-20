@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://updates.example.com/{{target}}/{{arch}}/{{current_version}}"],
+      "pubkey": "REPLACE_WITH_MINISIGN_PUBLIC_KEY"
+    }
+  }
+}

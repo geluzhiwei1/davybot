@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "NormNomos",
+  "version": "1.1.0",
+  "identifier": "com.normnomos.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev -- --config vite.config.tauri.ts",
+    "beforeBuildCommand": "npm run build -- --config vite.config.tauri.ts",
+    "devUrl": "http://localhost:8015",
+    "frontendDist": "ui-dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "NormNomos — AI Native 全球合规风控引擎",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "devtools": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost http://localhost:8431 http://localhost:8011 http://localhost:8012 http://localhost:8013 http://localhost:8014 ws://localhost:8431 ws://localhost:* http://localhost:8015 http://localhost:* https: wss:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http://localhost:* blob:; font-src 'self' data: http://localhost:*; media-src 'self' blob: http://localhost:*; object-src 'none'; worker-src 'self' blob:; child-src 'self' blob:;"
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "externalBin": ["binaries/dawei"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "copyright": "Copyright (c) 2025 格律至微. All rights reserved.",
+    "category": "Business",
+    "shortDescription": "AI Native 全球合规风控引擎",
+    "longDescription": "NormNomos 是面向法律行业的 AI 智能体平台，包含知识产权管理（8大模块）、制裁合规、合同审查等全功能。支持本地部署、批量许可证管理和专属技术支持。",
+    "windows": {
+      "nsis": {
+        "languages": ["SimpChinese", "English"]
+      }
+    }
+  }
+}

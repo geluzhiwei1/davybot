@@ -1,0 +1,66 @@
+platform: zhihu
+display_name: 知乎
+version: 0.2.0
+capability:
+  publish: browser
+  publish_modes:
+  - direct
+  trending: browser
+  metrics: browser
+constraints:
+  char_limit: 50000
+  max_files: 20
+  max_video_seconds: 600
+  rich_text: true
+domains:
+- www.zhihu.com
+publish:
+  compose_url: https://www.zhihu.com/creators
+  selectors:
+    compose_box:
+      primary: div[contenteditable="true"].WriteIndex-titleInput
+      fallback: textarea[placeholder*="写下你的问题"]
+    publish_button:
+      primary: button:has-text("发布")
+      fallback: button.PublishPanel-publishButton
+      wait_after_click_ms: 3000
+    media_upload:
+      primary: input[type="file"][accept*="image"]
+      max_files: 20
+      max_video_seconds: 600
+    success_indicator:
+      method: url_change
+      pattern: zhuanlan.zhihu.com/p/
+    title_input:
+      primary: textarea[placeholder*="标题"]
+      fallback: .WriteIndex-titleInput textarea
+  rich_text:
+    enabled: true
+    content_format: html_semantic
+    inject_method: innerHTML
+    image_handling: file_upload
+    style:
+      heading_style: 'margin: 1.2em 0 0.6em;'
+      paragraph_style: 'margin: 0.8em 0; line-height: 1.7;'
+      image_style: 'max-width: 100%; margin: 10px auto; display: block;'
+  login_check:
+    url: https://www.zhihu.com/
+    indicator: .AppHeader-userInfo, .GlobalSideBar-user
+trending:
+  url: https://www.zhihu.com/hot
+  container: .HotList-list .HotItem
+  topic: .HotItem-title
+  pagination: scroll
+metrics:
+  likes: button.VoteButton--up span, .LikeButton span
+  comments: a[class*="Comment"] span, .ContentItem-actions button:has-text("评论") span
+  collects: button:has-text("收藏") span, .FollowButton span
+  shares: button:has-text("分享") span
+
+# 地理/语种维度(多国家运营过滤;countries=主市场 ISO-2,global 区域平台各国通行)
+geo:
+  region: cn
+  countries:
+  - CN
+  languages:
+  - zh

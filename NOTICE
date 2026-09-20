@@ -1,0 +1,10 @@
+DavyBot (open-source monorepo)
+Copyright 2025 格律至微
+
+This product includes software developed by 格律至微 (https://www.davybot.com).
+
+Licensing is per-directory: engine/ is AGPL-3.0-only (engine/LICENSE);
+app/, scripts/ and root files are Apache-2.0 (app/LICENSE). See LICENSE.md
+for the full scope table.
+
+The desktop product built from this repository is "NormNomos".

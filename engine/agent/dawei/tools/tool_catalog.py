@@ -1,0 +1,711 @@
+# Copyright (c) 2025 格律至微
+# SPDX-License-Identifier: AGPL-3.0-only
+
+"""Tool Catalog — Progressive Tool Discovery 元数据
+
+为 search_tools 工具提供工具目录搜索能力。
+每个工具条目包含：名称、简短描述、关键字、所属分组、详细使用说明。
+
+使用场景：
+- Orchestrator 模式下，LLM 可调 search_tools 查找合适工具
+- 前端工具浏览器可展示工具分类
+"""
+
+import logging
+from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolCatalogEntry:
+    """工具目录条目"""
+
+    name: str
+    group: str
+    short_desc: str  # 一行简述（≤60字）
+    keywords: list[str] = field(default_factory=list)
+    when_to_use: str = ""  # 何时使用此工具
+    examples: list[str] = field(default_factory=list)  # 使用示例
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "group": self.group,
+            "short_desc": self.short_desc,
+            "keywords": self.keywords,
+            "when_to_use": self.when_to_use,
+            "examples": self.examples,
+        }
+
+
+# ============================================================================
+# 工具目录注册表
+# ============================================================================
+
+_CATALOG: list[ToolCatalogEntry] = [
+    # --- read ---
+    ToolCatalogEntry(
+        name="read_file",
+        group="read",
+        short_desc="读取文本文件或 PDF 内容（支持行号、行范围）",
+        keywords=["文件", "读取", "pdf", "txt", "代码", "read", "file"],
+        when_to_use="需要查看文件内容时使用。支持指定行范围。PDF 会自动提取文本。",
+    ),
+    ToolCatalogEntry(
+        name="list_files",
+        group="read",
+        short_desc="列出目录内容（支持递归）",
+        keywords=["目录", "文件列表", "ls", "dir", "list"],
+        when_to_use="需要浏览工作区文件结构时使用。",
+    ),
+    # --- edit ---
+    ToolCatalogEntry(
+        name="write_text_file",
+        group="edit",
+        short_desc="写入或创建文本文件",
+        keywords=["写入", "创建", "文件", "write", "create"],
+        when_to_use="需要创建新文件或完全覆盖文件内容时使用。",
+    ),
+    ToolCatalogEntry(
+        name="smart_text_edit",
+        group="edit",
+        short_desc="智能文本编辑（精确匹配替换）",
+        keywords=["编辑", "替换", "修改", "edit", "replace", "smart"],
+        when_to_use="需要修改文件中的特定内容时使用。基于精确字符串匹配。",
+    ),
+    ToolCatalogEntry(
+        name="insert_text_content",
+        group="edit",
+        short_desc="在文件指定行插入内容",
+        keywords=["插入", "添加", "insert", "append"],
+        when_to_use="需要在文件特定位置插入新内容时使用。",
+    ),
+    # --- docx ---
+    ToolCatalogEntry(
+        name="docx_read_structured",
+        group="docx",
+        short_desc="结构化读取 DOCX 文档（保留段落、表格、样式）",
+        keywords=["word", "docx", "文档", "段落", "表格", "document"],
+        when_to_use="需要读取 .docx/.doc 文件且保留格式结构时使用。",
+    ),
+    ToolCatalogEntry(
+        name="docx_edit",
+        group="docx",
+        short_desc="编辑 DOCX 文档（保持格式不变）",
+        keywords=["word", "docx", "编辑", "修改", "edit"],
+        when_to_use="需要修改 Word 文档内容且不破坏格式时使用。",
+    ),
+    ToolCatalogEntry(
+        name="docx_diff",
+        group="docx",
+        short_desc="比较两个 DOCX 文档的差异",
+        keywords=["word", "docx", "比较", "差异", "diff", "compare"],
+        when_to_use="需要对比两个 Word 文档版本差异时使用。",
+    ),
+    # --- workflow ---
+    ToolCatalogEntry(
+        name="new_task",
+        group="workflow",
+        short_desc="创建新的子任务（派发即返回）",
+        keywords=["任务", "创建", "子任务", "并行", "派发", "task", "new", "subtask"],
+        when_to_use="需要将复杂工作拆分为子任务时使用：同一轮可并行派发多个无依赖子任务；必须给出可判定的验收标准（acceptance），执行报告会回注供逐条判定。",
+    ),
+    ToolCatalogEntry(
+        name="update_todo_list",
+        group="workflow",
+        short_desc="更新待办事项列表",
+        keywords=["待办", "todo", "清单", "计划", "task list"],
+        when_to_use="需要跟踪任务进度或管理工作计划时使用。",
+    ),
+    ToolCatalogEntry(
+        name="switch_mode",
+        group="workflow",
+        short_desc="切换 Agent 工作模式",
+        keywords=["模式", "切换", "mode", "orchestrator", "pdca"],
+        when_to_use="需要切换到不同的工作模式时使用。",
+    ),
+    ToolCatalogEntry(
+        name="expand_tool_result",
+        group="workflow",
+        short_desc="展开被截断的工具结果（使用 snapshot_id）",
+        keywords=["展开", "截断", "快照", "expand", "snapshot", "truncated"],
+        when_to_use="工具结果被截断且包含 snapshot_id 时，用本工具获取完整数据。",
+    ),
+    ToolCatalogEntry(
+        name="search_tools",
+        group="workflow",
+        short_desc="搜索可用工具目录（渐进式披露）",
+        keywords=["搜索", "工具", "发现", "search", "tools", "discover"],
+        when_to_use="不确定应该使用哪个工具时，搜索工具目录并自动激活。",
+    ),
+    ToolCatalogEntry(
+        name="attempt_completion",
+        group="workflow",
+        short_desc="完成任务并提交结果",
+        keywords=["完成", "提交", "结束", "completion", "finish"],
+        when_to_use="任务全部完成后，用本工具提交最终结果。",
+    ),
+    ToolCatalogEntry(
+        name="ask_followup_question",
+        group="workflow",
+        short_desc="向用户提问以澄清需求",
+        keywords=["提问", "澄清", "追问", "followup", "question", "ask"],
+        when_to_use="需要向用户确认需求或获取更多信息时使用。",
+    ),
+    ToolCatalogEntry(
+        name="execute_command",
+        group="command",
+        short_desc="执行 Shell 命令",
+        keywords=["命令", "执行", "shell", "command", "execute", "终端"],
+        when_to_use="需要执行系统命令或脚本时使用。",
+    ),
+    # --- knowledge ---
+    ToolCatalogEntry(
+        name="search_user_knowledge_base",
+        group="knowledge",
+        short_desc="搜索用户知识库（向量+全文混合检索）",
+        keywords=["知识库", "搜索", "rag", "向量", "kb", "knowledge"],
+        when_to_use="需要在用户上传的知识库中查找信息时使用。",
+    ),
+    ToolCatalogEntry(
+        name="query_user_knowledge_base",
+        group="knowledge",
+        short_desc="RAG 问答（知识库增强回答）",
+        keywords=["知识库", "问答", "rag", "query", "ask"],
+        when_to_use="需要基于知识库内容回答问题时使用。",
+    ),
+    ToolCatalogEntry(
+        name="search_legal_knowledge",
+        group="knowledge",
+        short_desc="法律知识搜索（search_legal_knowledge，支持 kb_ids）",
+        keywords=["法律", "搜索", "法规", "案例", "legal", "search", "knowledge"],
+        when_to_use="需要搜索法律条文、案例、法规时使用。支持 kb_ids 指定知识库。",
+    ),
+    ToolCatalogEntry(
+        name="ask_legal_question",
+        group="knowledge",
+        short_desc="法律知识问答（RAG 增强）",
+        keywords=["法律", "问答", "legal", "ask", "question", "rag"],
+        when_to_use="需要基于法律知识库回答法律问题时使用。",
+    ),
+    ToolCatalogEntry(
+        name="get_legal_document",
+        group="knowledge",
+        short_desc="获取法律文档详情",
+        keywords=["法律", "文档", "详情", "legal", "document"],
+        when_to_use="需要查看法律文档完整内容时使用。",
+    ),
+    ToolCatalogEntry(
+        name="list_legal_knowledge_bases",
+        group="knowledge",
+        short_desc="列出可用法律知识库（catalog 发现）",
+        keywords=["法律", "知识库", "列表", "目录", "catalog", "list", "kb"],
+        when_to_use="不确定有哪些法律知识库时，先查看可用库列表。",
+    ),
+    ToolCatalogEntry(
+        name="legal_search_facets",
+        group="knowledge",
+        short_desc="法律检索分面聚合（按字段统计）",
+        keywords=["法律", "分面", "聚合", "统计", "facets", "aggregation"],
+        when_to_use="需要查看法律知识的分面分布（如按类型、管辖区域统计）时使用。",
+    ),
+    ToolCatalogEntry(
+        name="legal_graph_search",
+        group="knowledge",
+        short_desc="法律知识图谱搜索（实体关系）",
+        keywords=["法律", "图谱", "实体", "关系", "graph", "entity"],
+        when_to_use="需要查找法律实体之间的关联关系时使用。",
+    ),
+    ToolCatalogEntry(
+        name="legal_analytics",
+        group="knowledge",
+        short_desc="法律数据分析（趋势/生命周期/热力图）",
+        keywords=["法律", "分析", "趋势", "统计", "analytics", "trends"],
+        when_to_use="需要分析法律数据的趋势、生命周期或管辖区域分布时使用。",
+    ),
+    ToolCatalogEntry(
+        name="legal_document_timeline",
+        group="knowledge",
+        short_desc="法律文档版本时间线（历史版本）",
+        keywords=["法律", "版本", "时间线", "历史", "timeline", "version"],
+        when_to_use="需要查看法律文档的版本变更历史或特定时间点的表述时使用。",
+    ),
+    # --- sanctions ---
+    ToolCatalogEntry(
+        name="sanctions_search_entities",
+        group="sanctions",
+        short_desc="搜索制裁实体列表",
+        keywords=["制裁", "搜索", "实体", "sanctions", "screening"],
+        when_to_use="需要搜索制裁名单中的实体（个人/组织）时使用。",
+    ),
+    ToolCatalogEntry(
+        name="sanctions_get_entity",
+        group="sanctions",
+        short_desc="获取制裁实体详情",
+        keywords=["制裁", "详情", "实体", "sanctions", "entity"],
+        when_to_use="需要查看特定制裁实体的详细信息时使用。",
+    ),
+    ToolCatalogEntry(
+        name="sanctions_screen_entity",
+        group="sanctions",
+        short_desc="制裁风险筛查（模糊匹配+风险评分）",
+        keywords=["制裁", "筛查", "风控", "screen", "risk", "compliance"],
+        when_to_use="需要对客户/合作伙伴进行制裁风险筛查时使用。",
+    ),
+    ToolCatalogEntry(
+        name="sanctions_graph_search",
+        group="sanctions",
+        short_desc="制裁实体关联图谱搜索",
+        keywords=["制裁", "图谱", "关联", "graph", "network"],
+        when_to_use="需要查找制裁实体的关联网络时使用。",
+    ),
+    ToolCatalogEntry(
+        name="sanctions_create_watchlist",
+        group="sanctions",
+        short_desc="创建监控名单（持续监控）",
+        keywords=["制裁", "监控", "名单", "watchlist", "create", "monitor"],
+        when_to_use="需要对实体进行持续监控时创建监控名单。",
+    ),
+    ToolCatalogEntry(
+        name="sanctions_run_monitoring_check",
+        group="sanctions",
+        short_desc="执行监控检查（复查监控名单）",
+        keywords=["制裁", "监控", "检查", "复查", "monitoring", "check", "run"],
+        when_to_use="需要对已创建的监控名单执行定期复查时使用。",
+    ),
+    ToolCatalogEntry(
+        name="sanctions_dashboard",
+        group="sanctions",
+        short_desc="制裁数据看板（数据集覆盖统计）",
+        keywords=["制裁", "看板", "统计", "dashboard", "stats", "overview"],
+        when_to_use="需要查看制裁数据集的覆盖情况和统计数据时使用。",
+    ),
+    ToolCatalogEntry(
+        name="sanctions_filters",
+        group="sanctions",
+        short_desc="制裁可用过滤项（列表/数据集/字段）",
+        keywords=["制裁", "过滤", "筛选", "filters", "options"],
+        when_to_use="需要了解制裁搜索可用的过滤选项时使用。",
+    ),
+    # --- normflow（律所业务数据，仅 firm-team，见 project/firmAgent升级.md） ---
+    ToolCatalogEntry(
+        name="normflow_search_cases",
+        group="normflow",
+        short_desc="检索律所案件/项目列表（名称/状态/类型过滤）",
+        keywords=["案件", "项目", "检索", "case", "列表", "在处理"],
+        when_to_use="回答案件数量、案件进度、案件清单等问题时使用（「在处理」= status:active）。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_case_detail",
+        group="normflow",
+        short_desc="获取单个案件完整详情",
+        keywords=["案件", "详情", "case", "detail"],
+        when_to_use="已知 case_id，需要案件当事人/案由/状态/负责人等完整信息时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_case_tasks",
+        group="normflow",
+        short_desc="获取案件下全部任务与期限",
+        keywords=["任务", "期限", "截止", "task", "deadline", "todo"],
+        when_to_use="需要案件任务进度、截止期限提醒时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_case_timesheet",
+        group="normflow",
+        short_desc="获取案件工时统计摘要",
+        keywords=["工时", "计时", "timesheet", "小时"],
+        when_to_use="需要案件工时/计费小时统计时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_case_documents",
+        group="normflow",
+        short_desc="获取案件文档列表",
+        keywords=["文档", "合同", "证据", "document", "文件"],
+        when_to_use="需要案件关联的合同/文书/证据清单时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_advance_workflow",
+        group="normflow",
+        short_desc="推进案件工作流到指定节点（写操作）",
+        keywords=["工作流", "推进", "流程", "workflow", "advance"],
+        when_to_use="确认用户意图后，将工作流实例推进到下一步时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_workflow_templates",
+        group="normflow",
+        short_desc="获取可用项目/工作流模板",
+        keywords=["模板", "流程", "template", "workflow"],
+        when_to_use="需要查看可立项的工作流模板时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_search_clients",
+        group="normflow",
+        short_desc="检索律所客户列表（阶段/类型过滤）",
+        keywords=["客户", "委托人", "client", "检索"],
+        when_to_use="查找客户、按漏斗阶段筛选客户时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_client_detail",
+        group="normflow",
+        short_desc="获取客户完整详情（联系方式/标签/阶段）",
+        keywords=["客户", "详情", "client", "detail"],
+        when_to_use="已知 client_id，需要客户完整档案时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_client_cases",
+        group="normflow",
+        short_desc="获取客户名下全部关联案件",
+        keywords=["客户", "案件", "client", "cases"],
+        when_to_use="需要某客户的所有委托案件时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_create_follow_up",
+        group="normflow",
+        short_desc="为客户创建跟进记录（写操作）",
+        keywords=["跟进", "回访", "follow-up", "记录"],
+        when_to_use="确认用户意图后，记录一次客户沟通/安排下次联系时使用。",
+    ),
+    ToolCatalogEntry(
+        name="normflow_get_payment_status",
+        group="normflow",
+        short_desc="案件回款仪表盘（预估/开票/回款/逾期）",
+        keywords=["回款", "收款", "欠款", "应收", "payment", "财务"],
+        when_to_use="回答回款情况、未收款、逾期金额等财务问题时使用。",
+    ),
+    # --- market（市场智能数据，仅 market-team，见 project/MarkkeAgent-prd.md） ---
+    ToolCatalogEntry(
+        name="market_dashboard",
+        group="market",
+        short_desc="市场智能看板聚合（KPI/行动漏斗/竞品矩阵/数据源健康）",
+        keywords=["市场", "看板", "KPI", "漏斗", "dashboard", "总览"],
+        when_to_use="回答市场整体情况、待处理量、行动进展，或会话开局拉当前市场状态时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_products",
+        group="market",
+        short_desc="列出在管产品（含 product_id 上下文）",
+        keywords=["产品", "product", "清单"],
+        when_to_use="回答「在追踪哪些产品」或需要 product_id 时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_signals",
+        group="market",
+        short_desc="检索原始市场信号流（RSS/GitHub/HN/Reddit 采集）",
+        keywords=["信号", "signal", "采集", "提及", "rss"],
+        when_to_use="回答最近有什么新信号、某品牌/竞品最近被提及什么时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_get_signal",
+        group="market",
+        short_desc="查看单条信号完整原文（标题/正文/链接）",
+        keywords=["信号", "原文", "详情", "溯源", "signal"],
+        when_to_use="溯源或深入分析某条信号时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_events",
+        group="market",
+        short_desc="检索市场事件（谁/做什么/影响/置信度）",
+        keywords=["事件", "event", "竞品动作", "早鸟", "情报"],
+        when_to_use="回答竞品最近有什么动作、高置信事件、趋势早鸟时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_get_event",
+        group="market",
+        short_desc="查看事件完整详情（含溯源信号 id）",
+        keywords=["事件", "详情", "溯源", "event"],
+        when_to_use="已知 event_id 需要完整四要素与溯源链时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_briefs",
+        group="market",
+        short_desc="检索市场简报（事件聚合的 AI 情报简报）",
+        keywords=["简报", "brief", "情报", "总结"],
+        when_to_use="回答最近市场简报内容、竞品攻势总结时使用（AI 产物须带置信度引用）。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_insights",
+        group="market",
+        short_desc="检索行动建议（insight，可采纳/驳回）",
+        keywords=["建议", "insight", "采纳", "pricing", "content"],
+        when_to_use="回答有什么可执行建议、某类建议有哪些时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_competitors",
+        group="market",
+        short_desc="列出在管竞品（品类/价格带/监控矩阵）",
+        keywords=["竞品", "competitor", "对手", "监控"],
+        when_to_use="回答在追踪哪些竞品或需要 competitor_id 时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_competitor_profile",
+        group="market",
+        short_desc="获取竞品 AI 画像（定位/平台/价格带/内容策略）",
+        keywords=["画像", "定位", "profile", "竞品分析"],
+        when_to_use="分析竞品定位或制定对策时使用；未生成过返回 404。",
+    ),
+    ToolCatalogEntry(
+        name="market_competitor_contents",
+        group="market",
+        short_desc="获取竞品内容库时间线（最近发了什么）",
+        keywords=["内容库", "竞品内容", "时间线", "contents"],
+        when_to_use="分析竞品最近发布内容时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_trends",
+        group="market",
+        short_desc="行业关键词热度趋势（rising/flat/declining）",
+        keywords=["趋势", "行业", "热度", "trend", "rising"],
+        when_to_use="回答什么在涨、行业趋势走向时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_geo_summary",
+        group="market",
+        short_desc="搜索可见度汇总（GEO 引用率/SEO 首页词数）",
+        keywords=["可见度", "GEO", "引用率", "AI 回答", "SEO", "visibility"],
+        when_to_use="回答 AI 回答里的引用率、搜索可见度现状时必用。",
+    ),
+    ToolCatalogEntry(
+        name="market_geo_checks",
+        group="market",
+        short_desc="GEO 检查明细（引擎×关键词的被引情况与答案摘录）",
+        keywords=["GEO", "明细", "引用", "cited", "引擎"],
+        when_to_use="定位哪些关键词未被 AI 引用、答案里都是谁时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_seo_checks",
+        group="market",
+        short_desc="SEO 排名明细（本地 SERP 采集上报）",
+        keywords=["SEO", "排名", "SERP", "收录"],
+        when_to_use="分析搜索排名与收录情况时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_keyword_sets",
+        group="market",
+        short_desc="列出可见度监控词集（品牌/产品/行业/竞品词）",
+        keywords=["词集", "关键词", "keyword", "监控词"],
+        when_to_use="需要 keyword_set_id 或评估监控覆盖面时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_actions",
+        group="market",
+        short_desc="检索渠道行动（idea→live 状态机漏斗）",
+        keywords=["行动", "外推", "action", "漏斗", "GTM"],
+        when_to_use="回答行动漏斗、进行中的外推、哪些 idea 未动时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_list_opportunities",
+        group="market",
+        short_desc="检索商机（需求信号评估的销售机会）",
+        keywords=["商机", "线索", "opportunity", "lead", "需求"],
+        when_to_use="回答待跟进商机、打单进展时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_calibration",
+        group="market",
+        short_desc="建议置信度校准（各桶真实采纳率）",
+        keywords=["校准", "calibration", "采纳率", "置信"],
+        when_to_use="给建议前校准措辞——引用真实比率，禁止无数据推断偏好。",
+    ),
+    # --- market 写工具（L3 白名单：幂等/草稿/配额内，PRD §8.2） ---
+    ToolCatalogEntry(
+        name="market_run_pipeline",
+        group="market",
+        short_desc="触发信号→事件处理流水线（写，幂等）",
+        keywords=["流水线", "处理", "pipeline", "触发", "提取"],
+        when_to_use="用户要求处理信号/跑流水线，或事件数据滞后时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_run_source",
+        group="market",
+        short_desc="立即采集指定数据源（写，幂等）",
+        keywords=["采集", "数据源", "拉取", "collect", "refresh"],
+        when_to_use="用户要求对某数据源立即采集最新数据时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_run_geo",
+        group="market",
+        short_desc="触发一轮 GEO 引用检查（写，配额内）",
+        keywords=["GEO", "引用率", "测试", "检查", "run"],
+        when_to_use="用户要求测一下 AI 引用率/跑一轮 GEO 时使用（8h 冷却+每日配额服务端强制）。",
+    ),
+    ToolCatalogEntry(
+        name="market_run_snapshot",
+        group="market",
+        short_desc="触发行业关键词热度快照（写，幂等）",
+        keywords=["快照", "趋势", "snapshot", "刷新"],
+        when_to_use="用户要求刷新趋势数据时使用（常规 worker 每日执行）。",
+    ),
+    ToolCatalogEntry(
+        name="market_generate_profile",
+        group="market",
+        short_desc="重新生成竞品 AI 画像（写，版本留痕）",
+        keywords=["画像", "生成", "profile", "更新"],
+        when_to_use="用户确认要更新某竞品画像时使用（内容库 ≥3 条）。",
+    ),
+    ToolCatalogEntry(
+        name="market_generate_report",
+        group="market",
+        short_desc="生成周报草稿（写，draft）",
+        keywords=["周报", "报告", "生成", "report", "weekly"],
+        when_to_use="用户要求出周报时使用；确认/导出/推送由用户在报告页操作。",
+    ),
+    ToolCatalogEntry(
+        name="market_draft_action",
+        group="market",
+        short_desc="从建议生成渠道行动草稿（写，idea 草稿）",
+        keywords=["行动", "草稿", "外链", "draft", "action"],
+        when_to_use="用户要求把某条建议落成可执行行动时使用（四型 backlink/launch/metadata/content）。",
+    ),
+    ToolCatalogEntry(
+        name="market_evaluate_demand",
+        group="market",
+        short_desc="录入需求信号并即时 LLM 评估（写，生成商机）",
+        keywords=["需求", "询价", "招标", "评估", "rfq", "商机"],
+        when_to_use="用户贴来询价/招标/海关/展会信息要求评估时使用。",
+    ),
+    ToolCatalogEntry(
+        name="market_insight_feedback",
+        group="market",
+        short_desc="采纳/驳回行动建议（写）",
+        keywords=["采纳", "驳回", "adopt", "discard", "反馈"],
+        when_to_use="仅当用户明确表示采纳或驳回某条建议时使用（proposed 状态，否则 409）。",
+    ),
+    # --- research（科研审稿控制面，仅 gelu-research-team，见 gelu-research-flow 设计 §4.2） ---
+    ToolCatalogEntry(
+        name="research_journal_lookup",
+        group="research",
+        short_desc="刊物档案查询（指标/投稿要求/rubric 概览）",
+        keywords=["刊物", "期刊", "影响因子", "投稿要求", "journal", "issn"],
+        when_to_use="投稿选刊、按刊物标准评审、需要 journal_id 上下文时使用。",
+    ),
+    ToolCatalogEntry(
+        name="research_journal_rubric",
+        group="research",
+        short_desc="刊物生效评审 rubric（维度 weight/threshold，{journal_profile} 注入块）",
+        keywords=["rubric", "维度", "权重", "阈值", "评审标准"],
+        when_to_use="peer-review / quality-gate 模式打分前必用（无刊物时回退全局默认）。",
+    ),
+    ToolCatalogEntry(
+        name="research_paper_search",
+        group="research",
+        short_desc="检索库内文献元数据（可选首条全文向量命中）",
+        keywords=["文献", "论文", "检索", "paper", "literature"],
+        when_to_use="回答「有哪些相关文献」、需要 paper_id 上下文时使用。",
+    ),
+    ToolCatalogEntry(
+        name="research_paper_get",
+        group="research",
+        short_desc="文献完整元数据 + 可选全文主题片段（kb2）",
+        keywords=["文献", "详情", "全文", "摘要", "fulltext"],
+        when_to_use="深读某篇文献、按主题取全文片段、核查摄取状态时使用。",
+    ),
+    ToolCatalogEntry(
+        name="research_paper_import",
+        group="research",
+        short_desc="按 DOI/arXiv/PMID 导入文献并异步摄取全文（写）",
+        keywords=["导入", "doi", "arxiv", "摄取", "import"],
+        when_to_use="评审/综述需要某篇库外文献时使用（摄取为后台任务）。",
+    ),
+    ToolCatalogEntry(
+        name="research_review_run_create",
+        group="research",
+        short_desc="发起评审 run（快照刊物 rubric，返回 run_id）",
+        keywords=["评审", "审稿", "run", "peer review", "发起"],
+        when_to_use="用户要求模拟审稿/投稿前自查/轻量批判时使用。",
+    ),
+    ToolCatalogEntry(
+        name="research_review_submit",
+        group="research",
+        short_desc="★ 审稿产出结构化回流（reviewer-outputs/gate/complete，写）",
+        keywords=["回流", "审稿意见", "打分", "submit", "回流提交"],
+        when_to_use="审稿人产出/质量门聚合/收尾汇总写回控制面 run 时使用（运行详情页实时可见）。",
+    ),
+    ToolCatalogEntry(
+        name="research_journal_suggest",
+        group="research",
+        short_desc="选刊推荐（heuristic-v1 确定性打分，理由带来源与年份）",
+        keywords=["选刊", "推荐期刊", "投稿", "suggest", "journal"],
+        when_to_use="回答「投哪本刊」、按摘要/关键词选刊时使用（返回 journal_id 供投稿台账/自检）。",
+    ),
+    ToolCatalogEntry(
+        name="research_submission_check",
+        group="research",
+        short_desc="投稿格式自检（逐项命中刊物要求：词数/摘要/图/引文风格）",
+        keywords=["格式自检", "投稿检查", "format", "checklist", "达标"],
+        when_to_use="投稿打包前核查稿件是否满足目标刊物要求时使用（结果落台账 checklist 包）。",
+    ),
+]
+
+
+def get_catalog() -> list[ToolCatalogEntry]:
+    """返回完整工具目录"""
+    return _CATALOG
+
+
+def search_catalog(query: str, limit: int = 10) -> list[ToolCatalogEntry]:
+    """搜索工具目录
+
+    Args:
+        query: 搜索关键词
+        limit: 最大返回条目数
+
+    Returns:
+        匹配的工具列表（按相关度排序）
+    """
+    query_lower = query.lower().strip()
+    if not query_lower:
+        return _CATALOG[:limit]
+
+    scored: list[tuple[int, ToolCatalogEntry]] = []
+
+    for entry in _CATALOG:
+        score = 0
+        # 名称匹配（最高权重）
+        if query_lower in entry.name.lower():
+            score += 10
+        # 简述匹配
+        if query_lower in entry.short_desc.lower():
+            score += 5
+        # 关键词匹配（双向：query 包含 keyword 或 keyword 包含 query）
+        for kw in entry.keywords:
+            kw_lower = kw.lower()
+            if query_lower in kw_lower or kw_lower in query_lower:
+                score += 3
+        # 使用场景匹配
+        if query_lower in entry.when_to_use.lower():
+            score += 2
+
+        if score > 0:
+            scored.append((score, entry))
+
+    # 按分数降序
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [entry for _, entry in scored[:limit]]
+
+
+def get_catalog_summary(groups: list[str] | None = None) -> str:
+    """生成工具目录摘要文本（用于系统提示）
+
+    Args:
+        groups: 可选的分组过滤。None = 所有分组
+
+    Returns:
+        格式化的工具目录摘要
+    """
+    entries = _CATALOG
+    if groups:
+        entries = [e for e in entries if e.group in groups]
+
+    if not entries:
+        return "（无可用工具）"
+
+    lines = ["可用工具目录："]
+    current_group = ""
+    for entry in entries:
+        if entry.group != current_group:
+            current_group = entry.group
+            lines.append(f"\n[{current_group}]")
+        lines.append(f"  - {entry.name}: {entry.short_desc}")
+
+    return "\n".join(lines)

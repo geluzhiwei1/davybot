@@ -1,0 +1,209 @@
+template:
+  slug: pct-national-phase
+  name: "PCT 国家阶段进入规划"
+  version: "1.0"
+  module: ip-filing
+  team_slug: ip-filing
+
+  description: |
+    PCT 国际申请进入国家阶段的详细规划。
+    基于国际检索报告（ISR）和书面意见（WO/ISA）结果，为每个目标国制定进入策略。
+    包含期限管理、翻译安排、PPH 利用、费用优化。
+
+  data_requirements:
+    required:
+      - key: invention_title
+        label: "发明名称"
+        type: string
+        placeholder: "请输入发明名称"
+        store: "input/task_params.json"
+      - key: target_countries
+        label: "计划进入的国家"
+        type: string
+        placeholder: "如：CN, US, EP, JP, KR, IN, BR, AU（逗号分隔）"
+        store: "input/task_params.json"
+      - key: priority_date
+        label: "优先权日"
+        type: string
+        placeholder: "YYYY-MM-DD（必须提供，用于计算各国截止日）"
+        store: "input/task_params.json"
+    optional:
+      - key: isr_result
+        label: "国际检索报告结果"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "未知/尚未收到" }
+          - { value: "positive", label: "正面（无X/Y类文献）" }
+          - { value: "mixed", label: "混合（有Y类文献，可克服）" }
+          - { value: "negative", label: "负面（有X类文献）" }
+        store: "input/task_params.json"
+      - key: wo_isa_opinion
+        label: "WO/ISA 书面意见"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "未知" }
+          - { value: "positive", label: "正面（认为有新颖性/创造性）" }
+          - { value: "negative", label: "负面（认为缺乏新颖性/创造性）" }
+        store: "input/task_params.json"
+      - key: chapter_ii
+        label: "是否做了国际初步审查"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "否" }
+          - { value: "yes", label: "是（已提交 Chapter II 请求）" }
+        store: "input/task_params.json"
+      - key: budget_range
+        label: "预算约束"
+        type: select
+        default: ""
+        options:
+          - { value: "", label: "不限" }
+          - { value: "low", label: "经济型（需精简进入国）" }
+          - { value: "medium", label: "标准型" }
+          - { value: "high", label: "充裕型（全面进入）" }
+        store: "input/task_params.json"
+      - key: patent_application_language
+        label: "PCT 申请语言"
+        type: select
+        default: "en"
+        options:
+          - { value: "en", label: "英语" }
+          - { value: "zh", label: "中文" }
+          - { value: "ja", label: "日文" }
+          - { value: "other", label: "其他" }
+        store: "input/task_params.json"
+
+  knowledge_refs:
+    - knowledge/patent-law
+
+  checklists:
+    - ref: "checklist/filing-requirements"
+
+  workspace_structure:
+    - dir: input
+      description: "用户输入数据"
+    - dir: input/inherited
+      description: "从上游 PCT 申请继承的文件"
+    - dir: input/checklists
+      description: "申请要求清单"
+    - dir: output
+      description: "Agent 产出"
+    - dir: drafts
+      description: "完整进入规划"
+    - dir: references
+      description: "法规知识参考"
+
+  agent_instructions: |
+    # {template_name} — Agent 工作指令
+
+    你已加入 PCT 国家阶段进入规划工作区，请按照 PDCA 工作流执行。
+
+    ## 各国国家阶段进入期限（从优先权日起算）
+
+    | 国家/地区 | 进入期限 | 可恢复期限 | 备注 |
+    |----------|---------|-----------|------|
+    | 中国（CNIPA） | 30 个月 | 32 个月（需交恢复费） | 必须提供中文翻译 |
+    | 美国（USPTO） | 30 个月 | 31 个月（需额外费用） | 非英文申请需英文翻译 |
+    | 欧洲（EPO） | 31 个月 | 31 个月（仅可延后2个月，需额外费用） | 需确认程序语言 |
+    | 日本（JPO） | 30 个月 | 不可恢复 | 必须提供日文翻译 |
+    | 韩国（KIPO） | 31 个月 | 不可恢复 | 必须提供韩文翻译 |
+    | 印度 | 31 个月 | 不可恢复 | 需提供地址/代理人信息 |
+    | 巴西 | 30 个月 | 不可恢复 | 葡萄牙语翻译 |
+    | 澳大利亚 | 31 个月 | 不可恢复 | 英文无需翻译 |
+    | 加拿大 | 30 个月 | 不可恢复 | 英文/法文 |
+    | 俄罗斯 | 31 个月 | 不可恢复 | 俄语翻译 |
+    | 东南亚各国 | 30-31 个月 | 各国不同 | 需逐国确认 |
+
+    ## ISR/WO-ISA 结果分析策略
+
+    ### 正面结果（无 X/Y 类文献）
+    - **策略**：全量进入所有目标国
+    - **加速**：利用 PPH 在各国加速审查
+    - **费用优化**：无需大幅修改权利要求
+
+    ### 混合结果（有 Y 类文献）
+    - **策略**：修改权利要求后进入，重点进入核心市场
+    - **PPH**：修改后可能仍可利用 PPH
+    - **建议**：修改权利要求克服 Y 类文献，同时保留合理保护范围
+
+    ### 负面结果（有 X 类文献）
+    - **策略**：大幅修改权利要求或放弃部分国家
+    - **PPH**：通常无法直接利用，需修改后重新审查
+    - **建议**：评估修改后权利要求的商业价值，决定是否值得投入
+
+    ## PPH 利用策略
+    - **条件**：ISR 或 WO-ISA 中至少有一项权利要求被认为具有新颖性和创造性
+    - **优势**：各国审查周期大幅缩短
+    - **流程**：
+      1. 修改权利要求使其与被认可的权利要求一致
+      2. 向各国专利局提交 PPH 请求
+      3. 各局加速审查
+
+    ## 翻译安排
+    | 目标国 | 翻译语言 | 翻译时机 | 注意事项 |
+    |--------|---------|---------|---------|
+    | 中国 | 中文 | 进入时必须提交 | 术语一致性 |
+    | 日本 | 日文 | 进入时必须提交 | 权利要求翻译准确性 |
+    | 韩国 | 韩文 | 进入时必须提交 | — |
+    | 欧洲 | 英/法/德 | 可延后提交 | 权利要求需翻译为三种语言 |
+    | 美国 | 英文 | 仅在原申请非英文时需要 | — |
+    | 巴西 | 葡萄牙语 | 进入后60天内 | — |
+
+    ## 输入数据
+    1. `input/task_params.json` — 目标国家、优先权日、ISR 结果、预算、申请语言
+    2. `input/inherited/` — PCT 申请文件、ISR/WO-ISA（如有）
+
+    ## IP 清单
+    {checklist_table}
+
+    ## 工作流 (PDCA)
+    ### Plan: 确认目标国家、计算各国截止日、评估 ISR 结果
+    ### Do:
+    - 各国进入时间表（精确计算每个国家截止日）
+    - ISR 结果分析与权利要求修改建议
+    - 翻译需求清单（各国语言、翻译截止日）
+    - 费用估算（各国进入费 + 翻译费 + 代理费）
+    - PPH 可行性分析
+    - 本地代理安排建议
+    ### Check: 核对所有截止日、验证翻译完整性、确认费用计算
+    ### Act: 生成完整国家阶段进入规划
+
+  deliverables:
+    - file: "drafts/national_phase_plan.md"
+      name: "国家阶段进入规划方案"
+      format: markdown
+    - file: "output/deadlines_calendar.md"
+      name: "各国截止日时间表"
+      format: markdown
+    - file: "output/fee_breakdown.md"
+      name: "各国进入费用明细"
+      format: markdown
+    - file: "output/translation_plan.md"
+      name: "翻译需求与安排"
+      format: markdown
+    - file: "output/pph_strategy.md"
+      name: "PPH 利用策略（如适用）"
+      format: markdown
+
+  phases:
+    - name: plan
+      label: "确认目标与期限"
+      progress: 15
+    - name: do_analysis
+      label: "ISR 分析与策略"
+      progress: 25
+    - name: do_countries
+      label: "各国进入规划"
+      progress: 25
+    - name: do_fees
+      label: "费用与翻译"
+      progress: 20
+    - name: check
+      label: "核验清单"
+      progress: 5
+    - name: act
+      label: "输出方案"
+      progress: 10
