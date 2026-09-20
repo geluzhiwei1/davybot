@@ -22,7 +22,16 @@
  * biz/ 不在场 = 代码不存在)。
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 
 const APP = process.cwd();
@@ -65,7 +74,9 @@ function guardNoOverwrite(relPath, domain) {
     process.exit(1);
   }
   if (claimed.has(relPath)) {
-    console.error(`[assemble] FATAL (F7a): biz/${domain} 与更早的 biz 域路径冲突 ${relPath} —— 各域命名空间必须互斥。`);
+    console.error(
+      `[assemble] FATAL (F7a): biz/${domain} 与更早的 biz 域路径冲突 ${relPath} —— 各域命名空间必须互斥。`,
+    );
     process.exit(1);
   }
   claimed.add(relPath);
@@ -259,7 +270,9 @@ function writeRegistry(domains) {
       emptySpreads.push(`  ..._wes_${id},`);
     }
     if (/export\s+const\s+workspaceEmptyComponents/.test(src)) {
-      imports.push(`import { workspaceEmptyComponents as _wec_${id} } from "../../biz/${d}/manifest";`);
+      imports.push(
+        `import { workspaceEmptyComponents as _wec_${id} } from "../../biz/${d}/manifest";`,
+      );
       emptyCompSpreads.push(`  ..._wec_${id},`);
     }
     if (/export\s+const\s+agentStatusSinks/.test(src)) {
@@ -267,7 +280,9 @@ function writeRegistry(domains) {
       sinkSpreads.push(`  ..._sink_${id},`);
     }
     if (/export\s+const\s+sidebarContextSelects/.test(src)) {
-      imports.push(`import { sidebarContextSelects as _ctxs_${id} } from "../../biz/${d}/manifest";`);
+      imports.push(
+        `import { sidebarContextSelects as _ctxs_${id} } from "../../biz/${d}/manifest";`,
+      );
       ctxSelSpreads.push(`  ..._ctxs_${id},`);
     }
     if (/export\s+const\s+identityResetHooks/.test(src)) {
@@ -301,7 +316,9 @@ function main() {
   if (domains.length === 0) {
     console.error("[assemble] FATAL: 未发现任何业务域(biz/<domain>/manifest.ts)。");
     console.error("[assemble]   单仓形态: app 根下应含 biz/;");
-    console.error("[assemble]   拆库跨仓形态: 设置 DAVY_BIZ_ROOT 指向闭源仓 biz/ 目录(见 davy-cloud README);");
+    console.error(
+      "[assemble]   拆库跨仓形态: 设置 DAVY_BIZ_ROOT 指向闭源仓 biz/ 目录(见 davy-cloud README);",
+    );
     console.error("[assemble]   仅核心构建请用 npm run build / build:server(不经本脚本)。");
     process.exit(1);
   }

@@ -124,7 +124,9 @@ export function ToolWizard({
   /** 提交时才校验的必填项清单（供预览步汇总展示） */
   const missing = useMemo(() => {
     const allFields = config.steps.flatMap((s) =>
-      s.fields.filter((f) => f.required).map((f) => ({ step: s.title, label: f.label, key: f.key })),
+      s.fields
+        .filter((f) => f.required)
+        .map((f) => ({ step: s.title, label: f.label, key: f.key })),
     );
     return allFields.filter((f) => (values[f.key] ?? "").trim().length === 0);
   }, [config.steps, values]);

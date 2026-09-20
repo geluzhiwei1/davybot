@@ -424,7 +424,12 @@ export const RESEARCH_WIZARDS: Record<string, ToolWizardConfig> = {
             defaultValue: "全套申请书",
           },
           { key: "budget", label: "预算需求", type: "textarea", placeholder: "经费额度与主要用途" },
-          { key: "notes", label: "特别提醒", type: "textarea", placeholder: "评审偏好、以往函审意见等" },
+          {
+            key: "notes",
+            label: "特别提醒",
+            type: "textarea",
+            placeholder: "评审偏好、以往函审意见等",
+          },
         ],
       },
     ],
@@ -505,7 +510,12 @@ export const RESEARCH_WIZARDS: Record<string, ToolWizardConfig> = {
         title: "投稿信息",
         fields: [
           { key: "topic", label: "论文主题", required: true, placeholder: "论文标题或核心主题" },
-          { key: "journal", label: "目标期刊", required: true, placeholder: "如未定可填「待推荐」" },
+          {
+            key: "journal",
+            label: "目标期刊",
+            required: true,
+            placeholder: "如未定可填「待推荐」",
+          },
           {
             key: "articleType",
             label: "投稿类型",

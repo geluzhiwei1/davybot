@@ -291,23 +291,18 @@ export function SidebarGroupsRenderer(props: RendererProps) {
                   {/* biz 注册的上下文行(产品/品牌全局切换等,assemble 注入;核心构建 = 空表不渲染) */}
                   {!collapsed &&
                     !collapsedNow &&
-                    BIZ_SIDEBAR_CONTEXT_SELECTS.filter((e) => e.groupKey === group.key).map(
-                      (e) => {
-                        const ContextSelect = e.component;
-                        return (
-                          <div
-                            key={e.groupKey}
-                            className="flex items-center gap-2 px-2 pt-2 pb-1"
-                          >
-                            <span className="text-xs font-semibold tracking-wide text-foreground/80 shrink-0">
-                              {typeof e.label === "function" ? e.label() : e.label}
-                            </span>
-                            <ContextSelect />
-                            <div className="h-px flex-1 bg-sidebar-border" />
-                          </div>
-                        );
-                      },
-                    )}
+                    BIZ_SIDEBAR_CONTEXT_SELECTS.filter((e) => e.groupKey === group.key).map((e) => {
+                      const ContextSelect = e.component;
+                      return (
+                        <div key={e.groupKey} className="flex items-center gap-2 px-2 pt-2 pb-1">
+                          <span className="text-xs font-semibold tracking-wide text-foreground/80 shrink-0">
+                            {typeof e.label === "function" ? e.label() : e.label}
+                          </span>
+                          <ContextSelect />
+                          <div className="h-px flex-1 bg-sidebar-border" />
+                        </div>
+                      );
+                    })}
 
                   {/* 子分组 */}
                   {subgroups.map((sg, idx) => (
@@ -707,7 +702,9 @@ export function AppSidebar() {
                   </DropdownMenuItem>
                   {isSectionVisible("modules", caps) && (
                     <DropdownMenuItem
-                      onClick={() => openPageTab("/settings/modules", t("sidebar.user.modules"), "sparkles")}
+                      onClick={() =>
+                        openPageTab("/settings/modules", t("sidebar.user.modules"), "sparkles")
+                      }
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
                       <span>{t("sidebar.user.modules")}</span>
@@ -716,7 +713,11 @@ export function AppSidebar() {
                   {isSectionVisible("devices", caps) && (
                     <DropdownMenuItem
                       onClick={() =>
-                        openPageTab("/settings/devices", t("sidebar.user.myDevices"), "monitor-smartphone")
+                        openPageTab(
+                          "/settings/devices",
+                          t("sidebar.user.myDevices"),
+                          "monitor-smartphone",
+                        )
                       }
                     >
                       <MonitorSmartphone className="w-4 h-4 mr-2" />

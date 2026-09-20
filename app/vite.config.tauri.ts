@@ -68,7 +68,8 @@ function mobileCssDownlevel(): Plugin {
       const scriptUrl = pathToFileURL(resolve(__dirname, "scripts/mobile-css-downlevel.mjs")).href;
       const { downlevelCssDir } = await import(scriptUrl);
       const results = downlevelCssDir(resolve(__dirname, "src-tauri/ui-dist/assets"));
-      for (const r of results) console.log(`[mobile-css] ${r.bytes ? "downleveled" : "skipped"} ${r.file}`);
+      for (const r of results)
+        console.log(`[mobile-css] ${r.bytes ? "downleveled" : "skipped"} ${r.file}`);
     },
   };
 }

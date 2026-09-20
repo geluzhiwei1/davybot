@@ -137,7 +137,8 @@ export default {
   "login.failed": "Login failed",
   "login.terms": "登录即表示您同意我们的服务条款和隐私政策",
   "login.accessTitle": "访问验证",
-  "login.accessSubtitle": "此服务由访问密码保护（服务器 DAWEI_SERVER_PASSWORD 设置；未设置则留空直接进入）",
+  "login.accessSubtitle":
+    "此服务由访问密码保护（服务器 DAWEI_SERVER_PASSWORD 设置；未设置则留空直接进入）",
   "login.accessPassword": "访问密码",
   "login.accessPlaceholder": "输入访问密码（未设置则留空）",
   "login.accessSubmit": "进入",

@@ -436,7 +436,8 @@ const enUS = {
   "contractWizard.step.aiGenerate": "AI generation",
   "contractWizard.step.review": "Review and create",
   "contractWizard.step.generateReview": "Preview & launch",
-  "contractWizard.missingFields": "Missing: {{fields}}. Please go back and complete before launching.",
+  "contractWizard.missingFields":
+    "Missing: {{fields}}. Please go back and complete before launching.",
   "contractWizard.pipelineHint":
     "On submit an agent workspace is created with input/AGENT_INSTRUCTIONS.md; the AI contract drafter follows a Plan→Do→Check→Act workflow and saves deliverables to output/.",
   "contractWizard.pipelineHintTitle": "The agent pipeline starts with this instruction",

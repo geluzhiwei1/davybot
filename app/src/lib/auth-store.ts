@@ -497,8 +497,7 @@ export const useAuthStore = create<AuthState>()(
           clearTimeout(timeoutId);
           if (res.ok) {
             const info = await res.json();
-            const hasAuth =
-              Array.isArray(info?.capabilities) && info.capabilities.includes("auth");
+            const hasAuth = Array.isArray(info?.capabilities) && info.capabilities.includes("auth");
             if (!hasAuth) {
               const saved = localStorage.getItem(STORAGE_KEYS.serverPassword);
               get().enterLocalMode(saved ?? undefined);

@@ -40,10 +40,7 @@ import { cn } from "@/lib/utils";
 import type { ContentBlock } from "@/lib/types";
 import { AgentDegradedBanner } from "@/components/agent-degraded-banner";
 import { marketApi, type TeamHierarchyEntry } from "@/lib/market-api";
-import {
-  BIZ_WORKSPACE_EMPTY_STATES,
-  BIZ_WORKSPACE_EMPTY_COMPONENTS,
-} from "@/lib/biz-registry";
+import { BIZ_WORKSPACE_EMPTY_STATES, BIZ_WORKSPACE_EMPTY_COMPONENTS } from "@/lib/biz-registry";
 
 /** Stable empty array ref — avoids new [] on every render */
 const EMPTY_ARR: never[] = [];

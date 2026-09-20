@@ -337,143 +337,149 @@ export function ToolPage({
           />
         </div>
       ) : (
-      <div className="max-w-4xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
-            <Icon className="w-6 h-6 text-brand-foreground" />
-          </div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">{title}</h1>
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          </div>
-          {wizard && (
-            <Button
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => setShowWizard(true)}
-              disabled={creating}
-            >
-              <Wand2 className="w-4 h-4" /> 向导启动
+        <div className="max-w-4xl mx-auto px-6 py-10">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
+              <Icon className="w-6 h-6 text-brand-foreground" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">{title}</h1>
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
+            </div>
+            {wizard && (
+              <Button
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setShowWizard(true)}
+                disabled={creating}
+              >
+                <Wand2 className="w-4 h-4" /> 向导启动
+              </Button>
+            )}
+            <Button className="gap-1.5" onClick={() => void handleCreate()} disabled={creating}>
+              {creating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              {t("toolPage.create")}
             </Button>
-          )}
-          <Button className="gap-1.5" onClick={() => void handleCreate()} disabled={creating}>
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            {t("toolPage.create")}
-          </Button>
-        </div>
-
-        {/* Recent workspaces */}
-        <div className="mb-3">
-          <div className="flex items-center gap-2 mb-3">
-            <FolderOpen className="w-4 h-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              {t("toolPage.recentWorkspaces")}
-            </h2>
-            <Badge variant="secondary" className="text-[10px]">
-              {workspaces.length}
-            </Badge>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              <span className="text-sm">{t("common.loading")}</span>
+          {/* Recent workspaces */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <FolderOpen className="w-4 h-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("toolPage.recentWorkspaces")}
+              </h2>
+              <Badge variant="secondary" className="text-[10px]">
+                {workspaces.length}
+              </Badge>
             </div>
-          ) : sortedWorkspaces.length === 0 ? (
-            <div className="bg-card/40 border border-dashed border-border rounded-2xl p-14 text-center">
-              <Icon className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground mb-4">{t("toolPage.empty", { title })}</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sortedWorkspaces.map((ws) => {
-                const wsTasks = storeTasks.filter((t) => t.workspaceId === ws.id);
-                const lastActive = getLastActive(ws.id);
-                const displayName = ws.display_name || ws.name;
-                return (
-                  <Card
-                    key={ws.id}
-                    className="group cursor-pointer hover:border-brand/40 transition"
-                    onClick={() => handleOpenWorkspace(ws.id)}
-                  >
-                    <CardContent className="p-3.5 flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-brand/10 border border-brand/30 flex items-center justify-center shrink-0">
-                        <MessageSquare className="w-4 h-4 text-brand" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">{displayName}</span>
-                          {ws.lifecycle === "temporary" && (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] text-amber-600 border-amber-500/40 bg-amber-500/10"
-                            >
-                              {t("toolPage.temporary")}
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <span className="text-sm">{t("common.loading")}</span>
+              </div>
+            ) : sortedWorkspaces.length === 0 ? (
+              <div className="bg-card/40 border border-dashed border-border rounded-2xl p-14 text-center">
+                <Icon className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t("toolPage.empty", { title })}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sortedWorkspaces.map((ws) => {
+                  const wsTasks = storeTasks.filter((t) => t.workspaceId === ws.id);
+                  const lastActive = getLastActive(ws.id);
+                  const displayName = ws.display_name || ws.name;
+                  return (
+                    <Card
+                      key={ws.id}
+                      className="group cursor-pointer hover:border-brand/40 transition"
+                      onClick={() => handleOpenWorkspace(ws.id)}
+                    >
+                      <CardContent className="p-3.5 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-brand/10 border border-brand/30 flex items-center justify-center shrink-0">
+                          <MessageSquare className="w-4 h-4 text-brand" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm truncate">{displayName}</span>
+                            {ws.lifecycle === "temporary" && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] text-amber-600 border-amber-500/40 bg-amber-500/10"
+                              >
+                                {t("toolPage.temporary")}
+                              </Badge>
+                            )}
+                            <Badge variant="secondary" className="text-[10px]">
+                              {t("toolPage.sessionCount", { count: wsTasks.length })}
                             </Badge>
-                          )}
-                          <Badge variant="secondary" className="text-[10px]">
-                            {t("toolPage.sessionCount", { count: wsTasks.length })}
-                          </Badge>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            {lastActive > 0
+                              ? t("toolPage.updatedAt", { time: formatRelativeTime(lastActive, t) })
+                              : t("toolPage.createdAt", {
+                                  time: formatRelativeTime(new Date(ws.created_at).getTime(), t),
+                                })}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">
-                          {lastActive > 0
-                            ? t("toolPage.updatedAt", { time: formatRelativeTime(lastActive, t) })
-                            : t("toolPage.createdAt", {
-                                time: formatRelativeTime(new Date(ws.created_at).getTime(), t),
-                              })}
-                        </div>
-                      </div>
-                      {/* Actions */}
-                      <div
-                        className="flex items-center gap-1 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1 text-xs h-7 opacity-0 group-hover:opacity-100 transition"
-                          onClick={() => handleOpenWorkspace(ws.id)}
+                        {/* Actions */}
+                        <div
+                          className="flex items-center gap-1 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {t("toolPage.open")} <ArrowRight className="w-3 h-3" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition"
-                            >
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setRenameValue(displayName);
-                                setRenameTarget({ id: ws.id, name: displayName });
-                              }}
-                            >
-                              <Pencil className="w-3.5 h-3.5 mr-2" /> {t("common.rename")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteTarget({ id: ws.id, name: displayName })}
-                            >
-                              <Trash2 className="w-3.5 h-3.5 mr-2" /> {t("common.delete")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 text-xs h-7 opacity-0 group-hover:opacity-100 transition"
+                            onClick={() => handleOpenWorkspace(ws.id)}
+                          >
+                            {t("toolPage.open")} <ArrowRight className="w-3 h-3" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setRenameValue(displayName);
+                                  setRenameTarget({ id: ws.id, name: displayName });
+                                }}
+                              >
+                                <Pencil className="w-3.5 h-3.5 mr-2" /> {t("common.rename")}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteTarget({ id: ws.id, name: displayName })}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-2" /> {t("common.delete")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       )}
 
       {/* Rename dialog */}

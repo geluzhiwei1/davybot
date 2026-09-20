@@ -100,6 +100,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const results = st.isDirectory()
       ? downlevelCssDir(arg)
       : [{ file: arg, bytes: downlevelCssFile(arg) }];
-    for (const r of results) console.log(`${r.bytes ? "downleveled" : "skipped     "} ${r.file} (${r.bytes} bytes)`);
+    for (const r of results)
+      console.log(`${r.bytes ? "downleveled" : "skipped     "} ${r.file} (${r.bytes} bytes)`);
   }
 }

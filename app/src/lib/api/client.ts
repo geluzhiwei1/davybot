@@ -106,9 +106,7 @@ export async function request<T>(
   // Attach JWT if available; server 自包含模式下退化为访问密码 (DAWEI_SERVER_PASSWORD)
   const token =
     localStorage.getItem(STORAGE_KEYS.authToken) ??
-    (useAuthStore.getState().localMode
-      ? localStorage.getItem(STORAGE_KEYS.serverPassword)
-      : null);
+    (useAuthStore.getState().localMode ? localStorage.getItem(STORAGE_KEYS.serverPassword) : null);
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }

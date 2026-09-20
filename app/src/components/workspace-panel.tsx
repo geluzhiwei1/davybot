@@ -1116,76 +1116,76 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
             )}
 
             <>
-                  {fileTreeLoading && (
-                    <div className="flex items-center justify-center py-3">
-                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                    </div>
-                  )}
+              {fileTreeLoading && (
+                <div className="flex items-center justify-center py-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
 
-                  {fileTree.length === 0 && !fileTreeLoading && (
-                    <div className="text-[11px] text-muted-foreground text-center py-4">
-                      {uiT("common.noFiles")}
-                    </div>
-                  )}
+              {fileTree.length === 0 && !fileTreeLoading && (
+                <div className="text-[11px] text-muted-foreground text-center py-4">
+                  {uiT("common.noFiles")}
+                </div>
+              )}
 
-                  <div className="max-h-[500px] overflow-y-auto scrollbar-thin">
-                    {fileTree.map((item) => (
-                      <FileTreeNode
-                        key={item.path}
-                        item={item}
-                        level={0}
-                        selectedPath={selectedPath}
-                        onClick={handleFileClick}
-                        renderActions={(file) => (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                wsStore.downloadFile(workspace.id, file.path);
-                              }}
-                              className="p-1 rounded hover:bg-muted/60 transition"
-                              title={uiT("wsPanel.download")}
-                            >
-                              <Download className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRename(file.path);
-                              }}
-                              className="p-1 rounded hover:bg-muted/60 transition"
-                              title={uiT("common.rename")}
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(file.path);
-                              }}
-                              className="p-1 rounded hover:bg-red-500/10 text-red-500 transition"
-                              title={uiT("common.delete")}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                setSelectedPath(file.path);
-                                setShowFileInfo(true);
-                                await wsStore.fetchFileInfo(workspace.id, file.path);
-                              }}
-                              className="p-1 rounded hover:bg-muted/60 transition"
-                              title={uiT("wsPanel.fileInfo")}
-                            >
-                              <Info className="w-3 h-3" />
-                            </button>
-                          </>
-                        )}
-                      />
-                    ))}
-                  </div>
-                </>
+              <div className="max-h-[500px] overflow-y-auto scrollbar-thin">
+                {fileTree.map((item) => (
+                  <FileTreeNode
+                    key={item.path}
+                    item={item}
+                    level={0}
+                    selectedPath={selectedPath}
+                    onClick={handleFileClick}
+                    renderActions={(file) => (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            wsStore.downloadFile(workspace.id, file.path);
+                          }}
+                          className="p-1 rounded hover:bg-muted/60 transition"
+                          title={uiT("wsPanel.download")}
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRename(file.path);
+                          }}
+                          className="p-1 rounded hover:bg-muted/60 transition"
+                          title={uiT("common.rename")}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(file.path);
+                          }}
+                          className="p-1 rounded hover:bg-red-500/10 text-red-500 transition"
+                          title={uiT("common.delete")}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setSelectedPath(file.path);
+                            setShowFileInfo(true);
+                            await wsStore.fetchFileInfo(workspace.id, file.path);
+                          }}
+                          className="p-1 rounded hover:bg-muted/60 transition"
+                          title={uiT("wsPanel.fileInfo")}
+                        >
+                          <Info className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  />
+                ))}
+              </div>
+            </>
 
             {fileContentLoading && (
               <div className="flex items-center justify-center py-3">
@@ -1654,9 +1654,7 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
         defaultValue={
           nameDialog?.kind === "rename" ? (nameDialog.path?.split("/").pop() ?? "") : ""
         }
-        actionLabel={
-          nameDialog?.kind === "rename" ? uiT("common.rename") : uiT("wsPanel.create")
-        }
+        actionLabel={nameDialog?.kind === "rename" ? uiT("common.rename") : uiT("wsPanel.create")}
         onConfirm={handleNameDialogConfirm}
       />
 

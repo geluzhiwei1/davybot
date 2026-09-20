@@ -141,9 +141,7 @@ function RootComponent() {
     if (!initialized || !authenticated || isPublicPage) return;
     if (moduleKey === null) return; // 非業務路由（如 /select-tenant）放行
     const allowed =
-      effectiveModules == null
-        ? isCoreModuleKey(moduleKey)
-        : effectiveModules.includes(moduleKey);
+      effectiveModules == null ? isCoreModuleKey(moduleKey) : effectiveModules.includes(moduleKey);
     if (!allowed) {
       toast.warning(t("root.moduleNotAllowed"));
       // 用 replace 避免產生歷史記錄

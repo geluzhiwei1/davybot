@@ -10,7 +10,13 @@ import { EmptyState } from "@/components/empty-state";
 import { isSectionVisible, type SectionKey } from "@/lib/caps";
 import { useCaps } from "@/lib/stores/runtime-store";
 
-export function CapabilityGate({ section, children }: { section: SectionKey; children: ReactNode }) {
+export function CapabilityGate({
+  section,
+  children,
+}: {
+  section: SectionKey;
+  children: ReactNode;
+}) {
   const { t } = useTranslation("commonUi");
   const { caps, mode } = useCaps();
 

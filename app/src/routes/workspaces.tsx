@@ -80,15 +80,13 @@ export const Route = createFileRoute("/workspaces")({
 
 // ── Dialog states ────────────────────────────────────────────
 type RenameState =
-  | { open: true; id: string; name: string; kind: "workspace" | "collection" }
-  | { open: false };
+  { open: true; id: string; name: string; kind: "workspace" | "collection" } | { open: false };
 type DeleteState =
   | { open: true; id: string; name: string; kind: "workspace" | "collection"; count: number }
   | { open: false };
 type CreateCollState = { open: true } | { open: false };
 type EditCollWsState =
-  | { open: true; collectionId: string; collectionName: string }
-  | { open: false };
+  { open: true; collectionId: string; collectionName: string } | { open: false };
 
 // ── Resource type filter definitions ─────────────────────────
 const TYPE_TEAM_TYPES = {

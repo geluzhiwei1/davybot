@@ -66,14 +66,11 @@ export async function relayCall<T = unknown>(
   deviceId?: string,
 ): Promise<T> {
   try {
-    const r = await request<{ success: boolean; result: T }>(
-      "/api/users/me/mcp-relay/call",
-      {
-        method: "POST",
-        body: JSON.stringify({ server, tool, arguments: args, device_id: deviceId || undefined }),
-        timeoutMs: 80_000,
-      },
-    );
+    const r = await request<{ success: boolean; result: T }>("/api/users/me/mcp-relay/call", {
+      method: "POST",
+      body: JSON.stringify({ server, tool, arguments: args, device_id: deviceId || undefined }),
+      timeoutMs: 80_000,
+    });
     return r.result;
   } catch (e) {
     throw new Error(relayErrorMessage(e));
@@ -93,14 +90,16 @@ export function relayTrackLoginOpen(
   platform: string,
   deviceId?: string,
 ): Promise<TrackLoginOpenResult> {
-  return relayCall<TrackLoginOpenResult>(TRACK_SERVER, "browser_login_open", { platform }, deviceId);
+  return relayCall<TrackLoginOpenResult>(
+    TRACK_SERVER,
+    "browser_login_open",
+    { platform },
+    deviceId,
+  );
 }
 
 /** 远程校验平台登录态(走桌面版 recipe login_check,幂等只读)。 */
-export function relayTrackVerify(
-  platform: string,
-  deviceId?: string,
-): Promise<TrackVerifyResult> {
+export function relayTrackVerify(platform: string, deviceId?: string): Promise<TrackVerifyResult> {
   return relayCall<TrackVerifyResult>(TRACK_SERVER, "browser_verify", { platform }, deviceId);
 }
 

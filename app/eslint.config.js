@@ -6,7 +6,8 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi", "src-tauri/target"] },
+  // .assemble = assemble.mjs 构建暂存(跨仓形态含闭源 biz 副本)——lint/audit 不得扫入
+  { ignores: ["dist", ".output", ".vinxi", ".assemble", "src-tauri/target"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
