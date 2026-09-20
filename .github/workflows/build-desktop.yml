@@ -234,6 +234,11 @@ jobs:
     needs: verify
     if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' || github.event_name != 'workflow_dispatch' }}
     runs-on: macos-latest
+    # secrets 不允许出现在 step 级 if: 的表达式里（GitHub 校验拒绝 → 整个 workflow 文件无效，
+    # 表现为零 job 失败 run；actionlint 实证）。先映射到 job env，再以 env 判空。
+    env:
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     defaults:
       run:
         working-directory: app
@@ -309,7 +314,7 @@ jobs:
         run: rustup target add aarch64-apple-darwin
 
       - name: Import Apple Developer Certificate
-        if: ${{ secrets.APPLE_SIGNING_IDENTITY != '' }}
+        if: ${{ env.APPLE_SIGNING_IDENTITY != '' }}
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -355,7 +360,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Notarize macOS DMG
-        if: ${{ secrets.APPLE_TEAM_ID != '' }}
+        if: ${{ env.APPLE_TEAM_ID != '' }}
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_NOTARY_USER: ${{ secrets.APPLE_NOTARY_USER }}

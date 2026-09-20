@@ -16,8 +16,8 @@ dist-ssr
 .nitro
 *.local
 
-# Lock files — only pnpm-lock.yaml is kept
-package-lock.json
+# Lock files — npm (package-lock.json) is tracked: CI npm ci + setup-node cache 依赖它
+pnpm-lock.yaml
 bun.lockb
 yarn.lock
 
