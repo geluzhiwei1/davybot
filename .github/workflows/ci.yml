@@ -76,14 +76,30 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      # 注意：无 tui extra —— textual 是 base 依赖（pyproject [project.dependencies]），
+      # 此前误写 ".[dev,tui]" 会在安装步直接红（uv: Extra 'tui' is not defined）。
       - name: Install dependencies
         env:
           UV_SYSTEM_PYTHON: 1
-        run: uv pip install --system -e ".[dev,tui]"
+        run: uv pip install --system -e ".[dev]"
 
       - run: dawei --help
       - run: dawei server --help
       - run: dawei tui --help
+
+      # E5 零外部服务矩阵 · tui 形态：无 TTY 无法交互启动 → 模式解析断言（BLOCKING）
+      - name: TUI mode resolution assert (BLOCKING)
+        env:
+          DAWEI_RUNTIME_MODE: tui
+        run: |
+          python3 - <<'EOF'
+          from dawei.runtime import validate_environment
+          info = validate_environment()
+          assert info["mode"] == "tui", info
+          assert info["deployment_class"] == "local", info
+          assert info["capabilities"] == [], info
+          print("tui-mode OK:", info)
+          EOF
 
   app:
     name: App lint / typecheck / test / build
@@ -115,10 +131,11 @@ jobs:
       - name: Core server build
         run: npm run build:server
 
-  # 拆库方案 §5.1 E5 / §9.5 尾巴收口：无任何云 env 冷启 server 形态，
-  # runtime-info 必须报 local + [relay]（零外部服务矩阵的 CI 化）。
+  # 拆库方案 §5.1 E5 / §9.5+§10.7 尾巴收口：无任何云 env 冷启 server + desktop 形态，
+  # runtime-info 必须报 local + 各自合法 caps（零外部服务矩阵的 CI 化；
+  # tui 形态在 cli job 以模式解析断言覆盖）。
   server-smoke:
-    name: Server zero-cloud smoke (E5)
+    name: Server/desktop zero-cloud smoke (E5)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -172,3 +189,26 @@ jobs:
           UI_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8931/app-ui/)
           [ "$UI_CODE" = "200" ] || { echo "app-ui HTTP $UI_CODE"; tail -50 /tmp/dawei-smoke.log; exit 1; }
           kill $SRV || true
+
+      # 零外部服务矩阵 · desktop 形态：与 Tauri sidecar 同一 DAWEI_RUNTIME_MODE 注入路径
+      # （cli/commands/server.py setdefault → 显式 env 优先），断言全量本地 caps。
+      - name: Boot desktop-mode server & assert full local caps
+        run: |
+          cd engine/agent
+          DAWEI_RUNTIME_MODE=desktop dawei server start --host 127.0.0.1 --port 8932 > /tmp/dawei-desktop-smoke.log 2>&1 &
+          SRV=$!
+          trap 'kill $SRV 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8932/api/runtime-info > /dev/null && break
+            sleep 2
+          done
+          python3 - <<'EOF'
+          import json, urllib.request
+          info = json.load(urllib.request.urlopen("http://127.0.0.1:8932/api/runtime-info"))
+          assert info.get("mode") == "desktop", info
+          assert info.get("deployment_class") == "local", info
+          assert info.get("capabilities") == ["auth", "sandbox", "local-mcp", "relay", "market"], info
+          print("desktop runtime-info OK:", info)
+          EOF
+          UI_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8932/app-ui/)
+          [ "$UI_CODE" = "200" ] || { echo "app-ui HTTP $UI_CODE"; tail -50 /tmp/dawei-desktop-smoke.log; exit 1; }

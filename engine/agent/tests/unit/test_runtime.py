@@ -52,6 +52,31 @@ class TestModeMatrix:
         assert deployment_class() == expected_class
         assert set(get_capabilities()) == expected_caps
 
+    @pytest.mark.parametrize(
+        ("mode", "expected_caps"),
+        [
+            ("desktop", ["auth", "sandbox", "local-mcp", "relay", "market"]),
+            ("server", ["relay"]),
+            ("tui", []),
+        ],
+    )
+    def test_zero_cloud_boot_matrix(self, monkeypatch, mode, expected_caps):
+        """拆库方案 §5.1 E5 零外部服务启动矩阵 (单测层):
+
+        无任何云端 env 冷启 local 三形态, validate_environment() 全管线通过
+        (矛盾/盖戳校验 + runtime info) 且 caps 精确确定 (顺序含)。
+        真机冷启冒烟在 CI server-smoke job (server + desktop) 与 cli job (tui 模式解析)。
+        """
+        _clear_mode_env(monkeypatch)
+        monkeypatch.setenv("DAWEI_RUNTIME_MODE", mode)
+
+        from dawei.runtime import validate_environment
+
+        info = validate_environment()
+        assert info["mode"] == mode
+        assert info["deployment_class"] == "local"
+        assert info["capabilities"] == expected_caps
+
     def test_server_mode_market_config_driven(self, monkeypatch):
         """server 自包含: 显式设 MARKET_API_URL 才注册 market capability"""
         _clear_mode_env(monkeypatch)
