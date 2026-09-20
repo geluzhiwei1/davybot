@@ -27,7 +27,10 @@ import { join, resolve } from "node:path";
 
 const APP = process.cwd();
 const OUT = join(APP, ".assemble");
-const BIZ = join(APP, "biz");
+// biz 根:默认单仓形态(APP/biz);拆库后(拆库方案 §4.2)闭源业务域在独立仓,
+// 经 DAVY_BIZ_ROOT 指向该仓的 biz/ 目录(相对路径按 APP 解析),如:
+//   DAVY_BIZ_ROOT=../../davy-cloud/biz npm run build:server:full
+const BIZ = process.env.DAVY_BIZ_ROOT ? resolve(process.env.DAVY_BIZ_ROOT) : join(APP, "biz");
 
 const EXCLUDE = new Set(["node_modules", "dist", ".git", ".assemble", ".enterprise"]);
 
@@ -296,11 +299,22 @@ function writeRegistry(domains) {
 function main() {
   const domains = listDomains();
   if (domains.length === 0) {
-    console.error("[assemble] FATAL: biz/ 下无任何域(含 manifest.ts)。enterprise 构建需要至少一个业务域。");
+    console.error("[assemble] FATAL: 未发现任何业务域(biz/<domain>/manifest.ts)。");
+    console.error("[assemble]   单仓形态: app 根下应含 biz/;");
+    console.error("[assemble]   拆库跨仓形态: 设置 DAVY_BIZ_ROOT 指向闭源仓 biz/ 目录(见 davy-cloud README);");
+    console.error("[assemble]   仅核心构建请用 npm run build / build:server(不经本脚本)。");
     process.exit(1);
   }
   console.log(`[assemble] domains: ${domains.join(", ")}`);
   copyApp();
+  // 跨仓形态(DAVY_BIZ_ROOT):APP 拷贝不含 biz → 把各域 manifest 落位
+  // .assemble/biz/<d>/,供 writeRegistry 生成的相对导入(../../biz/<d>/manifest)
+  // 解析。manifest 仅 import "../../src/..." 合树路径(§11.3),故单文件自洽;
+  // 单仓形态下 copyApp 已整树拷入,此处为幂等重写。
+  for (const d of domains) {
+    mkdirSync(join(OUT, "biz", d), { recursive: true });
+    cpSync(join(BIZ, d, "manifest.ts"), join(OUT, "biz", d, "manifest.ts"));
+  }
   for (const d of domains) mergeDomain(d);
   writeRegistry(domains);
   symlinkSync(join(APP, "node_modules"), join(OUT, "node_modules"), "dir");
