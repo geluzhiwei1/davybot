@@ -8,7 +8,6 @@
 import asyncio
 import json
 import logging
-import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from typing import List, Dict, Any, ClassVar
@@ -26,14 +25,6 @@ from dawei.entity.lm_messages import LLMMessage
 
 from .base_llm_api import LlmApi
 from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
-from .metrics import (
-    check_prometheus_available,
-    decrement_active_requests,
-    increment_active_requests,
-    record_llm_rate_limit_error,
-    record_llm_request,
-    record_llm_timeout_error,
-)
 
 # 导入保护机制
 from .rate_limiter import AdaptiveRateLimiter, RateLimitConfig
@@ -49,7 +40,6 @@ class BaseClient(LlmApi, ABC):
     - 自适应速率限制
     - 智能请求队列
     - 断路器模式
-    - 完整监控指标
     """
 
     # 全局保护组件（所有子类共享）
@@ -277,70 +267,11 @@ class BaseClient(LlmApi, ABC):
             with_protection: 是否使用保护机制
 
         """
-        provider = self.get_provider_name()
-        model = getattr(self, "model", "unknown")
-
-        start_time = time.time()
-
         if with_protection:
-            increment_active_requests(provider)
-
-        try:
-            if with_protection:
-                # 通过断路器调用受保护的请求
-                result = await self._make_protected_http_request(endpoint, params)
-            else:
-                # 直接调用（不受保护）
-                result = await self._make_unprotected_http_request(endpoint, params)
-
-            # 记录成功指标
-            duration = time.time() - start_time
-            if with_protection:
-                record_llm_request(
-                    provider=provider,
-                    model=model,
-                    duration=duration,
-                    status="success",
-                )
-
-            return result
-
-        except Exception as e:
-            # 记录失败指标
-            duration = time.time() - start_time
-            error_str = str(e)
-
-            if "429" in error_str or "rate_limit" in error_str.lower():
-                record_llm_request(
-                    provider=provider,
-                    model=model,
-                    duration=duration,
-                    status="rate_limit_error",
-                )
-                if with_protection:
-                    record_llm_rate_limit_error(provider, model)
-            elif "timeout" in error_str.lower():
-                record_llm_request(
-                    provider=provider,
-                    model=model,
-                    duration=duration,
-                    status="timeout",
-                )
-                if with_protection:
-                    record_llm_timeout_error(provider, model)
-            else:
-                record_llm_request(
-                    provider=provider,
-                    model=model,
-                    duration=duration,
-                    status="error",
-                )
-
-            raise
-
-        finally:
-            if with_protection:
-                decrement_active_requests(provider)
+            # 通过断路器调用受保护的请求
+            return await self._make_protected_http_request(endpoint, params)
+        # 直接调用（不受保护）
+        return await self._make_unprotected_http_request(endpoint, params)
 
     async def _make_protected_http_request(
         self,
@@ -474,12 +405,6 @@ class BaseClient(LlmApi, ABC):
         params: Dict[str, Any],
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """执行流式 HTTP 请求（受保护）"""
-        provider = self.get_provider_name()
-        model = getattr(self, "model", "unknown")
-
-        increment_active_requests(provider)
-        start_time = time.time()
-
         try:
             # 确保速率限制器已初始化（防御性惰性初始化）
             BaseClient._ensure_rate_limiter(self.config)
@@ -531,8 +456,6 @@ class BaseClient(LlmApi, ABC):
                         yield chunk
 
             # 记录成功
-            duration = time.time() - start_time
-            record_llm_request(provider=provider, model=model, duration=duration, status="success")
             BaseClient._global_rate_limiter.record_success()
 
         # JSON decode errors and streaming errors
@@ -564,21 +487,14 @@ class BaseClient(LlmApi, ABC):
             )
         except Exception as e:
             # 记录失败
-            duration = time.time() - start_time
             error_str = str(e)
 
             if "429" in error_str or "rate_limit" in error_str.lower():
                 BaseClient._global_rate_limiter.record_failure(is_rate_limit=True)
-                record_llm_rate_limit_error(provider, model)
             else:
                 BaseClient._global_rate_limiter.record_failure(is_rate_limit=False)
 
-            record_llm_request(provider=provider, model=model, duration=duration, status="error")
-
             raise
-
-        finally:
-            decrement_active_requests(provider)
 
     async def close(self) -> None:
         """关闭客户端会话"""
@@ -607,11 +523,6 @@ class BaseClient(LlmApi, ABC):
             await BaseClient._global_request_queue.start()
             logger.info("✓ Global request queue started")
 
-        if not check_prometheus_available():
-            logger.warning(
-                "⚠ prometheus_client not installed. Install with: pip install prometheus_client",
-            )
-
     @staticmethod
     async def shutdown_global_components():
         """关闭全局组件（应用关闭时调用）"""
@@ -629,12 +540,4 @@ class BaseClient(LlmApi, ABC):
             "rate_limiter": (BaseClient._global_rate_limiter.get_stats() if BaseClient._global_rate_limiter else {}),
             "request_queue": (BaseClient._global_request_queue.get_stats() if BaseClient._global_request_queue else {}),
             "circuit_breakers": {provider: cb.get_stats() for provider, cb in BaseClient._circuit_breakers.items()},
-            "prometheus_available": check_prometheus_available(),
         }
-
-    @staticmethod
-    def get_prometheus_metrics() -> str:
-        """获取 Prometheus 指标"""
-        from .metrics import get_all_metrics
-
-        return get_all_metrics()

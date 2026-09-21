@@ -724,6 +724,30 @@ class TaskGraphExecutionEngine:
             # 🔧 续跑父任务：报告已回注（_inject_subtask_summaries），父任务获得
             # 新执行期读取 [子任务执行报告] 并决定下一步（派发新 Stage 或收尾）
             try:
+                # 🔧 P0-3 修复（2026-09-20 TUI conv 9f2d4586 实证）：父任务自身轮次
+                # 结束时已把节点置为 COMPLETED（attempt_completion / 自然收尾），
+                # 而 _run_task_loop 的终态门（task_node_executor.py:1226-1231）会在
+                # 任何 LLM 轮次之前直接 break —— 续跑沦为 0 轮空转，报告无人消费，
+                # 收尾保护只能降级 COMPLETED→FAILED（子任务成果全部作废=白烧 token）。
+                # 恢复手段：COMPLETED 终态先经唯一合法重跑入口 reset_task_for_rerun
+                # 回 PENDING（旧 result stash 进 metadata.prev_*，审计可追溯），
+                # 续跑才有真实 LLM 轮次去消费报告并真正收尾。FAILED/ABORTED 不复活。
+                if current_task.status is TaskStatus.COMPLETED:
+                    _reset_ok = False
+                    try:
+                        _reset_ok = bool(
+                            await self._user_workspace.task_graph.reset_task_for_rerun(
+                                task_node_id,
+                                reason="orchestration resume: consume injected subtask report",
+                            )
+                        )
+                    except Exception:  # noqa: BLE001 — reset 失败保留终态，续跑按旧语义空转，收尾保护兜底
+                        self.logger.exception(f"Task {task_node_id} rerun reset before resume failed: ")
+                    if _reset_ok:
+                        self.logger.info(
+                            f"Task {task_node_id} reset COMPLETED -> PENDING before resume "
+                            f"(stashed previous result to metadata.prev_*), parent will get real LLM rounds",
+                        )
                 self.logger.info(
                     f"Task {task_node_id} resuming parent executor to consume subtask report "
                     f"(round {_round}/{_MAX_ORCHESTRATION_ROUNDS})...",
@@ -738,6 +762,26 @@ class TaskGraphExecutionEngine:
                 f"Task {task_node_id} hit max orchestration rounds ({_MAX_ORCHESTRATION_ROUNDS}), "
                 f"forcing finalize with status {final_status.value}",
             )
+
+        # 【状态和解】orchestration 续跑前会把 COMPLETED 节点 reset 回 PENDING
+        # （reset_task_for_rerun，见上方循环）；若续跑轮结束时节点未再度终结
+        # （父 LLM 消费报告后自然收尾、未调 attempt_completion），final_status
+        # （终态）与状态机现状（PENDING）脱节 —— 直接 PENDING→COMPLETED/FAILED
+        # 会被状态机拒绝并炸掉整图（E2E 2026-09-21 tui-review 实证：S3-6 报告
+        # 消费后 pending→completed 崩溃，CLI 退出码 1）。先补 PENDING→RUNNING
+        # 跳板，后续终态转换（含下方收尾保护 FAILED 路径与最终 final_status
+        # 收口）在状态机中均合法。
+        if final_status in _terminal:
+            try:
+                _graph_status = await self._user_workspace.task_graph.get_task_status(task_node_id)
+            except Exception:  # noqa: BLE001 — 查询失败按节点对象状态兜底
+                _graph_status = current_task.status
+            if _graph_status == TaskStatus.PENDING:
+                self.logger.info(
+                    f"Task {task_node_id} status reconcile: PENDING -> RUNNING hop "
+                    f"before final {final_status.value} (resume turn ended without re-finalizing)",
+                )
+                await self._update_task_status(task_node_id, TaskStatus.RUNNING)
 
         # P0-2 收尾保护（仅根任务）：COMPLETED 且对话尾部仍有未消费的
         # [子任务执行报告] 时不得静默成功 —— 派发结果被无视等于白烧 token

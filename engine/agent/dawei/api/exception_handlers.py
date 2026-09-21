@@ -181,6 +181,10 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         request,
         JSONResponse(
             status_code=exc.status_code,
+            # 透传异常自带 headers(如 mcp-relay 的 X-Relay-Error 结构化标记):
+            # 统一错误体重建后若丢弃,壳侧 is_device_logged_out/is_device_unknown
+            # 等按头判定的契约全部失效(只剩状态码)。
+            headers=getattr(exc, "headers", None),
             content={
                 "success": False,
                 "error": exc.detail,

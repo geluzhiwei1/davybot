@@ -99,11 +99,11 @@ const CORE_SIDEBAR_GROUPS: SidebarGroup[] = [
       { key: "system.audit", title: "操作审计", route: "/audit", icon: "scroll-text" },
       { key: "system.knowledge", title: "知识管理", route: "/knowledge", icon: "brain" },
       { key: "system.memory", title: "记忆管理", route: "/memory", icon: "lightbulb" },
-      // user-settings 是抽屜，不是路由，但保留在配置中以受模塊過濾控制
+      // 用户设置(原抽屉改为 tab 页卡,布局对齐记忆管理)
       {
         key: "system.user-settings",
         title: "用户设置",
-        route: "/__drawer_user_settings__",
+        route: "/user-settings",
         icon: "shield",
       },
     ],

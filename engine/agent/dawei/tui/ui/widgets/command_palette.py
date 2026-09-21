@@ -22,8 +22,11 @@ class Command:
     name: str
     description: str
     action: str
-    category: ClassVar[str] = "General"
-    shortcut: ClassVar[str | None] = None
+    # NOTE: was ClassVar — dataclass excludes ClassVar from __init__, so every
+    # 5-arg Command(...) call in get_default_commands() raised TypeError and
+    # ctrl+p never opened the palette. category/shortcut are per-command data.
+    category: str = "General"
+    shortcut: str | None = None
 
 
 class CommandPalette(ModalScreen):
@@ -160,6 +163,21 @@ class CommandPalette(ModalScreen):
                 self.selected_command = self.filtered_commands[row_index]
                 self._update_preview(self.selected_command)
 
+    def on_key(self, event) -> None:
+        """Forward up/down to the table while the filter Input has focus.
+
+        Without this, arrow keys move nothing (Input ignores them, DataTable
+        never highlights), selected_command stays None and Enter is a no-op.
+        """
+        if event.key not in ("down", "up"):
+            return
+        event.stop()
+        table = self.query_one("#commands_table", DataTable)
+        if event.key == "down":
+            table.action_cursor_down()
+        else:
+            table.action_cursor_up()
+
     def on_input_submitted(self, _event: Input.Submitted) -> None:
         """Handle input submit (execute command)
 
@@ -204,6 +222,9 @@ class CommandPalette(ModalScreen):
                 cmd.shortcut or "",
                 key=cmd.name,
             )
+
+        # Default selection = first filtered row (Enter without arrows executes it)
+        self.selected_command = commands[0] if commands else None
 
     def _update_preview(self, command: Command) -> None:
         """Update preview text

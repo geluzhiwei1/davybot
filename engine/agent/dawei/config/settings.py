@@ -195,8 +195,6 @@ class MonitoringConfig(BaseSettings):
         extra="allow",
     )
 
-    prometheus_enabled: bool = Field(default=True)
-    prometheus_port: int = Field(default=9090)
     grafana_port: int = Field(default=3000)
     log_level: str = Field(default="INFO")
 

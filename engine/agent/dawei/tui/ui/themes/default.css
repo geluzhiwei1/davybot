@@ -1,8 +1,16 @@
 /*
  * Dawei TUI - Default Theme
  *
- * Color scheme and layout styling
- * Updated for Textual 7.5.0+ with compatible CSS syntax
+ * Claude-Code style layout: single column, chat-dominant transcript.
+ *   [CustomHeader  1 line ]
+ *   [ChatArea      1fr    ]  <- Markdown transcript (full width)
+ *   [StatusBar     1 line ]
+ *   [InputBox      3 lines]
+ *   [Footer        1 line ]
+ * Side panels (PDCA/Thinking/Tools) live in a hidden drawer toggled
+ * with ctrl+t (`#side_drawer`), docked right, instead of permanently
+ * stealing ~30% of the chat width. Narrow-terminal guard (< 100 cols)
+ * is enforced in app.py (Textual CSS has no @media queries).
  */
 
 /* ========================================
@@ -31,88 +39,96 @@ Screen {
 /* ========================================
    Header & Footer
    ======================================== */
+CustomHeader {
+    background: $primary 95%;
+}
+
 Header {
     background: $primary 95%;
     text-align: center;
     text-style: bold;
-    border: round $accent;
-    padding: 0 2;
-    height: 3;
+    height: 1;
 }
 
 Footer {
     background: $primary 95%;
-    text-align: center;
-    text-style: bold;
 }
 
 /* ========================================
-   Main Layout Containers
+   Main Layout - single column, chat dominant
    ======================================== */
 #main_container {
     height: 1fr;
 }
 
-#left_panel {
-    width: 70%;
+#side_drawer {
+    display: none;
+    dock: right;
+    width: 46;
     height: 1fr;
-    padding: 1;
-    /* Ensure vertical layout works correctly */
+    border-left: round $border;
+    background: $surface 95%;
+    padding: 0 1;
+}
+
+#main_container.show-drawer #side_drawer {
     display: block;
 }
 
-#right_panel {
-    width: 30%;
-    height: 1fr;
-    padding: 1;
-}
-
 /* ========================================
-   Chat Area
+   Chat Area (Markdown transcript)
    ======================================== */
 ChatArea {
     height: 1fr;
-    min-height: 10;
-    /* CRITICAL: Don't use all vertical space, leave room for input box */
-    max-height: 1fr;
-    border: thick $accent;
-    background: $surface;
-    padding: 1;
+    padding: 0 1;
     scrollbar-size: 1 1;
-    color: $text;
     scrollbar-background: $surface;
-    scrollbar-color: $accent;
+    scrollbar-color: $border;
 }
 
-ChatArea:focus {
-    border: heavy $secondary;
+.chat-label-user {
+    color: $secondary;
+    text-style: bold;
+    margin-top: 1;
 }
 
-/* RichLog specific styling */
-RichLog {
-    background: $surface;
-    color: $text;
+.chat-label-assistant {
+    color: $success;
+    text-style: bold;
+    margin-top: 1;
 }
 
-RichLog > .richlog--log {
-    background: transparent;
+/* 'Assistant is thinking' spinner shown between submit and first token */
+.chat-pending {
+    height: 1;
+    margin-left: 1;
+    color: $success;
 }
 
-/* Enable text selection in RichLog/ChatArea */
-RichLog > .richlog--log-container {
-    background: transparent;
+.chat-message {
+    margin-left: 1;
 }
 
-RichLog > .richlog--log-container > ScrollView {
-    background: transparent;
+.chat-placeholder {
+    color: $text-muted;
+    text-style: italic;
+    margin: 1 0;
 }
 
-RichLog > .richlog--log-container > ScrollView > .richlog--content {
-    background: transparent;
+.chat-note {
+    color: $accent;
+    margin-top: 1;
 }
 
-/* ChatArea (RichLog) supports text selection by default */
-/* No additional CSS needed - Textual handles this automatically */
+.chat-error {
+    color: $error;
+    margin-top: 1;
+}
+
+.chat-system {
+    color: $warning;
+    margin-top: 1;
+}
 
 /* ========================================
    Input Box
@@ -121,66 +137,70 @@ InputBox, Input {
     height: 3;
     min-height: 3;
     max-height: 3;
-    margin-top: 1;
-    border: thick $accent;
-    background: $primary;
+    margin: 1 1 0 1;
+    border: round $border;
+    background: $surface;
     padding: 0 1;
     color: $text;
-    text-style: none;
-    /* Ensure input box is always visible */
-    display: block;
-    visibility: visible;
 }
 
 InputBox:focus, Input:focus {
-    border: heavy $secondary;
-    background: $primary 105%;
+    border: round $secondary;
 }
 
-/* Placeholder styling */
 Input.-placeholder {
     color: $text-muted;
     text-style: italic;
 }
 
 /* ========================================
-   Status Bar
+   Status Bar (single line)
    ======================================== */
 StatusBar {
-    height: 4;
-    min-height: 4;
+    height: 1;
+    min-height: 1;
+    max-height: 1;
     background: $primary 90%;
     padding: 0 1;
-    border: round $border;
-    content-align: center middle;
-    text-style: bold;
+    color: $text;
 }
 
 /* ========================================
-   Thinking Panel
+   Side Drawer Panels
    ======================================== */
+PDCAPanel {
+    height: auto;
+    min-height: 6;
+    max-height: 12;
+    border: round $warning;
+    background: $surface 90%;
+    padding: 0 1;
+    margin-top: 1;
+}
+
+PDCAPanel:focus {
+    border: heavy $warning;
+}
+
 ThinkingPanel {
     height: 1fr;
-    min-height: 10;
-    border: thick $border;
+    min-height: 6;
+    border: round $border;
     background: $surface 95%;
-    padding: 1;
+    padding: 0 1;
     margin-top: 1;
 }
 
 ThinkingPanel:focus {
-    border: heavy $warning;
+    border: heavy $secondary;
 }
 
-/* ========================================
-   Tool Panel
-   ======================================== */
 ToolPanel {
     height: 1fr;
-    min-height: 10;
-    border: thick $border;
+    min-height: 6;
+    border: round $border;
     background: $surface 95%;
-    padding: 1;
+    padding: 0 1;
     margin-top: 1;
 }
 
@@ -189,27 +209,10 @@ ToolPanel:focus {
 }
 
 /* ========================================
-   PDCA Panel
-   ======================================== */
-PDCAPanel {
-    height: 8;
-    min-height: 6;
-    max-height: 12;
-    border: thick $warning;
-    background: $surface 90%;
-    padding: 1;
-    margin-top: 1;
-}
-
-PDCAPanel:focus {
-    border: heavy $warning;
-}
-
-/* ========================================
    DataTable (used in screens)
    ======================================== */
 DataTable {
-    border: thick $border;
+    border: round $border;
     background: $surface;
 }
 
@@ -268,7 +271,7 @@ CommandPalette {
 
 CommandPalette > Input {
     margin: 0 1 1 1;
-    border: thick $secondary;
+    border: round $secondary;
 }
 
 CommandPalette > DataTable {

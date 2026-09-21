@@ -301,15 +301,39 @@ class StreamProcessor:
                     idle_timeout_event.set()
 
         idle_task: asyncio.Task | None = None
+        # 长驻取行任务句柄 —— 必须在 try 之外声明，否则 create_task 抛异常时
+        # finally 清理会 NameError
+        next_line_task: asyncio.Task | None = None
 
         try:
             # 启动 idle 超时检测后台任务
             idle_task = asyncio.create_task(check_idle_timeout_task())
 
-            async for line in stream:
+            # 【关键修复】空闲超时看门狗此前只在两个 chunk 之间检查 —— 当连接
+            # 挂死在 __anext__ 里（TCP 半开 / 网关静默断流）时检查永远不执行，
+            # 流会无限期卡住。改为：把 __anext__ 包成长驻 task，每秒醒来检查
+            # idle 事件；超时即抛 TimeoutError（FAST FAIL，交给上层重试）。
+            # 注意不能用 asyncio.wait_for 包 __anext__：超时会取消底层读取，
+            # 破坏流迭代器；asyncio.wait + timeout 不会取消任务。
+            stream_aiter = stream.__aiter__()
+            while True:
                 # 检查是否有空闲超时
                 if idle_timeout_event.is_set():
                     raise asyncio.TimeoutError(f"No data received for {idle_timeout}s (idle timeout)")
+
+                if next_line_task is None:
+                    next_line_task = asyncio.ensure_future(stream_aiter.__anext__())
+
+                _done, _pending = await asyncio.wait({next_line_task}, timeout=1.0)
+                if not _done:
+                    # 1 秒内无数据 —— 回到循环顶检查 idle 看门狗（长驻任务保留）
+                    continue
+
+                line_task, next_line_task = next_line_task, None
+                try:
+                    line = line_task.result()
+                except StopAsyncIteration:
+                    break
 
                 # 每次收到数据，重置空闲计时器
                 last_data_time = time.monotonic()
@@ -435,3 +459,8 @@ class StreamProcessor:
                 idle_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await idle_task
+            # 取消仍在等待的底层取行任务（空闲超时/异常退出时清理流读取）
+            if next_line_task is not None:
+                next_line_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await next_line_task

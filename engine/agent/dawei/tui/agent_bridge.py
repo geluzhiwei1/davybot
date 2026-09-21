@@ -224,7 +224,7 @@ class AgentBridge:
             asyncio.CancelledError: If operation is cancelled
 
         """
-        logger.info(f"[AGENT_BRIDGE] _forward_event called: {event_type.value}")
+        logger.debug(f"[AGENT_BRIDGE] _forward_event called: {event_type.value}")
 
         # Create event dict for UI
         event_dict = {
@@ -239,7 +239,7 @@ class AgentBridge:
         # Forward to UI queue - Fast Fail if queue is broken
         try:
             await self.ui_queue.put(event_dict)
-            logger.info(f"[AGENT_BRIDGE] Forwarded event to UI: {event_type.value}, data keys: {list(event.data.keys()) if isinstance(event.data, dict) else 'N/A'}")
+            logger.debug(f"[AGENT_BRIDGE] Forwarded event to UI: {event_type.value}")
         except asyncio.CancelledError:
             logger.warning(f"Event forwarding cancelled for {event_type.value}")
             raise
@@ -280,6 +280,44 @@ class AgentBridge:
             raise
 
         logger.info("Message sent to Agent successfully")
+
+    async def answer_followup_question(self, tool_call_id: str, answer: str) -> bool:
+        """Deliver the user's answer to a pending followup question (user_question tool)
+
+        Mirrors the websocket FOLLOWUP_RESPONSE path
+        (websocket/handlers/chat.py:_process_followup_response): iterate the
+        execution engine's node executors until one accepts the answer and
+        resolves the asyncio.Future it is awaiting.
+
+        Args:
+            tool_call_id: ID of the ask_followup_question tool call
+            answer: User's answer text
+
+        Returns:
+            True if a pending followup accepted the answer, False otherwise
+        """
+        if self.agent is None:
+            logger.error("Cannot answer followup question: agent not available")
+            return False
+
+        engine = getattr(self.agent, "execution_engine", None)
+        executors = getattr(engine, "_node_executors", None)
+        if not executors:
+            logger.warning("Cannot answer followup question: no node executors")
+            return False
+
+        logger.info(f"Delivering followup answer for tool_call {tool_call_id}")
+        for node_id, executor in list(executors.items()):
+            try:
+                if await executor.handle_followup_response(tool_call_id, answer):
+                    logger.info(f"Followup answer delivered to node {node_id}")
+                    return True
+            except Exception as e:
+                # One broken executor must not block delivery to the others
+                logger.error(f"Error delivering followup answer to node {node_id}: {e}", exc_info=True)
+
+        logger.warning(f"No node executor accepted followup answer for tool_call_id: {tool_call_id}")
+        return False
 
     def _cleanup_event_handlers(self) -> None:
         """Cleanup event handlers to prevent memory leaks"""

@@ -98,12 +98,18 @@ class AgenticLogger:
 
     def _setup_handlers(self):
         """设置日志处理器"""
-        # 控制台处理器（使用 UTF-8 流）
-        console_handler = UTF8StreamHandler()
-        console_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"),
-        )
-        self.logger.addHandler(console_handler)
+        # TUI 模式：Textual 独占终端，任何控制台写入（含 WARNING+）都会
+        # 破坏全屏渲染 → 只保留文件日志。
+        # DAWEI_TUI_MODE 由 dawei.tui.__main__ 在任何 engine import 之前注入。
+        tui_mode = os.environ.get("DAWEI_TUI_MODE") == "true"
+
+        if not tui_mode:
+            # 控制台处理器（使用 UTF-8 流）
+            console_handler = UTF8StreamHandler()
+            console_handler.setFormatter(
+                logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"),
+            )
+            self.logger.addHandler(console_handler)
 
         # 防止日志传播到父 logger（避免重复处理和编码问题）
         self.logger.propagate = False
@@ -126,7 +132,10 @@ class AgenticLogger:
             )
             self.logger.addHandler(file_handler)
         except Exception as e:
-            # 如果无法创建文件日志，仅使用控制台输出
+            # TUI 模式下若无任何处理器，WARNING+ 会走 logging.lastResort
+            # 写 stderr 破坏渲染 → 先挂 NullHandler 吞掉
+            if not self.logger.handlers:
+                self.logger.addHandler(logging.NullHandler())
             self.logger.warning(f"Failed to setup file logging: {e}")
 
     def debug(self, message: str, *args, **kwargs):

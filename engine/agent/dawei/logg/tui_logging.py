@@ -13,11 +13,12 @@ Logging Strategy:
        - Removes all existing handlers from root logger
        - Replaces Phase 1 early logging (from __main__.py)
 
-    2. Console Handler (UTF-8):
-       - UTF8StreamHandler for proper multi-language support
-       - SensitiveInfoFilter to redact API keys, passwords, etc.
-       - Compact format for terminal display
-       - Max message length: 500 chars (truncated)
+    2. NO Console Handler:
+       - Textual owns the terminal while the app runs; any stderr/stderr
+         write (even INFO) corrupts the full-screen rendering.
+       - Console output is therefore limited to Phase 1 (before app.run()).
+       - If file logging fails, a NullHandler is attached so that
+         logging.lastResort never writes to stderr mid-run.
 
     3. File Handlers (Rotating):
        - Main log: All levels (DEBUG/INFO/WARNING/ERROR/CRITICAL)
@@ -59,14 +60,28 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from dawei.config.logging_config import get_tui_error_log_path, get_tui_log_path
+from dawei.core.local_context import get_message_id, get_session_id
 
-from .logger import ContextFilter, UTF8StreamHandler
 from .sanitize_logs import SensitiveInfoFilter
 
 # Store original hooks for cleanup
 _original_excepthook: Any | None = None
 _original_threading_excepthook: Any | None = None
 _exception_logger: logging.Logger | None = None
+
+
+class ContextFilter(logging.Filter):
+    """为日志记录注入 session/message 上下文。
+
+    从 dawei.core.local_context (contextvars) 读取当前上下文；
+    未设置时填 "-"，保证文件日志格式中的 %(session_id)s / %(message_id)s 总有值。
+    （原 dawei.logg.logger 模块已删除，此处为唯一实现。）
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.session_id = get_session_id() or "-"
+        record.message_id = get_message_id() or "-"
+        return True
 
 
 class GlobalExceptionHandler:
@@ -459,7 +474,8 @@ def setup_tui_logging(
     Phase 2 Configuration:
         --------------------
         1. 清除所有现有的 handlers（移除 Phase 1 配置）
-        2. 添加 UTF-8 控制台处理器（带敏感信息过滤）
+        2. 不挂任何控制台处理器（Textual 运行期独占终端，
+           控制台输出只存在于 Phase 1，即 app.run() 之前）
         3. 添加文件日志处理器（如果 log_to_file=True）
            - 主日志文件：所有级别
            - 错误日志文件：仅 ERROR 及以上
@@ -497,22 +513,12 @@ def setup_tui_logging(
     level = logging.DEBUG if verbose else logging.INFO
     root_logger.setLevel(level)
 
-    # 1. 控制台处理器（UTF-8 + 敏感信息过滤）
-    console_handler = UTF8StreamHandler()
-    console_handler.setLevel(level)
-    console_formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    console_handler.setFormatter(console_formatter)
-
-    # 添加敏感信息过滤器到控制台
-    sensitive_filter = SensitiveInfoFilter(max_length=500)
-    console_handler.addFilter(sensitive_filter)
-
-    root_logger.addHandler(console_handler)
-
-    # 2. 文件日志处理器（如果启用）
+    # 1. 文件日志处理器（如果启用）
+    #
+    # 注意：Phase 2 不再挂任何控制台 StreamHandler。
+    # Textual 接管终端后，任何 stderr/stdout 写入（包括 INFO 日志）
+    # 都会直接刷在全屏 UI 上导致渲染错乱（bugfix 2026-09-20）。
+    # 控制台输出仅保留在 Phase 1（app.run() 之前，见 __main__.py）。
     if log_to_file:
         try:
             # 使用统一的日志路径配置
@@ -574,8 +580,10 @@ def setup_tui_logging(
             root_logger.addHandler(error_handler)
 
         except (OSError, PermissionError) as e:
-            # 如果无法创建日志文件，仅输出到控制台
+            # 如果无法创建日志文件：此时 setup 尚未进入 app.run()，可以打一条警告；
+            # 随后挂 NullHandler，避免运行期 WARNING+ 走 logging.lastResort 写 stderr 破坏渲染
             root_logger.warning(f"Failed to setup file logging: {e}")
+            root_logger.addHandler(logging.NullHandler())
 
     # 5. 安装全局异常处理器（捕获所有类型的异常）
     if enable_global_exception_handler:

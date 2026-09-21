@@ -30,6 +30,8 @@ class HeaderStatus(Static):
         padding: 0 1;
         content-align: left middle;
         text-style: bold;
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
     }
 
     HeaderStatus.connected {
@@ -54,7 +56,7 @@ class HeaderStatus(Static):
     status_type = reactive("ready")  # ready, connected, disconnected, connecting
 
     def render(self) -> str:
-        """Render status indicator"""
+        """Render status indicator (ellipsis CSS truncates, CJK-safe)."""
         icons = {
             "ready": "✓",
             "connected": "●",
@@ -62,7 +64,7 @@ class HeaderStatus(Static):
             "connecting": "○",
         }
         icon = icons.get(self.status_type, "•")
-        return f"{icon} {self.status[:8]}"
+        return f"{icon} {self.status}"
 
     def on_click(self, event: Click) -> None:
         """Handle click on status - show status details"""

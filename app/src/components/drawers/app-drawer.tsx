@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 
 export type DrawerId =
-  "agents" | "llm" | "scheduled" | "workspace-settings" | "user-settings" | "evolution";
+  "agents" | "llm" | "scheduled" | "workspace-settings" | "evolution";
 
 interface Props {
   id: DrawerId;

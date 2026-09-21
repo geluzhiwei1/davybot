@@ -4,6 +4,7 @@
 import json
 import re
 import time
+import unicodedata
 from typing import List, Any, ClassVar
 
 from pydantic import BaseModel, Field
@@ -19,13 +20,21 @@ _DESC_PREFIX_LEN = 120
 
 
 def _normalize_desc_key(message: str | None, prefix_len: int = _DESC_PREFIX_LEN) -> str:
-    """去掉空白与 markdown 强调符后取前缀，作为"同目标"判定键。
+    """去掉空白与全部 Unicode 标点后取前缀，作为"同目标"判定键。
 
     （mode-工具解耦 D6：原实现位于 tools/tool_group_hints.py，随该模块删除内联至此）
+    （2026-09-20 TUI conv 9f2d4586 实证：等价重派仅差 1 个标点——"任务——" vs
+     "任务："——即绕过旧的前缀熔断，Stage 0 重跑白烧 682k tokens。改为按
+     Unicode 类别 P* 剥离所有标点（含全角/中文标点），markdown 强调符
+     `*_>#-[]()` 亦属标点，行为兼容且更严。）
     """
     if not message:
         return ""
-    stripped = re.sub(r"[\s`*_>#\-\[\]()]+", "", str(message))
+    stripped = "".join(
+        ch
+        for ch in str(message)
+        if not ch.isspace() and not unicodedata.category(ch).startswith("P")
+    )
     return stripped[:prefix_len]
 
 

@@ -1,0 +1,22 @@
+tree HEAD:./
+
+.env.desktop.dev.example
+.env.desktop.prod.example
+.env.example
+.env.saas.dev.example
+.env.saas.prod.example
+.env.server.dev.example
+.env.server.prod.example
+.gitignore
+Dockerfile
+certs/
+compliance-agent/
+dawei/
+docker/
+docs/
+market-packages/
+pyproject.toml
+scripts/
+scripts_e2e_market_agent.py
+tests/
+uv.lock

@@ -66,6 +66,36 @@ def get_or_create_mcp_manager(workspace_root: "str | None", user_id: str = "defa
     return mgr
 
 
+# TUI 模式下 MCP 子进程 stderr 的落盘文件缓存（per-server，复用句柄避免重连泄漏 FD）
+_TUI_MCP_ERRLOG_FILES: Dict[str, Any] = {}
+
+
+def _tui_mcp_errlog(server_name: str) -> Any:
+    """返回 stdio_client 的 errlog 目标。
+
+    TUI 模式：Textual 独占终端，MCP 子进程（如 `uv run duckduckgo-mcp-server`
+    的 "Resolving dependencies..." spinner）stderr 直写终端会破坏全屏渲染，
+    重定向到 DAWEI_HOME/logs/mcp/<server>.stderr.log。
+    非 TUI 模式：保持 SDK 默认（sys.stderr），行为不变。
+    """
+    import os as _os
+    import sys
+
+    if _os.environ.get("DAWEI_TUI_MODE") != "true":
+        return sys.stderr
+
+    fh = _TUI_MCP_ERRLOG_FILES.get(server_name)
+    if fh is None or fh.closed:
+        from dawei.config.logging_config import get_log_dir
+
+        errlog_dir = get_log_dir() / "mcp"
+        errlog_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in server_name)
+        fh = (errlog_dir / f"{safe_name}.stderr.log").open("a", encoding="utf-8", errors="replace")
+        _TUI_MCP_ERRLOG_FILES[server_name] = fh
+    return fh
+
+
 def _reset_manager_registry() -> None:
     """清空共享注册表（仅供测试隔离使用，不参与业务流程）。"""
     _MANAGER_REGISTRY.clear()
@@ -605,7 +635,7 @@ class MCPToolManager:
                     if transport == "stdio":
                         from mcp.client.stdio import stdio_client as _stdio_client
 
-                        cm = _stdio_client(server_params)
+                        cm = _stdio_client(server_params, errlog=_tui_mcp_errlog(server_name))
                     elif transport == "sse":
                         from mcp.client.sse import sse_client
 
@@ -984,12 +1014,50 @@ class MCPToolManager:
 
         except Exception as e:
             logger.error(f"Failed to call MCP tool {server_name}.{tool_name}: {e}", exc_info=True)
+            err_text = str(e)
+            # 自愈重试(2026-09-20):壳/子进程在引擎会话存活期间重启时,新子进程
+            # 未收到 initialize,严格 MCP SDK 把未初始化请求一律误报为
+            # -32602 "Invalid request parameters"(与真实参数错误同文案,线上
+            # task 42c05231 根因;壳侧已加生命周期门禁,此处为纵深防御)。
+            # 断开重连一次(全新 ClientSession 会重新 initialize 并刷新工具面),
+            # 重试一次;仍失败才返回错误。FAST FAIL:只重试一次,不做重试风暴。
+            if any(
+                s in err_text
+                for s in ("Invalid request parameters", "not initialized", "Not initialized")
+            ):
+                logger.warning(
+                    f"[MCP] '{server_name}' lifecycle-style error ({err_text}); reconnecting once and retrying"
+                )
+                try:
+                    await self.disconnect_server(server_name)
+                    await self.connect_server(server_name)
+                    server_info = self.get_server_info(server_name)
+                    if server_info and server_info.session:
+                        result = await _asyncio.wait_for(
+                            server_info.session.call_tool(tool_name, arguments), timeout=call_timeout
+                        )
+                        try:
+                            result_payload = result.model_dump(mode="json")
+                        except Exception:
+                            result_payload = repr(result)
+                        logger.info(
+                            f"MCP tool {server_name}.{tool_name} succeeded after reconnect-retry"
+                        )
+                        return {
+                            "server_name": server_name,
+                            "tool_name": tool_name,
+                            "arguments": arguments,
+                            "status": "success",
+                            "result": result_payload,
+                        }
+                except Exception as e2:
+                    logger.error(f"Reconnect-retry for {server_name}.{tool_name} failed: {e2}")
             return {
                 "server_name": server_name,
                 "tool_name": tool_name,
                 "arguments": arguments,
                 "status": "error",
-                "error": str(e),
+                "error": err_text,
             }
 
     async def access_resource(self, server_name: str, uri: str) -> Dict[str, Any]:

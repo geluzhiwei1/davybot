@@ -3,9 +3,12 @@
 
 """StatusBar Widget
 
-Displays Agent status, mode, PDCA cycle info, and other runtime information.
+Single-line Claude-Code style status bar: status │ mode │ model │ PDCA.
+Rich ``Text`` with ellipsis overflow handles CJK-safe width truncation
+(char-count slicing like ``model[:27]`` corrupts double-width text).
 """
 
+from rich.text import Text
 from textual.reactive import reactive
 from textual.widgets import Static
 
@@ -100,19 +103,23 @@ class StatusBar(Static):
         self.update_text()
 
     def update_text(self) -> None:
-        """Update the status text"""
+        """Update the status text (single line; ellipsis handles overflow)."""
         model_display = self.model or _("N/A")
         status_emoji = self._get_status_emoji(self.status)
 
-        # Build base status
-        text = f"{status_emoji} [bold]{_('Status')}:[/bold] {self.status} | [bold]{_('Mode')}:[/bold] {self.mode} | [bold]{_('Model')}:[/bold] {model_display}"
+        # Plain Text segments (markup-injection safe); no_wrap + ellipsis
+        # truncate to the bar's actual cell width, CJK-safe.
+        text = Text(no_wrap=True, overflow="ellipsis")
+        text.append(f"{status_emoji} {self.status}", style="bold")
+        text.append(f" │ {self.mode}")
+        text.append(f" │ {model_display}", style="cyan")
 
-        # Add PDCA info if active
         if self.pdca_active:
             phase_emoji = self._get_phase_emoji(self.pdca_phase)
-            domain_emoji = self._get_domain_emoji(self.pdca_domain)
-            pdca_info = f" | {phase_emoji} [bold]PDCA:[/bold] {self.pdca_phase.upper()} ({domain_emoji}{self.pdca_domain}) {self.pdca_completion:.0f}%"
-            text += pdca_info
+            text.append(
+                f" │ {phase_emoji} PDCA {self.pdca_phase.upper()} {self.pdca_completion:.0f}%",
+                style="yellow",
+            )
 
         self.update(text)
 
@@ -202,9 +209,8 @@ class StatusBar(Static):
             model: New model
 
         """
-        # Truncate long model names
-        if len(model) > 30:
-            model = model[:27] + "..."
+        # No char-count truncation: update_text() ellipsis-truncates to the
+        # actual render width (char slicing mis-measures double-width CJK).
         self.model = model
 
     def set_pdca_active(self, active: bool) -> None:

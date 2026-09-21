@@ -96,27 +96,24 @@ class AutocompleteInputBox(Input):
 
         logger = get_logger(__name__)
 
-        # FAST FAIL: Log all key events with maximum detail
-        # Use print() to ensure visibility even if logging is misconfigured
-        print(f"[DEBUG KEY] key={event.key!r}, char={event.character!r}, is_printable={event.is_printable}, aliases={event.aliases}")
-
-        logger.info(f"[KEY_EVENT] key={event.key!r}, char={event.character!r}, is_printable={event.is_printable}, aliases={event.aliases}")
+        # NOTE: no print()/per-key logging here — writes to the terminal
+        # corrupt Textual's alt-screen rendering (see tui_logging.py).
 
         # Forward Ctrl+H or F1 to app's show_help action (before any other handling)
         # PowerShell sends Ctrl+H as backspace character, so check both key and character
         is_help_key = event.key in ("ctrl+h", "f1", "F1", "ctrl+H", "Ctrl+H")
 
         if is_help_key:
-            print("[DEBUG] Help key detected - calling action_show_help")
-            logger.info(f"Help key detected: key={event.key}, char={event.character}, calling action_show_help")
+            logger.info(f"Help key detected: key={event.key}, calling action_show_help")
             event.stop()
             if hasattr(self.app, "action_show_help"):
                 self.app.action_show_help()
             return
 
         # Check for "?" key (when input is empty)
-        if event.key == "?" and not self.value:
-            print("[DEBUG] Help '?' key detected - calling action_show_help")
+        # NOTE: Textual names the "?" key "question_mark" (via unicodedata),
+        # so a plain `event.key == "?"` never matched — help was unreachable.
+        if event.key in ("question_mark", "?") and not self.value:
             logger.info("Help key '?' detected (empty input), calling action_show_help")
             event.stop()
             if hasattr(self.app, "action_show_help"):
@@ -125,7 +122,6 @@ class AutocompleteInputBox(Input):
 
         # Check for Tab key
         if event.key == Keys.Tab:
-            print("[DEBUG] Tab key detected - calling autocomplete")
             event.stop()
             # Call async method
             self.call_after_refresh(self._handle_tab_completion)
@@ -133,7 +129,6 @@ class AutocompleteInputBox(Input):
 
         # For all other keys, DON'T call event.stop() - let Textual handle normal input
         # including Chinese IME characters automatically
-        print("[DEBUG] Passing key to Textual's default handler")
 
     async def _handle_tab_completion(self) -> None:
         """Handle Tab key autocomplete for @skill directives"""

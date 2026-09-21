@@ -6,10 +6,10 @@
  * - caps: [...]    → 运行期能力 (GET /api/runtime-info)
  * 前端隐藏 ≠ 安全: 后端守卫才是权威, 无能力操作照常 4xx。
  */
-import { IS_DESKTOP } from "@/lib/platform";
+import { IS_DESKTOP, isTauri } from "@/lib/platform";
 
 export interface SectionDef {
-  /** 构建期限定: 仅 desktop 构建 (Tauri) 可见 */
+  /** 需 Tauri 壳: desktop 构建, 或 web 构建运行于壳内 (light-app, isTauri 兜底) */
   desktop?: boolean;
   /** 运行期能力要求 (全部满足才可见; 空数组 = 任何模式可见) */
   caps?: readonly string[];
@@ -36,7 +36,9 @@ export type SectionKey = keyof typeof SECTIONS;
 
 export function isSectionVisible(key: SectionKey, caps: readonly string[] | null): boolean {
   const def = SECTIONS[key] as SectionDef;
-  if (def.desktop && !IS_DESKTOP) return false;
+  // desktop 段需 Tauri 壳: desktop 构建恒可见; web 构建跑在壳内(light-app 加载 saas
+  // bundle)亦可见 —— 运行时 isTauri() 兜底,纯浏览器才隐藏。对位 LocalMcpSection 自检。
+  if (def.desktop && !IS_DESKTOP && !isTauri()) return false;
   const required = def.caps ?? [];
   if (required.length === 0) return true;
   // caps=null (未加载/失联) → 按 FAST FAIL 最小安全集处理: 隐藏

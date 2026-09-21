@@ -119,10 +119,6 @@ class LoggingConfig(BaseSettings):
         Path(self.dir).mkdir(parents=True, exist_ok=True)
         Path(self.llm_dir).mkdir(parents=True, exist_ok=True)
 
-        # 打印路径信息用于调试
-        dawei_home = get_dawei_home()
-        print(f"DAWEI_HOME: {dawei_home}")
-
     @field_validator("sensitive_fields", mode="before")
     @classmethod
     def parse_sensitive_fields(cls, v, info):

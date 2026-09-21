@@ -731,6 +731,13 @@ class LLMProvider(ILLMService):
             from dawei.entity.llm_config import LLMConfig, LLMProviderConfig
 
             support_url = get_settings().support_system.url.rstrip("/")
+            if not support_url:
+                # E1 无云端缺省: 未配置 SUPPORT_SYSTEM_URL 时禁用网关注册,
+                # 避免拼出相对 base_url "/api/v1/llm" 在 create_client 才炸出难懂的 pydantic 校验错
+                logger.error(
+                    f"[GATEWAY] SUPPORT_SYSTEM_URL not configured; cannot register gateway model {model_id}"
+                )
+                return False
             gateway_base_url = f"{support_url}/api/v1/llm"
 
             # 使用已缓存的 JWT token 作为 gateway 认证
@@ -784,6 +791,13 @@ class LLMProvider(ILLMService):
             from dawei.entity.llm_config import LLMConfig, LLMProviderConfig
 
             support_url = get_settings().support_system.url.rstrip("/")
+            if not support_url:
+                # E1 无云端缺省: 未配置 SUPPORT_SYSTEM_URL 时禁用网关注册,
+                # 避免拼出相对 base_url "/api/v1/llm" 在 create_client 才炸出难懂的 pydantic 校验错
+                logger.error(
+                    f"[GATEWAY] SUPPORT_SYSTEM_URL not configured; cannot register gateway model {model_id}"
+                )
+                return False
             gateway_base_url = f"{support_url}/api/v1/llm"
 
             # 尝试多源获取 token

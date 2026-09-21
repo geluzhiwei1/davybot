@@ -162,7 +162,8 @@ async def register_local_mcp(request: RegisterRequest, current_user: str = Depen
 async def claim_local_mcp_frames(request: ClaimRequest, current_user: str = Depends(get_authenticated_user_id)):
     """长轮询领取待执行帧(定向给自己 + 广播,先到先得);claim 本身即该设备
     心跳。revoked 设备:定向队列仍有帧 → 放行送达(device/logout 控制帧),
-    送完 → 403 触发壳本地登出(§9.3)。"""
+    送完 → 403 触发壳本地登出(§9.3)。真实设备不在档 → 409 device_unknown
+    (服务端失忆自愈信号,见下方注释)。"""
     registry = get_relay_registry()
     device_id = request.device_id.strip()
     dev = registry.get_device(current_user, device_id) if device_id else None
@@ -171,6 +172,17 @@ async def claim_local_mcp_frames(request: ClaimRequest, current_user: str = Depe
             status_code=403,
             detail="device_logged_out: 本设备已被账号所有者登出;请重新登录(将生成新设备身份)",
             headers={"X-Relay-Error": "device_logged_out"},  # 同 register:结构化标记优先
+        )
+    # 服务端失忆自愈:注册表为进程内存态,引擎重启即清空。若对未知真实设备
+    # 沿用"空返回"旧语义,壳侧 claim 永远 200 空帧、无从感知,内置 MCP 在
+    # 服务端视角永久离线(repos relay.rs 只在配置签名变化时 register)。
+    # 故 FAST FAIL 返回 409 device_unknown,壳清 registered_sig 后重新
+    # register。legacy 伪设备(空 device_id)保持空返回语义不变。
+    if device_id and dev is None:
+        raise HTTPException(
+            status_code=409,
+            detail="device_unknown: 设备未在服务端注册(服务端可能已重启),请重新 register",
+            headers={"X-Relay-Error": "device_unknown"},
         )
     frames = await registry.claim(current_user, device_id, request.wait, request.limit)
     return ClaimResponse(frames=frames)

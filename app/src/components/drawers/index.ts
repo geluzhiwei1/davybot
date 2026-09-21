@@ -7,7 +7,6 @@ export { AppDrawer, type DrawerId } from "./app-drawer";
 export { AgentsDrawer } from "./agents-drawer";
 export { LLMProvidersDrawer } from "./llm-providers-drawer";
 export { WorkspaceSettingsDrawer } from "./workspace-settings-drawer";
-export { UserSettingsDrawer } from "./user-settings-drawer";
 export { SubtaskThreadDrawer } from "./subtask-thread-drawer";
 
 /**

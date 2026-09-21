@@ -84,7 +84,6 @@ sandbox = [
 ]
 
 all = [
-    "prometheus_client",
     # Large ML/AI libraries
     "sentence-transformers>=2.2.0",
     "numpy>=1.24.0",

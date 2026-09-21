@@ -1,9 +1,10 @@
 /**
- * UserSettingsDrawer — 用户级全局配置面板。
- * 左导航 + 内容区布局（对齐 WorkspaceSettingsDrawer 风格），
+ * User Settings Route — 用户级全局配置页面(原抽屉改为 tab 页卡,布局对齐 memory.tsx)。
+ * 左导航 + 内容区布局,
  * 管理 LLM / MCP / Skills / Memory / Knowledge / Security / Preferences / About。
  */
 import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   User,
   Palette,
@@ -26,8 +27,7 @@ import {
   ToggleRight,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { AppDrawer } from "./app-drawer";
-import { LocalMcpSection } from "./local-mcp-section";
+import { LocalMcpSection } from "@/components/drawers/local-mcp-section";
 import { isSectionVisible, type SectionKey } from "@/lib/caps";
 import { useCaps } from "@/lib/stores/runtime-store";
 import { SecurityPolicyForm } from "@/components/security/security-policy-form";
@@ -181,7 +181,11 @@ const SKILLS_DEFAULTS: Record<string, unknown> = {
 // Main Component
 // ═══════════════════════════════════════════════════════════════════════
 
-export function UserSettingsDrawer() {
+export const Route = createFileRoute("/user-settings")({
+  component: UserSettingsPage,
+});
+
+function UserSettingsPage() {
   const { t } = useTranslation("drawersUi");
   // 运行期能力 (多模式统一方案 §L4): NAV 按 SECTIONS 表过滤, 不按 mode 字符串分支
   const { caps } = useCaps();
@@ -190,13 +194,12 @@ export function UserSettingsDrawer() {
     items: g.items.filter((it) => isSectionVisible(it.value as SectionKey, caps)),
   })).filter((g) => g.items.length > 0);
   return (
-    <AppDrawer
-      id="user-settings"
-      title={t("user.drawer.title")}
-      description={t("user.drawer.description")}
-      icon={User}
-      width="w-full sm:w-[760px] sm:max-w-[800px]"
-    >
+    <div className="flex flex-col h-full">
+      {/* Header — matches memory.tsx layout */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60 shrink-0">
+        <User className="w-5 h-5 text-brand" />
+        <h1 className="text-base font-semibold flex-1">{t("user.drawer.title")}</h1>
+      </div>
       <Tabs defaultValue="llm" className="flex-1 flex flex-row min-h-0">
         <TabsList className="flex flex-col w-44 shrink-0 items-stretch justify-start rounded-none border-r border-border/60 bg-transparent p-2 gap-0.5 overflow-y-auto scrollbar-thin h-auto">
           {navGroups.flatMap((g) => [
@@ -246,7 +249,7 @@ export function UserSettingsDrawer() {
           </TabsContent>
         </div>
       </Tabs>
-    </AppDrawer>
+    </div>
   );
 }
 

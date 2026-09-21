@@ -56,7 +56,6 @@ import {
   Pin,
   CircleUser,
   MonitorSmartphone,
-  Sparkles,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useTabsStore } from "@/lib/tabs-store";
@@ -700,16 +699,6 @@ export function AppSidebar() {
                     <CircleUser className="w-4 h-4 mr-2" />
                     <span>{t("sidebar.user.myAccount")}</span>
                   </DropdownMenuItem>
-                  {isSectionVisible("modules", caps) && (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        openPageTab("/settings/modules", t("sidebar.user.modules"), "sparkles")
-                      }
-                    >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      <span>{t("sidebar.user.modules")}</span>
-                    </DropdownMenuItem>
-                  )}
                   {isSectionVisible("devices", caps) && (
                     <DropdownMenuItem
                       onClick={() =>

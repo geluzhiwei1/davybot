@@ -15,6 +15,7 @@ from dawei.agentic.agent import Agent
 from dawei.cli.config import CLIConfig
 from dawei.entity.user_input_message import UserInputText
 from dawei.logg.logging import get_logger
+from dawei.tools.custom_tools.async_utils import set_main_loop
 from dawei.workspace.user_workspace import UserWorkspace
 
 
@@ -96,6 +97,12 @@ class AgentRunner:
         start_time = time.time()
 
         try:
+            # 0. 注册主事件循环（对齐 server_app lifespan 的 bug#5 修复）：
+            # CLI 模式下同步 MCP 工具经 run_on_main_loop 把协程投递回主
+            # loop；不注册则每个 MCP 调用都报 "main loop not registered"
+            # （server 启动时注册过，CLI 路径此前缺失）。
+            set_main_loop(asyncio.get_running_loop())
+
             # 1. 确保已初始化
             if not self.agent:
                 await self.initialize()

@@ -526,12 +526,6 @@ def create_app(host: str = "0.0.0.0", port: int = 8431) -> FastAPI:
 
         return {"success": True, "data": {"enabled": True, "workspaces": workspace_stats, "total_memories": total_memories}}
 
-    @app.get("/api/metrics")
-    async def get_prometheus_metrics():
-        from dawei.llm_api.base_client import BaseClient
-        from fastapi.responses import Response
-        return Response(content=BaseClient.get_prometheus_metrics(), media_type="text/plain")
-
     # Mount frontend static files
     _mount_frontend_static(app)
 

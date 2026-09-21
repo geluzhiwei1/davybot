@@ -147,6 +147,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _strip_console_handlers() -> int:
+    """移除所有 logger 上的控制台 StreamHandler（文件/Null 处理器保留）。
+
+    Textual 接管终端后，任何 stderr/stdout 写入（包括 INFO 日志）都会直接
+    刷在全屏 UI 上导致渲染错乱。在 app.run() 前调用本函数兜底——即使
+    Phase 2 (setup_tui_logging) 失败回落到 Phase 1，也不会带 console handler
+    进入渲染期。返回移除的处理器数量。
+    """
+    removed = 0
+
+    def _is_console_handler(h: logging.Handler) -> bool:
+        return isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+
+    all_loggers: list[logging.Logger] = [logging.getLogger()]
+    for name in list(logging.Logger.manager.loggerDict):
+        lg = logging.getLogger(name)
+        if lg not in all_loggers:
+            all_loggers.append(lg)
+
+    for lg in all_loggers:
+        for h in [h for h in lg.handlers if _is_console_handler(h)]:
+            lg.handlers.remove(h)
+            removed += 1
+
+    # root 若无任何处理器，WARNING+ 会走 logging.lastResort 写 stderr → 破坏渲染。
+    # NullHandler 使记录被视为已处理。
+    root = logging.getLogger()
+    if not root.handlers:
+        root.addHandler(logging.NullHandler())
+
+    return removed
+
+
 def main():
     """Main entry point for dawei.tui"""
     from dotenv import find_dotenv, load_dotenv
@@ -329,6 +362,10 @@ Notes:
         patch_logger = logging.getLogger(f"{__name__}.patch")
         logger.info(f"[INIT] Patch logger level: {patch_logger.level}")
         logger.info(f"[INIT] Root logger level: {logging.getLogger().level}")
+
+        # 渲染前兜底：移除所有控制台 StreamHandler（Textual 运行期终端只归它）
+        removed = _strip_console_handlers()
+        logger.info(f"[INIT] Stripped {removed} console handler(s) before app.run()")
 
         app.run(size=(terminal_size.columns, terminal_size.lines))
     except KeyboardInterrupt:

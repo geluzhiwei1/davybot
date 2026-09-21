@@ -116,7 +116,7 @@ if sys.platform == "win32":
 # ============================================================================
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.widgets import Footer
 
 from dawei.core.events import TaskEventType
@@ -166,8 +166,15 @@ class GeweiTUIApp(App):
         ("ctrl+alt+t", "toggle_theme", "Theme"),  # 切换主题
         ("ctrl+l", "clear_chat", "Clear Chat"),
         ("ctrl+r", "show_history", "History"),
+        ("ctrl+t", "toggle_side_panel", "Panels"),
         ("?", "show_help", "Help"),
     ]
+
+    # Textual's built-in command palette registers a PRIORITY ctrl+p binding
+    # that shadows our ("ctrl+p", "show_command_palette") entry and pushes a
+    # foreign modal (footer even advertises "^p palette"). The app has its own
+    # CommandPalette — disable the built-in so ctrl+p reaches our binding.
+    ENABLE_COMMAND_PALETTE = False
 
     # Title and subtitle will be set in __init__ after i18n is configured
     TITLE = "Dawei TUI - Agent Terminal Interface"
@@ -232,6 +239,10 @@ class GeweiTUIApp(App):
         self.agent_bridge: AgentBridge | None = None
         self.event_queue: asyncio.Queue | None = None
         self._is_streaming = False
+        # tool_call_id of a pending agent followup question (user_question
+        # tool). While set, the next input submission is routed as the answer
+        # instead of starting a new task.
+        self._pending_followup_tool_call_id: str | None = None
 
         # Session management
         self.session_manager = SessionManager(config.workspace_absolute)
@@ -251,34 +262,30 @@ class GeweiTUIApp(App):
         self.toast_manager: ToastManager | None = None
 
     def compose(self) -> ComposeResult:
-        """Compose UI layout"""
-        yield CustomHeader()
+        """Compose UI layout.
 
+        Claude-Code style single column: header / chat transcript (dominant) /
+        status line / input / footer. Side panels (PDCA/Thinking/Tools) live in
+        a hidden right drawer toggled with ctrl+t (`#side_drawer`).
+        """
         # Get workspace path
         workspace_path = Path(self.config.workspace_absolute)
 
-        # Main content area - split horizontally
-        yield Horizontal(
-            # Left panel (70%): Chat area + Input box
-            Vertical(
-                ChatArea(id="chat_area"),
-                AutocompleteInputBox(
-                    id="input_box",
-                    placeholder="Type @skill:name or message... (Tab to autocomplete, Enter to send)",
-                    workspace_path=workspace_path,
-                ),
-                id="left_panel",
-            ),
-            # Right panel (30%): Status + Info
-            Vertical(
-                StatusBar(id="status_bar"),
-                PDCAPanel(id="pdca_panel"),
-                ThinkingPanel(id="thinking_panel"),
-                ToolPanel(id="tool_panel"),
-                id="right_panel",
-            ),
-            id="main_container",
-        )
+        yield CustomHeader()
+
+        with Vertical(id="main_container"):
+            yield ChatArea(id="chat_area")
+            yield StatusBar(id="status_bar")
+            yield AutocompleteInputBox(
+                id="input_box",
+                placeholder="Type @skill:name or message... (Tab to autocomplete, Enter to send)",
+                workspace_path=workspace_path,
+            )
+            # Hidden side drawer (ctrl+t to toggle) — docked right
+            with Vertical(id="side_drawer"):
+                yield PDCAPanel(id="pdca_panel")
+                yield ThinkingPanel(id="thinking_panel")
+                yield ToolPanel(id="tool_panel")
 
         yield Footer()
 
@@ -412,12 +419,12 @@ class GeweiTUIApp(App):
                 raise ValueError("Event missing required 'event_type' field")
 
             # Debug: Log all events
-            logger.info(f"[EVENT] Received event type: {event_type}, data type: {type(data).__name__}")
+            logger.debug(f"[EVENT] Received event type: {event_type}, data type: {type(data).__name__}")
 
             # Route to handler using registry
             handler_name = self.EVENT_HANDLERS.get(event_type)
             if handler_name:
-                logger.info(f"[EVENT] Routing to handler: {handler_name}")
+                logger.debug(f"[EVENT] Routing to handler: {handler_name}")
                 handler = getattr(self, handler_name)
                 # ✅ 修复：直接传递data对象，不假设它是字典
                 handler(data)
@@ -462,11 +469,11 @@ class GeweiTUIApp(App):
             data: Event data with content chunk (dict or object)
 
         """
-        logger.info(f"[CONTENT_STREAM] Handling content stream event: {type(data).__name__}")
+        logger.debug(f"[CONTENT_STREAM] Handling content stream event: {type(data).__name__}")
         chat_area = self.query_one("#chat_area", ChatArea)
 
         if not self._is_streaming:
-            logger.info("[CONTENT_STREAM] Starting streaming mode")
+            logger.debug("[CONTENT_STREAM] Starting streaming mode")
             self._is_streaming = True
             chat_area.start_streaming()
             status_bar = self.query_one("#status_bar", StatusBar)
@@ -583,14 +590,24 @@ class GeweiTUIApp(App):
 
         Args:
             data: Event data with error info
-
         """
         chat_area = self.query_one("#chat_area", ChatArea)
-        error = self._get_attr(data, "error", "Unknown error")
-        context = self._get_attr(data, "context", "")
-        error_msg = f"Error: {error}"
-        if context:
-            error_msg += f" (context: {context})"
+        # ERROR_OCCURRED payload is {error_type, message, details} (see
+        # task_graph_excutor._emit_error_event); 'error'/'context' are legacy
+        # keys that never matched, causing "Unknown error" for every failure.
+        error = self._get_attr(data, "message", "") or self._get_attr(data, "error", "") or "Unknown error"
+        error_type = self._get_attr(data, "error_type", "")
+        if error_type:
+            error_msg = f"Error [{error_type}]: {error}"
+        else:
+            error_msg = f"Error: {error}"
+        details = self._get_attr(data, "details", None)
+        if isinstance(details, dict):
+            category = details.get("error_category", "")
+            node_id = details.get("task_node_id", "")
+            extras = [x for x in (category, node_id) if x]
+            if extras:
+                error_msg += f" ({', '.join(extras)})"
         chat_area.add_error(error_msg)
 
         status_bar = self.query_one("#status_bar", StatusBar)
@@ -615,14 +632,29 @@ class GeweiTUIApp(App):
     def _handle_followup_question(self, data: Any) -> None:
         """Handle followup question event
 
-        Args:
-            data: Event data with question
+        The agent is blocked awaiting the user's answer (ask_followup_question
+        tool). Capture tool_call_id so the next input submission is routed to
+        the pending followup instead of starting a new task — without this,
+        the agent waits forever and the UI appears frozen.
 
+        Args:
+            data: Event data with question/suggestions/tool_call_id
         """
         chat_area = self.query_one("#chat_area", ChatArea)
         question = self._get_attr(data, "question", "")
+        suggestions = self._get_attr(data, "suggestions", []) or []
+        tool_call_id = self._get_attr(data, "tool_call_id", "")
+
+        if tool_call_id:
+            self._pending_followup_tool_call_id = tool_call_id
+            logger.info(f"Followup question pending: {tool_call_id}")
+
         if question:
-            chat_area.add_system_message(f"Question: {question}")
+            lines = [f"❓ {question}"]
+            if suggestions:
+                lines.append(f"   Suggestions: {', '.join(str(s) for s in suggestions)}")
+            lines.append("   (Type your answer and press Enter)")
+            chat_area.add_system_message("\n".join(lines))
 
     def _handle_skills_loaded(self, data: Any) -> None:
         """Handle skills loaded event
@@ -667,24 +699,30 @@ class GeweiTUIApp(App):
             data: Event data with cycle info
 
         """
+        # Guard: PDCA event enums alias TaskGraph event enums (PDCA_CYCLE_STARTED
+        # and TASK_GRAPH_CREATED share value "workflow_started"). Real PDCA
+        # payloads always carry "domain"; misrouted graph events don't.
+        domain = self._get_attr(data, "domain", "")
+        if not domain:
+            logger.debug("Ignoring misrouted cycle-started event (no domain field)")
+            return
+
         pdca_panel = self.query_one("#pdca_panel", PDCAPanel)
         status_bar = self.query_one("#status_bar", StatusBar)
 
         # Update panel
         pdca_panel.set_pdca_active(True)
-        pdca_panel.set_domain(self._get_attr(data, "domain", ""))
+        pdca_panel.set_domain(domain)
         pdca_panel.set_current_phase("plan")  # Starts at plan
         pdca_panel.set_cycle_count(0)
 
         # Update status bar
         status_bar.set_pdca_active(True)
-        status_bar.set_pdca_domain(self._get_attr(data, "domain", ""))
+        status_bar.set_pdca_domain(domain)
         status_bar.set_pdca_phase("plan")
 
         # Add info message to chat
         chat_area = self.query_one("#chat_area", ChatArea)
-        domain = self._get_attr(data, "domain", "unknown")
-        self._get_attr(data, "task_description", "")
         chat_area.add_info(f"🔄 PDCA cycle started for {domain.upper()} domain")
 
         logger.info(f"PDCA cycle started: {self._get_attr(data, 'cycle_id')}")
@@ -701,6 +739,12 @@ class GeweiTUIApp(App):
 
         previous_phase = self._get_attr(data, "previous_phase", "")
         current_phase = self._get_attr(data, "current_phase", "")
+        # Guard: PDCA_PHASE_ADVANCED aliases WORKFLOW_STEP_COMPLETED (shared with
+        # TASK_GRAPH_UPDATED / TASK_NODE_*). Real PDCA transitions always carry
+        # both phase fields.
+        if not previous_phase or not current_phase:
+            logger.debug("Ignoring misrouted phase-advanced event (missing phase fields)")
+            return
         cycle_count = self._get_attr(data, "cycle_count", 0)
         completion = self._get_attr(data, "completion_percentage", 0)
 
@@ -728,8 +772,14 @@ class GeweiTUIApp(App):
             data: Event data with completion report
 
         """
+        # Guard: PDCA_CYCLE_COMPLETED aliases WORKFLOW_COMPLETED (shared with
+        # PERSIST_TASK_GRAPH). Real completions always carry "cycle_id".
+        cycle_id = self._get_attr(data, "cycle_id", "")
+        if not cycle_id:
+            logger.debug("Ignoring misrouted cycle-completed event (no cycle_id)")
+            return
+
         pdca_panel = self.query_one("#pdca_panel", PDCAPanel)
-        self.query_one("#status_bar", StatusBar)
 
         # Update panel
         pdca_panel.set_completion_percentage(100)
@@ -737,7 +787,6 @@ class GeweiTUIApp(App):
         # Add completion message to chat
         chat_area = self.query_one("#chat_area", ChatArea)
         cycle_count = self._get_attr(data, "cycle_count", 0)
-        self._get_attr(data, "domain", "unknown")
         artifacts = self._get_attr(data, "artifacts", [])
         issues = self._get_attr(data, "issues", [])
 
@@ -749,7 +798,7 @@ class GeweiTUIApp(App):
         if issues:
             chat_area.add_info(f"Issues recorded: {len(issues)}")
 
-        logger.info(f"PDCA cycle completed: {self._get_attr(data, 'cycle_id')}")
+        logger.info(f"PDCA cycle completed: {cycle_id}")
 
     def _handle_pdca_domain_detected(self, data: Any) -> None:
         """Handle PDCA domain detected event
@@ -758,32 +807,18 @@ class GeweiTUIApp(App):
             data: Event data with domain info
 
         """
-        domain = self._get_attr(data, "domain", "unknown")
+        # Guard: PDCA_DOMAIN_DETECTED aliases STATE_CHANGED (emitted by
+        # task_graph state_manager with old_state/new_state payloads).
+        # Real PDCA detections always carry "domain".
+        domain = self._get_attr(data, "domain", "")
+        if not domain:
+            logger.debug("Ignoring misrouted domain-detected event (no domain field)")
+            return
         logger.info(f"PDCA domain detected: {domain}")
 
         # Optionally show in chat for debugging
         chat_area = self.query_one("#chat_area", ChatArea)
         chat_area.add_system_message(f"Domain detected: {domain.upper()}")
-
-    def on_key(self, event) -> None:
-        """FAST FAIL: Intercept ALL key events for debugging Chinese input
-
-        This method is called BEFORE any widget-specific handlers.
-        We log everything to diagnose Chinese input issues.
-
-        Args:
-            event: Key event from Textual
-        """
-        # FAST FAIL: Use print() to ensure visibility - don't rely on logging config
-        print(f"[APP KEY] key={event.key!r}, char={event.character!r}, is_printable={event.is_printable}")
-
-        # Also log to logger for persistence
-        logger.info(f"[APP_KEY_EVENT] key={event.key!r}, char={event.character!r}, is_printable={event.is_printable}, aliases={event.aliases}")
-
-        # Special handling for Chinese characters (non-ASCII printable)
-        if event.character and ord(event.character[0]) > 127:
-            print(f"[APP KEY] *** NON-ASCII CHARACTER DETECTED ***: {event.character!r} (U+{ord(event.character[0]):04X})")
-            logger.warning(f"[CHINESE INPUT] Detected non-ASCII character: {event.character!r} (U+{ord(event.character[0]):04X})")
 
     async def on_autocomplete_input_box_message_submitted(self, message: AutocompleteInputBox.MessageSubmitted) -> None:
         """Handle user input submission from AutocompleteInputBox
@@ -815,28 +850,102 @@ class GeweiTUIApp(App):
             chat_area = self.query_one("#chat_area", ChatArea)
             chat_area.add_user_message(user_text)
 
-            # Update status
             status_bar = self.query_one("#status_bar", StatusBar)
+
+            # Followup answer: agent is blocked waiting for this reply —
+            # deliver it to the pending user_question instead of starting a
+            # new task
+            pending_tool_call_id = self._pending_followup_tool_call_id
+            if pending_tool_call_id and self.agent_bridge:
+                self._pending_followup_tool_call_id = None
+                status_bar.set_status("Sending answer...")
+                asyncio.create_task(self._send_followup_answer_bg(pending_tool_call_id, user_text))
+                return  # handler must return immediately (non-blocking)
+
+            # Normal send: assistant turn + 'thinking' spinner until the first
+            # token arrives (set _is_streaming so _handle_content_stream does
+            # not re-start the turn)
+            self._is_streaming = True
+            chat_area.start_streaming()
             status_bar.set_status("Sending...")
 
-            # Send to Agent - Fast Fail on critical errors
-            try:
-                logger.info("[INPUT] Sending to AgentBridge...")  # DEBUG
-                await self.send_user_message(user_text)
-                logger.info("[INPUT] Sent successfully")  # DEBUG
-            except Exception as e:
-                logger.error(f"Error sending message: {e}", exc_info=True)
-                chat_area.add_error(f"Failed to send message: {e}")
-                status_bar.set_status("Error")
-                return  # Don't continue after sending error
+            # Background task: agent.process_message can block for the whole
+            # task lifetime (it awaits followup questions that have no
+            # timeout) — awaiting it here would freeze the UI message pump.
+            asyncio.create_task(self._send_user_message_bg(user_text))
 
         except Exception as e:
             logger.error(f"Fatal error in input handling: {e}", exc_info=True)
+            self._is_streaming = False
             try:
                 chat_area = self.query_one("#chat_area", ChatArea)
+                chat_area.end_streaming()
                 chat_area.add_error(f"Input handling error: {e}")
             except Exception:
                 pass  # UI might be broken
+
+    async def _send_user_message_bg(self, message: str) -> None:
+        """Send user message to agent in a background task
+
+        agent.process_message awaits the full task (which may block on
+        followup questions with no timeout), so this must never be awaited
+        from a UI message handler.
+
+        Args:
+            message: User message text
+        """
+        try:
+            logger.debug("[INPUT] Sending to AgentBridge...")
+            await self.send_user_message(message)
+            logger.debug("[INPUT] Sent successfully")
+        except Exception as e:
+            logger.error(f"Error sending message: {e}", exc_info=True)
+            self._handle_send_failure(e)
+
+    async def _send_followup_answer_bg(self, tool_call_id: str, answer: str) -> None:
+        """Deliver the user's answer to the blocked ask_followup_question tool
+
+        Falls back to a normal send if no executor accepts the answer
+        (e.g. the task already ended and the pending id is stale).
+
+        Args:
+            tool_call_id: ID of the pending followup tool call
+            answer: User's answer text
+        """
+        try:
+            delivered = await self.agent_bridge.answer_followup_question(tool_call_id, answer)
+        except Exception as e:
+            logger.error(f"Error sending followup answer: {e}", exc_info=True)
+            delivered = False
+
+        if delivered:
+            self.session_manager.add_message("user", answer)
+            return
+
+        logger.warning(f"Followup {tool_call_id} not pending; sending as normal message")
+        try:
+            chat_area = self.query_one("#chat_area", ChatArea)
+            self._is_streaming = True
+            chat_area.start_streaming()
+            self.query_one("#status_bar", StatusBar).set_status("Sending...")
+        except Exception:
+            pass  # UI feedback is best-effort; the send itself matters
+        asyncio.create_task(self._send_user_message_bg(answer))
+
+    def _handle_send_failure(self, error: Exception) -> None:
+        """Reset streaming UI state after a failed send
+
+        Args:
+            error: The exception that caused the failure
+        """
+        self._is_streaming = False
+        try:
+            chat_area = self.query_one("#chat_area", ChatArea)
+            chat_area.end_streaming()  # drop the pending spinner/label
+            chat_area.add_error(f"Failed to send message: {error}")
+            self.query_one("#status_bar", StatusBar).set_status("Error")
+        except Exception:
+            pass  # UI might be broken
 
     async def send_user_message(self, message: str) -> None:
         """Send user message to Agent
@@ -933,6 +1042,36 @@ class GeweiTUIApp(App):
         """Toggle PDCA on"""
         self._toggle_pdca(True)
 
+    # ------------------------------------------------------------------
+    # Side drawer (PDCA/Thinking/Tools panels, ctrl+t)
+    # ------------------------------------------------------------------
+
+    # Below this terminal width the drawer would starve the chat column
+    # (Textual CSS has no @media queries, so the guard lives here).
+    DRAWER_MIN_WIDTH = 100
+
+    def action_toggle_side_panel(self) -> None:
+        """Toggle the side drawer (PDCA/Thinking/Tools panels)."""
+        container = self.query_one("#main_container")
+        opening = not container.has_class("show-drawer")
+        if opening and self.size.width < self.DRAWER_MIN_WIDTH:
+            self.notify(_("Terminal too narrow for side panels (need 100 columns)"), severity="warning")
+            return
+        container.toggle_class("show-drawer")
+        if container.has_class("show-drawer"):
+            self._focus_thinking()
+        else:
+            self._focus_input()
+
+    def _ensure_drawer_visible(self) -> None:
+        """Show the side drawer if hidden (panels can't be focused while hidden)."""
+        container = self.query_one("#main_container")
+        if self.size.width < self.DRAWER_MIN_WIDTH:
+            self.notify(_("Terminal too narrow for side panels (need 100 columns)"), severity="warning")
+            return
+        if not container.has_class("show-drawer"):
+            container.add_class("show-drawer")
+
     def _focus_chat(self) -> None:
         """Focus chat area"""
         chat_area = self.query_one("#chat_area", ChatArea)
@@ -945,16 +1084,19 @@ class GeweiTUIApp(App):
 
     def _focus_thinking(self) -> None:
         """Focus thinking panel"""
+        self._ensure_drawer_visible()
         thinking_panel = self.query_one("#thinking_panel", ThinkingPanel)
         thinking_panel.focus()
 
     def _focus_tools(self) -> None:
         """Focus tool panel"""
+        self._ensure_drawer_visible()
         tool_panel = self.query_one("#tool_panel", ToolPanel)
         tool_panel.focus()
 
     def _focus_pdca(self) -> None:
         """Focus PDCA panel"""
+        self._ensure_drawer_visible()
         pdca_panel = self.query_one("#pdca_panel", PDCAPanel)
         pdca_panel.focus()
 
@@ -1217,16 +1359,16 @@ class GeweiTUIApp(App):
 
     def on_resize(self, event) -> None:
         """Handle terminal resize events"""
-        logger.info("[RESIZE EVENT] Terminal resized!")
-        logger.info(f"[RESIZE EVENT] New size: {event.size}")
-        logger.info(f"[RESIZE EVENT] Container size: {event.container_size}")
-        logger.info("[RESIZE EVENT] Widget tree will re-layout automatically")
+        logger.debug("[RESIZE EVENT] Terminal resized!")
+        logger.debug(f"[RESIZE EVENT] New size: {event.size}")
+        logger.debug(f"[RESIZE EVENT] Container size: {event.container_size}")
+        logger.debug("[RESIZE EVENT] Widget tree will re-layout automatically")
 
         # Log current terminal size
         import shutil
 
         terminal_size = shutil.get_terminal_size()
-        logger.info(f"[RESIZE EVENT] Actual terminal size from shutil: {terminal_size.columns}x{terminal_size.lines}")
+        logger.debug(f"[RESIZE EVENT] Actual terminal size from shutil: {terminal_size.columns}x{terminal_size.lines}")
 
     async def on_unmount(self) -> None:
         """Cleanup on app unmount"""

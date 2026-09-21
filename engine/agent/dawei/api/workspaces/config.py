@@ -124,10 +124,6 @@ DEFAULT_CONFIG = {
         "enable_performance_logging": True,
         "sanitize_sensitive_data": True,
     },
-    "monitoring": {
-        "prometheus_enabled": True,
-        "prometheus_port": 9090,
-    },
     "analytics": {
         "enabled": True,
         "retention_days": 90,
