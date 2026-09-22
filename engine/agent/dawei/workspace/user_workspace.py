@@ -392,6 +392,16 @@ class UserWorkspace:
             logger.debug(f"is_command_allowed: whitelist disabled, allowing '{command[:30]}'")
             return None
 
+        # 2.5 管道/后台/命令替换策略 — 前端 allow* 三开关的执行点 (2026-09-22)。
+        # 语义：白名单开启时，含对应语法的命令须显式打开开关才放行；
+        # 白名单关闭（如 demo 宽松化）在步骤 2 已全放行，不受影响。
+        if "|" in command and not sec.get("allow_pipe_commands", False):
+            return "管道命令(|)未启用 (allowPipeCommands=false)"
+        if command.strip().endswith("&") and not sec.get("allow_background_commands", False):
+            return "后台执行(&)未启用 (allowBackgroundCommands=false)"
+        if ("$(" in command or "`" in command) and not sec.get("allow_shell_commands", False):
+            return "命令替换($()/反引号)未启用 (allowShellCommands=false)"
+
         command_name = command.strip().split()[0] if command.strip() else ""
 
         # 3. custom_denied_commands 始终优先
@@ -426,12 +436,19 @@ class UserWorkspace:
             return f"命令 '{command_name}' 不在允许列表中"
 
         # 7. system 源启用 → 做 flag/子命令/参数验证
+        #   (管道/后台/命令替换已在步骤 2.5 按 allow* 开关统一判定，
+        #    此处传 flag 跳过 validate_command 内的重复拒绝)
         if "system" in allowed_sources:
             from dawei.sandbox.command_whitelist import CommandWhitelist
 
             if not CommandWhitelist._loaded:
                 CommandWhitelist.load_from_config()
-            is_valid, error_msg = CommandWhitelist.validate_command(command)
+            is_valid, error_msg = CommandWhitelist.validate_command(
+                command,
+                allow_pipe=bool(sec.get("allow_pipe_commands", False)),
+                allow_background=bool(sec.get("allow_background_commands", False)),
+                allow_shell=bool(sec.get("allow_shell_commands", False)),
+            )
             if not is_valid:
                 logger.debug(
                     f"is_command_allowed: system whitelist validation failed: {error_msg}"

@@ -63,6 +63,10 @@ class SecurityManager:
         # 多租户存储：user_id → 用户级配置； (user_id, workspace_id) → 工作区级覆盖
         self._user_settings: dict[str, UserSecuritySettings] = {}
         self._workspace_security: dict[tuple[str, str], dict[str, Any]] = {}
+        # 原始 JSON 缓存（user_id → security.json 原文 dict）：用于区分
+        # 「显式配置」与「模型缺省」（如 commandExecutionTimeout 缺省 30
+        # 不应被当作用户设置的超时上限）。与 _user_settings 同生命周期。
+        self._raw_user_config: dict[str, dict[str, Any]] = {}
         # 合并结果缓存：key=(user_id, workspace_id)
         self._merged_cache: dict[tuple[str, str], dict[str, Any]] = {}
 
@@ -173,6 +177,25 @@ class SecurityManager:
                 self._user_settings[uid] = self._load_user_settings(uid)
             return self._user_settings[uid]
 
+    def get_user_command_timeout_cap(self, user_id: str | None = None) -> int:
+        """用户【显式】配置的单命令超时上限（秒）；0 = 未配置（不限制）。
+
+        只认 security.json 里真实写过的 commandExecutionTimeout —— 模型缺省
+        (30) 不算，避免无配置用户被误扣到 30s。沙箱 provider 用它对工具层
+        传入的 timeout 取 min（2026-09-22 接活前端「执行超时」字段）。
+        """
+        uid = user_id or _CTX_USER_ID.get()
+        with self._lock:
+            # raw 缓存缺失（首次读取 / API 更新后失效）→ 从磁盘重载
+            if uid not in self._raw_user_config:
+                self._user_settings[uid] = self._load_user_settings(uid)
+            raw = self._raw_user_config.get(uid, {})
+        try:
+            value = int(raw.get("commandExecutionTimeout", 0) or 0)
+            return value if value > 0 else 0
+        except (TypeError, ValueError):
+            return 0
+
     def update_user_settings(
         self, settings: UserSecuritySettings, user_id: str | None = None
     ) -> None:
@@ -180,6 +203,8 @@ class SecurityManager:
         with self._lock:
             uid = user_id or _CTX_USER_ID.get()
             self._user_settings[uid] = settings
+            # raw 缓存失效：API 更新后由下次读取从磁盘重载（显式值语义）
+            self._raw_user_config.pop(uid, None)
             # 清该 user 所有 workspace 的合并缓存
             for key in list(self._merged_cache.keys()):
                 if key[0] == uid:
@@ -195,6 +220,7 @@ class SecurityManager:
     def _load_user_settings(self, user_id: str) -> UserSecuritySettings:
         """从 configs/{user_id}/security.json 加载用户配置（不迁移旧数据）。"""
         config_file = self._get_config_file(user_id)
+        self._raw_user_config[user_id] = {}
 
         if not config_file.exists():
             logger.debug(f"User security config not found: {config_file}, using defaults")
@@ -203,6 +229,7 @@ class SecurityManager:
         try:
             with config_file.open("r", encoding="utf-8") as f:
                 data = json.load(f)
+            self._raw_user_config[user_id] = data if isinstance(data, dict) else {}
             settings = UserSecuritySettings.from_dict(data)
             logger.info(f"User security config loaded from {config_file}")
             return settings

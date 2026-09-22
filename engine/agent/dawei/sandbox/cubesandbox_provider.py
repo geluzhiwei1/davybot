@@ -229,7 +229,12 @@ class CubeSandboxProvider(SandboxProvider):
         流程: 配额检查 → 会话获取/创建 → pause 策略 → 命令分类 → 执行
 
         timeout: 工具层传入的每命令超时 (秒); None = 用部署侧缺省。
+            用户 security.json 显式配置 commandExecutionTimeout 时，
+            对显式入参取 min 作为 per-user 上限 (2026-09-22 接活前端
+            「执行超时」字段; 未配置 = 不限制, 不会把无配置用户扣到
+            模型缺省 30s)。最终仍受部署侧 max_timeout clamp。
         """
+        timeout = self._cap_timeout_by_policy(timeout, ctx)
         self._check_quota(ctx)
         key = self._session_key(ctx)
 
@@ -261,6 +266,28 @@ class CubeSandboxProvider(SandboxProvider):
         """合并工具入参 timeout 与部署缺省, 并 clamp 到 [1, max_timeout]"""
         effective = int(timeout) if timeout and int(timeout) > 0 else self.default_timeout
         return max(1, min(effective, self.max_timeout))
+
+    def _cap_timeout_by_policy(self, timeout: int | None, ctx: TrustedContext) -> int | None:
+        """按用户显式配置的 commandExecutionTimeout 收紧入参 timeout。
+
+        - timeout 为 None/<=0: 不动 (走部署缺省, 无配置用户零影响)
+        - 读取失败: 不限制 (与 _resolve_mount_mode 同为静默降级, 只留日志)
+        """
+        if not timeout or int(timeout) <= 0:
+            return timeout
+        try:
+            from dawei.core.security_manager import security_manager
+
+            cap = security_manager.get_user_command_timeout_cap(ctx.user_id)
+            if cap > 0 and int(timeout) > cap:
+                logger.info(
+                    "[E2B] 用户 %s 显式超时上限 %ss 生效 (请求 %ss → %ss)",
+                    ctx.user_id, cap, timeout, cap,
+                )
+                return cap
+        except Exception as e:
+            logger.warning("[E2B] 读取用户超时上限失败 (user=%s), 不限制: %s", ctx.user_id, e)
+        return timeout
 
     def health_check(self) -> bool:
         """健康检查 — 探测 E2B API 是否可达"""

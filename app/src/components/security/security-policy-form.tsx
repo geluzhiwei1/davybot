@@ -1,28 +1,24 @@
 /**
  * SecurityPolicyForm — structured two-level (user / workspace) security policy editor.
  *
- * Phase 4 (P4) frontend. Covers the command + sandbox domains via the existing
- * backend APIs (securityApi for workspace, usersSecurityApi for user). override-or-inherit:
+ * Covers the command + approval domains via the existing backend APIs
+ * (securityApi for workspace, usersSecurityApi for user). override-or-inherit:
  * user level is the default; the workspace may freely override any field.
+ *
+ * 2026-09-22: 容器沙箱区块整体移除 — enableSandbox/containerRuntime/
+ * sandboxDisableNetwork/dropAllCapabilities/noNewPrivileges 在现行引擎中
+ * 无消费点 (沙箱启停由部署侧 DAWEI_TOOL_EXECUTION_MODE 决定, provider 由
+ * SandboxSection 的 sandboxProvider 链决定)。字段保留在 DEFAULTS/payload
+ * 以维持存储往返兼容, 仅不再渲染死控件。管道/后台/命令替换三开关与执行
+ * 超时已在引擎接活 (user_workspace.command_denial_reason 步骤 2.5 +
+ * cubesandbox per-user 上限)。
  *
  * Reused by:
  *  - WorkspaceSettingsDrawer → Security tab (scope="workspace")
  *  - UserSettingsDrawer      → Security tab (scope="user")
- *
- * Replaces the former "raw JSON dump" (workspace) and empty placeholder (user).
  */
 import { useCallback, useEffect, useState } from "react";
-import {
-  RefreshCw,
-  RotateCcw,
-  Save,
-  Plus,
-  X,
-  Zap,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-} from "lucide-react";
+import { RefreshCw, RotateCcw, Save, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -35,8 +31,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { securityApi, usersSecurityApi } from "@/lib/api/infra";
-import { sandboxTestApi } from "@/lib/api/sandbox";
-import type { ProviderType } from "@/lib/types/sandbox";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import type { UserSecuritySettings, WorkspaceSecuritySettings } from "@/lib/types/api";
@@ -298,12 +292,6 @@ export function SecurityPolicyForm({ scope, workspaceId }: SecurityPolicyFormPro
   const [saving, setSaving] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [apiUnavailable, setApiUnavailable] = useState(false);
-  // Sandbox test state
-  const [sandboxTestStatus, setSandboxTestStatus] = useState<
-    "idle" | "testing" | "passed" | "failed"
-  >("idle");
-  const [sandboxTestError, setSandboxTestError] = useState<string | null>(null);
-  const [sandboxTestLatency, setSandboxTestLatency] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (scope === "workspace" && !workspaceId) return;
@@ -334,39 +322,7 @@ export function SecurityPolicyForm({ scope, workspaceId }: SecurityPolicyFormPro
 
   const set = (key: string, value: unknown) => setSettings((prev) => ({ ...prev, [key]: value }));
 
-  // Sandbox test handlers — changing sandbox config resets test status
-  const handleSandboxToggle = (v: boolean) => {
-    set("enableSandbox", v);
-    setSandboxTestStatus("idle");
-  };
-
-  const handleRuntimeChange = (v: string) => {
-    set("containerRuntime", v);
-    setSandboxTestStatus("idle");
-  };
-
-  const handleSandboxTest = async () => {
-    setSandboxTestStatus("testing");
-    setSandboxTestError(null);
-    try {
-      const provider = String(settings.containerRuntime ?? "auto") as ProviderType;
-      const res = await sandboxTestApi.testConnection(provider);
-      if (res.result.ok) {
-        setSandboxTestStatus("passed");
-        setSandboxTestLatency(res.result.latency_ms ?? null);
-      } else {
-        setSandboxTestStatus("failed");
-        setSandboxTestError(res.result.error ?? t("security.unknownError"));
-      }
-    } catch (e) {
-      setSandboxTestStatus("failed");
-      setSandboxTestError(e instanceof Error ? e.message : t("security.testFailed"));
-    }
-  };
-
   const dirty = loaded ? JSON.stringify(loaded) !== JSON.stringify(settings) : false;
-  // Save is blocked when sandbox is enabled but test hasn't passed
-  const sandboxSaveBlocked = !!settings.enableSandbox && sandboxTestStatus !== "passed";
 
   const save = async () => {
     setSaving(true);
@@ -566,92 +522,9 @@ export function SecurityPolicyForm({ scope, workspaceId }: SecurityPolicyFormPro
         </FieldRow>
       </div>
 
-      {/* Container sandbox */}
-      <div className="rounded-lg border border-border/60 p-3 space-y-0.5">
-        <div className="text-xs font-medium text-muted-foreground mb-1">
-          {t("security.sandboxSection")}
-        </div>
-        <p className="text-[11px] text-muted-foreground mb-2">{t("security.sandboxDesc")}</p>
-        <FieldRow label={t("security.enableSandbox")} hint={t("security.enableSandboxHint")}>
-          <Switch checked={!!settings.enableSandbox} onCheckedChange={handleSandboxToggle} />
-        </FieldRow>
-        <FieldRow label={t("security.sandboxBackend")} hint={t("security.sandboxBackendHint")}>
-          <Select
-            value={String(settings.containerRuntime ?? "auto")}
-            onValueChange={handleRuntimeChange}
-          >
-            <SelectTrigger className="h-7 w-32 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">auto</SelectItem>
-              <SelectItem value="docker">docker</SelectItem>
-              <SelectItem value="podman">podman</SelectItem>
-              <SelectItem value="e2b">e2b (CubeSandbox)</SelectItem>
-            </SelectContent>
-          </Select>
-        </FieldRow>
-        {settings.enableSandbox && (
-          <FieldRow
-            label={t("security.sandboxTest")}
-            hint={
-              sandboxSaveBlocked
-                ? t("security.sandboxTestBlockedHint")
-                : sandboxTestStatus === "passed"
-                  ? t("security.sandboxTestPassed", {
-                      latency: sandboxTestLatency !== null ? ` (${sandboxTestLatency}ms)` : "",
-                    })
-                  : undefined
-            }
-          >
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs"
-                onClick={handleSandboxTest}
-                disabled={sandboxTestStatus === "testing"}
-                type="button"
-              >
-                {sandboxTestStatus === "testing" ? (
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                ) : (
-                  <Zap className="w-3 h-3 mr-1" />
-                )}
-                {t("security.testSandbox")}
-              </Button>
-              {sandboxTestStatus === "passed" && (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> {t("security.passed")}
-                </span>
-              )}
-              {sandboxTestStatus === "failed" && (
-                <span className="flex items-center gap-1 text-xs text-destructive">
-                  <XCircle className="w-3.5 h-3.5" /> {sandboxTestError ?? t("security.failed")}
-                </span>
-              )}
-            </div>
-          </FieldRow>
-        )}
-        <FieldRow label={t("security.disableNetwork")}>
-          <Switch
-            checked={!!settings.sandboxDisableNetwork}
-            onCheckedChange={(v) => set("sandboxDisableNetwork", v)}
-          />
-        </FieldRow>
-        <FieldRow label={t("security.dropCaps")} hint="cap_drop ALL">
-          <Switch
-            checked={!!settings.dropAllCapabilities}
-            onCheckedChange={(v) => set("dropAllCapabilities", v)}
-          />
-        </FieldRow>
-        <FieldRow label={t("security.noPrivileges")} hint="no-new-privileges">
-          <Switch
-            checked={!!settings.noNewPrivileges}
-            onCheckedChange={(v) => set("noNewPrivileges", v)}
-          />
-        </FieldRow>
-      </div>
+      {/* 容器沙箱区块已移除 (2026-09-22): 上述字段在引擎无消费点 —
+          沙箱启停 = 部署侧 DAWEI_TOOL_EXECUTION_MODE; provider/挂载/virtiofs
+          = 本 tab 下方 SandboxSection (仅 saas/desktop 可见)。 */}
 
       {/* Approval (human-in-the-loop, P2.2) */}
       <div className="rounded-lg border border-border/60 p-3 space-y-0.5">
@@ -720,18 +593,9 @@ export function SecurityPolicyForm({ scope, workspaceId }: SecurityPolicyFormPro
           >
             {showRaw ? t("security.hideJson") : t("security.showJson")}
           </Button>
-          <Button
-            size="sm"
-            className="h-7"
-            onClick={save}
-            disabled={!dirty || saving || sandboxSaveBlocked}
-          >
+          <Button size="sm" className="h-7" onClick={save} disabled={!dirty || saving}>
             <Save className="w-3 h-3 mr-1" />{" "}
-            {saving
-              ? t("security.saving")
-              : sandboxSaveBlocked
-                ? t("security.testFirst")
-                : t("security.save")}
+            {saving ? t("security.saving") : t("security.save")}
           </Button>
         </div>
       </div>

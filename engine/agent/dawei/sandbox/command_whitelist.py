@@ -362,11 +362,21 @@ class CommandWhitelist:
         return cls._config.get("allowed_commands", {}).get(command_name, {})
 
     @classmethod
-    def validate_command(cls, command: str) -> tuple[bool, str]:
+    def validate_command(
+        cls,
+        command: str,
+        allow_pipe: bool = False,
+        allow_background: bool = False,
+        allow_shell: bool = False,
+    ) -> tuple[bool, str]:
         """验证命令是否在白名单中
 
         Args:
             command: 要验证的命令字符串
+            allow_pipe: 上游策略已放行管道(|) → 跳过管道拒绝 (2026-09-22,
+                统一决策点上移 user_workspace.command_denial_reason 步骤 2.5)
+            allow_background: 上游策略已放行后台(&) → 跳过后台拒绝
+            allow_shell: 上游策略已放行命令替换($()/``) → 跳过替换拒绝
 
         Returns:
             (is_valid, error_message)
@@ -380,15 +390,15 @@ class CommandWhitelist:
             cmd_name = parts[0]
 
             # 检查后台执行
-            if command.strip().endswith("&"):
+            if command.strip().endswith("&") and not allow_background:
                 return False, "不允许后台执行(&)"
 
             # 检查管道命令
-            if "|" in command:
+            if "|" in command and not allow_pipe:
                 return False, "暂不支持管道命令(|)"
 
             # 检查命令替换
-            if "$(" in command or "`" in command:
+            if ("$(" in command or "`" in command) and not allow_shell:
                 return False, "不允许命令替换"
 
             # 检查危险模式
@@ -453,15 +463,15 @@ class CommandWhitelist:
                     )
 
             # 检查管道命令
-            if "|" in command:
+            if "|" in command and not allow_pipe:
                 return False, "暂不支持管道命令(|)"
 
             # 检查命令替换
-            if "$(" in command or "`" in command:
+            if ("$(" in command or "`" in command) and not allow_shell:
                 return False, "不允许命令替换"
 
             # 检查后台执行
-            if "&" in command and command.strip().endswith("&"):
+            if "&" in command and command.strip().endswith("&") and not allow_background:
                 return False, "不允许后台执行"
 
             return True, ""
