@@ -395,6 +395,12 @@ const enUS = {
   "user.llm.form.modelId": "Model ID",
   "user.llm.form.modelPlaceholder": "e.g. gpt-4o",
   "user.llm.form.keepKey": "Leave blank to keep the existing key",
+  "user.llm.form.customHeaders": "Custom Headers",
+  "user.llm.form.customHeadersHint":
+    "Extra HTTP headers sent with each request. Use the presets to emulate clients like Claude Code / Roo Code (note: setting Authorization overrides API key auth).",
+  "user.llm.form.headerName": "Header name, e.g. User-Agent",
+  "user.llm.form.headerValue": "Value",
+  "user.llm.form.addHeader": "Add Header",
   "user.llm.form.advanced": "Advanced parameters",
   "user.llm.form.timeout": "Timeout (s)",
   "user.llm.form.maxRetries": "Max retries",

@@ -64,7 +64,7 @@ import { resolveIcon } from "@/lib/icon-map";
 import { BIZ_SIDEBAR_CONTEXT_SELECTS } from "@/lib/biz-registry";
 import { cn } from "@/lib/utils";
 import { redirectToLogin, useAuthStore } from "@/lib/auth-store";
-import { SUPPORT_API_URL, USER_CENTER_BASE_URL } from "@/lib/env";
+import { SERVER_BUILD, SUPPORT_API_URL, USER_CENTER_BASE_URL } from "@/lib/env";
 import { useSidebarCounts } from "@/hooks/use-sidebar-counts";
 import { isSectionVisible } from "@/lib/caps";
 import { useCaps } from "@/lib/stores/runtime-store";
@@ -691,14 +691,19 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="start" className="w-48">
-                  <DropdownMenuItem onClick={() => navigate({ to: "/select-tenant" })}>
-                    <ArrowLeftRight className="w-4 h-4 mr-2" />
-                    <span>{t("sidebar.user.switch")}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void openMyAccount()}>
-                    <CircleUser className="w-4 h-4 mr-2" />
-                    <span>{t("sidebar.user.myAccount")}</span>
-                  </DropdownMenuItem>
+                  {/* SERVER_BUILD: 切换身份/我的账号 依赖云端账号体系,构建期隐藏 */}
+                  {!SERVER_BUILD && (
+                    <DropdownMenuItem onClick={() => navigate({ to: "/select-tenant" })}>
+                      <ArrowLeftRight className="w-4 h-4 mr-2" />
+                      <span>{t("sidebar.user.switch")}</span>
+                    </DropdownMenuItem>
+                  )}
+                  {!SERVER_BUILD && (
+                    <DropdownMenuItem onClick={() => void openMyAccount()}>
+                      <CircleUser className="w-4 h-4 mr-2" />
+                      <span>{t("sidebar.user.myAccount")}</span>
+                    </DropdownMenuItem>
+                  )}
                   {isSectionVisible("devices", caps) && (
                     <DropdownMenuItem
                       onClick={() =>

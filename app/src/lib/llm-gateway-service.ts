@@ -51,6 +51,12 @@ async function gatewayRequest<T>(
   options: RequestInit = {},
   { silent401 = false }: { silent401?: boolean } = {},
 ): Promise<T> {
+  // F1: SUPPORT_API_URL 未配置(空) = 集成关闭(server 自包含模式)。
+  // fast-fail,不发任何网络请求;调用方均已 try/catch 降级。
+  if (!SUPPORT_API_URL) {
+    throw new Error("Gateway integration disabled (SUPPORT_API_URL is empty)");
+  }
+
   const base = SUPPORT_API_URL.replace(/\/$/, "");
   // /support/api/../llm-api → /support/llm-api
   const url = `${base}/..${path}`;

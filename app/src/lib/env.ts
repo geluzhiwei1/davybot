@@ -93,6 +93,11 @@ export const NORFLOW_API_URL = import.meta.env.VITE_NORFLOW_API_URL || "";
 /** User center web base URL — path appended in code */
 export const USER_CENTER_BASE_URL = import.meta.env.VITE_USER_CENTER_BASE_URL || "";
 
+// ── Server 自包含构建开关 ─────────────────────────────────────────────
+// build:server = `vite build --mode server` → 云端依赖 UI 在构建期降级
+// (资源市场入口 / 切换身份 / 我的账号 等;SaaS 形态不受影响)。
+export const SERVER_BUILD = import.meta.env.MODE === "server";
+
 // ── Optional numeric config ───────────────────────────────────────────
 
 // VITE_WS_RECONNECT_DELAY: base backoff in ms (doubles up to 30s cap).

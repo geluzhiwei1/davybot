@@ -79,15 +79,6 @@ const CORE_SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [{ key: "home", title: "首页", route: "/", icon: "home" }],
   },
 
-  // ── 探索（核心:引擎资源市场）──
-  {
-    key: "explore",
-    title: "探索",
-    order: 70,
-    core: true,
-    items: [{ key: "explore.market", title: "资源市场", route: "/resources", icon: "store" }],
-  },
-
   // ── 系統（部分常駐 pinned;核心）──
   {
     key: "system",

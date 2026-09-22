@@ -10,8 +10,8 @@
 
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as WorkspacesRouteImport } from "./routes/workspaces"
+import { Route as UserSettingsRouteImport } from "./routes/user-settings"
 import { Route as SelectTenantRouteImport } from "./routes/select-tenant"
-import { Route as ResourcesRouteImport } from "./routes/resources"
 import { Route as RegularTasksRouteImport } from "./routes/regular-tasks"
 import { Route as NoTenantRouteImport } from "./routes/no-tenant"
 import { Route as MemoryRouteImport } from "./routes/memory"
@@ -25,7 +25,6 @@ import { Route as IndexRouteImport } from "./routes/index"
 import { Route as WorkspaceWorkspaceIdRouteImport } from "./routes/workspace.$workspaceId"
 import { Route as TempTaskIdRouteImport } from "./routes/temp.$taskId"
 import { Route as SharedReportTokenRouteImport } from "./routes/shared-report.$token"
-import { Route as SettingsModulesRouteImport } from "./routes/settings.modules"
 import { Route as SettingsDevicesRouteImport } from "./routes/settings.devices"
 import { Route as ExpertsExpertIdRouteImport } from "./routes/experts.$expertId"
 import { Route as WorkspaceWorkspaceIdIndexRouteImport } from "./routes/workspace.$workspaceId.index"
@@ -39,14 +38,14 @@ const WorkspacesRoute = WorkspacesRouteImport.update({
   path: "/workspaces",
   getParentRoute: () => rootRouteImport,
 } as any)
+const UserSettingsRoute = UserSettingsRouteImport.update({
+  id: "/user-settings",
+  path: "/user-settings",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SelectTenantRoute = SelectTenantRouteImport.update({
   id: "/select-tenant",
   path: "/select-tenant",
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResourcesRoute = ResourcesRouteImport.update({
-  id: "/resources",
-  path: "/resources",
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegularTasksRoute = RegularTasksRouteImport.update({
@@ -114,11 +113,6 @@ const SharedReportTokenRoute = SharedReportTokenRouteImport.update({
   path: "/shared-report/$token",
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsModulesRoute = SettingsModulesRouteImport.update({
-  id: "/settings/modules",
-  path: "/settings/modules",
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
   id: "/settings/devices",
   path: "/settings/devices",
@@ -170,12 +164,11 @@ export interface FileRoutesByFullPath {
   "/memory": typeof MemoryRoute
   "/no-tenant": typeof NoTenantRoute
   "/regular-tasks": typeof RegularTasksRoute
-  "/resources": typeof ResourcesRoute
   "/select-tenant": typeof SelectTenantRoute
+  "/user-settings": typeof UserSettingsRoute
   "/workspaces": typeof WorkspacesRoute
   "/experts/$expertId": typeof ExpertsExpertIdRoute
   "/settings/devices": typeof SettingsDevicesRoute
-  "/settings/modules": typeof SettingsModulesRoute
   "/shared-report/$token": typeof SharedReportTokenRoute
   "/temp/$taskId": typeof TempTaskIdRoute
   "/workspace/$workspaceId": typeof WorkspaceWorkspaceIdRouteWithChildren
@@ -196,12 +189,11 @@ export interface FileRoutesByTo {
   "/memory": typeof MemoryRoute
   "/no-tenant": typeof NoTenantRoute
   "/regular-tasks": typeof RegularTasksRoute
-  "/resources": typeof ResourcesRoute
   "/select-tenant": typeof SelectTenantRoute
+  "/user-settings": typeof UserSettingsRoute
   "/workspaces": typeof WorkspacesRoute
   "/experts/$expertId": typeof ExpertsExpertIdRoute
   "/settings/devices": typeof SettingsDevicesRoute
-  "/settings/modules": typeof SettingsModulesRoute
   "/shared-report/$token": typeof SharedReportTokenRoute
   "/temp/$taskId": typeof TempTaskIdRoute
   "/settings/security/sandbox": typeof SettingsSecuritySandboxRoute
@@ -222,12 +214,11 @@ export interface FileRoutesById {
   "/memory": typeof MemoryRoute
   "/no-tenant": typeof NoTenantRoute
   "/regular-tasks": typeof RegularTasksRoute
-  "/resources": typeof ResourcesRoute
   "/select-tenant": typeof SelectTenantRoute
+  "/user-settings": typeof UserSettingsRoute
   "/workspaces": typeof WorkspacesRoute
   "/experts/$expertId": typeof ExpertsExpertIdRoute
   "/settings/devices": typeof SettingsDevicesRoute
-  "/settings/modules": typeof SettingsModulesRoute
   "/shared-report/$token": typeof SharedReportTokenRoute
   "/temp/$taskId": typeof TempTaskIdRoute
   "/workspace/$workspaceId": typeof WorkspaceWorkspaceIdRouteWithChildren
@@ -250,12 +241,11 @@ export interface FileRouteTypes {
     | "/memory"
     | "/no-tenant"
     | "/regular-tasks"
-    | "/resources"
     | "/select-tenant"
+    | "/user-settings"
     | "/workspaces"
     | "/experts/$expertId"
     | "/settings/devices"
-    | "/settings/modules"
     | "/shared-report/$token"
     | "/temp/$taskId"
     | "/workspace/$workspaceId"
@@ -276,12 +266,11 @@ export interface FileRouteTypes {
     | "/memory"
     | "/no-tenant"
     | "/regular-tasks"
-    | "/resources"
     | "/select-tenant"
+    | "/user-settings"
     | "/workspaces"
     | "/experts/$expertId"
     | "/settings/devices"
-    | "/settings/modules"
     | "/shared-report/$token"
     | "/temp/$taskId"
     | "/settings/security/sandbox"
@@ -301,12 +290,11 @@ export interface FileRouteTypes {
     | "/memory"
     | "/no-tenant"
     | "/regular-tasks"
-    | "/resources"
     | "/select-tenant"
+    | "/user-settings"
     | "/workspaces"
     | "/experts/$expertId"
     | "/settings/devices"
-    | "/settings/modules"
     | "/shared-report/$token"
     | "/temp/$taskId"
     | "/workspace/$workspaceId"
@@ -328,11 +316,10 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   NoTenantRoute: typeof NoTenantRoute
   RegularTasksRoute: typeof RegularTasksRoute
-  ResourcesRoute: typeof ResourcesRoute
   SelectTenantRoute: typeof SelectTenantRoute
+  UserSettingsRoute: typeof UserSettingsRoute
   WorkspacesRoute: typeof WorkspacesRoute
   SettingsDevicesRoute: typeof SettingsDevicesRoute
-  SettingsModulesRoute: typeof SettingsModulesRoute
   SharedReportTokenRoute: typeof SharedReportTokenRoute
   TempTaskIdRoute: typeof TempTaskIdRoute
   WorkspaceWorkspaceIdRoute: typeof WorkspaceWorkspaceIdRouteWithChildren
@@ -348,18 +335,18 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof WorkspacesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/user-settings": {
+      id: "/user-settings"
+      path: "/user-settings"
+      fullPath: "/user-settings"
+      preLoaderRoute: typeof UserSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/select-tenant": {
       id: "/select-tenant"
       path: "/select-tenant"
       fullPath: "/select-tenant"
       preLoaderRoute: typeof SelectTenantRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    "/resources": {
-      id: "/resources"
-      path: "/resources"
-      fullPath: "/resources"
-      preLoaderRoute: typeof ResourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/regular-tasks": {
@@ -453,13 +440,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SharedReportTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    "/settings/modules": {
-      id: "/settings/modules"
-      path: "/settings/modules"
-      fullPath: "/settings/modules"
-      preLoaderRoute: typeof SettingsModulesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     "/settings/devices": {
       id: "/settings/devices"
       path: "/settings/devices"
@@ -551,11 +531,10 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   NoTenantRoute: NoTenantRoute,
   RegularTasksRoute: RegularTasksRoute,
-  ResourcesRoute: ResourcesRoute,
   SelectTenantRoute: SelectTenantRoute,
+  UserSettingsRoute: UserSettingsRoute,
   WorkspacesRoute: WorkspacesRoute,
   SettingsDevicesRoute: SettingsDevicesRoute,
-  SettingsModulesRoute: SettingsModulesRoute,
   SharedReportTokenRoute: SharedReportTokenRoute,
   TempTaskIdRoute: TempTaskIdRoute,
   WorkspaceWorkspaceIdRoute: WorkspaceWorkspaceIdRouteWithChildren,

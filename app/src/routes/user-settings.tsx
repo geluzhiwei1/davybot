@@ -119,12 +119,64 @@ const NAV_GROUPS: { label: string; items: { value: string; icon: ReactNode; text
 
 // API provider 预设（含官方默认 base_url）见 @/lib/llm-providers
 
+// ── 自定义 Header 客户端预设（模拟 Roo Code / Claude Code 等客户端请求头）──
+const HEADER_PRESETS: { label: string; headers: Record<string, string> }[] = [
+  {
+    label: "Claude Code",
+    headers: {
+      "User-Agent": "claude-cli/1.0.44 (external, cli)",
+      "x-app": "cli",
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": "claude-code-20250219",
+    },
+  },
+  {
+    label: "Roo Code",
+    headers: {
+      "User-Agent": "RooCode/3.21.0",
+      "X-Title": "Roo Code",
+      "HTTP-Referer": "https://roocode.com",
+    },
+  },
+  {
+    label: "Cline",
+    headers: {
+      "User-Agent": "cline/3.9.0",
+      "X-Title": "Cline",
+      "HTTP-Referer": "https://cline.bot",
+    },
+  },
+  {
+    label: "Cursor",
+    headers: {
+      "User-Agent": "cursor/0.50.7",
+      "x-cursor-checksum": "10istratorcursor(loader/Coq7mDNJcn4jWqkH7OEvCLlf1Ejs2dWUwRpRLCXWsQJfgELIWABA3mLX0tBnoC77+dtD+H2ACa2O4uTtinWB1A==)",
+    },
+  },
+];
+
+type HeaderRow = { key: string; value: string };
+
+function headerRowsFromRecord(headers?: Record<string, string>): HeaderRow[] {
+  return Object.entries(headers ?? {}).map(([key, value]) => ({ key, value }));
+}
+
+function recordFromHeaderRows(rows: HeaderRow[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const k = r.key.trim();
+    if (k) out[k] = r.value;
+  }
+  return out;
+}
+
 const emptyLLMForm: LLMProviderCreatePayload = {
   name: "",
   apiProvider: "openai",
   openAiBaseUrl: "https://api.openai.com/v1",
   openAiApiKey: "",
   openAiModelId: "",
+  openAiHeaders: {},
   temperature: 0.7,
   timeout: 600,
   maxRetries: 3,
@@ -310,6 +362,8 @@ function LLMProviderDialog({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [testMode, setTestMode] = useState<"stream" | "non-stream">("non-stream");
+  // 自定义 Header 编辑行（键可临时为空，保存时过滤）
+  const [headerRows, setHeaderRows] = useState<HeaderRow[]>([]);
   // Provider 下拉预设：优先后端目录，静态列表兜底
   const [providerPresets, setProviderPresets] = useState<ApiProviderPreset[]>(API_PROVIDERS);
 
@@ -326,6 +380,7 @@ function LLMProviderDialog({
           openAiBaseUrl: cfg.openAiBaseUrl ?? "",
           openAiApiKey: cfg.openAiApiKey ?? "",
           openAiModelId: cfg.openAiModelId ?? "",
+          openAiHeaders: cfg.openAiHeaders ?? {},
           temperature: cfg.temperature ?? 0.7,
           timeout: cfg.timeout ?? 600,
           maxRetries: cfg.maxRetries ?? 3,
@@ -333,14 +388,22 @@ function LLMProviderDialog({
           toolChoice: cfg.toolChoice ?? undefined,
           saveLocation: "user",
         });
+        setHeaderRows(headerRowsFromRecord(cfg.openAiHeaders));
       } else {
         setForm(emptyLLMForm);
+        setHeaderRows([]);
       }
       setTestResult(null);
     }
   }, [open, editProvider]);
 
   const update = (patch: Partial<LLMProviderCreatePayload>) => setForm((f) => ({ ...f, ...patch }));
+
+  // 同步 Header 行 → form.openAiHeaders（空键行保存时被过滤）
+  const updateHeaderRows = (rows: HeaderRow[]) => {
+    setHeaderRows(rows);
+    update({ openAiHeaders: recordFromHeaderRows(rows) });
+  };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.apiProvider) {
@@ -480,6 +543,74 @@ function LLMProviderDialog({
                 className="h-8 text-xs"
               />
             </div>
+          </div>
+          <Separator />
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">{t("user.llm.form.customHeaders")}</Label>
+              <div className="flex flex-wrap gap-1 justify-end">
+                {HEADER_PRESETS.map((p) => (
+                  <Button
+                    key={p.label}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => updateHeaderRows(headerRowsFromRecord(p.headers))}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {t("user.llm.form.customHeadersHint")}
+            </p>
+            {headerRows.map((row, idx) => (
+              <div key={idx} className="flex items-center gap-1.5">
+                <Input
+                  placeholder={t("user.llm.form.headerName")}
+                  value={row.key}
+                  onChange={(e) => {
+                    const rows = headerRows.map((r, i) =>
+                      i === idx ? { ...r, key: e.target.value } : r,
+                    );
+                    updateHeaderRows(rows);
+                  }}
+                  className="h-8 text-xs flex-[4]"
+                />
+                <Input
+                  placeholder={t("user.llm.form.headerValue")}
+                  value={row.value}
+                  onChange={(e) => {
+                    const rows = headerRows.map((r, i) =>
+                      i === idx ? { ...r, value: e.target.value } : r,
+                    );
+                    updateHeaderRows(rows);
+                  }}
+                  className="h-8 text-xs flex-[6]"
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="w-6 h-6 shrink-0"
+                  onClick={() => updateHeaderRows(headerRows.filter((_, i) => i !== idx))}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => updateHeaderRows([...headerRows, { key: "", value: "" }])}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              {t("user.llm.form.addHeader")}
+            </Button>
           </div>
           <Separator />
           <p className="text-[11px] text-muted-foreground">{t("user.llm.form.advanced")}</p>

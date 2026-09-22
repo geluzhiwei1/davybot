@@ -381,6 +381,12 @@ const zhCN = {
   "user.llm.form.modelId": "模型 ID",
   "user.llm.form.modelPlaceholder": "如 gpt-4o",
   "user.llm.form.keepKey": "留空则保留原 Key",
+  "user.llm.form.customHeaders": "自定义 Header",
+  "user.llm.form.customHeadersHint":
+    "随请求发送的额外 HTTP Header；点击右侧预设可模拟 Claude Code / Roo Code 等客户端（设置 Authorization 会覆盖 API Key 认证）。",
+  "user.llm.form.headerName": "Header 名，如 User-Agent",
+  "user.llm.form.headerValue": "值",
+  "user.llm.form.addHeader": "添加 Header",
   "user.llm.form.advanced": "高级参数",
   "user.llm.form.timeout": "超时 (s)",
   "user.llm.form.maxRetries": "最大重试",
