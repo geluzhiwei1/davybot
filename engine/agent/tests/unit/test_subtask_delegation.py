@@ -924,7 +924,11 @@ async def test_runtime_guard_noop_without_filter():
 
 
 async def test_create_subtask_tools_param_overrides_profile():
-    """new_task tools 参数:调用层覆盖 explorer 的 denylist(只给白名单)"""
+    """new_task tools 参数:调用层覆盖 explorer 的 denylist(只给白名单)
+
+    P3-7 例外:new_task 本身不可被白名单解除——所有子任务运行时一律拒绝
+    new_task(防再委派;_create_subtask 恒以 root 为父,深度护栏不生效)。
+    """
     root = FakeTaskNode("root", status=TaskStatus.RUNNING)
     graph = FakeTaskGraph([root])
     tool = wtf.NewTaskTool(task_graph=graph, workspace_root=None)
@@ -935,7 +939,7 @@ async def test_create_subtask_tools_param_overrides_profile():
     )
     _, data = graph.created_subtasks[0]
     assert data.metadata["tools_allowlist"] == ["read_file", "list_files"]
-    assert "tools_denylist" not in data.metadata  # 被调用层覆盖剔除
+    assert data.metadata["tools_denylist"] == ["new_task"]  # profile denylist 被覆盖剔除,但 P3-7 结构性防再委派保留
 
 
 async def test_new_task_run_accepts_tools_param(monkeypatch):

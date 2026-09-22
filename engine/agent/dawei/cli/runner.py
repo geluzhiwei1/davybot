@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import os
 import time
 from pathlib import Path
 from typing import List, Dict, Any
@@ -17,6 +18,60 @@ from dawei.entity.user_input_message import UserInputText
 from dawei.logg.logging import get_logger
 from dawei.tools.custom_tools.async_utils import set_main_loop
 from dawei.workspace.user_workspace import UserWorkspace
+
+
+def _acquire_workspace_run_lock(workspace_path: str) -> tuple[int | None, str | None]:
+    """获取工作区级运行锁（防同工作区并发 run）。
+
+    【2026-09-21】同一工作区并发 `dawei agent run` 会交叉写 task_graph /
+    conversations / output（tui-review 实测 4 个重复 run 同时在跑，产物互踩）。
+    flock(LOCK_EX|LOCK_NB) 排他：后到者立即失败退出；锁随进程退出自动释放，
+    无陈旧锁问题。锁文件写入持锁 pid 便于诊断。
+
+    Returns:
+        (fd, None): 成功持锁，fd 由调用方持有并在结束时关闭
+        (None, error): 已被持锁 / 获取失败（FAST FAIL，附原因）
+        (None, None): 显式跳过（DAWEI_RUN_LOCK=0）或平台无 fcntl
+    """
+    if os.environ.get("DAWEI_RUN_LOCK", "1").lower() in ("0", "false", "no", "off"):
+        return None, None
+    try:
+        import fcntl
+    except ImportError:  # 非 POSIX 平台无 flock，放行
+        return None, None
+
+    lock_dir = Path(workspace_path) / ".dawei" / ".locks"
+    lock_file = lock_dir / "agent-run.lock"
+    fd: int | None = None
+    try:
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        fd = os.open(lock_file, os.O_RDWR | os.O_CREAT, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        holder = "?"
+        try:
+            holder = lock_file.read_text(encoding="utf-8").strip() or "?"
+        except OSError:
+            pass
+        if fd is not None:
+            os.close(fd)
+        return None, (
+            f"工作区已有 agent run 在执行（持锁 pid={holder}）：{workspace_path}。"
+            "请等待其完成后再运行；若确认持锁进程已死亡，删除 "
+            f"{lock_file} 后重试。如确需并发（不推荐），设 DAWEI_RUN_LOCK=0。"
+        )
+    except OSError as e:
+        # 锁目录不可写等：FAST FAIL——宁可不跑，不可并发写坏工作区
+        if fd is not None:
+            os.close(fd)
+        return None, f"获取工作区运行锁失败: {e}"
+
+    try:
+        os.truncate(fd, 0)
+        os.write(fd, str(os.getpid()).encode())
+    except OSError:
+        pass  # pid 写失败仅影响诊断信息，不影响锁语义
+    return fd, None
 
 
 class AgentRunner:
@@ -223,6 +278,16 @@ async def run_agent_directly(
             "error": error_msg,
         }
 
+    # 【2026-09-21 运行锁】同工作区并发 run 排他（见 _acquire_workspace_run_lock）
+    lock_fd, lock_error = _acquire_workspace_run_lock(config.workspace_absolute)
+    if lock_error is not None:
+        return {
+            "success": False,
+            "message": "Workspace is locked by another run",
+            "duration": 0,
+            "error": lock_error,
+        }
+
     # 创建runner
     runner = AgentRunner(config)
 
@@ -233,6 +298,8 @@ async def run_agent_directly(
     finally:
         # 确保清理资源
         await runner.cleanup()
+        if lock_fd is not None:
+            os.close(lock_fd)
 
 
 def run_agent_sync(

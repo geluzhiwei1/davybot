@@ -977,6 +977,17 @@ class NewTaskTool(CustomBaseTool):
                 profile_meta["tools_allowlist"] = list(tools)
                 profile_meta.pop("tools_denylist", None)
 
+            # P3-7 防再委派护栏（2026-09-21）：new_task 创建的子任务一律在
+            # 运行时拒绝 new_task。根因：_create_subtask 恒以 root 为父，
+            # 子任务内再调 new_task 只会在 root 下造出兄弟节点，深度护栏
+            # （P3-5）对此不生效；tui-review 综述实测 Stage 6 因此派生 4 个
+            # 变体、S16 重跑 2 轮，重复尝试烧掉 ~3.4M 累计输入 token。
+            # 运行时强制点：tool_message_handler 的 tools_denylist 检查
+            # （deny 优先于 allow，显式 tools 白名单也无法绕过）。
+            profile_meta["tools_denylist"] = sorted(
+                set(profile_meta.get("tools_denylist") or []) | {"new_task"}
+            )
+
             # 创建子任务数据
             subtask_context = TaskContext(
                 user_id=root_task.data.context.user_id,

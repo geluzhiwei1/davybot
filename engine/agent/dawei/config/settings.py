@@ -245,7 +245,11 @@ class CompressionConfig(BaseSettings):
     )
 
     # 启用开关
-    enabled: bool = Field(default=False)
+    # 【2026-09-21 默认开启】长会话历史每轮全量重发是最大 token 开销
+    # （tui-review 实测累计输入放大 38.5×）；压缩器按 3 级策略在
+    # >50 消息 或 >max_tokens*threshold 时触发摘要压缩，保留最近
+    # preserve_recent 条。关闭：COMPRESSION_ENABLED=false
+    enabled: bool = Field(default=True)
 
     # 压缩策略配置
     preserve_recent: int = Field(default=20, description="保留最近的消息数量")
@@ -501,6 +505,21 @@ class AgentExecutionConfig(BaseSettings):
     task_max_empty_tool_results: int = Field(default=4)  # 连续工具返回空结果最大次数（env: AGENT_TASK_MAX_EMPTY_TOOL_RESULTS）
     # 缓存配置
     mode_cache_ttl: int = Field(default=300)  # 模式配置缓存TTL（秒）
+    # 整轮 chat Agent 任务超时（秒）；-1=不限（默认），由单次 LLM/工具超时与迭代上限兜底
+    # （对齐 AsyncTaskManagerConfig.default_timeout=None 的设计）。
+    # 背景：原 ChatHandler 硬编码 600s，会在 new_task 子任务（可声明 1800s）仍在运行时
+    # 级联中止整轮任务（asyncio.wait_for 超时 → SUBTASK_ABORTED）。
+    # env: AGENT_CHAT_TASK_TIMEOUT
+    chat_task_timeout: int = Field(default=-1)
+    # 子任务（new_task 派发）墙钟超时全局闸门（秒）；-1=不限（默认）。
+    # 背景：编排器 LLM 常声明 timeout=1800（30 分钟），对长综述类子任务太短；
+    # 默认不启用 deadline 判定。>0 时作为全局上限：节点声明值更小则取节点值。
+    # env: AGENT_SUBTASK_TIMEOUT
+    subtask_timeout: int = Field(default=-1)
+    # 子任务 token 预算全局闸门；-1=不限（默认，暂不限制预算）。
+    # >0 时作为全局上限：节点声明值更小则取节点值。
+    # env: AGENT_SUBTASK_TOKEN_BUDGET
+    subtask_token_budget: int = Field(default=-1)
 
 
 # ============================================================================

@@ -353,9 +353,16 @@ class EnhancedSystemBuilder(IMessageProcessor):
         dynamic_content["sections"] = sections
 
         # 添加时间戳
+        # 【cache-stable 2026-09-21】系统提示每次 LLM 调用都作为消息数组前缀
+        # 重发；秒级时间戳会让服务端前缀缓存（DeepSeek auto prefix cache 等）
+        # 永远无法命中，历史重放 token 全额计费（tui-review 实测 583 次调用
+        # 放大 38.5×）。取整到小时：典型任务运行（<1h）内系统提示逐字节稳定。
         from datetime import datetime
 
-        dynamic_content["generation_timestamp"] = datetime.now(UTC).isoformat()
+        _now = datetime.now(UTC)
+        dynamic_content["generation_timestamp"] = _now.replace(
+            minute=0, second=0, microsecond=0
+        ).isoformat()
 
         return dynamic_content
 

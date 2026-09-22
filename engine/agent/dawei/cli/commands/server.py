@@ -16,6 +16,21 @@ def server_cmd():
     """Server command group"""
 
 
+def apply_server_password(password: str | None) -> bool:
+    """--password 注入 DAWEI_SERVER_PASSWORD（server 自包含访问密码门）。
+
+    - 非空 → 覆盖环境变量（含 .env 预设值；CLI 显式参数优先级最高）
+    - None/空 → 不动环境变量（.env 已设的密码仍生效；默认完全无密码）
+
+    Returns:
+        是否注入了密码（供启动日志显示门状态，绝不回显密码本身）
+    """
+    if password:
+        os.environ["DAWEI_SERVER_PASSWORD"] = password
+        return True
+    return False
+
+
 @server_cmd.command(name="start", help="Start the FastAPI web server")
 @click.option(
     "--host",
@@ -51,6 +66,11 @@ def server_cmd():
 @click.option("--super", is_flag=True, help="⚠️  Enable super mode (bypass all security)")
 @click.option("--force-kill", is_flag=True, help="Kill process using the port without asking")
 @click.option(
+    "--password",
+    default=None,
+    help="访问密码（server 自包含密码门 DAWEI_SERVER_PASSWORD）；默认不设 = 免密码",
+)
+@click.option(
     "--sidecar",
     is_flag=True,
     help="非交互模式：端口被占/出错时直接退出，绝不等待 stdin（供桌面 sidecar 调用）",
@@ -74,7 +94,7 @@ def server_cmd():
     help="PID file path for daemon mode (default: ~/.normnomos/run/dawei-server-<port>.pid)",
 )
 @click.pass_context
-def server_start(ctx, host, port, reload, workers, log_level, super, force_kill, daemon, log_file, pid_file, sidecar):
+def server_start(ctx, host, port, reload, workers, log_level, super, force_kill, password, daemon, log_file, pid_file, sidecar):
     """Start the Dawei web server with WebSocket support.
 
     This starts the FastAPI server with REST API and WebSocket endpoints.
@@ -87,6 +107,10 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill,
     # 运行模式默认 (多模式统一方案): --sidecar = 桌面 sidecar (desktop),
     # 其余 (dawei server / server 二进制) = server。仅未显式设置时注入。
     os.environ.setdefault("DAWEI_RUNTIME_MODE", "desktop" if sidecar else "server")
+
+    # --password 注入访问密码门（server 自包含）。AccessPasswordMiddleware 每请求
+    # 读取该环境变量，注入须在 daemonize fork 前（子进程继承 os.environ）。
+    password_gate_on = apply_server_password(password)
 
     # Validate daemon options
     if daemon:
@@ -148,6 +172,8 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill,
         click.echo(f"   Mode: {click.style('DAEMON', fg='magenta', bold=True)}")
         click.echo(f"   PID file: {pid_file}")
         click.echo(f"   Log file: {log_file}")
+    if password_gate_on:
+        click.echo(f"   Access password: {click.style('enabled (--password)', fg='cyan')}")
 
     if super_mode:
         click.echo()
@@ -331,6 +357,7 @@ def server_start(ctx, host, port, reload, workers, log_level, super, force_kill,
                 f.write(f"Port: {port}\n")
                 f.write(f"Workers: {workers}\n")
                 f.write(f"Log Level: {log_level}\n")
+                f.write(f"Access Password Gate: {'enabled' if password_gate_on else 'disabled'}\n")
                 f.write(f"{'=' * 60}\n\n")
 
         # Print access URLs (only in foreground mode)

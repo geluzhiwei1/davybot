@@ -138,11 +138,27 @@ class ChatHandler(AsyncMessageHandler):
 
     # 配置常量
     DEFAULT_MAX_CONCURRENT_TASKS = 10
-    DEFAULT_TASK_TIMEOUT = 600  # 整体任务超时 10 分钟，超时后自动停止 Agent
+    DEFAULT_TASK_TIMEOUT = 600  # 兜底值；实际取 agent_execution.chat_task_timeout（env: AGENT_CHAT_TASK_TIMEOUT）
     DEFAULT_RETRY_ATTEMPTS = 2
     DEFAULT_RETRY_DELAY = 1.0
     DEFAULT_MAX_RETRY_DELAY = 10.0
     MAX_OUTPUT_SIZE = 100000  # 100KB
+
+    @classmethod
+    def _resolve_task_timeout(cls) -> float | None:
+        """整轮 Agent 任务超时（秒）。
+
+        读取 agent_execution.chat_task_timeout（env: AGENT_CHAT_TASK_TIMEOUT）：
+        -1 = 不限时（默认，由单次 LLM/工具超时与迭代上限兜底），>0 = 秒数。
+        读取失败时回退 DEFAULT_TASK_TIMEOUT。
+        """
+        try:
+            from dawei.config.settings import get_settings  # 延迟导入避免循环依赖
+
+            cfg_seconds = get_settings().agent_execution.chat_task_timeout
+        except Exception:
+            return float(cls.DEFAULT_TASK_TIMEOUT)
+        return None if cfg_seconds < 0 else float(cfg_seconds)
 
     def __init__(self, max_concurrent_tasks: int | None = None):
         _max_tasks = max_concurrent_tasks or self.DEFAULT_MAX_CONCURRENT_TASKS
@@ -293,7 +309,7 @@ class ChatHandler(AsyncMessageHandler):
                 "task_id": task_id,
                 "user_message": message,
             },
-            timeout=self.DEFAULT_TASK_TIMEOUT,
+            timeout=self._resolve_task_timeout(),
             retry_policy=RetryPolicy(
                 max_attempts=self.DEFAULT_RETRY_ATTEMPTS,
                 base_delay=self.DEFAULT_RETRY_DELAY,

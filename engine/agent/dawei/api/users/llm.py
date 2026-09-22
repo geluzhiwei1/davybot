@@ -492,6 +492,7 @@ async def test_user_llm_provider(
                 "openAiModelId": model_id,
                 "openAiApiKey": api_key or "ollama",
                 "openAiLegacyFormat": False,
+                "openAiHeaders": data.openAiHeaders or {},
             }
         else:
             model_id = data.openAiModelId or "gpt-4o"
@@ -501,6 +502,7 @@ async def test_user_llm_provider(
                 "openAiApiKey": api_key or "",
                 "openAiModelId": model_id,
                 "openAiLegacyFormat": data.openAiLegacyFormat or False,
+                "openAiHeaders": data.openAiHeaders or {},
             }
 
         llm_api = OpenaiCompatibleClient(config)

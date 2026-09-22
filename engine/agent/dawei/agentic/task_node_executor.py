@@ -165,7 +165,12 @@ class TaskNodeExecutionEngine:
             self.logger.exception("Failed to record token usage: ")
 
     def _check_budget_and_deadline(self) -> str | None:
-        """P3-3：每轮主循环检查 token 预算与墙钟超时。
+        """P3-3：每轮主循环检查 token 预算与墙钟超时（受全局闸门控制）。
+
+        全局闸门（2026-09-21）：AGENT_SUBTASK_TOKEN_BUDGET / AGENT_SUBTASK_TIMEOUT，
+        -1 = 不限（默认：暂不限制预算；节点/LLM 声明的 timeout 如 1800s 对长任务
+        太短，默认不启用 deadline 判定）。>0 时作为全局上限：节点声明值更小则取
+        节点值，节点未声明则用全局值。
 
         Returns:
             超限时返回 task_completion 失败 JSON（build_budget_failure_result），
@@ -174,16 +179,37 @@ class TaskNodeExecutionEngine:
         try:
             from dawei.agentic.task_budget import build_budget_failure_result, deadline_exceeded
 
+            cfg_budget, cfg_timeout = -1, -1
+            try:
+                from dawei.config.settings import get_settings
+
+                _ae = get_settings().agent_execution
+                cfg_budget = int(getattr(_ae, "subtask_token_budget", -1))
+                cfg_timeout = int(getattr(_ae, "subtask_timeout", -1))
+            except Exception:  # noqa: BLE001 — 配置不可用时视为不限
+                pass
+
             data = getattr(self.task_node, "data", None)
 
+            # 有效预算 = 节点声明值为主；全局闸门 >0 时取 min(节点, 全局)、
+            # 节点未声明时用全局值；全局 -1（默认）只关闭"全局兜底"，
+            # 不吞掉节点自己的声明（首版实现 -1 时连节点值也跳过，
+            # committed 测试 test_check_budget_and_deadline_branches 因此红）。
             budget = getattr(data, "token_budget", None)
-            if isinstance(budget, (int, float)) and budget > 0 and self._tokens_used >= budget:
+            budget = float(budget) if isinstance(budget, (int, float)) and budget > 0 else None
+            if cfg_budget > 0:
+                budget = float(cfg_budget) if budget is None else min(budget, float(cfg_budget))
+            if budget is not None and self._tokens_used >= budget:
                 return build_budget_failure_result("token_budget", used=self._tokens_used, limit=int(budget))
 
+            # 超时同语义：节点声明值为主，全局闸门 >0 时取 min
             timeout = getattr(data, "timeout_seconds", None)
-            if deadline_exceeded(self._loop_started_at, timeout):
+            timeout = float(timeout) if isinstance(timeout, (int, float)) and timeout > 0 else None
+            if cfg_timeout > 0:
+                timeout = float(cfg_timeout) if timeout is None else min(timeout, float(cfg_timeout))
+            if timeout is not None and deadline_exceeded(self._loop_started_at, timeout):
                 used_s = int(time.monotonic() - self._loop_started_at) if self._loop_started_at is not None else 0
-                return build_budget_failure_result("timeout", used=used_s, limit=timeout)
+                return build_budget_failure_result("timeout", used=used_s, limit=int(timeout))
         except Exception:  # noqa: BLE001 — 检查失败不阻塞执行
             self.logger.exception("budget/deadline check failed: ")
         return None

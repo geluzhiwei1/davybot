@@ -806,6 +806,11 @@ async def get_workspaces_list(
         and w.get("tenant_id", "personal") == tenant_id
     ]
 
+    # 过滤失效注册：目录已被删除的陈旧条目（与 workspace_manager.get_workspace_by_id
+    # 的 _is_workspace_alive 存活检查保持一致）。否则列表展示死链工作区，
+    # 前端选中后所有 by-id 调用（conversations 等）都会 404。
+    workspaces = [w for w in workspaces if w.get("path") and Path(w["path"]).is_dir()]
+
     # 过滤活跃的工作区
     if not include_inactive:
         workspaces = [w for w in workspaces if w.get("is_active", True)]
