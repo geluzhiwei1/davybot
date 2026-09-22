@@ -48,8 +48,10 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
-# F4: env 出库 —— 仅中性模板/集成测试配置入库
+# F4: env 出库 —— 仅中性模板/集成测试/demo 端点配置入库(.env.demo 全公开云端端点,无秘密;
+# 不入库则换机构建 demo 即烤空 → 0922 登录 404 事故)
 .env*
 !.env.example
 !.env.integration
+!.env.demo
 src-tauri/target-check/

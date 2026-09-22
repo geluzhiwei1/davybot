@@ -16,6 +16,7 @@
     "build:full": "node scripts/assemble.mjs --mode production",
     "build:server:full": "node scripts/assemble.mjs --mode server",
     "build:demo": "vite build --mode demo",
+    "build:demo:full": "node scripts/assemble.mjs --mode demo",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
