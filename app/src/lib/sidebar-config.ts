@@ -9,6 +9,7 @@
  * null = 無模組管控（自包含 server/tui 本地態）→ 僅渲染 `core: true` 分組（F2）。
  */
 
+import type { TFunction } from "i18next";
 import { BIZ_SIDEBAR_GROUPS } from "./biz-registry";
 
 export type SidebarBadge = "alpha" | "beta" | "ai";
@@ -105,6 +106,27 @@ const CORE_SIDEBAR_GROUPS: SidebarGroup[] = [
 export const SIDEBAR_CONFIG: SidebarGroup[] = [...CORE_SIDEBAR_GROUPS, ...BIZ_SIDEBAR_GROUPS].sort(
   (a, b) => a.order - b.order,
 );
+
+/**
+ * 导航标题渲染期 i18n 解析:按模块键查 commonUi 命名空间 `sidebar.nav.<key>`,
+ * 缺键回退配置原文(FAST FAIL 不挡渲染 —— zh 不配键即显示 manifest 原文,英文翻
+ * 译集中在 en-US/commonUi.ts 的 sidebar.nav 段)。key 为空(非模块项)直接回退。
+ */
+export function navTitle(
+  t: TFunction,
+  key: string | null | undefined,
+  fallback: string,
+): string {
+  return key ? t(`sidebar.nav.${key}`, { defaultValue: fallback, ns: "commonUi" }) : fallback;
+}
+
+/**
+ * 子分组标签渲染期 i18n 解析:子分组无模块键,按 `sidebar.nav.<groupKey>.<label>`
+ * 查询(叶子为原文标签,flat key);缺键回退原文,机制同 navTitle。
+ */
+export function navSubgroupLabel(t: TFunction, groupKey: string, label: string): string {
+  return t(`sidebar.nav.${groupKey}.${label}`, { defaultValue: label, ns: "commonUi" });
+}
 
 /**
  * F2: 模块键是否属于核心分组（首页/资源市场/系统）。

@@ -13,7 +13,12 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { Home, Menu } from "lucide-react";
-import { SIDEBAR_CONFIG, isExactRoute, type SidebarItem } from "@/lib/sidebar-config";
+import {
+  SIDEBAR_CONFIG,
+  isExactRoute,
+  navTitle,
+  type SidebarItem,
+} from "@/lib/sidebar-config";
 import { resolveIcon } from "@/lib/icon-map";
 import { useTabsStore } from "@/lib/tabs-store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -60,10 +65,10 @@ export function MobileTabBar() {
   // F2: 無模組管控(自包含本地態) → 僅核心分組(与 app-sidebar 同規則)
   const coreOnly = effectiveModules === null;
 
-  // 分组展开(顶层 + 子分组),供「更多」抽屉与回填使用
+  // 分组展开(顶层 + 子分组),供「更多」抽屉与回填使用(标题渲染期解析 i18n)
   const groups = SIDEBAR_CONFIG.filter((g) => g.key !== "home" && (!coreOnly || g.core))
     .map((g) => ({
-      title: g.title,
+      title: navTitle(t, g.key, g.title),
       items: [
         ...(g.items ? filterItems(g.items, enabledKeys) : []),
         ...(g.subgroups ?? []).flatMap((sg) => filterItems(sg.items, enabledKeys)),
@@ -79,14 +84,24 @@ export function MobileTabBar() {
   for (const key of MOBILE_PRIORITY_KEYS) {
     const hit = flat.find((it) => it.key === key);
     if (hit) {
-      quick.push({ key: hit.key, title: hit.title, route: hit.route, icon: hit.icon });
+      quick.push({
+        key: hit.key,
+        title: navTitle(t, hit.key, hit.title),
+        route: hit.route,
+        icon: hit.icon,
+      });
       used.add(hit.key);
     }
   }
   for (const it of flat) {
     if (quick.length >= 4) break; // 首页 + 2 个槽位;第 4 格固定为「更多」
     if (used.has(it.key)) continue;
-    quick.push({ key: it.key, title: it.title, route: it.route, icon: it.icon });
+    quick.push({
+      key: it.key,
+      title: navTitle(t, it.key, it.title),
+      route: it.route,
+      icon: it.icon,
+    });
     used.add(it.key);
   }
 

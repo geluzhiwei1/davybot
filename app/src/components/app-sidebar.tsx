@@ -73,6 +73,8 @@ import {
   SIDEBAR_CONFIG,
   isCoreModuleKey,
   isExactRoute,
+  navSubgroupLabel,
+  navTitle,
   routeToModuleKey,
   type SidebarItem,
   type SidebarSubgroup,
@@ -208,18 +210,20 @@ export function SidebarGroupsRenderer(props: RendererProps) {
             {/* Pinned shortcuts — shown directly under 首页 */}
             {visiblePinned.map((item) => {
               const Icon = resolveIcon(item.icon);
+              // 釘倉存的是 pin 當下原文;渲染時按 route 反查模塊鍵重新解析 i18n
+              const pinnedTitle = navTitle(t, routeToModuleKey(item.route), item.title);
               return (
                 <SidebarMenuItem key={item.key} className="group/menu-item">
                   <SidebarMenuButton
                     isActive={isRouteActive(path, item.route, isExactRoute(item.route))}
-                    onClick={() => openPageTab(item.route, item.title, item.icon)}
+                    onClick={() => openPageTab(item.route, pinnedTitle, item.icon)}
                   >
                     <Icon className="w-4 h-4" />
-                    <span>{item.title}</span>
+                    <span>{pinnedTitle}</span>
                     {!collapsed && (
                       <PinToggleButton
                         route={item.route}
-                        title={item.title}
+                        title={pinnedTitle}
                         iconName={item.icon}
                         pinned={pinnedKeys.has(item.route)}
                         onToggle={handleTogglePin}
@@ -259,7 +263,7 @@ export function SidebarGroupsRenderer(props: RendererProps) {
                 )}
                 onClick={() => toggleGroup(group.key)}
               >
-                <span>{group.title}</span>
+                <span>{navTitle(t, group.key, group.title)}</span>
                 {group.badge === "alpha" && <AlphaBadge />}
                 <ChevronDown
                   className={cn(
@@ -307,6 +311,7 @@ export function SidebarGroupsRenderer(props: RendererProps) {
                   {subgroups.map((sg, idx) => (
                     <SidebarSubgroupBlock
                       key={sg.label}
+                      groupKey={group.key}
                       label={sg.label}
                       items={sg.items}
                       path={path}
@@ -349,13 +354,16 @@ function SidebarItemRow({
   setActiveDrawer: (drawer: string | null) => void;
 }) {
   const Icon = resolveIcon(item.icon);
+  const { t } = useTranslation("commonUi");
+  // 渲染期解析 i18n:tab/pin 持久化的 title 取點擊時語言,切語言後新開即新語言
+  const title = navTitle(t, item.key, item.title);
   const isDrawer = item.route.startsWith("/__drawer_");
   const handleClick = () => {
     if (isDrawer && item.route === "/__drawer_user_settings__") {
       setActiveDrawer("user-settings");
       return;
     }
-    openPageTab(item.route, item.title, item.icon);
+    openPageTab(item.route, title, item.icon);
   };
 
   return (
@@ -365,7 +373,7 @@ function SidebarItemRow({
         onClick={handleClick}
       >
         <Icon className="w-4 h-4" />
-        <span>{item.title}</span>
+        <span>{title}</span>
         {/* Count badge */}
         {!collapsed && item.countKey && sidebarCounts[item.countKey] !== undefined && (
           <CountBadge count={sidebarCounts[item.countKey]} variant={item.countVariant} />
@@ -381,7 +389,7 @@ function SidebarItemRow({
         {!collapsed && (
           <PinToggleButton
             route={item.route}
-            title={item.title}
+            title={title}
             iconName={item.icon}
             pinned={pinnedKeys.has(item.route)}
             onToggle={handleTogglePin}
@@ -394,6 +402,7 @@ function SidebarItemRow({
 
 /** 子分组塊 — 含分隔符 + 內部 items。 */
 function SidebarSubgroupBlock({
+  groupKey,
   label,
   items,
   path,
@@ -404,6 +413,7 @@ function SidebarSubgroupBlock({
   sidebarCounts,
   showSeparator,
 }: {
+  groupKey: string;
   label: string;
   items: SidebarItem[];
   path: string;
@@ -414,6 +424,7 @@ function SidebarSubgroupBlock({
   sidebarCounts: CountsShape;
   showSeparator: boolean;
 }) {
+  const { t } = useTranslation("commonUi");
   if (items.length === 0) return null;
   return (
     <>
@@ -422,7 +433,7 @@ function SidebarSubgroupBlock({
           {!collapsed && (
             <div className="flex items-center gap-2 px-2 pt-2 pb-0">
               <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 shrink-0">
-                {label}
+                {navSubgroupLabel(t, groupKey, label)}
               </span>
               <div className="h-px flex-1 bg-sidebar-border" />
             </div>
