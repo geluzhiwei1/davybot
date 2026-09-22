@@ -25,6 +25,7 @@ import {
   Loader2,
   ToggleLeft,
   ToggleRight,
+  Lock,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { LocalMcpSection } from "@/components/drawers/local-mcp-section";
@@ -240,7 +241,9 @@ export const Route = createFileRoute("/user-settings")({
 function UserSettingsPage() {
   const { t } = useTranslation("drawersUi");
   // 运行期能力 (多模式统一方案 §L4): NAV 按 SECTIONS 表过滤, 不按 mode 字符串分支
-  const { caps } = useCaps();
+  const { caps, mode } = useCaps();
+  // SaaS: 大模型/安全 由平台统一管理 → 界面只读并明示 (后端守卫仍是权威)
+  const saasReadonly = mode === "saas";
   const navGroups = NAV_GROUPS.map((g) => ({
     ...g,
     items: g.items.filter((it) => isSectionVisible(it.value as SectionKey, caps)),
@@ -272,7 +275,13 @@ function UserSettingsPage() {
 
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <TabsContent value="llm" className="p-4 mt-0">
-            <UserLLMTab />
+            {saasReadonly ? (
+              <SaasReadonly>
+                <UserLLMTab />
+              </SaasReadonly>
+            ) : (
+              <UserLLMTab />
+            )}
           </TabsContent>
           <TabsContent value="mcp" className="p-4 mt-0">
             <UserMCPTab />
@@ -287,11 +296,21 @@ function UserSettingsPage() {
             <UserKnowledgeTab />
           </TabsContent>
           <TabsContent value="security" className="p-4 mt-0">
-            <div className="space-y-4">
-              <SecurityPolicyForm scope="user" />
-              {/* 沙箱执行环境(安全族归位:原 /settings 页卡迁入;无 sandbox cap 的模式整体隐藏) */}
-              {isSectionVisible("sandbox", caps) && <SandboxSection />}
-            </div>
+            {saasReadonly ? (
+              <SaasReadonly>
+                <div className="space-y-4">
+                  <SecurityPolicyForm scope="user" />
+                  {/* 沙箱执行环境(安全族归位:原 /settings 页卡迁入;无 sandbox cap 的模式整体隐藏) */}
+                  {isSectionVisible("sandbox", caps) && <SandboxSection />}
+                </div>
+              </SaasReadonly>
+            ) : (
+              <div className="space-y-4">
+                <SecurityPolicyForm scope="user" />
+                {/* 沙箱执行环境(安全族归位:原 /settings 页卡迁入;无 sandbox cap 的模式整体隐藏) */}
+                {isSectionVisible("sandbox", caps) && <SandboxSection />}
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="preferences" className="p-4 mt-0">
             <PreferencesTab />
@@ -308,6 +327,28 @@ function UserSettingsPage() {
 // ═══════════════════════════════════════════════════════════════════════
 // Helper Components
 // ═══════════════════════════════════════════════════════════════════════
+
+// SaaS 平台托管只读容器: 锁形横幅明示原因 + inert 屏蔽交互 (含键盘焦点)。
+// 仅 UI 层约束; 后端守卫仍是权威 (前端隐藏/禁用 ≠ 安全)。
+function SaasReadonly({ children }: { children: ReactNode }) {
+  const { t } = useTranslation("drawersUi");
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+        <Lock className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            {t("user.saasManaged.title")}
+          </p>
+          <p className="text-[11px] text-muted-foreground">{t("user.saasManaged.desc")}</p>
+        </div>
+      </div>
+      <div inert className="pointer-events-none select-none opacity-70">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function SectionTitle({ title, desc }: { title: string; desc: string }) {
   return (

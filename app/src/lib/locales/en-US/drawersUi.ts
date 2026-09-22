@@ -355,6 +355,11 @@ const enUS = {
   "user.nav.preferences": "Preferences",
   "user.nav.about": "About",
 
+  // SaaS platform-managed read-only notice (LLM/Security tabs)
+  "user.saasManaged.title": "SaaS mode · Managed by platform",
+  "user.saasManaged.desc":
+    "This section is configured by the platform administrator and is read-only. Contact your administrator for changes.",
+
   // user LLM tab + provider dialog
   "user.llm.tab.title": "LLM",
   "user.llm.tab.desc":

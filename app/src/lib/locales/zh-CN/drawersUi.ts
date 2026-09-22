@@ -343,6 +343,10 @@ const zhCN = {
   "user.nav.preferences": "偏好设置",
   "user.nav.about": "关于",
 
+  // SaaS 平台托管只读提示 (大模型/安全 tab)
+  "user.saasManaged.title": "SaaS 模式 · 由平台统一管理",
+  "user.saasManaged.desc": "此项由平台管理员统一配置，仅可查看。如需调整请联系管理员。",
+
   // user LLM tab + provider dialog
   "user.llm.tab.title": "大模型",
   "user.llm.tab.desc": "用户级 LLM 提供商（全局可用，各工作区默认继承）",
