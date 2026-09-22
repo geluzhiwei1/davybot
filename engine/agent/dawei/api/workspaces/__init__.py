@@ -66,7 +66,7 @@ router.include_router(subtasks_router)     # 新增:子任务委派 API (§6.2 U
 router.include_router(memory_api.router)
 
 # 注册安全配置路由器
-# Canonical path: /api/workspaces/{workspace_id}/security (对齐前端 nn-bot-app securityApi)
+# Canonical path: /api/workspaces/{workspace_id}/security (对齐前端 davybot-app securityApi)
 # 旧路径 /security-settings 作为别名保留，向后兼容（遗留 webui 仍引用）
 router.include_router(security_api.router, prefix="/{workspace_id}/security")
 router.include_router(security_api.router, prefix="/{workspace_id}/security-settings")

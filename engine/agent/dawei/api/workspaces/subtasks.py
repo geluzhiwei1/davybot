@@ -1,7 +1,7 @@
 # Copyright (c) 2025 格律至微
 # SPDX-License-Identifier: AGPL-3.0-only
 
-"""子任务委派 API（§6.2 UI 协议层，服务 nn-bot-app 工作区可视化）
+"""子任务委派 API（§6.2 UI 协议层，服务 davybot-app 工作区可视化）
 
 端点：
 - GET  /api/workspaces/{ws}/subtasks                            树 bootstrap（parent_id/depth/agent/conversation_id）

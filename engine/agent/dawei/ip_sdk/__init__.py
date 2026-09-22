@@ -4,7 +4,7 @@
 """DavyBot IP SDK — Python client for DavyBot IP Module REST API.
 
 Minimal Python client wrapping the DavyBot IP HTTP API (8 modules).
-Install from source: `pip install -e path/to/nn-bot/agent/`
+Install from source: `pip install -e path/to/davybot/engine/agent/`
 
 Usage:
     from dawei.ip_sdk import IpClient

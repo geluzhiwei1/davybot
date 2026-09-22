@@ -46,7 +46,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nn-bot"
+name = "davybot-engine"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

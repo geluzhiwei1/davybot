@@ -150,9 +150,9 @@ function Restore-VersionFiles {
     }
 }
 
-# ---- Build frontend (nn-bot-app → agent\dawei\frontend\) ----
+# ---- Build frontend (davybot-app → agent\dawei\frontend\) ----
 function Build-Frontend {
-    Write-Host "==> Building frontend (nn-bot-app web SPA)..." -ForegroundColor Cyan
+    Write-Host "==> Building frontend (davybot-app web SPA)..." -ForegroundColor Cyan
     Push-Location $TauriDir
     try {
         if (-not (Test-Path (Join-Path $TauriDir "node_modules"))) {

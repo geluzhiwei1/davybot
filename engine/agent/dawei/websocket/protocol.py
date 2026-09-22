@@ -1968,7 +1968,7 @@ class MessageValidator:
             raise ValueError(f"不支持的消息类型: '{message_type}'")
 
         # ── 前端兼容预处理 ──────────────────────────────────────────
-        # 前端 (nn-bot-app) 发送的消息可能与后端模型存在差异：
+        # 前端 (davybot-app) 发送的消息可能与后端模型存在差异：
         #   1. timestamp: 前端发 int 毫秒，后端期望 ISO str
         #   2. session_id: 前端可能不传，后端部分模型要求必填
         #   3. 额外字段: 前端可能传 workspace_id/conversation_id/data 等

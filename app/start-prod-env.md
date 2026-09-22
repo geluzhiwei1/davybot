@@ -7,12 +7,12 @@ npm run dev
 ```bash
 
 # 后端
-cd nn-bot/agent
+cd engine/agent
 cp .env.prod .env
 uv run dawei server start --reload
 
 # 前端
-cd nn-bot-app
+cd ../app
 npm run dev -- --mode prod
 
 ```

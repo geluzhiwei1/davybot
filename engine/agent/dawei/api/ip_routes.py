@@ -4,7 +4,7 @@
 """
 IP 知识产权模块 API 路由
 
-为 nn-bot-app 前端提供 8 大 IP 模块的后端 API 端点：
+为 davybot-app 前端提供 8 大 IP 模块的后端 API 端点：
   M1 创意保护舱 → /api/team/ip-idea-vault/run
   M2 交底书 Agent → /api/team/ip-disclosure/run
   M3 智能撰写 Agent → /api/team/ip-draft/run

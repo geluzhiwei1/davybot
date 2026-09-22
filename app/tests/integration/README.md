@@ -125,7 +125,7 @@ ws_connect      # websockets.connect(live_ws_url/{workspace_id})，收集 STREAM
 
 ---
 
-## 3. Part B · 客户端契约（TS / `nn-bot-app/tests/integration/`）
+## 3. Part B · 客户端契约（TS / `davybot-app/tests/integration/`）
 
 ### 3.1 测试基础设施
 

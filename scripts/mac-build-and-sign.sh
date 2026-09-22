@@ -226,7 +226,7 @@ resolve_targets() {
 }
 
 # ── Phase 0: Clean stale artifacts ─────────────────────────────────
-# Ensures nn-bot sidecar and nn-bot-app bundle are rebuilt from current
+# Ensures nn-bot sidecar and davybot-app bundle are rebuilt from current
 # source on every run. Without this, prior build outputs survive and can
 # be picked up by later steps (notably copy_sidecar's cross-binary
 # fallback), shipping a DMG with outdated nn-bot code.
@@ -240,12 +240,12 @@ clean_artifacts() {
     rm -rf "$AGENT_DIR/dist/dawei"* 2>/dev/null || true
     rm -rf "$AGENT_DIR/build/dawei"* 2>/dev/null || true
 
-    # nn-bot-app: wipe staged sidecar binaries so copy_sidecar can never
+    # davybot-app: wipe staged sidecar binaries so copy_sidecar can never
     # fall back to a stale dawei-<triple> from a previous run.
-    info "Cleaning nn-bot-app sidecar: src-tauri/binaries/"
+    info "Cleaning davybot-app sidecar: src-tauri/binaries/"
     rm -f "$TAURI_DIR/src-tauri/binaries/dawei-"* 2>/dev/null || true
 
-    # nn-bot-app: drop prior bundle outputs per target. Keep cargo's
+    # davybot-app: drop prior bundle outputs per target. Keep cargo's
     # incremental compile cache (target/...) for speed; only the final
     # .app/.dmg stage is forced to regenerate.
     local tgt
@@ -261,7 +261,7 @@ clean_artifacts() {
     ok "Stale artifacts removed"
 }
 
-# ── Phase 0.5: Build frontend (nn-bot-app SPA → agent/dawei/frontend/) ──
+# ── Phase 0.5: Build frontend (davybot-app SPA → agent/dawei/frontend/) ──
 # PyInstaller --collect-all dawei bundles whatever currently sits in
 # agent/dawei/frontend/, so the SPA must be rebuilt BEFORE the sidecar —
 # otherwise the DMG ships whatever frontend a previous build left behind.

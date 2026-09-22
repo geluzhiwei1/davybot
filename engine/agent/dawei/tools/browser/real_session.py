@@ -5,7 +5,7 @@
 直连更轻)。headless 可配(平台风控敏感时用 headful)。
 
 使用场景(重要):本模块只在本机"执行端"运行 ——
-  1. 桌面端 dawei sidecar(nn-bot-app Tauri 内嵌引擎,Windows 为主);
+  1. 桌面端 dawei sidecar(davybot-app Tauri 内嵌引擎,Windows 为主);
   2. davy-light-app 壳的 Python 兼容路径(若启用)。
 SaaS 云端引擎(DAWEI_DEPLOYMENT_MODE=saas)**从不执行本模块** —— 云端只编排,
 真实浏览器操作经 nn-social-flow 控制面下发 claim,由上述本机执行端消费执行。

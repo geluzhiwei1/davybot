@@ -178,9 +178,9 @@ check_macos_prereqs() {
     fi
 }
 
-# ---- Build frontend (nn-bot-app → dawei/frontend/) ----
+# ---- Build frontend (davybot-app → dawei/frontend/) ----
 build_frontend() {
-    info "${C_BOLD}Building frontend (nn-bot-app web SPA)...${C_RESET}"
+    info "${C_BOLD}Building frontend (davybot-app web SPA)...${C_RESET}"
     cd "$TAURI_DIR"
 
     # Install deps if needed

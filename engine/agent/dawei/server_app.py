@@ -381,12 +381,12 @@ def create_app(host: str = "0.0.0.0", port: int = 8431) -> FastAPI:
     # NOTE: allow_credentials=True is incompatible with allow_origins=["*"] per CORS spec.
     #   Browsers will reject credentialed requests to wildcard origins.
     #   When running behind nginx (production), add the deployment origin below.
-    #   When running locally for dev, localhost:8015 (nn-bot-app Vite) is the main consumer.
+    #   When running locally for dev, localhost:8015 (davybot-app Vite) is the main consumer.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
             "http://localhost:8431",
-            "http://localhost:8015",  # nn-bot-app Vite dev
+            "http://localhost:8015",  # davybot-app Vite dev
             "tauri://localhost",
             "https://tauri.localhost",
             "http://tauri.localhost",

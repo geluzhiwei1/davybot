@@ -21,7 +21,7 @@ const SPEC = join(ROOT, "..", "gelu-research-flow", "openapi.json");
 const OUT = join(ROOT, "src", "lib", "research", "types.ts");
 const BANNER = `// AUTO-GENERATED from apps/gelu-research-flow/openapi.json — DO NOT EDIT.
 // Regenerate: cd apps/gelu-research-flow && uv run python scripts/export_openapi.py && \\
-//             cd ../nn-bot-app && npm run gen:research-types
+//             cd ../davybot/app && npm run gen:research-types
 `;
 
 if (!existsSync(SPEC)) {

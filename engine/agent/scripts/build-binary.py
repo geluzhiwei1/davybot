@@ -2,10 +2,10 @@
 """PyInstaller build script for dawei sidecar --onefile binary.
 
 Usage:
-    cd nn-bot/agent && python scripts/build-binary.py          # build for current platform
-    cd nn-bot/agent && python scripts/build-binary.py --clean  # clean + build
-    cd nn-bot/agent && python scripts/build-binary.py --no-upx # skip UPX compression
-    cd nn-bot/agent && python scripts/build-binary.py --runtime-mode desktop  # stamp artifact
+    cd engine/agent && python scripts/build-binary.py          # build for current platform
+    cd engine/agent && python scripts/build-binary.py --clean  # clean + build
+    cd engine/agent && python scripts/build-binary.py --no-upx # skip UPX compression
+    cd engine/agent && python scripts/build-binary.py --runtime-mode desktop  # stamp artifact
     # Cross-arch (macOS Rosetta) — separate workpath so caches don't collide:
     arch -x86_64 uv run --with pyinstaller --python 3.12 python scripts/build-binary.py \
         --name dawei-x86_64 --workpath build/dawei-x86_64 --clean

@@ -1,7 +1,7 @@
 """浏览器轨发布 —— 真机执行入口(social-control 下发 → Chrome → 回报)。
 
 使用场景(重要):本模块只在本机"执行端"运行 ——
-  1. 桌面端 dawei sidecar(nn-bot-app Tauri 内嵌引擎);
+  1. 桌面端 dawei sidecar(davybot-app Tauri 内嵌引擎);
   2. davy-light-app 壳的 Python 兼容路径(原生路径为其 src-tauri/src/track/,协议同源)。
 SaaS 云端引擎(DAWEI_DEPLOYMENT_MODE=saas)从不执行本模块:云端只把任务排进
 nn-social-flow 控制面;router.py 对 /browser-track/start、/login* 端点在 saas

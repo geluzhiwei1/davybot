@@ -4,7 +4,7 @@
 #
 # Do NOT add project dependencies here; use agent/pyproject.toml instead.
 [project]
-name = "nn-bot"
+name = "davybot-engine"
 version = "0.1.0"
 description = "Vestigial root config — see agent/pyproject.toml"
 readme = "README.md"
