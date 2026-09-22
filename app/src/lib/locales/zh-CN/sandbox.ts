@@ -3,6 +3,7 @@ const zhCN = {
   // Provider selector
   "provider.auto.label": "自动检测",
   "provider.auto.description": "根据环境自动选择最佳 Provider",
+  "provider.auto.current": "当前生效: {{name}}",
   "provider.subprocess.label": "进程隔离 (subprocess)",
   "provider.subprocess.description": "子进程执行, 性能最优但无隔离",
   "provider.docker.label": "容器隔离 (Docker/Podman)",
@@ -46,6 +47,7 @@ const zhCN = {
 
   // Status panel
   "status.uninitialized": "未初始化",
+  "status.idle": "空闲 (按需创建)",
   "status.initializing": "初始化中",
   "status.active": "运行中",
   "status.paused": "已暂停",

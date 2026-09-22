@@ -11,6 +11,7 @@ import type { SandboxStatus } from "@/lib/types/sandbox";
 
 const STATUS_VARIANT: Record<SandboxStatus, "default" | "secondary" | "destructive" | "outline"> = {
   uninitialized: "outline",
+  idle: "secondary",
   initializing: "secondary",
   active: "default",
   paused: "secondary",
@@ -22,6 +23,7 @@ const STATUS_VARIANT: Record<SandboxStatus, "default" | "secondary" | "destructi
 
 const STATUS_COLORS: Record<SandboxStatus, string> = {
   uninitialized: "bg-gray-400",
+  idle: "bg-emerald-400",
   initializing: "bg-yellow-400",
   active: "bg-green-500",
   paused: "bg-yellow-500",

@@ -67,11 +67,17 @@ export const useSandboxStore = create<SandboxStoreState>()(
 
           if (providersRes.status === "fulfilled") {
             set({ providers: providersRes.value.providers });
-            // detect actual provider (first available)
-            const firstAvail = providersRes.value.providers.find((p) => p.available);
+            // detect actual provider (first available; "auto" 项仅报告解析结果, 不算实体 provider)
+            const concrete = providersRes.value.providers.filter((p) => p.provider !== "auto");
+            const firstAvail = concrete.find((p) => p.available);
             if (firstAvail) {
               set({ actualProvider: firstAvail.provider });
             }
+            // 状态推导 (沙箱按需创建, 无常驻会话):
+            // - 有可用 provider → idle (空闲, 任务执行时按需创建)
+            // - 全部不可用     → error (服务不可达)
+            // 修复: 此前 status 永远停在初始值 "uninitialized", 无任何调用方更新
+            set({ status: firstAvail ? "idle" : "error" });
           }
 
           if (quotaRes.status === "fulfilled") {

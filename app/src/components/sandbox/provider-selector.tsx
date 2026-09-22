@@ -23,6 +23,7 @@ export function ProviderSelector({
   capabilities,
   availableProviders,
   deploymentMode,
+  actualProvider,
 }: ProviderSelectorProps) {
   const { t } = useTranslation("sandbox");
   const allProviders: ProviderType[] = ["auto", "subprocess", "docker", "e2b"];
@@ -62,6 +63,13 @@ export function ProviderSelector({
                 {t(`provider.${p}.label`)}
               </Label>
               <p className="text-sm text-muted-foreground">{t(`provider.${p}.description`)}</p>
+              {value === p && p === "auto" && actualProvider && actualProvider !== "auto" && (
+                <p className="text-xs font-medium text-primary">
+                  {t("provider.auto.current", {
+                    name: t(`provider.${actualProvider}.label`),
+                  })}
+                </p>
+              )}
               {value === p && capabilities && (
                 <div className="pt-1">
                   <CapabilitiesBadge capabilities={capabilities} />

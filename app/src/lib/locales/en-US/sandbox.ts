@@ -3,6 +3,7 @@ const enUS = {
   // Provider selector
   "provider.auto.label": "Auto-detect",
   "provider.auto.description": "Automatically choose the best provider for the environment",
+  "provider.auto.current": "Currently using: {{name}}",
   "provider.subprocess.label": "Process isolation (subprocess)",
   "provider.subprocess.description": "Runs as a child process — best performance but no isolation",
   "provider.docker.label": "Container isolation (Docker/Podman)",
@@ -51,6 +52,7 @@ const enUS = {
 
   // Status panel
   "status.uninitialized": "Uninitialized",
+  "status.idle": "Idle (on-demand)",
   "status.initializing": "Initializing",
   "status.active": "Running",
   "status.paused": "Paused",

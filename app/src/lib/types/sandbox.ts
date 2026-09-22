@@ -14,6 +14,7 @@ export type MountMode = "ro" | "rw";
 
 export type SandboxStatus =
   | "uninitialized"
+  | "idle"
   | "initializing"
   | "active"
   | "paused"
