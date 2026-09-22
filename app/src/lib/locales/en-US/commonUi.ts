@@ -26,7 +26,6 @@ const enUS = {
   "sidebar.nav.system": "System",
   "sidebar.nav.system.workspaces": "My Workspaces",
   "sidebar.nav.system.audit": "Audit Log",
-  "sidebar.nav.system.knowledge": "Knowledge",
   "sidebar.nav.system.memory": "Memory",
   "sidebar.nav.system.user-settings": "User Settings",
   // sanctions
@@ -80,7 +79,6 @@ const enUS = {
   "sidebar.nav.legal-tools": "Legal AI Q&A",
   "sidebar.nav.legal-tools.legal-search": "Regulations",
   "sidebar.nav.legal-tools.case-search": "Case Precedents",
-  "sidebar.nav.legal-tools.knowledge": "Knowledge",
   "sidebar.nav.legal-tools.standards-search": "Standards",
   "sidebar.nav.legal-tools.contract-templates": "Contract Templates",
   "sidebar.nav.legal-tools.patent-search": "Patent Search",

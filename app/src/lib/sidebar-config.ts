@@ -89,7 +89,6 @@ const CORE_SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [
       { key: "system.workspaces", title: "我的工作区", route: "/workspaces", icon: "folder-open" },
       { key: "system.audit", title: "操作审计", route: "/audit", icon: "scroll-text" },
-      { key: "system.knowledge", title: "知识管理", route: "/knowledge", icon: "brain" },
       { key: "system.memory", title: "记忆管理", route: "/memory", icon: "lightbulb" },
       // 用户设置(原抽屉改为 tab 页卡,布局对齐记忆管理)
       {
