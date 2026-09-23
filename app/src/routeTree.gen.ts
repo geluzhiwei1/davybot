@@ -24,6 +24,7 @@ import { Route as IndexRouteImport } from "./routes/index"
 import { Route as WorkspaceWorkspaceIdRouteImport } from "./routes/workspace.$workspaceId"
 import { Route as TempTaskIdRouteImport } from "./routes/temp.$taskId"
 import { Route as SharedReportTokenRouteImport } from "./routes/shared-report.$token"
+import { Route as ShareShareIdRouteImport } from "./routes/share.$shareId"
 import { Route as SettingsDevicesRouteImport } from "./routes/settings.devices"
 import { Route as ExpertsExpertIdRouteImport } from "./routes/experts.$expertId"
 import { Route as WorkspaceWorkspaceIdIndexRouteImport } from "./routes/workspace.$workspaceId.index"
@@ -107,6 +108,11 @@ const SharedReportTokenRoute = SharedReportTokenRouteImport.update({
   path: "/shared-report/$token",
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShareShareIdRoute = ShareShareIdRouteImport.update({
+  id: "/share/$shareId",
+  path: "/share/$shareId",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
   id: "/settings/devices",
   path: "/settings/devices",
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   "/workspaces": typeof WorkspacesRoute
   "/experts/$expertId": typeof ExpertsExpertIdRoute
   "/settings/devices": typeof SettingsDevicesRoute
+  "/share/$shareId": typeof ShareShareIdRoute
   "/shared-report/$token": typeof SharedReportTokenRoute
   "/temp/$taskId": typeof TempTaskIdRoute
   "/workspace/$workspaceId": typeof WorkspaceWorkspaceIdRouteWithChildren
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   "/workspaces": typeof WorkspacesRoute
   "/experts/$expertId": typeof ExpertsExpertIdRoute
   "/settings/devices": typeof SettingsDevicesRoute
+  "/share/$shareId": typeof ShareShareIdRoute
   "/shared-report/$token": typeof SharedReportTokenRoute
   "/temp/$taskId": typeof TempTaskIdRoute
   "/settings/security/sandbox": typeof SettingsSecuritySandboxRoute
@@ -210,6 +218,7 @@ export interface FileRoutesById {
   "/workspaces": typeof WorkspacesRoute
   "/experts/$expertId": typeof ExpertsExpertIdRoute
   "/settings/devices": typeof SettingsDevicesRoute
+  "/share/$shareId": typeof ShareShareIdRoute
   "/shared-report/$token": typeof SharedReportTokenRoute
   "/temp/$taskId": typeof TempTaskIdRoute
   "/workspace/$workspaceId": typeof WorkspaceWorkspaceIdRouteWithChildren
@@ -236,6 +245,7 @@ export interface FileRouteTypes {
     | "/workspaces"
     | "/experts/$expertId"
     | "/settings/devices"
+    | "/share/$shareId"
     | "/shared-report/$token"
     | "/temp/$taskId"
     | "/workspace/$workspaceId"
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | "/workspaces"
     | "/experts/$expertId"
     | "/settings/devices"
+    | "/share/$shareId"
     | "/shared-report/$token"
     | "/temp/$taskId"
     | "/settings/security/sandbox"
@@ -283,6 +294,7 @@ export interface FileRouteTypes {
     | "/workspaces"
     | "/experts/$expertId"
     | "/settings/devices"
+    | "/share/$shareId"
     | "/shared-report/$token"
     | "/temp/$taskId"
     | "/workspace/$workspaceId"
@@ -307,6 +319,7 @@ export interface RootRouteChildren {
   UserSettingsRoute: typeof UserSettingsRoute
   WorkspacesRoute: typeof WorkspacesRoute
   SettingsDevicesRoute: typeof SettingsDevicesRoute
+  ShareShareIdRoute: typeof ShareShareIdRoute
   SharedReportTokenRoute: typeof SharedReportTokenRoute
   TempTaskIdRoute: typeof TempTaskIdRoute
   WorkspaceWorkspaceIdRoute: typeof WorkspaceWorkspaceIdRouteWithChildren
@@ -420,6 +433,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SharedReportTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/share/$shareId": {
+      id: "/share/$shareId"
+      path: "/share/$shareId"
+      fullPath: "/share/$shareId"
+      preLoaderRoute: typeof ShareShareIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/settings/devices": {
       id: "/settings/devices"
       path: "/settings/devices"
@@ -514,6 +534,7 @@ const rootRouteChildren: RootRouteChildren = {
   UserSettingsRoute: UserSettingsRoute,
   WorkspacesRoute: WorkspacesRoute,
   SettingsDevicesRoute: SettingsDevicesRoute,
+  ShareShareIdRoute: ShareShareIdRoute,
   SharedReportTokenRoute: SharedReportTokenRoute,
   TempTaskIdRoute: TempTaskIdRoute,
   WorkspaceWorkspaceIdRoute: WorkspaceWorkspaceIdRouteWithChildren,

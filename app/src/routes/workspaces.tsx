@@ -8,6 +8,8 @@ import { IS_DESKTOP } from "@/lib/platform";
 import { marketApi, type MarketResource } from "@/lib/api-client";
 import { useQuickChat } from "@/hooks/use-quick-chat";
 import { SwipeActionRow } from "@/components/mobile-shell/swipe-action-row";
+import { WorkspaceShareDialog } from "@/components/workspaces/share-dialog";
+import { workspaceShareApi } from "@/lib/api/share";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +56,7 @@ import {
   Settings,
   Settings2,
   Search,
+  Share2,
   X,
   Bot,
   BookOpen,
@@ -488,6 +491,20 @@ function WorkspacesPage() {
   const [renameValue, setRenameValue] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteState>({ open: false });
+  // 工作区分享弹窗目标 (null = 关闭)
+  const [shareTarget, setShareTarget] = useState<{ id: string; name: string } | null>(null);
+  // 删除工作区联动提示 (方案 §UX): 生效中的分享 → 删除后链接立即失效
+  const [deleteShareActive, setDeleteShareActive] = useState(false);
+  useEffect(() => {
+    setDeleteShareActive(false);
+    if (!deleteTarget.open || deleteTarget.kind !== "workspace") return;
+    workspaceShareApi
+      .get(deleteTarget.id)
+      .then((v) => setDeleteShareActive(!v.revoked && !v.expired && v.status === "active"))
+      .catch(() => {
+        // 无分享/查询失败 → 不提示, 不阻塞删除
+      });
+  }, [deleteTarget]);
 
   const [createColl, setCreateColl] = useState<CreateCollState>({ open: false });
   const [newCollName, setNewCollName] = useState("");
@@ -824,6 +841,9 @@ function WorkspacesPage() {
                   }}
                 >
                   <Pencil className="w-3.5 h-3.5 mr-2" /> {t("workspaces.rename")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShareTarget({ id: ws.id, name: ws.name })}>
+                  <Share2 className="w-3.5 h-3.5 mr-2" /> {t("workspaces.share")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -1607,6 +1627,11 @@ function WorkspacesPage() {
               {deleteTarget.open && deleteTarget.kind === "collection" && (
                 <>{t("workspaces.collectionDeleteNote")}</>
               )}{" "}
+              {deleteTarget.open && deleteTarget.kind === "workspace" && deleteShareActive && (
+                <span className="block mt-1 text-amber-600 font-medium">
+                  {t("workspaces.deleteShareNote")}
+                </span>
+              )}{" "}
               {t("workspaces.cannotUndo")}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1681,6 +1706,14 @@ function WorkspacesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Workspace share (链接+提取码, 只读浏览/复制) */}
+      <WorkspaceShareDialog
+        workspaceId={shareTarget?.id ?? ""}
+        workspaceName={shareTarget?.name ?? ""}
+        open={shareTarget !== null}
+        onOpenChange={(o) => !o && setShareTarget(null)}
+      />
     </div>
   );
 }

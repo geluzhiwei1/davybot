@@ -10,7 +10,11 @@ from fastapi import APIRouter
 
 # 导入记忆系统API
 from . import memory as memory_api
+from . import security as security_api
+from .acp_agents import router as acp_agents_router
+from .channels import router as channels_router
 from .checkpoints import router as checkpoints_router
+from .collections import router as collections_router
 
 # 导入各子模块的路由器
 from .config import router as config_router
@@ -18,6 +22,7 @@ from .config_reload import router as config_reload_router
 from .core import get_user_workspace
 from .core import router as core_router
 from .crud import router as crud_router
+from .diagnostics import router as diagnostics_router
 from .evolution import router as evolution_router
 from .files import router as files_router
 from .graphs import router as graphs_router
@@ -26,14 +31,10 @@ from .mcp_servers import router as mcp_servers_router
 from .models import *
 from .plugin_config import router as plugin_config_router
 from .plugins import router as plugins_router
-from .ui_settings import router as ui_settings_router
-from .acp_agents import router as acp_agents_router
-from .channels import router as channels_router
-from .collections import router as collections_router
-from .diagnostics import router as diagnostics_router
-from .traces import router as traces_router
+from .share import router as share_router  # 工作区分享 Owner 端点 (/{workspace_id}/share)
 from .subtasks import router as subtasks_router
-from . import security as security_api
+from .traces import router as traces_router
+from .ui_settings import router as ui_settings_router
 
 # 创建主路由器
 router = APIRouter(prefix="/api/workspaces")
@@ -42,6 +43,9 @@ router = APIRouter(prefix="/api/workspaces")
 # 注意：collections_router 必须在 crud_router 之前注册，
 # 因为 crud_router 的 /{workspace_id} 路径会匹配 "collections"
 router.include_router(collections_router)  # 工作区集合管理 API
+# share_router (三段 /{workspace_id}/share/...) 与 crud 的两段 /{workspace_id} 段数不同,
+# 无遮蔽风险; 按仓库惯例仍注册在 crud_router 之前。
+router.include_router(share_router)  # 工作区分享 Owner API (创建/关闭/开启/续期/撤销)
 router.include_router(crud_router)
 router.include_router(core_router)
 router.include_router(files_router)

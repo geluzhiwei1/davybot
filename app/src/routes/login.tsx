@@ -47,6 +47,13 @@ function LoginPage() {
 
     try {
       const data = await login(identifier, password, loginType);
+      // ?redirect= 优先（工作区分享「登录后复制」回跳, 方案 §7）:
+      // 仅接受站内相对路径, 防开放跳转。
+      const redirect = new URLSearchParams(window.location.search).get("redirect") || "";
+      if (redirect.startsWith("/") && !redirect.startsWith("//")) {
+        window.location.assign(redirect);
+        return;
+      }
       // 身份选择分发：
       //   有租户 membership → /select-tenant（让用户选个人身份 or 租户身份）
       //   无租户 membership  → 直接进入个人模式（系统原生支持,不阻断）

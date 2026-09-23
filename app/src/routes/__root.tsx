@@ -79,7 +79,9 @@ function RootComponent() {
   const currentPath = routerState.location.pathname;
   const isLoginPage = currentPath === "/login";
   // 公开页面（免登录 + 免租户/模块守卫）: 登录页 + 报告分享页（PRD §10 #5）
-  const isPublicPage = isLoginPage || currentPath.startsWith("/shared-report/");
+  // + 工作区分享页 /share/（自带提取码+share-token 鉴权, 方案 §7）
+  const isPublicPage =
+    isLoginPage || currentPath.startsWith("/shared-report/") || currentPath.startsWith("/share/");
 
   // Full login URL including runtime basepath (e.g. "/app-ui/login")
   const loginHref = (getBasepath() + "/login").replace(/\/+/g, "/");

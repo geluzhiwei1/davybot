@@ -140,6 +140,7 @@ from dawei.api import (
     users,
     admin_sandbox,  # 沙箱管理 Admin API (§14.19)
     sandbox_system,  # 沙箱系统 API (前端安全设置页面)
+    shares,  # 工作区分享 Viewer 公开端点 (/api/shares, 方案 §5.2)
 )
 # Internal server-to-server endpoints (not in dawei.api.__init__ to keep that
 # namespace user-facing). Imported here for explicit router registration.
@@ -459,6 +460,7 @@ def create_app(host: str = "0.0.0.0", port: int = 8431) -> FastAPI:
     app.include_router(users.router)
     app.include_router(users_security_router, prefix="/api")
     app.include_router(conversations.router)
+    app.include_router(shares.router)  # 工作区分享 Viewer 公开端点 (verify/只读/clone)
     app.include_router(system.router)
     app.include_router(skills.router)
     app.include_router(scheduled_tasks.router)

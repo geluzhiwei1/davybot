@@ -813,4 +813,47 @@ export default {
   "workspaces.deleteWorkspace": "Delete workspace",
   "workspaces.manageCollectionWorkspaces": "Manage collection workspaces — {{name}}",
   "workspaces.noSelectableWorkspaces": "No selectable workspaces",
+
+  // ── workspaces share (workspace sharing) ──
+  "workspaces.share": "Share",
+  "workspaces.shareTitle": "Share workspace — {{name}}",
+  "workspaces.shareCreateDesc":
+    "Generate a link and extraction code; visitors can browse read-only without login. Validity: 1/3/7 days only.",
+  "workspaces.shareManageDesc":
+    "Visitors browse read-only via link + code; logged-in users can clone the whole workspace (config & secrets excluded).",
+  "workspaces.shareExpiryLabel": "Validity",
+  "workspaces.shareDays": "{{count}} d",
+  "workspaces.shareCustomPassword": "Custom code (optional, 4-32 printable chars)",
+  "workspaces.shareAutoPassword": "Leave empty to auto-generate a 4-char code",
+  "workspaces.shareCreateBtn": "Create share link",
+  "workspaces.shareCreated": "Share link created",
+  "workspaces.shareLinkLabel": "Share link",
+  "workspaces.sharePasswordLabel": "Extraction code",
+  "workspaces.shareCopy": "Copy",
+  "workspaces.shareCopied": "Copied to clipboard",
+  "workspaces.shareCopyFailed": "Copy failed — please select and copy manually",
+  "workspaces.shareStatusActive": "Active",
+  "workspaces.shareStatusClosed": "Closed",
+  "workspaces.shareStatusExpired": "Expired",
+  "workspaces.shareStatusRevoked": "Revoked",
+  "workspaces.shareExpiresAt": "Valid until {{time}}",
+  "workspaces.sharePasswordUnavailable":
+    "Code cannot be revealed (server secret changed) — regenerate the share",
+  "workspaces.shareRenew": "Renew",
+  "workspaces.shareClose": "Close share",
+  "workspaces.shareOpen": "Open share",
+  "workspaces.shareReopenWithDays": "Expired — pick a validity to reopen:",
+  "workspaces.shareRevoke": "Revoke",
+  "workspaces.shareRevokeTitle": "Revoke share?",
+  "workspaces.shareRevokeDesc":
+    "The link stops working immediately and permanently. You can only generate a new one.",
+  "workspaces.shareRegenerate": "Regenerate",
+  "workspaces.shareRegenerateTitle": "Regenerate share?",
+  "workspaces.shareRegenerateDesc":
+    "A new link and code will be generated (default 3-day validity). The current link stops working immediately.",
+  "workspaces.shareCloneLog": "Clone history",
+  "workspaces.shareCloneLogEmpty": "No clones yet",
+  "workspaces.shareLoadFailed": "Failed to load share info",
+  "workspaces.deleteShareNote":
+    "This workspace has an active share link — it will stop working immediately after deletion.",
 } as const;

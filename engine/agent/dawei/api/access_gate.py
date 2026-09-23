@@ -24,6 +24,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 # 匿名可达豁免路径 (前端启动探测)
 EXEMPT_PATHS = frozenset({"/api/runtime-info"})
+# 匿名可达豁免前缀 — 工作区分享公开页 (/api/shares 自带提取码+share-token 鉴权)
+EXEMPT_PREFIXES = ("/api/shares",)
 
 # 受保护的路径前缀 (REST + WS 握手)
 PROTECTED_PREFIXES = ("/api/", "/ws")
@@ -61,7 +63,7 @@ class AccessPasswordMiddleware:
             return
 
         path = scope.get("path", "")
-        if not path.startswith(PROTECTED_PREFIXES) or path in EXEMPT_PATHS:
+        if not path.startswith(PROTECTED_PREFIXES) or path in EXEMPT_PATHS or path.startswith(EXEMPT_PREFIXES):
             await self.app(scope, receive, send)
             return
 
