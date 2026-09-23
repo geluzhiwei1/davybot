@@ -140,6 +140,7 @@ from .workflow_tools_fixed import (
     RunTaskTool,
     SwitchModeTool,
     UpdateTodoListTool,
+    WaitTasksTool,
 )
 
 __all__ = [
@@ -175,6 +176,7 @@ __all__ = [
     "RunTaskTool",
     "UpdateTodoListTool",
     "GetTaskStatusTool",
+    "WaitTasksTool",
     # Timer/Scheduler Tools
     "TimerTool",
     # Knowledge Base Tools

@@ -5,14 +5,13 @@ import json
 import re
 import time
 import unicodedata
-from typing import List, Any, ClassVar
+from typing import Any, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from dawei.logg.logging import get_logger
 from dawei.tools.custom_base_tool import CustomBaseTool
 from dawei.tools.custom_tools.async_utils import run_async
-
 
 # 派发目标归一化键前缀长度（P1-3 重复派发熔断）：等价重派的 prompt 头部
 # （目标描述）几乎总一致，prefix 截断使"同一目标"判定对尾部追加细节不敏感。
@@ -30,12 +29,33 @@ def _normalize_desc_key(message: str | None, prefix_len: int = _DESC_PREFIX_LEN)
     """
     if not message:
         return ""
-    stripped = "".join(
-        ch
-        for ch in str(message)
-        if not ch.isspace() and not unicodedata.category(ch).startswith("P")
-    )
+    stripped = "".join(ch for ch in str(message) if not ch.isspace() and not unicodedata.category(ch).startswith("P"))
     return stripped[:prefix_len]
+
+
+# 派发身份归一窗口（C8）：比旧前缀熔断的 120 字更宽 —— 等价重派判定从
+# "目标描述头部" 升级为 "mode+交付物+全量归一化指令"，误伤面更小。
+_DISPATCH_IDENTITY_MSG_WINDOW = 400
+
+
+def _dispatch_identity(
+    mode: str,
+    deliverable: str | None,
+    item_identity: str | None = None,
+    message: str | None = None,
+) -> str:
+    """派发身份（C8）：hash(mode + deliverable + item.identity)。
+
+    - batch 项：显式 item.identity 充任身份分量（同 identity 重派熔断，
+      不同 identity 互不误伤 —— N 项模板展开天然各自身份不同）
+    - 单个 new_task：无 item.identity → 以归一化 message（400 字窗口）充任
+    - 保留 1.79M tokens 事故防线：等价重派（同 mode/交付物/指令）身份相同
+    """
+    import hashlib
+
+    ident = (item_identity or "").strip() or _normalize_desc_key(message, prefix_len=_DISPATCH_IDENTITY_MSG_WINDOW)
+    key = f"{mode}\x1f{(deliverable or '').strip()}\x1f{ident}"
+    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
 
 
 def _import_task_graph_components():
@@ -77,7 +97,7 @@ class AskFollowupQuestionInput(BaseModel):
         ...,
         description="Clear, specific question addressing information needed from the user.",
     )
-    follow_up: List[str] = Field(
+    follow_up: list[str] = Field(
         ...,
         description="List of 2-4 suggested answers as plain strings. Each string is one suggested response the user can select.",
     )
@@ -95,7 +115,7 @@ class AskFollowupQuestionTool(CustomBaseTool):
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
 
-    def _run(self, question: str, follow_up: List[str]) -> str:
+    def _run(self, question: str, follow_up: list[str]) -> str:
         """Ask follow-up question with enhanced error handling."""
         try:
             # Validate follow-up suggestions
@@ -184,10 +204,7 @@ class AttemptCompletionTool(CustomBaseTool):
                                 "type": "task_completion",
                                 "status": "blocked",
                                 "message": f"Cannot complete task: {len(unfinished)} subtask(s) not finished.",
-                                "unfinished_subtasks": [
-                                    {"subtask_id": st.task_id, "status": st.status.value, "description": (st.data.description or "")[:200]}
-                                    for st in unfinished
-                                ],
+                                "unfinished_subtasks": [{"subtask_id": st.task_id, "status": st.status.value, "description": (st.data.description or "")[:200]} for st in unfinished],
                                 "hint": "Wait for subtasks to finish (use get_task_status to poll), then attempt_completion again.",
                             },
                             indent=2,
@@ -307,10 +324,7 @@ class SwitchModeInput(BaseModel):
 
     mode_slug: str = Field(
         ...,
-        description=(
-            "Slug of mode to switch to (the live list of workspace modes is injected "
-            "into this description at load time; unknown slugs return available_modes)."
-        ),
+        description=("Slug of mode to switch to (the live list of workspace modes is injected into this description at load time; unknown slugs return available_modes)."),
     )
     reason: str | None = Field(None, description="Reason for switching modes.")
 
@@ -321,12 +335,7 @@ class SwitchModeTool(CustomBaseTool):
     name: ClassVar[str] = "switch_mode"
     # P1-1: 修正过时描述（旧文案提 "PDCA mode" 与 plan/do/check/act —— 这些
     # 不是 registry 中的 mode slug，误导 LLM 枚举不存在的模式）
-    description: ClassVar[str] = (
-        "Switches to a different mode for the current session. Modes are dynamically "
-        "loaded from the workspace mode registry (built-in: orchestrator, pdca; plus "
-        "workspace custom modes). If the specified mode is not found, returns the "
-        "list of available modes."
-    )
+    description: ClassVar[str] = "Switches to a different mode for the current session. Modes are dynamically loaded from the workspace mode registry (built-in: orchestrator, pdca; plus workspace custom modes). If the specified mode is not found, returns the list of available modes."
     args_schema: ClassVar[type[BaseModel]] = SwitchModeInput
 
     def __init__(self, task_graph=None, workspace_root: str | None = None):
@@ -338,9 +347,7 @@ class SwitchModeTool(CustomBaseTool):
         self._available_modes: dict[str, dict[str, Any]] | None = None
         self._modes_registry = None  # 生成缓存时的 Registry 实例（invalidate 后自动重建）
         # P1-1: mode_slug 字段描述注入全量模式实时清单（切换目标对 LLM 可见）
-        self.args_schema = _dynamic_mode_args_schema(
-            SwitchModeInput, "mode_slug", "Slug of mode to switch to.", self.workspace_root
-        )
+        self.args_schema = _dynamic_mode_args_schema(SwitchModeInput, "mode_slug", "Slug of mode to switch to.", self.workspace_root)
 
     def _load_available_modes(self) -> dict[str, dict[str, Any]]:
         """动态加载可用模式（P6：经 ModeRegistry 单例，不再 ad-hoc ModeManager）"""
@@ -454,11 +461,7 @@ class SwitchModeTool(CustomBaseTool):
                 "reason": reason or "Mode switch requested",
                 "status": "switched" if state_applied else "error",
                 "mode_state_applied": state_applied,
-                "note": (
-                    "Mode switched; the new toolset takes effect on the next LLM turn."
-                    if state_applied
-                    else "user_workspace unavailable: mode NOT switched. Ask the user to switch mode in the UI."
-                ),
+                "note": ("Mode switched; the new toolset takes effect on the next LLM turn." if state_applied else "user_workspace unavailable: mode NOT switched. Ask the user to switch mode in the UI."),
                 "timestamp": time.time(),
             }
 
@@ -526,21 +529,28 @@ class NewTaskInput(BaseModel):
 
     mode: str = Field(
         ...,
-        description=(
-            "Slug of mode to start new task in (the live list of delegable modes with "
-            "their tool groups is injected into this description at load time)."
-        ),
+        description=("Slug of mode to start new task in (the live list of delegable modes with their tool groups is injected into this description at load time)."),
     )
-    message: str = Field(..., description="Initial user message or instructions for new task.")
+    message: str = Field(
+        ...,
+        max_length=800,  # C2/R1: 单一交付物指令硬顶（巨子任务 schema 层拒死）
+        description=("Initial instructions for the subtask. Must target ONE deliverable and be self-contained (goal, scope, key constraints) — but must NOT bundle N similar work items (e.g. 'review these 6 files') into one subtask; dispatch those as one subtask per item instead."),
+    )
     acceptance: str = Field(
         ...,
         description=(
-            "REQUIRED verifiable acceptance criteria for the subtask (验收标准). "
-            "Must be decidable from the subtask's result alone, e.g. "
-            "'report contains all 7 sections', 'tests pass with 0 failures'. "
-            "Echoed back in the subtask execution report so the parent can judge "
-            "completed vs completed-but-not-accepted."
+            "REQUIRED verifiable acceptance criteria for the subtask (验收标准). Must be decidable from the subtask's result alone, e.g. 'report contains all 7 sections', 'tests pass with 0 failures'. Echoed back in the subtask execution report so the parent can judge completed vs completed-but-not-accepted."
         ),
+    )
+    deliverable: str = Field(
+        ...,
+        max_length=200,
+        description=("REQUIRED: the single deliverable of this subtask in one short sentence, e.g. '交付/审查报告/新加坡_劳动合同.md'. One subtask = one deliverable (one file / one jurisdiction / one decidable question). If the request names N similar deliverables, split into N subtasks instead."),
+    )
+    output_file: str | None = Field(
+        None,
+        max_length=500,
+        description=("REQUIRED for report/review-type deliverables: workspace file path the subtask must WRITE the full deliverable to (e.g. '交付/审查报告/新加坡.md'). The subtask's chat reply then contains only a ≤500-char summary + this path — single-turn long generation gets killed by stream timeouts."),
     )
     agent: str = Field(
         "default",
@@ -577,11 +587,13 @@ class NewTaskTool(CustomBaseTool):
     description: ClassVar[str] = (
         "Creates a new subtask and returns immediately (dispatch-and-return): the subtask is "
         "registered as PENDING and executed by the orchestration loop after the current task's "
-        "executor finishes. REQUIRED argument: acceptance — verifiable acceptance criteria "
-        "decidable from the subtask result alone (e.g. 'report contains all 7 sections'). "
-        "Batch-dispatch independent subtasks with multiple new_task calls in the same turn; "
-        "they run in parallel and a [Subtask Execution Report] with acceptance/cost per subtask "
-        "is injected back into the conversation for you to judge completed vs not-accepted."
+        "executor finishes. One subtask = ONE deliverable (deliverable arg required): a single "
+        "file / jurisdiction / decidable question — never bundle N similar work items into one "
+        "subtask; dispatch one new_task per item instead. REQUIRED acceptance — verifiable "
+        "criteria decidable from the subtask result alone. Report/review-type deliverables "
+        "REQUIRE output_file: the full report is written to the file and the chat reply carries "
+        "only a ≤500-char summary + path. A [Subtask Execution Report] with acceptance/cost per "
+        "subtask is injected back into the conversation for you to judge completed vs not-accepted."
     )
     args_schema: ClassVar[type[BaseModel]] = NewTaskInput
 
@@ -596,9 +608,7 @@ class NewTaskTool(CustomBaseTool):
         # P1-1: mode 字段描述注入可委派模式实时清单（含各模式工具组）——
         # 父 LLM 派发时即见合法目标，不再盲猜（can_delegate=false 的 orchestrator
         # 等不出现在清单中，与 _run 侧拒绝口径一致）
-        self.args_schema = _dynamic_mode_args_schema(
-            NewTaskInput, "mode", "Slug of mode to start new task in.", self.workspace_root, delegable_only=True
-        )
+        self.args_schema = _dynamic_mode_args_schema(NewTaskInput, "mode", "Slug of mode to start new task in.", self.workspace_root, delegable_only=True)
 
     def _load_available_modes(self) -> dict[str, str]:
         """动态加载可用模式（P6：经 ModeRegistry 单例，不再 ad-hoc ModeManager）"""
@@ -629,6 +639,8 @@ class NewTaskTool(CustomBaseTool):
         mode: str,
         message: str,
         acceptance: str = "",
+        deliverable: str = "",
+        output_file: str | None = None,
         agent: str = "default",
         context: str | None = None,
         timeout: float | None = None,
@@ -647,12 +659,20 @@ class NewTaskTool(CustomBaseTool):
                 return json.dumps(
                     {
                         "status": "error",
-                        "message": (
-                            "acceptance (验收标准) is required for new_task. Provide decidable "
-                            "criteria that can be verified from the subtask result alone, e.g. "
-                            "'report contains all 7 sections', 'tests pass with 0 failures'."
-                        ),
+                        "message": ("acceptance (验收标准) is required for new_task. Provide decidable criteria that can be verified from the subtask result alone, e.g. 'report contains all 7 sections', 'tests pass with 0 failures'."),
                         "hint": "Resend new_task with the acceptance argument. Subtask was NOT created.",
+                    },
+                    indent=2,
+                )
+
+            # C2/L1 粒度契约：deliverable 必填 —— 一个子任务 = 一个交付物。
+            # 不先说清楚"交付什么"，粒度约束无从谈起。fast-fail，对 LLM 可见。
+            if not deliverable or not deliverable.strip():
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": ("deliverable is required for new_task: the single deliverable of this subtask in one short sentence (e.g. '交付/审查报告/新加坡_劳动合同.md'). One subtask = one deliverable; N similar deliverables must be split into N subtasks."),
+                        "hint": "Resend new_task with the deliverable argument. Subtask was NOT created.",
                     },
                     indent=2,
                 )
@@ -694,13 +714,8 @@ class NewTaskTool(CustomBaseTool):
                     return json.dumps(
                         {
                             "status": "error",
-                            "message": (
-                                f"Mode '{mode}' cannot be delegated to "
-                                f"(can_delegate=false)"
-                            ),
-                            "available_modes": sorted(
-                                m.slug for m in registry.all() if m.can_delegate
-                            ),
+                            "message": (f"Mode '{mode}' cannot be delegated to (can_delegate=false)"),
+                            "available_modes": sorted(m.slug for m in registry.all() if m.can_delegate),
                         },
                         indent=2,
                     )
@@ -726,10 +741,36 @@ class NewTaskTool(CustomBaseTool):
             subtask_id = None
             subtask_error = None
             if task_graph:
-                from dawei.agentic.errors import DuplicateSubtaskError, SubtaskBreadthLimitExceededError
+                from dawei.agentic.errors import (
+                    DuplicateSubtaskError,
+                    SubtaskBreadthLimitExceededError,
+                    SubtaskGranularityError,
+                )
 
                 try:
-                    subtask_id = await self._create_subtask(mode, message, initial_todos, profile=profile, context_note=context, timeout_seconds=timeout, token_budget=token_budget, acceptance_criteria=acceptance, tools=tools)
+                    subtask_id = await self._create_subtask(mode, message, initial_todos, profile=profile, context_note=context, timeout_seconds=timeout, token_budget=token_budget, acceptance_criteria=acceptance, tools=tools, deliverable=deliverable, output_file=output_file)
+                except SubtaskGranularityError as gran_err:
+                    # C3/L1 粒度硬闸 R1-R3：巨子任务创建层熔断 —— error + actionable
+                    # 提示 → LLM 按提示拆分重派（与 DuplicateSubtaskError 同一模式，已验证有效）
+                    _gdet = gran_err.details or {}
+                    try:  # C15：粒度熔断指标（fire-and-forget）
+                        from dawei.agentic.subtask_metrics import get_metrics
+
+                        get_metrics().record_granularity_rejected(str(_gdet.get("rule") or "unknown"))
+                    except Exception:  # noqa: BLE001 — 指标失败绝不影响主流程
+                        pass
+                    return json.dumps(
+                        {
+                            "type": "new_task",
+                            "status": "error",
+                            "error": "granularity_contract",
+                            "rule": _gdet.get("rule"),
+                            "evidence": _gdet.get("evidence"),
+                            "message": (f"子任务粒度契约违规（{_gdet.get('rule')}）：{_gdet.get('evidence')}。一个子任务 = 一个交付物；N 件同类工作必须拆成 N 个子任务。"),
+                            "hint": _gdet.get("hint"),
+                        },
+                        indent=2,
+                    )
                 except DuplicateSubtaskError as dup_err:
                     # P1-3 重复派发熔断：等价子任务已存在 → 拒绝 + 回指既有
                     # subtask_id，父 LLM 转 get_task_status 等待/复用，不再重派。
@@ -739,16 +780,9 @@ class NewTaskTool(CustomBaseTool):
                             "type": "new_task",
                             "status": "error",
                             "error": "duplicate_subtask",
-                            "message": (
-                                f"同父下已存在等价子任务（status={_det.get('existing_status')}）："
-                                "同一目标被重复派发已被熔断。"
-                            ),
+                            "message": (f"同父下已存在等价子任务（status={_det.get('existing_status')}）：同一目标被重复派发已被熔断。"),
                             "existing_subtask_id": _det.get("existing_subtask_id"),
-                            "hint": (
-                                "Do NOT re-dispatch the same goal. Use get_task_status on the existing "
-                                "subtask and wait for its report; if it already reported, reuse its result. "
-                                "If the goal genuinely changed, rewrite the message so the objective differs."
-                            ),
+                            "hint": ("Do NOT re-dispatch the same goal. Use get_task_status on the existing subtask and wait for its report; if it already reported, reuse its result. If the goal genuinely changed, rewrite the message so the objective differs."),
                         },
                         indent=2,
                     )
@@ -761,16 +795,9 @@ class NewTaskTool(CustomBaseTool):
                             "type": "new_task",
                             "status": "error",
                             "error": "breadth_limit",
-                            "message": (
-                                f"同父活跃子任务已达上限 max_active_subtasks={_det.get('limit')}；"
-                                f"当前活跃 {_det.get('active_count')} 个。"
-                            ),
+                            "message": (f"同父活跃子任务已达上限 max_active_subtasks={_det.get('limit')}；当前活跃 {_det.get('active_count')} 个。"),
                             "active_subtasks": _det.get("active_subtask_ids", []),
-                            "hint": (
-                                "Wait for existing subtasks to reach terminal states "
-                                "(get_task_status), or abort_task to free slots. "
-                                "Do NOT re-dispatch the same goal after CANCELLED."
-                            ),
+                            "hint": ("Wait for existing subtasks to reach terminal states (get_task_status), or abort_task to free slots. Do NOT re-dispatch the same goal after CANCELLED."),
                         },
                         indent=2,
                     )
@@ -821,6 +848,7 @@ class NewTaskTool(CustomBaseTool):
                     "subtask_id": subtask_id,
                     "agent": profile.name,  # §6.2: 前端子任务卡片渲染字段
                     "acceptance": acceptance,  # P1b ⑦: 回显验收标准（父 LLM 收报告时据此判定）
+                    "deliverable": deliverable,  # C2/L1: 回显唯一交付物（前端卡片/status 渲染字段）
                     "conversation_id": None,  # 会话在子任务起跑时才分配（P2-7）；起跑后经 subtask_lifecycle 事件携带
                     "initial_todos": [todo.content for todo in initial_todos],
                     "status": "created",
@@ -849,6 +877,11 @@ class NewTaskTool(CustomBaseTool):
         token_budget: int | None = None,
         acceptance_criteria: str | None = None,
         tools: list[str] | None = None,
+        deliverable: str | None = None,
+        output_file: str | None = None,
+        dispatch_identity: str | None = None,
+        batch_id: str | None = None,
+        item_identity: str | None = None,
     ) -> str | None:
         """异步创建子任务（新架构）
 
@@ -863,6 +896,15 @@ class NewTaskTool(CustomBaseTool):
                 的裁剪配置；提供则覆盖 profile 的 allow/deny（调用参数 > profile
                 文件，与 model/effort 同一优先序），提示词层裁剪 + 运行时强制
                 双层生效
+            deliverable: 本子任务唯一交付物（一句话）。写入 metadata.deliverable
+            output_file: 长产物落盘路径（L4 输出契约）。写入 metadata.output_file，
+                并把输出契约段自动注入 context_note（子任务首消息可见）
+            dispatch_identity: 派发身份（C8）。None = 自动按
+                hash(mode+deliverable+归一化message) 计算
+            batch_id: 批次 id（C7）。非 None = new_task_batch 展开项：
+                metadata 落 batch_id/item_identity，创建闸门按 batch 合法
+                形态放行（硬顶由工具层 R5 把守）
+            item_identity: 批次内工作项身份（C8 去重分量）
 
         Returns:
             创建成功的 subtask_id；无根任务时返回 None；失败时抛异常。
@@ -888,6 +930,45 @@ class NewTaskTool(CustomBaseTool):
                 self.logger.warning("No root task found for creating subtask")
                 return None
 
+            # C6 钉死（事故：LLM 传 timeout:"600" 字符串，节点落库 null）：
+            # 在唯一落库点把 timeout_seconds 强转 float —— schema 层校验与否都安全。
+            if timeout_seconds is not None:
+                timeout_seconds = float(timeout_seconds)
+
+            # C3/L1 粒度硬闸 R1-R3（new_task / run_task 共用此入口）：
+            # 事故根因是"单任务大小"维度零约束 —— 一份 message 涵盖 6 份文件 ×
+            # 4 检查维度的巨子任务，死在最终轮单次 LLM 长生成被 300s 流超时
+            # 杀死。宁可漏报不可误伤：R2 只拦"动词+数字+量词+文书名词"紧组合。
+            from dawei.agentic.errors import SubtaskGranularityError
+            from dawei.task_graph.granularity import (
+                MAX_SUBTASK_MESSAGE_CHARS,
+                acceptance_implies_plural,
+                detect_plural_deliverables,
+            )
+
+            if message and len(message) > MAX_SUBTASK_MESSAGE_CHARS:
+                raise SubtaskGranularityError(
+                    rule="R1_message_too_long",
+                    evidence=f"message {len(message)} chars > {MAX_SUBTASK_MESSAGE_CHARS}",
+                    hint=("指令过长：精简为单一交付物的自包含指令（目标/范围/验收）；若确属 N 件同类工作，改用 new_task_batch(template, items=[每件一项]) 并行派发。"),
+                )
+
+            _plural_evidence = detect_plural_deliverables(message)
+            if _plural_evidence:
+                raise SubtaskGranularityError(
+                    rule="R2_plural_deliverables",
+                    evidence=_plural_evidence,
+                    hint=("检测到 N 份同类文书工作被合并进一个子任务。一个子任务 = 一个交付物：改用 new_task_batch(template, items=[每份一项]) 并行派发，每个子任务只处理自己的那 1 份，各自产出独立报告文件。"),
+                )
+
+            _acc_evidence = acceptance_implies_plural(acceptance_criteria)
+            if _acc_evidence:
+                raise SubtaskGranularityError(
+                    rule="R3_plural_acceptance",
+                    evidence=_acc_evidence,
+                    hint=("验收标准以'每份/逐份/全部N份'为对象，说明目标本身就是 N 份交付。改用 new_task_batch 并行派发（acceptance_template 按项展开），各写各的验收标准。"),
+                )
+
             # P3-4: 创建时并发 fast-fail —— 统计图中未终结子任务数，超限直接拒绝
             # （对齐 Claude Code 超限 spawn 直接失败、不排队）
             def _agents_limits() -> tuple[int, int]:
@@ -908,18 +989,16 @@ class NewTaskTool(CustomBaseTool):
                 TaskStatus.INTERACTIVE,  # 2026-09-17 修漏计：追问等待同样占用在飞名额
             }
             all_tasks = await task_graph.get_all_tasks()
-            unfinished = [
-                t for t in all_tasks
-                if getattr(t, "parent_id", None) is not None and getattr(t, "status", None) in _UNFINISHED
-            ]
+            unfinished = [t for t in all_tasks if getattr(t, "parent_id", None) is not None and getattr(t, "status", None) in _UNFINISHED]
 
-            # P1-3 重复派发熔断：同父下已存在同目标（归一化描述前缀一致）的
+            # P1-3 重复派发熔断（C8 身份改造）：同父下已存在同派发身份的
             # 未终结/已完成子任务 → 拒绝并回指既有 subtask_id。
-            # 背景事故（E2E 2026-09-18 综述流水线）：编排器把等价的 arXiv 核验
-            # 子任务重派 6 次，单子任务烧 1.79M tokens。FAILED/ABORTED 不算
-            # 重复（显式重试合法）。
-            # （mode-工具解耦 D6：归一化键已从 tool_group_hints.py 内联到本地
-            #   —— 该模块随 mode 拦截工具机制整体删除。）
+            # 身份 = metadata.dispatch_identity = hash(mode+deliverable+item.identity)；
+            # batch 展开项各自身份不同（item.identity 互异）→ 互不误伤。
+            # 旧节点（无 dispatch_identity，历史会话恢复）回落 description
+            # 归一化前缀比对。背景事故（E2E 2026-09-18 综述流水线）：编排器
+            # 把等价的 arXiv 核验子任务重派 6 次，单子任务烧 1.79M tokens。
+            # FAILED/ABORTED/CANCELLED 不算重复（显式重试合法）。
             from dawei.agentic.errors import DuplicateSubtaskError
 
             def _desc_text(desc) -> str:  # noqa: ANN001 — 兼容 str / TaskDescription / dict
@@ -929,6 +1008,7 @@ class NewTaskTool(CustomBaseTool):
                 return str(text if text is not None else (desc or ""))
 
             _new_key = _normalize_desc_key(message)
+            _new_identity = dispatch_identity or _dispatch_identity(mode, deliverable, item_identity, message)
             _dup_blocking = _UNFINISHED | {TaskStatus.COMPLETED}
             if _new_key:
                 for t in all_tasks:
@@ -937,7 +1017,17 @@ class NewTaskTool(CustomBaseTool):
                     _t_status = getattr(t, "status", None)
                     if _t_status not in _dup_blocking:
                         continue
-                    if _normalize_desc_key(_desc_text(getattr(t.data, "description", ""))) == _new_key:
+                    _t_meta = getattr(getattr(t, "data", None), "metadata", None) or {}
+                    _t_identity = _t_meta.get("dispatch_identity")
+                    if _t_identity is not None:
+                        if _t_identity == _new_identity:
+                            raise DuplicateSubtaskError(
+                                parent_id=root_task.task_id,
+                                existing_id=t.task_node_id,
+                                existing_status=str(getattr(_t_status, "value", _t_status)),
+                                desc_key=_new_identity,
+                            )
+                    elif _normalize_desc_key(_desc_text(getattr(t.data, "description", ""))) == _new_key:
                         raise DuplicateSubtaskError(
                             parent_id=root_task.task_id,
                             existing_id=t.task_node_id,
@@ -945,19 +1035,16 @@ class NewTaskTool(CustomBaseTool):
                             desc_key=_new_key[:40],
                         )
 
-            if len(unfinished) >= _max_concurrent:
-                raise RuntimeError(
-                    f"并发子任务上限（max_concurrent_subtasks={_max_concurrent}）已达到："
-                    f"当前未终结子任务 {len(unfinished)} 个。请等待现有子任务完成后再派发，或先 abort 部分子任务。"
-                )
+            # C9：batch 合法形态放行（单次硬顶由工具层 R5 max_batch_items 把守）；
+            # 零散 new_task 无脑堆叠仍被拦。执行侧真并发由 max_parallel_tasks
+            # 信号量限流排队（wave 机制），超出不失败。
+            if not batch_id and len(unfinished) >= _max_concurrent:
+                raise RuntimeError(f"并发子任务上限（max_concurrent_subtasks={_max_concurrent}）已达到：当前未终结子任务 {len(unfinished)} 个。请等待现有子任务完成后再派发，或先 abort 部分子任务。")
 
             # P3-5: 深度限制 —— 新子任务 depth = 父 depth + 1，达到上限拒绝派生
             _depth = int(getattr(root_task.data, "depth", 0) or 0) + 1
             if _depth >= _max_depth:
-                raise RuntimeError(
-                    f"已达子任务派生深度上限（max_subtask_depth={_max_depth}）："
-                    "到顶后请自行处理子步骤，不要再派生子任务。"
-                )
+                raise RuntimeError(f"已达子任务派生深度上限（max_subtask_depth={_max_depth}）：到顶后请自行处理子步骤，不要再派生子任务。")
 
             # P3-0: Agent Profile 元数据（agent 名 / model / effort / 工具裁剪等）
             from dawei.agentic.agent_profile import resolve as resolve_agent_profile
@@ -971,6 +1058,17 @@ class NewTaskTool(CustomBaseTool):
             profile_meta = profile.to_metadata()
             if context_note:
                 profile_meta["context_note"] = context_note
+            # C2/L1: 唯一交付物落 metadata（get_task_status / 前端子任务卡片渲染字段）
+            if deliverable and deliverable.strip():
+                profile_meta["deliverable"] = deliverable.strip()
+            # L4 输出契约：长产物落盘路径 —— 除写 metadata 外，把契约段注入
+            # context_note（拼进子任务首消息），子任务开工即知"全文写文件、
+            # 对话只回 ≤500 字摘要 + 路径"（治本单轮长生成 300s 流超时）。
+            if output_file and output_file.strip():
+                _output_contract = f"输出契约：完整交付物必须写入工作区文件 {output_file.strip()}；对话回复仅返回 ≤500 字摘要 + 该文件路径，禁止在对话中输出全文（单轮长生成会被流超时杀死）。"
+                _existing_note = profile_meta.get("context_note")
+                profile_meta["context_note"] = f"{_existing_note}\n{_output_contract}" if _existing_note else _output_contract
+                profile_meta["output_file"] = output_file.strip()
             # P2 工具集最小化：调用参数 tools > profile 文件的 allow/deny
             # （与 model/effort 同一优先序）；空列表视为未提供（防 LLM 传 [] 砖死子任务）
             if tools:
@@ -984,9 +1082,7 @@ class NewTaskTool(CustomBaseTool):
             # 变体、S16 重跑 2 轮，重复尝试烧掉 ~3.4M 累计输入 token。
             # 运行时强制点：tool_message_handler 的 tools_denylist 检查
             # （deny 优先于 allow，显式 tools 白名单也无法绕过）。
-            profile_meta["tools_denylist"] = sorted(
-                set(profile_meta.get("tools_denylist") or []) | {"new_task"}
-            )
+            profile_meta["tools_denylist"] = sorted(set(profile_meta.get("tools_denylist") or []) | {"new_task"})
 
             # 创建子任务数据
             subtask_context = TaskContext(
@@ -1015,7 +1111,10 @@ class NewTaskTool(CustomBaseTool):
                 priority=TaskPriority.MEDIUM,
                 metadata={
                     "parent_task_id": root_task.task_id,
-                    "created_by": "NewTaskTool",
+                    "created_by": "NewTaskBatchTool" if batch_id else "NewTaskTool",
+                    "dispatch_identity": _new_identity,
+                    **({"batch_id": batch_id} if batch_id else {}),
+                    **({"item_identity": item_identity} if item_identity else {}),
                     **profile_meta,
                 },
             )
@@ -1065,11 +1164,7 @@ class AbortTaskTool(CustomBaseTool):
     """
 
     name: ClassVar[str] = "abort_task"
-    description: ClassVar[str] = (
-        "Aborts a subtask and all of its descendants (cascading cancellation). "
-        "Idempotent on already-finished subtasks. The root task cannot be aborted via this tool. "
-        "Use after new_task/run_task delegation when a subtask turns out to be unnecessary or wrong."
-    )
+    description: ClassVar[str] = "Aborts a subtask and all of its descendants (cascading cancellation). Idempotent on already-finished subtasks. The root task cannot be aborted via this tool. Use after new_task/run_task delegation when a subtask turns out to be unnecessary or wrong."
     args_schema: ClassVar[type[BaseModel]] = AbortTaskInput
 
     def __init__(self, task_graph=None, workspace_root: str | None = None):
@@ -1272,8 +1367,7 @@ class RunTaskInput(BaseModel):
     mode: str = Field(..., description="Mode slug to run the subtask in (e.g., 'labor-compliance').")
     message: str = Field(
         ...,
-        description="Detailed, self-contained task description for the subtask. Must include all necessary "
-        "context (goal, constraints, expected deliverables) because the subtask only sees this message.",
+        description="Detailed, self-contained task description for the subtask. Must include all necessary context (goal, constraints, expected deliverables) because the subtask only sees this message.",
     )
     agent: str = Field(
         "default",
@@ -1302,11 +1396,7 @@ class RunTaskTool(CustomBaseTool):
     """
 
     name: ClassVar[str] = "run_task"
-    description: ClassVar[str] = (
-        "Runs a subtask in the specified mode and BLOCKS until it finishes, returning its result "
-        "directly. Use for step-by-step delegation where you need the result before continuing. "
-        "For batch/background delegation use new_task instead."
-    )
+    description: ClassVar[str] = "Runs a subtask in the specified mode and BLOCKS until it finishes, returning its result directly. Use for step-by-step delegation where you need the result before continuing. For batch/background delegation use new_task instead."
     args_schema: ClassVar[type[BaseModel]] = RunTaskInput
 
     def __init__(self, task_graph=None, workspace_root: str | None = None):
@@ -1329,6 +1419,7 @@ class RunTaskTool(CustomBaseTool):
 
         # P3-0: 解析 Agent Profile（未知 agent 名 fast-fail，对 LLM 可见）
         from dawei.agentic.agent_profile import resolve as resolve_agent_profile
+        from dawei.agentic.errors import SubtaskGranularityError
 
         try:
             profile = resolve_agent_profile(agent, workspace_root=self.workspace_root)
@@ -1372,6 +1463,28 @@ class RunTaskTool(CustomBaseTool):
         # 1) 同步创建子任务（写入图后才继续）
         try:
             subtask_id = await creator._create_subtask(mode, message, initial_todos, profile=profile, context_note=context, timeout_seconds=timeout, token_budget=token_budget)
+        except SubtaskGranularityError as gran_err:
+            # C3/L1 粒度硬闸与 new_task 同源（run_task 也只该派单件工作）：
+            # 结构化 error + hint，LLM 按提示拆分重派，而非裸异常串。
+            _gdet = gran_err.details or {}
+            try:  # C15：粒度熔断指标（fire-and-forget）
+                from dawei.agentic.subtask_metrics import get_metrics
+
+                get_metrics().record_granularity_rejected(str(_gdet.get("rule") or "unknown"))
+            except Exception:  # noqa: BLE001 — 指标失败绝不影响主流程
+                pass
+            return _json.dumps(
+                {
+                    "type": "run_task",
+                    "status": "error",
+                    "error": "granularity_contract",
+                    "rule": _gdet.get("rule"),
+                    "evidence": _gdet.get("evidence"),
+                    "message": (f"子任务粒度契约违规（{_gdet.get('rule')}）：{_gdet.get('evidence')}。一个子任务 = 一个交付物；run_task 只用于单件工作，N 件同类工作请拆成 N 个子任务分别派发。"),
+                    "hint": _gdet.get("hint"),
+                },
+                indent=2,
+            )
         except Exception as e:  # noqa: BLE001 — 失败必须对 LLM 可见
             self.logger.exception("run_task: subtask creation failed: ")
             return _json.dumps({"status": "error", "message": f"Failed to create subtask: {e!s}"}, indent=2)
@@ -1428,6 +1541,315 @@ class RunTaskTool(CustomBaseTool):
                 "agent": (getattr(getattr(node, "data", None), "metadata", None) or {}).get("agent"),
                 "mode": mode,
                 "result": result_text,
+            },
+            indent=2,
+        )
+
+
+# ==================== NewTaskBatchTool (C7: L2 批量并行原语) ====================
+
+
+class BatchItem(BaseModel):
+    """new_task_batch 的单个工作项：identity 必填且同批互异，其余字段自由。
+
+    自由字段供 template 占位符引用（{item.path} / {item.report_path} / ...），
+    pydantic extra="allow" 下可作属性访问。
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    identity: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description=("Unique identity of this work item within the batch (the file / jurisdiction / entity it covers). Dedup key component: re-dispatching the same identity is blocked, different identities never collide."),
+    )
+
+
+class NewTaskBatchInput(BaseModel):
+    """Input for NewTaskBatchTool."""
+
+    mode: str = Field(..., description="Mode slug for ALL expanded subtasks (must be delegable).")
+    template: str = Field(
+        ...,
+        max_length=600,
+        description=("Instruction template, ONE deliverable per item, using {item.<field>} placeholders (e.g. {item.path}, {item.report_path}) or bare {item}. Each item is expanded into its own self-contained subtask message. Escape literal braces as {{ }}."),
+    )
+    items: list[BatchItem] = Field(
+        ...,
+        min_length=1,
+        description=("Work items; each becomes ONE parallel subtask. Every item MUST carry a unique non-empty 'identity' plus whatever fields the templates reference. Max 16 items."),
+    )
+    acceptance_template: str = Field(
+        ...,
+        description=("Acceptance criteria template per item, decidable from that item's result alone (e.g. 'report for {item.identity} covers all 7 sections')."),
+    )
+    deliverable_template: str = Field(
+        ...,
+        max_length=300,
+        description=("Single-deliverable template per item, one short sentence (e.g. '交付/审查报告/{item.identity}.md')."),
+    )
+    output_file_template: str | None = Field(
+        None,
+        max_length=500,
+        description=("Optional per-item output file template. REQUIRED for report/review-type deliverables: full artifact to file, chat reply only ≤500-char summary + path."),
+    )
+    agent: str = Field("default", description="Agent profile name applied to all items.")
+    context: str | None = Field(None, description="Optional extra context appended to every item's metadata.context_note.")
+    timeout: float | None = Field(None, description="Optional wall-clock timeout in seconds applied to every item.")
+    token_budget: int | None = Field(None, description="Optional token budget applied to every item.")
+    tools: list[str] | None = Field(None, description="Optional minimal tool allowlist applied to every item.")
+
+
+class NewTaskBatchTool(CustomBaseTool):
+    """批量并行委派工具（C7/L2）：一个模板 + 清单，一次展开 N 个同构子任务。
+
+    为什么是独立工具而不是 N 个 new_task：LLM 偷懒把 N 件同类工作塞一个
+    子任务（事故实证）；N 个 new_task 会撞广度闸且 message 前缀雷同导致
+    去重误伤。展开后的节点就是普通子任务节点 —— 编排循环、wave、依赖
+    闸门、报告回注全部复用现有机制（KISS，无新执行路径）。
+    """
+
+    name: ClassVar[str] = "new_task_batch"
+    description: ClassVar[str] = (
+        "Expands ONE template over a list of items into N parallel subtasks (one deliverable "
+        "per item) and returns immediately. MANDATORY for N>=2 homogeneous work items (N "
+        "files / jurisdictions / entities): never merge them into one subtask, and never "
+        "write N separate new_task calls. Each item needs a unique 'identity'; templates use "
+        "{item.<field>} placeholders. Max 16 items; granularity contract applies per item."
+    )
+    args_schema: ClassVar[type[BaseModel]] = NewTaskBatchInput
+
+    def __init__(self, task_graph=None, workspace_root: str | None = None):
+        super().__init__()
+        self.task_graph = task_graph
+        self.workspace_root = workspace_root
+        self.logger = get_logger(__name__)
+
+    @staticmethod
+    def _fmt(tpl: str, item: BatchItem) -> str:
+        """模板展开：{item.<field>} / {item}；未知占位符抛 KeyError/AttributeError（对 LLM 可见）"""
+        return tpl.format(item=item)
+
+    async def _run(
+        self,
+        mode: str,
+        template: str,
+        items: list[BatchItem],
+        acceptance_template: str,
+        deliverable_template: str,
+        output_file_template: str | None = None,
+        agent: str = "default",
+        context: str | None = None,
+        timeout: float | None = None,
+        token_budget: int | None = None,
+        tools: list[str] | None = None,
+    ) -> str:
+        import json as _json
+        import uuid as _uuid
+
+        from dawei.agentic.errors import DuplicateSubtaskError, SubtaskGranularityError
+
+        # ---------- R5：条目硬顶 / identity 唯一性（fast-fail，对 LLM 可见）----------
+        try:
+            from dawei.config.settings import get_settings
+
+            _max_items = int(get_settings().agent_execution.max_batch_items)
+        except Exception:  # noqa: BLE001 — 配置不可用退回保守默认
+            _max_items = 16
+        if not items:
+            return _json.dumps(
+                {"type": "new_task_batch", "status": "error", "error": "empty_items", "message": "items must contain at least 1 item."},
+                indent=2,
+            )
+        if len(items) > _max_items:
+            return _json.dumps(
+                {
+                    "type": "new_task_batch",
+                    "status": "error",
+                    "error": "batch_limit",
+                    "message": f"items {len(items)} exceed max_batch_items={_max_items}.",
+                    "hint": f"Split into multiple batches of at most {_max_items} items each, or narrow the scope.",
+                },
+                indent=2,
+            )
+        _seen: dict[str, int] = {}
+        for idx, it in enumerate(items):
+            if not str(it.identity).strip():
+                return _json.dumps(
+                    {
+                        "type": "new_task_batch",
+                        "status": "error",
+                        "error": "invalid_identity",
+                        "message": f"items[{idx}].identity is empty; every item needs a unique non-empty identity.",
+                    },
+                    indent=2,
+                )
+            if it.identity in _seen:
+                return _json.dumps(
+                    {
+                        "type": "new_task_batch",
+                        "status": "error",
+                        "error": "duplicate_identity",
+                        "message": f"identity '{it.identity}' appears more than once (items[{_seen[it.identity]}] and items[{idx}]).",
+                        "hint": "Identities must be unique within a batch — they are the dedup key for re-dispatch.",
+                    },
+                    indent=2,
+                )
+            _seen[it.identity] = idx
+
+        # ---------- 上下文解析（与 RunTaskTool 同模式：临时实例继承运行期上下文）----------
+        task_graph = self._resolve_task_graph()
+        if not task_graph:
+            return _json.dumps(
+                {
+                    "type": "new_task_batch",
+                    "status": "error",
+                    "message": "No task graph available in this context; batch dispatch is NOT possible. Use new_task or handle items yourself.",
+                },
+                indent=2,
+            )
+
+        try:
+            from dawei.agentic.agent_profile import resolve as resolve_agent_profile
+
+            profile = resolve_agent_profile(agent, workspace_root=self.workspace_root)
+        except ValueError as e:
+            return _json.dumps({"type": "new_task_batch", "status": "error", "message": str(e)}, indent=2)
+
+        creator = NewTaskTool(self.task_graph, self.workspace_root)
+        creator.user_workspace = self.user_workspace
+        available_modes = creator._load_available_modes()
+        if mode not in available_modes:
+            return _json.dumps(
+                {
+                    "type": "new_task_batch",
+                    "status": "error",
+                    "message": f"Mode '{mode}' not found",
+                    "available_modes": list(available_modes.keys()),
+                },
+                indent=2,
+            )
+        try:
+            from dawei.mode.registry import get_registry
+
+            if not get_registry(self.workspace_root).can_delegate_to(mode):
+                return _json.dumps(
+                    {
+                        "type": "new_task_batch",
+                        "status": "error",
+                        "message": f"Mode '{mode}' cannot be delegated to (can_delegate=false)",
+                    },
+                    indent=2,
+                )
+        except Exception:  # noqa: BLE001 — can_delegate 校验不可用不阻断（mode 存在性已确认）
+            self.logger.debug("can_delegate check unavailable for new_task_batch", exc_info=True)
+
+        components = _import_task_graph_components()
+        TodoItem = components["TodoItem"]
+        TodoStatus = components["TodoStatus"]
+
+        batch_id = _uuid.uuid4().hex[:12]
+        dispatch_results: list[dict] = []
+        created_ids: list[str] = []
+
+        for item in items:
+            # 模板展开（未知占位符 = 模板与 items 字段不匹配 → 逐项 error，不炸整批）
+            try:
+                message = self._fmt(template, item)
+                acceptance = self._fmt(acceptance_template, item)
+                deliverable = self._fmt(deliverable_template, item)
+                output_file = self._fmt(output_file_template, item) if output_file_template else None
+            except (KeyError, AttributeError, IndexError, ValueError) as e:
+                dispatch_results.append(
+                    {
+                        "identity": item.identity,
+                        "status": "error",
+                        "error": "template_placeholder",
+                        "message": f"template references a field this item does not have: {e}",
+                    },
+                )
+                continue
+
+            initial_todos = [
+                TodoItem(content=f"Start subtask in {mode} mode", status=TodoStatus.PENDING),
+                TodoItem(content=f"Process: {message}", status=TodoStatus.PENDING),
+            ]
+            try:
+                subtask_id = await creator._create_subtask(
+                    mode,
+                    message,
+                    initial_todos,
+                    profile=profile,
+                    context_note=context,
+                    timeout_seconds=timeout,
+                    token_budget=token_budget,
+                    acceptance_criteria=acceptance,
+                    tools=tools,
+                    deliverable=deliverable,
+                    output_file=output_file,
+                    batch_id=batch_id,
+                    item_identity=item.identity,
+                )
+                dispatch_results.append({"identity": item.identity, "status": "created", "subtask_id": subtask_id})
+                if subtask_id:
+                    created_ids.append(subtask_id)
+            except SubtaskGranularityError as gran_err:
+                _gdet = gran_err.details or {}
+                try:  # C15：粒度熔断指标（fire-and-forget）
+                    from dawei.agentic.subtask_metrics import get_metrics
+
+                    get_metrics().record_granularity_rejected(str(_gdet.get("rule") or "unknown"))
+                except Exception:  # noqa: BLE001 — 指标失败绝不影响主流程
+                    pass
+                dispatch_results.append(
+                    {
+                        "identity": item.identity,
+                        "status": "error",
+                        "error": "granularity_contract",
+                        "rule": _gdet.get("rule"),
+                        "evidence": _gdet.get("evidence"),
+                        "hint": _gdet.get("hint"),
+                    },
+                )
+            except DuplicateSubtaskError as dup_err:
+                _det = dup_err.details or {}
+                dispatch_results.append(
+                    {
+                        "identity": item.identity,
+                        "status": "duplicate",
+                        "existing_subtask_id": _det.get("existing_subtask_id"),
+                        "hint": "Same goal already dispatched (same identity); wait for its report or reuse its result instead of re-dispatching.",
+                    },
+                )
+            except Exception as e:  # noqa: BLE001 — 单项失败对 LLM 可见，不炸整批
+                self.logger.exception(f"new_task_batch: item '{item.identity}' creation failed: ")
+                dispatch_results.append({"identity": item.identity, "status": "error", "message": str(e)})
+
+        _ok = len(created_ids)
+        try:  # C15：批量派发指标（fire-and-forget，逐项结果分布）
+            from dawei.agentic.subtask_metrics import get_metrics
+
+            get_metrics().record_batch_dispatch(
+                items=len(items),
+                created=_ok,
+                duplicate=sum(1 for r in dispatch_results if r.get("status") == "duplicate"),
+                error=sum(1 for r in dispatch_results if r.get("status") == "error"),
+            )
+        except Exception:  # noqa: BLE001 — 指标失败绝不影响主流程
+            pass
+        self.logger.info(
+            f"new_task_batch: batch {batch_id} dispatched {_ok}/{len(items)} items in {mode} mode",
+        )
+        return _json.dumps(
+            {
+                "type": "new_task_batch",
+                "batch_id": batch_id,
+                "mode": mode,
+                "status": "dispatched" if _ok else "error",
+                "created_count": _ok,
+                "results": dispatch_results,
+                "note": ("Items are ordinary parallel subtasks; reports are injected back when they finish. Duplicates were skipped (see results); errored items may be re-dispatched individually after fixing the reported reason."),
             },
             indent=2,
         )
@@ -1572,7 +1994,7 @@ class MessageTaskTool(CustomBaseTool):
 class UpdateTodoListInput(BaseModel):
     """Input for UpdateTodoListTool."""
 
-    todos: List[str] = Field(
+    todos: list[str] = Field(
         ...,
         description="List of todo items as an array of strings. Each item must include a status marker and description. "
         'Status markers: "[x]" for completed, "[-]" for in-progress, "[ ]" for pending. '
@@ -1593,7 +2015,7 @@ class UpdateTodoListTool(CustomBaseTool):
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
 
-    def _run(self, todos: List[str]) -> str:
+    def _run(self, todos: list[str]) -> str:
         """Update todo list with enhanced task management."""
         try:
             # 获取组件
@@ -1643,7 +2065,13 @@ class UpdateTodoListTool(CustomBaseTool):
             # 如果有 TaskGraph，更新 TODO 列表
             # 【2026-09-12】worker 线程无事件循环，asyncio.create_task 必崩 → 经主 loop 调度
             if self._resolve_task_graph():
-                self._schedule_on_main_loop(self._update_todos(parsed_todos))
+                # C25：在 worker 线程内捕获子任务上下文（context 随 to_thread 复制
+                # 到本线程，但 _schedule_on_main_loop 在主 loop 的独立 Task 中执行，
+                # 不携带本线程 context）→ 必须显式传参。
+                from dawei.agentic.subtask_events import get_current_subtask
+
+                subtask_info = get_current_subtask()
+                self._schedule_on_main_loop(self._update_todos(parsed_todos, subtask_info))
 
             self.logger.info(f"TODO list update requested: {total} items")
 
@@ -1656,8 +2084,12 @@ class UpdateTodoListTool(CustomBaseTool):
                 indent=2,
             )
 
-    async def _update_todos(self, todos):
-        """异步更新 TODO 列表（新架构）"""
+    async def _update_todos(self, todos, subtask_info: dict | None = None):
+        """异步更新 TODO 列表（新架构）
+
+        C25：subtask_info 非空（子任务上下文中调用）时，额外发射
+        subtask_progress 步级事件（EventBus + WS 双通道，纯 UI 态）。
+        """
         try:
             task_graph = self._resolve_task_graph()
             if not task_graph:
@@ -1671,6 +2103,18 @@ class UpdateTodoListTool(CustomBaseTool):
                     f"Updated TODO list for task {root_task.task_id}: {len(todos)} items",
                 )
 
+            # C25：子任务 todo 步级进度事件（去重后 fire-and-forget）
+            if subtask_info and subtask_info.get("subtask_id"):
+                from dawei.agentic.subtask_events import emit_subtask_progress
+
+                await emit_subtask_progress(
+                    subtask_id=subtask_info["subtask_id"],
+                    parent_id=subtask_info.get("parent_id"),
+                    batch_id=subtask_info.get("batch_id"),
+                    item_identity=subtask_info.get("item_identity"),
+                    todos=list(todos),
+                )
+
         except (AttributeError, ValueError, KeyError) as e:
             self.logger.error(f"Failed to update TODO list: {e}", exc_info=True)
             raise  # Fast Fail: surface the error to caller
@@ -1681,6 +2125,10 @@ class GetTaskStatusInput(BaseModel):
     """Input for GetTaskStatusTool."""
 
     task_id: str | None = Field(None, description="Task ID to get status for (optional).")
+    include_subtasks: bool = Field(
+        True,
+        description="Include a compact per-subtask array (status/todos/result/tokens) for orchestration reads (default true).",
+    )
 
 
 class GetTaskStatusTool(CustomBaseTool):
@@ -1695,7 +2143,7 @@ class GetTaskStatusTool(CustomBaseTool):
         self.task_graph = task_graph
         self.logger = get_logger(__name__)
 
-    def _run(self, task_id: str | None = None) -> str:
+    def _run(self, task_id: str | None = None, include_subtasks: bool = True) -> str:
         """Get task status with enhanced task management."""
         try:
             if not self._resolve_task_graph():
@@ -1707,8 +2155,7 @@ class GetTaskStatusTool(CustomBaseTool):
                     indent=2,
                 )
 
-            result = run_async(self._get_real_status(task_id))
-            return result
+            return run_async(self._get_real_status(task_id, include_subtasks))
 
         except Exception as e:
             self.logger.exception("Error getting task status: ")
@@ -1717,7 +2164,7 @@ class GetTaskStatusTool(CustomBaseTool):
                 indent=2,
             )
 
-    async def _get_real_status(self, task_id: str | None = None) -> str:
+    async def _get_real_status(self, task_id: str | None = None, include_subtasks: bool = True) -> str:
         """获取真实任务状态（新架构）"""
         try:
             task_graph = self._resolve_task_graph()
@@ -1739,6 +2186,11 @@ class GetTaskStatusTool(CustomBaseTool):
                 "requested_task_id": task_id,
             }
 
+            # C11：紧凑子任务数组（编排者一眼判读"谁在跑/谁完了/花了多少"）。
+            # hierarchy/statistics 键保持原样不动 —— 新增键纯增量，向后兼容。
+            if include_subtasks:
+                result["subtasks"] = await self._collect_subtask_briefs(task_graph)
+
             return json.dumps(result, indent=2)
 
         except Exception as e:
@@ -1747,6 +2199,119 @@ class GetTaskStatusTool(CustomBaseTool):
                 {"status": "error", "message": f"Error getting task status: {e!s}"},
                 indent=2,
             )
+
+    async def _collect_subtask_briefs(self, task_graph) -> list[dict]:
+        """C11：收集全部子任务节点的紧凑摘要
+
+        每项：task_node_id/parent_id/status/description(≤80)/
+        todos{total,completed}/result(≤120)/tokens_used，可选 batch_id/
+        item_identity（new_task_batch 派发时写入 metadata）。读取失败降级
+        空数组（查询语义，FAST FAIL 交给上层调用方判读）。
+        """
+        try:
+            nodes = await task_graph.get_all_tasks()
+        except Exception:  # noqa: BLE001 — 查询失败降级空数组
+            self.logger.exception("Failed to collect subtask briefs: ")
+            return []
+
+        briefs: list[dict] = []
+        for node in nodes:
+            parent_id = getattr(node, "parent_id", None)
+            if not parent_id:
+                continue  # 根任务不在子任务列表
+            data = getattr(node, "data", None)
+            meta = dict(getattr(data, "metadata", None) or {})
+            total = completed = 0
+            try:
+                todos = await task_graph.get_todos(node.task_node_id)
+                total = len(todos)
+                completed = sum(1 for t in todos if getattr(getattr(t, "status", None), "value", "") == "completed")
+            except Exception:  # noqa: BLE001 — todos 读取失败只影响摘要字段
+                pass
+            brief = {
+                "task_node_id": node.task_node_id,
+                "parent_id": parent_id,
+                "status": node.status.value if hasattr(node.status, "value") else str(node.status),
+                "description": str(getattr(data, "description", "") or "")[:80],
+                "todos": {"total": total, "completed": completed},
+                "result": (str(getattr(data, "result", None) or "")[:120] or None),
+                "tokens_used": getattr(data, "tokens_used", None),
+            }
+            if meta.get("batch_id"):
+                brief["batch_id"] = str(meta["batch_id"])
+            if meta.get("item_identity"):
+                brief["item_identity"] = str(meta["item_identity"])[:40]
+            briefs.append(brief)
+        return briefs
+
+
+# C11: Wait Tasks Tool —— 编排者阻塞等待一批子任务到达终态
+class WaitTasksInput(BaseModel):
+    """Input for WaitTasksTool."""
+
+    task_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        description="Task node IDs to wait for (task_node_id values returned by new_task/new_task_batch).",
+    )
+    timeout_seconds: int = Field(
+        45,
+        ge=1,
+        le=300,
+        description="Max seconds to wait before returning current statuses with timed_out=true (default 45; keep below the tool-layer timeout).",
+    )
+
+
+class WaitTasksTool(CustomBaseTool):
+    """Tool for waiting until a set of subtasks reach a terminal status."""
+
+    name: ClassVar[str] = "wait_tasks"
+    description: ClassVar[str] = (
+        "Waits until all given subtasks reach a terminal status (completed/failed/aborted/cancelled), "
+        "then returns each task's final status. Use for orchestration: dispatch subtasks via new_task/new_task_batch, "
+        "then call this once to block until the batch finishes instead of polling get_task_status in a loop. "
+        "On timeout it returns current statuses with timed_out=true (never raises)."
+    )
+    args_schema: ClassVar[type[BaseModel]] = WaitTasksInput
+
+    def __init__(self, task_graph=None):
+        super().__init__()
+        self.task_graph = task_graph
+        self.logger = get_logger(__name__)
+
+    def _run(self, task_ids: list[str], timeout_seconds: int = 45) -> str:
+        try:
+            if not self._resolve_task_graph():
+                return json.dumps({"status": "error", "message": "Task graph not available."}, indent=2)
+            return run_async(self._wait_for_tasks(task_ids, timeout_seconds))
+        except Exception as e:
+            self.logger.exception("Error waiting for tasks: ")
+            return json.dumps({"status": "error", "message": f"Error waiting for tasks: {e!s}"}, indent=2)
+
+    async def _wait_for_tasks(self, task_ids: list[str], timeout_seconds: int) -> str:
+        """轮询等待所有任务到达终态（terminal 集合与 TaskGraph._TERMINAL_STATUSES 对齐）"""
+        import asyncio as _asyncio
+
+        task_graph = self._resolve_task_graph()
+        terminal = {"completed", "failed", "aborted", "cancelled"}
+        deadline = time.monotonic() + timeout_seconds
+        statuses: dict[str, str] = {}
+        while True:
+            statuses = {}
+            for tid in task_ids:
+                st = await task_graph.get_task_status(tid)
+                statuses[tid] = st.value if st is not None else "unknown"
+            all_terminal = all(s in terminal for s in statuses.values())
+            if all_terminal or time.monotonic() >= deadline:
+                return json.dumps(
+                    {
+                        "type": "wait_tasks",
+                        "timed_out": not all_terminal,
+                        "results": [{"task_id": tid, "status": statuses[tid], "terminal": statuses[tid] in terminal} for tid in task_ids],
+                    },
+                    indent=2,
+                )
+            await _asyncio.sleep(min(1.0, deadline - time.monotonic()))
 
 
 # ==================== WorkflowToolFactory（已删除 2026-09-12） ====================

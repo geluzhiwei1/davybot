@@ -9,7 +9,7 @@ import logging
 import os
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
@@ -22,18 +22,22 @@ from dawei.config.logging_config import LoggingConfig
 logger = logging.getLogger(__name__)
 
 # Known weak/placeholder secrets that must NOT be used in production
-_WEAK_SECRETS = frozenset({
-    "your_jwt_secret_here_change_in_production",
-    "your-secret-key-change-in-production",
-    "dev-secret-key-change-in-production-min-32-chars",
-    "change-me-in-production",
-    "secret",
-    "changeme",
-})
+_WEAK_SECRETS = frozenset(
+    {
+        "your_jwt_secret_here_change_in_production",
+        "your-secret-key-change-in-production",
+        "dev-secret-key-change-in-production-min-32-chars",
+        "change-me-in-production",
+        "secret",
+        "changeme",
+    }
+)
 
-_WEAK_ENCRYPTION_KEYS = frozenset({
-    "your_32_character_encryption_key_here",
-})
+_WEAK_ENCRYPTION_KEYS = frozenset(
+    {
+        "your_32_character_encryption_key_here",
+    }
+)
 
 
 class DatabaseConfig(BaseSettings):
@@ -106,17 +110,13 @@ class SecurityConfig(BaseSettings):
     encryption_key: str = Field(default="")
     license_secret: str = Field(default="")
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context, /) -> None:
         """Validate secrets are not using weak or empty defaults."""
         is_dev = os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev")
 
         if not self.jwt_secret or len(self.jwt_secret) < 32:
             if not is_dev:
-                raise ValueError(
-                    "FATAL: JWT_SECRET is required (>= 32 chars). "
-                    "Set JWT_SECRET via environment variable. "
-                    'Generate: python -c "import secrets; print(secrets.token_hex(32))"'
-                )
+                raise ValueError('FATAL: JWT_SECRET is required (>= 32 chars). Set JWT_SECRET via environment variable. Generate: python -c "import secrets; print(secrets.token_hex(32))"')
             if self.jwt_secret in _WEAK_SECRETS or not self.jwt_secret:
                 # Allow empty in dev only if set explicitly? No — warn and default
                 logger.warning("jwt_secret missing or using weak default — OK for dev only")
@@ -125,10 +125,7 @@ class SecurityConfig(BaseSettings):
 
         if not self.encryption_key or len(self.encryption_key) < 32:
             if not is_dev:
-                raise ValueError(
-                    "FATAL: ENCRYPTION_KEY is required (>= 32 chars). "
-                    "Set ENCRYPTION_KEY via environment variable (>= 32 chars)."
-                )
+                raise ValueError("FATAL: ENCRYPTION_KEY is required (>= 32 chars). Set ENCRYPTION_KEY via environment variable (>= 32 chars).")
             if self.encryption_key in _WEAK_ENCRYPTION_KEYS or not self.encryption_key:
                 logger.warning("encryption_key missing or using weak default — OK for dev only")
                 if not self.encryption_key:
@@ -136,11 +133,7 @@ class SecurityConfig(BaseSettings):
 
         if not self.license_secret or len(self.license_secret) < 32:
             if not is_dev:
-                raise ValueError(
-                    "FATAL: LICENSE_SECRET is required (>= 32 chars). "
-                    "Set LICENSE_SECRET via environment variable. "
-                    'Generate: python -c "import secrets; print(secrets.token_hex(32))"'
-                )
+                raise ValueError('FATAL: LICENSE_SECRET is required (>= 32 chars). Set LICENSE_SECRET via environment variable. Generate: python -c "import secrets; print(secrets.token_hex(32))"')
             if self.license_secret in _WEAK_SECRETS or not self.license_secret:
                 logger.warning("license_secret missing or using weak default — OK for dev only")
                 if not self.license_secret:
@@ -487,11 +480,17 @@ class AgentExecutionConfig(BaseSettings):
     enable_skills: bool = Field(default=True)
     enable_mcp: bool = Field(default=True)
     auto_approve_tools: bool = Field(default=True)
-    max_concurrent_subtasks: int = Field(default=3)
+    # 创建/广度闸（C9 闸门重划 2026-09-23）：创建侧宽松 + 硬顶明确 ——
+    # 正确的批量并行（new_task_batch，≤max_batch_items）不再被闸门惩罚，
+    # token 防线移到每子任务预算（§3.4）+ dispatch_identity 去重熔断。
+    max_concurrent_subtasks: int = Field(default=8)
     # P1b ⑦ 广度上限：同父活跃(非终态，含 interactive)子任务数上限，超限拒绝创建。
     # 图谱层锁内强制(结构不变量，兜批量并行派发的工具层 TOCTOU)；
-    # 工具层另有图级 max_concurrent_subtasks fast-path(语义：全局在飞数)。
-    max_active_subtasks: int = Field(default=3)
+    # 工具层另有图级 max_concurrent_subtasks fast-path(语义：全局在飞数)；
+    # batch 合法形态（metadata.batch_id 在场）放行 —— 单次硬顶由 max_batch_items 把守。
+    max_active_subtasks: int = Field(default=8)
+    # C7/R5：单次 new_task_batch 条目硬顶，超限工具层 fast-fail（对 LLM 可见）
+    max_batch_items: int = Field(default=16)
     # 子任务派生深度上限（P3-5，root=0；对齐 Claude Code 子代理 spawn 深度限制）
     max_subtask_depth: int = Field(default=3)
     # P2-7 子任务独立会话隔离（2026-09-17 P1a 转正：默认开启）
@@ -511,15 +510,17 @@ class AgentExecutionConfig(BaseSettings):
     # 级联中止整轮任务（asyncio.wait_for 超时 → SUBTASK_ABORTED）。
     # env: AGENT_CHAT_TASK_TIMEOUT
     chat_task_timeout: int = Field(default=-1)
-    # 子任务（new_task 派发）墙钟超时全局闸门（秒）；-1=不限（默认）。
-    # 背景：编排器 LLM 常声明 timeout=1800（30 分钟），对长综述类子任务太短；
-    # 默认不启用 deadline 判定。>0 时作为全局上限：节点声明值更小则取节点值。
+    # 子任务（new_task 派发）墙钟超时全局闸门（秒）；-1=不限。
+    # C14（2026-09-23）默认打开 900s：单文件审查级子任务 900s 足够；无兜底的
+    # 子任务会无限烧 token（2026-09-22 事故链的一环）。节点显式声明值更小则
+    # 取节点值（min 语义，判定点 task_node_executor._check_budget_and_deadline）。
     # env: AGENT_SUBTASK_TIMEOUT
-    subtask_timeout: int = Field(default=-1)
-    # 子任务 token 预算全局闸门；-1=不限（默认，暂不限制预算）。
-    # >0 时作为全局上限：节点声明值更小则取节点值。
+    subtask_timeout: int = Field(default=900)
+    # 子任务 token 预算全局闸门；-1=不限。
+    # C14 默认打开 200_000：批量 fan-out 单项预算受此兜底，总吞吐由执行信号量
+    # （max_parallel_tasks）控制。节点显式声明值更小则取节点值。
     # env: AGENT_SUBTASK_TOKEN_BUDGET
-    subtask_token_budget: int = Field(default=-1)
+    subtask_token_budget: int = Field(default=200_000)
 
 
 # ============================================================================

@@ -7,11 +7,10 @@
 
 import asyncio
 import json
+import re
 import time
 from datetime import datetime
 from typing import Any
-
-from dawei.core.datetime_compat import UTC
 
 from dawei import get_dawei_home
 from dawei.agentic.agent_config import Config
@@ -19,6 +18,7 @@ from dawei.agentic.checkpoint_manager import (
     CheckpointType,
     IntelligentCheckpointManager,
 )
+from dawei.core.datetime_compat import UTC
 from dawei.core.errors import CheckpointError, LLMError
 from dawei.core.events import TaskEventType, emit_typed_event
 from dawei.core.exceptions import LLMContextOverflowError
@@ -49,6 +49,25 @@ from dawei.task_graph.todo_models import TodoItem, TodoStatus
 from dawei.workspace.user_workspace import UserWorkspace
 
 from .tool_message_handler import ToolMessageHandle
+
+# C13 瞬时 provider 错误特征（2026-09-22 事故 c5d42736：网关 300s 流超时 → 504
+# SSE error 事件以 HTTP 200 包装下发 → LLMError("Provider error (504): ...")，
+# 旧分类落入"不可重试"分支 → 子任务/父任务/整图三级失败）。网关类 5xx
+# （502/503/504）与流中断属瞬时故障：同节点自动重试 1 次大概率恢复。
+_TRANSIENT_PROVIDER_ERROR_RE = re.compile(r"provider error\s*\(\s*50[234]\s*\)")
+
+
+def is_transient_llm_provider_error(error_msg: str | None) -> bool:
+    """C13：瞬时 LLM provider 错误判定（自动重试依据，大小写不敏感）。
+
+    覆盖：Provider error (502/503/504)（SSE 包装的网关 5xx）、stream timeout、
+    connection closed / server disconnected（流中断）。4xx/限流/余额类不在
+    此列 —— 它们重试也不会成功，仍走 fast-fail。
+    """
+    if not error_msg:
+        return False
+    msg = str(error_msg).lower()
+    return bool(_TRANSIENT_PROVIDER_ERROR_RE.search(msg) or "stream timeout" in msg or "connection closed" in msg or "server disconnected" in msg)
 
 
 class TaskNodeExecutionEngine:
@@ -167,10 +186,9 @@ class TaskNodeExecutionEngine:
     def _check_budget_and_deadline(self) -> str | None:
         """P3-3：每轮主循环检查 token 预算与墙钟超时（受全局闸门控制）。
 
-        全局闸门（2026-09-21）：AGENT_SUBTASK_TOKEN_BUDGET / AGENT_SUBTASK_TIMEOUT，
-        -1 = 不限（默认：暂不限制预算；节点/LLM 声明的 timeout 如 1800s 对长任务
-        太短，默认不启用 deadline 判定）。>0 时作为全局上限：节点声明值更小则取
-        节点值，节点未声明则用全局值。
+        全局闸门：AGENT_SUBTASK_TOKEN_BUDGET / AGENT_SUBTASK_TIMEOUT，-1 = 不限
+        （C14 起默认 200_000 / 900，此前 -1 全关）。>0 时作为全局上限：节点声明
+        值更小则取节点值，节点未声明则用全局值。
 
         Returns:
             超限时返回 task_completion 失败 JSON（build_budget_failure_result），
@@ -298,6 +316,14 @@ class TaskNodeExecutionEngine:
         # P1b ⑧ 记账：起跑时间写回 TaskData（首跳即定格；续跑/重试不重置）
         self._record_started_at()
 
+        # C25：子任务上下文 contextvar（worker 线程里的 update_todo_list 靠它
+        # 识别"我属于哪个子任务"并发射 subtask_progress）。根任务不设置。
+        # 注意 context 会随 asyncio.create_task 复制到 _run_task_loop 及其
+        # to_thread worker，故在 create_task 之前设置。
+        from .subtask_events import reset_current_subtask, set_current_subtask
+
+        _subtask_ctx_token = set_current_subtask(self._build_subtask_context())
+
         # 创建执行任务
         self.execution_task = asyncio.create_task(self._run_task_loop())
 
@@ -313,10 +339,38 @@ class TaskNodeExecutionEngine:
         finally:
             # P1b ⑧ 记账：终态时回写 tokens_used / completed_at（报告回显成本数据源）
             self._record_accounting_on_finish()
+            # C25：恢复子任务上下文
+            reset_current_subtask(_subtask_ctx_token)
             # 清理
             self.execution_task = None
 
         return result
+
+    def _build_subtask_context(self) -> dict | None:
+        """C25：构建子任务上下文（根任务返回 None）
+
+        值：{"subtask_id","parent_id","batch_id","item_identity"}，后两者来自
+        TaskData.metadata（new_task_batch 派发时写入）。
+        """
+        try:
+            node = self.task_node
+            parent_id = getattr(node, "parent_id", None)
+            if not parent_id:
+                return None
+            data = getattr(node, "data", None)
+            metadata = dict(getattr(data, "metadata", None) or {})
+            ctx: dict = {
+                "subtask_id": node.task_node_id,
+                "parent_id": parent_id,
+            }
+            if metadata.get("batch_id"):
+                ctx["batch_id"] = str(metadata["batch_id"])
+            if metadata.get("item_identity"):
+                ctx["item_identity"] = str(metadata["item_identity"])
+            return ctx
+        except Exception:  # noqa: BLE001 — 上下文构建失败不影响执行
+            self.logger.exception("Failed to build subtask context: ")
+            return None
 
     def _record_started_at(self) -> None:
         """P1b ⑧：started_at 写回 TaskData（幂等：已有值不覆盖）"""
@@ -468,6 +522,7 @@ class TaskNodeExecutionEngine:
                 else:
                     # Fallback: 生成临时ID (向后兼容)
                     import uuid
+
                     self._current_message_id = f"msg_{self.task_node.task_node_id}_{self._message_counter}_{uuid.uuid4().hex[:8]}"
                     self.logger.warning(
                         f"[MESSAGE_ID] LLM API did not provide message_id, using generated: {self._current_message_id}",
@@ -526,6 +581,7 @@ class TaskNodeExecutionEngine:
                 else:
                     # Fallback: 生成临时ID (向后兼容)
                     import uuid
+
                     self._current_message_id = f"msg_{self.task_node.task_node_id}_{self._message_counter}_{uuid.uuid4().hex[:8]}"
                     self.logger.warning(
                         f"[MESSAGE_ID] LLM API did not provide message_id, using generated: {self._current_message_id}",
@@ -580,6 +636,7 @@ class TaskNodeExecutionEngine:
         else:
             try:
                 from dawei.config.settings import get_settings
+
                 final_llm_timeout = get_settings().agent_timeout.llm_call_timeout
             except Exception:
                 final_llm_timeout = 300.0  # 5分钟 fallback
@@ -596,8 +653,7 @@ class TaskNodeExecutionEngine:
             final_stream_idle_timeout = 120  # 默认120秒
 
         self.logger.info(
-            f"Timeout configuration for task '{self.task_node.mode or 'unknown'}': "
-            f"LLM={final_llm_timeout:.0f}s, StreamIdle={final_stream_idle_timeout:.0f}s, Tools={final_tool_timeout:.0f}s",
+            f"Timeout configuration for task '{self.task_node.mode or 'unknown'}': LLM={final_llm_timeout:.0f}s, StreamIdle={final_stream_idle_timeout:.0f}s, Tools={final_tool_timeout:.0f}s",
         )
 
         self._tool_message_handler._has_attempt_completion = False
@@ -621,9 +677,7 @@ class TaskNodeExecutionEngine:
                 _data = getattr(self.task_node, "data", None)
                 _desc = _as_text(getattr(_data, "description", None))
                 _marker = f"[subtask {self.task_node.task_node_id}]"
-                _already = any(
-                    _marker in str(getattr(_m, "content", "")) for _m in getattr(_conv, "messages", []) or []
-                )
+                _already = any(_marker in str(getattr(_m, "content", "")) for _m in getattr(_conv, "messages", []) or [])
                 if _conv is not None and _desc and not _already:
                     _meta = getattr(_data, "metadata", None) or {}
                     _parts = [f"{_marker} {_desc}"]
@@ -648,10 +702,7 @@ class TaskNodeExecutionEngine:
         if _n_tools == 0:
             # mode-工具解耦（方案 §4.1）：CORE_TOOLS 恒在使空列表结构性不可能；
             # tools=[] 意味着装配契约被破坏（fail-closed，立即失败而非裸吐 DSML）
-            raise RuntimeError(
-                "build_messages returned tools=[] — tool assembly contract broken "
-                "(CORE_TOOLS must always be present; check tool_manager/session pool)"
-            )
+            raise RuntimeError("build_messages returned tools=[] — tool assembly contract broken (CORE_TOOLS must always be present; check tool_manager/session pool)")
 
         if not self._llm_service.get_current_provider():
             # 使用 LLMProvider 获取模式特定的配置
@@ -839,8 +890,7 @@ class TaskNodeExecutionEngine:
 
                     # 首次溢出：强制压缩对话并重试
                     self.logger.warning(
-                        f"LLM context overflow detected (attempt {context_retry + 1}), "
-                        f"forcing aggressive compression and retrying...",
+                        f"LLM context overflow detected (attempt {context_retry + 1}), forcing aggressive compression and retrying...",
                     )
                     try:
                         compressed = await self._force_compress_conversation()
@@ -896,8 +946,7 @@ class TaskNodeExecutionEngine:
 
                     if is_stream_idle:
                         self.logger.warning(
-                            f"LLM stream idle for {final_stream_idle_timeout:.0f}s "
-                            f"(can_retry={can_retry}): {err_str}",
+                            f"LLM stream idle for {final_stream_idle_timeout:.0f}s (can_retry={can_retry}): {err_str}",
                         )
                     else:
                         self.logger.exception(f"LLM call timeout after {final_llm_timeout}s")
@@ -910,10 +959,7 @@ class TaskNodeExecutionEngine:
 
                     if is_stream_idle:
                         await self._send_error_to_frontend(
-                            error_message=(
-                                f"LLM流式响应空闲超时（{final_stream_idle_timeout:.0f}秒无输出，"
-                                f"自动重试已用尽），请稍后重试或简化任务。"
-                            ),
+                            error_message=(f"LLM流式响应空闲超时（{final_stream_idle_timeout:.0f}秒无输出，自动重试已用尽），请稍后重试或简化任务。"),
                             error_type="stream_idle_timeout",
                             details={
                                 "stream_idle_timeout": final_stream_idle_timeout,
@@ -984,6 +1030,20 @@ class TaskNodeExecutionEngine:
                             },
                         )
                     else:
+                        # C13：瞬时 provider 错误（502/503/504 SSE 包装 / stream
+                        # timeout / 流中断）且服务端还会自动重试 → 不发致命
+                        # error 帧（前端收到 error 帧即终止会话，而重试大概率
+                        # 成功）；静默上抛由 task_graph_excutor 指数退避重试，
+                        # 重试耗尽时才统一发最终错误（与 TimeoutError 路径同款）。
+                        try:
+                            _transient_can_retry = bool(self.task_node.data.can_retry())
+                        except Exception:
+                            _transient_can_retry = False
+                        if _transient_can_retry and is_transient_llm_provider_error(error_str):
+                            self.logger.warning(
+                                f"Transient LLM provider error (auto-retry pending): {error_str[:200]}",
+                            )
+                            raise
                         # 其他LLM错误
                         self.logger.exception("LLM API error: ")
                         await self._send_error_to_frontend(
@@ -1042,10 +1102,7 @@ class TaskNodeExecutionEngine:
         """
         # 人机追问不限时：本批含 ask_followup_question 且其超时配置 <= 0 时，
         # 豁免外层工具总超时（stop_wait 仍保证 agent_stop 即时中断）
-        if any(
-            getattr(tc.function, "name", "") == "ask_followup_question"
-            for tc in getattr(complete_message, "tool_calls", []) or []
-        ):
+        if any(getattr(tc.function, "name", "") == "ask_followup_question" for tc in getattr(complete_message, "tool_calls", []) or []):
             try:
                 from dawei.config.settings import get_settings
 
@@ -1092,7 +1149,7 @@ class TaskNodeExecutionEngine:
             self.logger.exception(f"Tool execution timeout after {timeout}s")
         except (json.JSONDecodeError, RuntimeError, ValueError) as e:
             # 工具参数解析失败（通常因 SSE 流截断导致 JSON 不完整）
-            self.logger.error(
+            self.logger.exception(
                 f"Tool execution failed (likely truncated stream): {type(e).__name__}: {e}",
             )
             # 将截断错误作为 tool result 返回给 LLM，使其能在下一轮自动重试
@@ -1102,9 +1159,7 @@ class TaskNodeExecutionEngine:
                     ToolMessage(
                         content=json.dumps(
                             {
-                                "error": "Tool call was truncated due to output length limit. "
-                                "Please split this operation into smaller calls "
-                                "(e.g. use smart_text_edit instead of write_text_file for large files).",
+                                "error": "Tool call was truncated due to output length limit. Please split this operation into smaller calls (e.g. use smart_text_edit instead of write_text_file for large files).",
                                 "details": str(e)[:500],
                             },
                             ensure_ascii=False,
@@ -1279,15 +1334,9 @@ class TaskNodeExecutionEngine:
                 current_msg_count = len(self.active_conversation.messages)
             if current_msg_count <= prev_msg_count:
                 consecutive_no_progress += 1
-                self.logger.warning(
-                    f"No message progress (consecutive={consecutive_no_progress}/{max_no_progress}, "
-                    f"msg_count={current_msg_count}, iteration={iteration})"
-                )
+                self.logger.warning(f"No message progress (consecutive={consecutive_no_progress}/{max_no_progress}, msg_count={current_msg_count}, iteration={iteration})")
                 if consecutive_no_progress >= max_no_progress:
-                    self.logger.error(
-                        f"Aborting task loop: {consecutive_no_progress} consecutive iterations "
-                        f"with no message progress (silent LLM failure)."
-                    )
+                    self.logger.error(f"Aborting task loop: {consecutive_no_progress} consecutive iterations with no message progress (silent LLM failure).")
                     raise LLMError(
                         "openai",
                         "Task loop aborted: repeated empty LLM responses (silent provider failure).",
@@ -1301,15 +1350,9 @@ class TaskNodeExecutionEngine:
             _this_round_empty = self._check_last_round_empty_tool_results()
             if _this_round_empty:
                 consecutive_empty_tools += 1
-                self.logger.warning(
-                    f"Empty tool results detected (consecutive={consecutive_empty_tools}/{max_empty_tool_results}, "
-                    f"iteration={iteration})"
-                )
+                self.logger.warning(f"Empty tool results detected (consecutive={consecutive_empty_tools}/{max_empty_tool_results}, iteration={iteration})")
                 if consecutive_empty_tools >= max_empty_tool_results:
-                    self.logger.warning(
-                        f"Task {self.task_node.task_node_id}: {consecutive_empty_tools} consecutive rounds "
-                        f"with empty tool results — generating fallback reply instead of continuing."
-                    )
+                    self.logger.warning(f"Task {self.task_node.task_node_id}: {consecutive_empty_tools} consecutive rounds with empty tool results — generating fallback reply instead of continuing.")
                     await self._generate_max_iteration_fallback()
                     self.task_node.update_status(TaskStatus.COMPLETED)
                     break
@@ -1391,12 +1434,7 @@ class TaskNodeExecutionEngine:
         然后执行最后一轮 process_message（不带工具，强制纯文本回复）。
         """
         try:
-            fallback_prompt = (
-                "你已经达到了工具调用的最大次数限制。请根据到目前为止收集到的所有信息，"
-                "向用户提供一个尽可能完整的回复。如果你已经找到了部分有用的信息，请整理并呈现。"
-                "如果信息不足，请坦诚告知用户目前的发现，并建议他们可以尝试的替代方案（如换一种检索方式、"
-                "提供更具体的关键词等）。不要再调用任何工具。"
-            )
+            fallback_prompt = "你已经达到了工具调用的最大次数限制。请根据到目前为止收集到的所有信息，向用户提供一个尽可能完整的回复。如果你已经找到了部分有用的信息，请整理并呈现。如果信息不足，请坦诚告知用户目前的发现，并建议他们可以尝试的替代方案（如换一种检索方式、提供更具体的关键词等）。不要再调用任何工具。"
             if self.active_conversation:
                 from dawei.entity.lm_messages import SystemMessage
 
@@ -1409,10 +1447,7 @@ class TaskNodeExecutionEngine:
             self.logger.error(f"Fallback reply generation failed: {e}", exc_info=True)
             # 兜底兜底：如果LLM调用也失败了，至少发一条文本事件到前端
             try:
-                fallback_text = (
-                    "抱歉，任务在执行过程中达到了工具调用上限，"
-                    "且生成总结回复时遇到了问题。请尝试简化任务或重新提问。"
-                )
+                fallback_text = "抱歉，任务在执行过程中达到了工具调用上限，且生成总结回复时遇到了问题。请尝试简化任务或重新提问。"
                 await emit_typed_event(
                     TaskEventType.CONTENT_STREAM,
                     {
@@ -1492,12 +1527,10 @@ class TaskNodeExecutionEngine:
                             if self._consecutive_truncated_rounds >= 3:
                                 raise LLMError(
                                     "openai",
-                                    "LLM output truncated by max_tokens (finish_reason=length) for 3 consecutive rounds; "
-                                    "aborting task instead of silently marking it COMPLETED.",
+                                    "LLM output truncated by max_tokens (finish_reason=length) for 3 consecutive rounds; aborting task instead of silently marking it COMPLETED.",
                                 )
                             self.logger.warning(
-                                f"Task {self.task_node.task_node_id}: LLM output truncated by max_tokens "
-                                f"(round {self._consecutive_truncated_rounds}/3), retrying to let the model continue",
+                                f"Task {self.task_node.task_node_id}: LLM output truncated by max_tokens (round {self._consecutive_truncated_rounds}/3), retrying to let the model continue",
                             )
                             return True
                         self._consecutive_truncated_rounds = 0
@@ -1756,11 +1789,7 @@ class TaskNodeExecutionEngine:
         from dawei.entity.lm_messages import SystemMessage
 
         summary_msg = SystemMessage(
-            content=(
-                f"[Context Overflow Recovery] "
-                f"Conversation was compressed from {original_count} to {len(new_messages)} messages "
-                f"due to context window limit. Summary of removed messages:\n{summary_text}"
-            ),
+            content=(f"[Context Overflow Recovery] Conversation was compressed from {original_count} to {len(new_messages)} messages due to context window limit. Summary of removed messages:\n{summary_text}"),
         )
         conversation.messages.insert(0, summary_msg)
 

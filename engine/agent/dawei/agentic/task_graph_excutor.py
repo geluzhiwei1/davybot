@@ -9,7 +9,7 @@
 
 import asyncio
 import uuid
-from typing import List, Dict, Any
+from typing import Any
 
 # 导入错误类型
 from dawei.agentic.errors import TaskExecutionError, ToolExecutionError
@@ -24,10 +24,12 @@ from dawei.core.errors import (
 from dawei.core.exceptions import (
     LLMConnectionError,
     LLMContextOverflowError,
-    LLMError as LLMExceptionError,
     LLMRateLimitError,
     LLMResponseError,
     LLMTimeoutError,
+)
+from dawei.core.exceptions import (
+    LLMError as LLMExceptionError,
 )
 from dawei.entity.task_types import TaskStatus
 from dawei.entity.user_input_message import UserInputMessage
@@ -101,14 +103,14 @@ class TaskGraphExecutionEngine:
             raise ConfigurationError("tool_call_service must be provided")
 
         # 任务节点执行引擎管理
-        self._node_executors: Dict[str, TaskNodeExecutionEngine] = {}
+        self._node_executors: dict[str, TaskNodeExecutionEngine] = {}
 
         # 执行状态跟踪
-        self._execution_status: Dict[str, TaskStatus] = {}
+        self._execution_status: dict[str, TaskStatus] = {}
 
         # 🔧 修复：停止标志。stop() 置位后，收尾路径不再启动新的子任务
         self._stop_requested = False
-        self._execution_tasks: Dict[str, asyncio.Task] = {}
+        self._execution_tasks: dict[str, asyncio.Task] = {}
 
         # 锁
         self._lock = asyncio.Lock()
@@ -292,16 +294,12 @@ class TaskGraphExecutionEngine:
                     # 孤儿子任务：父已终结，无法再被调度 → 标记 ABORTED（fast fail）
                     await self._user_workspace.task_graph.update_task_status(task.task_node_id, TaskStatus.ABORTED)
                     self._execution_status[task.task_node_id] = TaskStatus.ABORTED
-                    self.logger.warning(
-                        f"Orphan subtask {task.task_node_id} (parent {task.parent_id}={parent.status.value}) marked ABORTED on startup"
-                    )
+                    self.logger.warning(f"Orphan subtask {task.task_node_id} (parent {task.parent_id}={parent.status.value}) marked ABORTED on startup")
                 elif task.status in (TaskStatus.RUNNING, TaskStatus.WAITING_FOR_TOOL):
                     # 进程崩溃残留：重置为 PENDING，随父任务执行流程恢复
                     await self._user_workspace.task_graph.update_task_status(task.task_node_id, TaskStatus.PENDING)
                     self._execution_status[task.task_node_id] = TaskStatus.PENDING
-                    self.logger.info(
-                        f"Stale subtask {task.task_node_id} reset RUNNING->PENDING on startup for resume"
-                    )
+                    self.logger.info(f"Stale subtask {task.task_node_id} reset RUNNING->PENDING on startup for resume")
         except Exception as e:  # noqa: BLE001 — 对账失败不阻塞主流程
             self.logger.warning(f"Subtask reconciliation on startup failed (non-fatal): {e}")
 
@@ -457,9 +455,38 @@ class TaskGraphExecutionEngine:
             status: 新状态
 
         """
+        _prev_status = self._execution_status.get(task_node_id)
         await self._user_workspace.task_graph.update_task_status(task_node_id, status)
         self._execution_status[task_node_id] = status
         await self._emit_subtask_lifecycle_event(task_node_id, status)
+        # C15：子任务终态指标 —— 全部终态转换的单一 choke point（含 fast-fail
+        # return 路径经 gather 兜底写回、stop 收口）。prev 已终态的重复写回
+        # 不重复计数；仅子任务（parent_id 非空）计入，批量条目单独聚合。
+        if status in (
+            TaskStatus.COMPLETED,
+            TaskStatus.FAILED,
+            TaskStatus.ABORTED,
+            TaskStatus.CANCELLED,
+        ) and _prev_status not in (
+            TaskStatus.COMPLETED,
+            TaskStatus.FAILED,
+            TaskStatus.ABORTED,
+            TaskStatus.CANCELLED,
+        ):
+            try:
+                from dawei.agentic.subtask_metrics import get_metrics
+
+                node = await self._user_workspace.task_graph.get_task(task_node_id)
+                if node is not None and getattr(node, "parent_id", None) is not None:
+                    _meta = getattr(getattr(node, "data", None), "metadata", None) or {}
+                    get_metrics().record_subtask_terminal(
+                        status.value if hasattr(status, "value") else str(status),
+                        batch_item=bool(_meta.get("batch_id")),
+                    )
+            except Exception:  # noqa: BLE001 — 指标失败绝不影响状态迁移主流程
+                self.logger.exception(f"Failed to record terminal metric for {task_node_id}: ")
+            # C10：终态即时通知注入父会话（与指标同一 guard：prev 已终态的重复写回不重复通知）
+            await self._notify_parent_of_terminal_subtask(task_node_id, status)
 
     # P3-6: 状态迁移 → 子任务生命周期事件名（None = 不发）
     _STATUS_TO_LIFECYCLE = {
@@ -498,6 +525,41 @@ class TaskGraphExecutionEngine:
         except Exception:  # noqa: BLE001 — 事件失败绝不影响状态迁移主流程
             self.logger.exception(f"Failed to emit subtask lifecycle event for {task_node_id}: ")
 
+    async def _notify_parent_of_terminal_subtask(self, task_node_id: str, status: TaskStatus) -> None:
+        """C10：子任务终态即时通知注入父会话（fire-and-forget，≤3 行短通知）
+
+        隔离子任务运行期间父 LLM 看不到任何子任务动态；终态时立刻注入短通知，
+        父 LLM 下一轮即可感知"哪个子任务已结束"，无需等收尾 [子任务执行报告]。
+        安全性：通知非 JSON（完成结果扫描跳过）、前缀 [子任务通知] ≠
+        [子任务执行报告]（_has_unconsumed_subtask_report 尾扫不受影响）。
+        """
+        try:
+            node = await self._user_workspace.task_graph.get_task(task_node_id)
+            if node is None or getattr(node, "parent_id", None) is None:
+                return
+            conversation = getattr(self._user_workspace, "current_conversation", None)
+            if conversation is None:
+                return
+            data = getattr(node, "data", None)
+            meta = getattr(data, "metadata", None) or {}
+            status_val = status.value if hasattr(status, "value") else str(status)
+            desc = str(getattr(data, "description", None) or task_node_id)[:80]
+            identity = meta.get("item_identity")
+            from dawei.agentic.injection_guard import sanitize_output
+
+            result_text = sanitize_output(str(getattr(data, "result", None) or "")[:200])
+            lines = [f"[子任务通知] {desc}" + (f" (条目: {str(identity)[:40]})" if identity else "") + f" → {status_val}"]
+            if result_text:
+                lines.append(f"  摘要: {result_text}")
+            conversation.say(UserMessage(content="\n".join(lines)))
+            self.logger.debug(f"C10: injected terminal notification for subtask {task_node_id} ({status_val}) into conversation {conversation.id}")
+            try:
+                await self._user_workspace.save_current_conversation()
+            except Exception:  # noqa: BLE001 — 保存失败不阻断
+                self.logger.warning(f"Failed to save conversation after terminal notification for {task_node_id}")
+        except Exception:  # noqa: BLE001 — 通知失败绝不影响状态迁移主流程
+            self.logger.exception(f"Failed to notify parent of terminal subtask {task_node_id}: ")
+
     async def _execute_task_and_handle_completion(
         self,
         current_task: TaskNode,
@@ -525,6 +587,20 @@ class TaskGraphExecutionEngine:
             )
             return TaskStatus.COMPLETED
 
+        # C13/C15：自动重试命中率计量 —— 任一可重试分支起跳时记一次
+        # scheduled（事件粒度），经历重试后成功 break 时记一次 success（任务粒度）。
+        _llm_retried = False
+
+        def _record_retry_scheduled() -> None:
+            nonlocal _llm_retried
+            _llm_retried = True
+            try:
+                from dawei.agentic.subtask_metrics import get_metrics
+
+                get_metrics().record_llm_retry_scheduled()
+            except Exception:  # noqa: BLE001 — 指标失败绝不影响重试主流程
+                pass
+
         while current_task.data.can_retry():
             current_task.data.increment_retry()
             attempt = current_task.data.retry_count
@@ -532,6 +608,14 @@ class TaskGraphExecutionEngine:
             try:
                 # 执行当前任务（等待直到完成或中止）
                 await executor.execute_task()
+
+                if _llm_retried:
+                    try:  # C13/C15：重试后成功（命中率分子）
+                        from dawei.agentic.subtask_metrics import get_metrics
+
+                        get_metrics().record_llm_retry_success()
+                    except Exception:  # noqa: BLE001
+                        pass
 
                 # 成功执行，退出重试循环
                 break
@@ -542,9 +626,9 @@ class TaskGraphExecutionEngine:
                     # 计算指数退避延迟
                     delay = base_delay * (2 ** (attempt - 1))
                     self.logger.warning(
-                        f"Task {task_node_id} timeout on attempt {attempt}/{current_task.data.max_retries}, "
-                        f"retrying in {delay:.1f}s...",
+                        f"Task {task_node_id} timeout on attempt {attempt}/{current_task.data.max_retries}, retrying in {delay:.1f}s...",
                     )
+                    _record_retry_scheduled()
 
                     await asyncio.sleep(delay)
 
@@ -568,7 +652,7 @@ class TaskGraphExecutionEngine:
                 # - RateLimit (429): rate limit 窗口 60s >> 退避周期，重试无意义
                 # - ResponseError: 响应格式错误，重试同样的请求结果不变
                 # - ContextOverflow: 上下文溢出，必须截断后才能重试
-                self.logger.error(
+                self.logger.exception(
                     f"Task {task_node_id} non-retryable LLM error ({type(e).__name__}): {e}",
                 )
                 await self._emit_error_event(task_node_id, e, f"non-retryable LLM error ({type(e).__name__})")
@@ -579,16 +663,14 @@ class TaskGraphExecutionEngine:
                 if current_task.data.can_retry():
                     delay = base_delay * (2 ** (attempt - 1))
                     self.logger.warning(
-                        f"Task {task_node_id} transient LLM/network error ({type(e).__name__}) on attempt "
-                        f"{attempt}/{current_task.data.max_retries}: {e}, "
-                        f"retrying in {delay:.1f}s...",
+                        f"Task {task_node_id} transient LLM/network error ({type(e).__name__}) on attempt {attempt}/{current_task.data.max_retries}: {e}, retrying in {delay:.1f}s...",
                     )
+                    _record_retry_scheduled()
                     await asyncio.sleep(delay)
                     executor = await self._get_or_create_executor(current_task, task_node_id)
                     continue
                 self.logger.exception(
-                    f"Task {task_node_id} failed after {attempt}/{current_task.data.max_retries} attempts "
-                    f"due to transient LLM/network error: {e}",
+                    f"Task {task_node_id} failed after {attempt}/{current_task.data.max_retries} attempts due to transient LLM/network error: {e}",
                 )
                 await self._emit_error_event(task_node_id, e, "LLM/network error")
                 return TaskStatus.FAILED
@@ -598,6 +680,15 @@ class TaskGraphExecutionEngine:
                 # 这些异常不继承自标准 OSError/ConnectionError，必须通过类型名或消息匹配
                 _exc_type = type(e).__name__
                 _err_msg = str(e).lower()
+                # C13：SSE 包装的网关 5xx（"Provider error (502/503/504)"）与
+                # stream timeout 属瞬时故障 → 同节点自动重试（2026-09-22 事故
+                # c5d42736：504 未被分类为可重试 → 三级失败）。
+                try:
+                    from dawei.agentic.task_node_executor import is_transient_llm_provider_error
+
+                    _provider_transient = is_transient_llm_provider_error(_err_msg)
+                except Exception:  # noqa: BLE001 — 分类器不可用时退回保守启发
+                    _provider_transient = False
                 _is_retryable = (
                     _exc_type
                     in (
@@ -612,6 +703,7 @@ class TaskGraphExecutionEngine:
                         "TransferEncodingError",
                         "PayloadEncodingError",
                     )
+                    or _provider_transient
                     or "connection closed" in _err_msg
                     or "server disconnected" in _err_msg
                     or "not enough data" in _err_msg
@@ -620,23 +712,22 @@ class TaskGraphExecutionEngine:
                 if _is_retryable and current_task.data.can_retry():
                     delay = base_delay * (2 ** (attempt - 1))
                     self.logger.warning(
-                        f"Task {task_node_id} network/transport error on attempt {attempt}/{current_task.data.max_retries}: {e}, "
-                        f"retrying in {delay:.1f}s...",
+                        f"Task {task_node_id} network/transport error on attempt {attempt}/{current_task.data.max_retries}: {e}, retrying in {delay:.1f}s...",
                     )
+                    _record_retry_scheduled()
                     await asyncio.sleep(delay)
                     executor = await self._get_or_create_executor(current_task, task_node_id)
                     continue
-                elif _is_retryable:
+                if _is_retryable:
                     self.logger.exception(
                         f"Task {task_node_id} failed after {attempt}/{current_task.data.max_retries} attempts due to network error: {e}",
                     )
                     await self._emit_error_event(task_node_id, e, "network transfer error")
                     return TaskStatus.FAILED
-                else:
-                    # 不可重试的未知错误，向上抛出
-                    self.logger.exception(f"Task {task_node_id} encountered unexpected error: ")
-                    await self._emit_error_event(task_node_id, e, "unexpected error")
-                    raise
+                # 不可重试的未知错误，向上抛出
+                self.logger.exception(f"Task {task_node_id} encountered unexpected error: ")
+                await self._emit_error_event(task_node_id, e, "unexpected error")
+                raise
 
         # 🔧 修复：不管当前状态如何，都要检查是否有子任务或子图需要处理
         # 这是为了避免主任务标记为COMPLETED但子任务还在执行的情况
@@ -664,15 +755,12 @@ class TaskGraphExecutionEngine:
             # 但其结果仍需回注报告并触发父任务续跑（否则回到旧 bug：报告无人消费）
             new_subtasks = [s for s in subtasks if s.task_node_id not in executed_subtask_ids]
             # 沿用原语义：子任务优先；sub_graph 仅在无任何子任务时才执行
-            has_new_work = bool(new_subtasks) or (
-                bool(current_task.sub_graph) and not subgraph_executed and not subtasks
-            )
+            has_new_work = bool(new_subtasks) or (bool(current_task.sub_graph) and not subgraph_executed and not subtasks)
 
             if not has_new_work:
                 if _round > 1:
                     self.logger.info(
-                        f"Task {task_node_id} orchestration round {_round}: no new subtasks/subgraph "
-                        f"after resumed parent turn, exiting loop with status {final_status.value}",
+                        f"Task {task_node_id} orchestration round {_round}: no new subtasks/subgraph after resumed parent turn, exiting loop with status {final_status.value}",
                     )
                 break
 
@@ -681,25 +769,20 @@ class TaskGraphExecutionEngine:
                 # 直接把未终结的子任务标记 ABORTED 收口（此前 stop 之后收尾
                 # 逻辑仍会 "Starting subtask ..." 把新子任务拉起来跑）。
                 self.logger.info(
-                    f"Task {task_node_id} finished after stop request, aborting "
-                    f"{len([s for s in subtasks if s.status not in _terminal])} subtasks instead of starting them",
+                    f"Task {task_node_id} finished after stop request, aborting {len([s for s in subtasks if s.status not in _terminal])} subtasks instead of starting them",
                 )
                 for _sub in subtasks:
                     if _sub.status in _terminal:
                         continue
                     try:
-                        await asyncio.wait_for(
-                            self._update_task_status(_sub.task_node_id, TaskStatus.ABORTED), timeout=5.0
-                        )
+                        await asyncio.wait_for(self._update_task_status(_sub.task_node_id, TaskStatus.ABORTED), timeout=5.0)
                     except Exception:  # noqa: BLE001 — 单个子任务收口失败不影响其余
                         self.logger.exception(f"Failed to abort subtask {_sub.task_node_id} during stop: ")
                 final_status = current_task.status
                 break
 
             self.logger.info(
-                f"Task {task_node_id} orchestration round {_round}/{_MAX_ORCHESTRATION_ROUNDS}: "
-                f"executing {len(new_subtasks)} new subtasks{'/subgraph' if not new_subtasks else ''} "
-                f"before resuming parent...",
+                f"Task {task_node_id} orchestration round {_round}/{_MAX_ORCHESTRATION_ROUNDS}: executing {len(new_subtasks)} new subtasks{'/subgraph' if not new_subtasks else ''} before resuming parent...",
             )
             if new_subtasks:
                 # 只执行"新"子任务：已执行节点若再次传入会被重跑并重复回注报告
@@ -745,12 +828,10 @@ class TaskGraphExecutionEngine:
                         self.logger.exception(f"Task {task_node_id} rerun reset before resume failed: ")
                     if _reset_ok:
                         self.logger.info(
-                            f"Task {task_node_id} reset COMPLETED -> PENDING before resume "
-                            f"(stashed previous result to metadata.prev_*), parent will get real LLM rounds",
+                            f"Task {task_node_id} reset COMPLETED -> PENDING before resume (stashed previous result to metadata.prev_*), parent will get real LLM rounds",
                         )
                 self.logger.info(
-                    f"Task {task_node_id} resuming parent executor to consume subtask report "
-                    f"(round {_round}/{_MAX_ORCHESTRATION_ROUNDS})...",
+                    f"Task {task_node_id} resuming parent executor to consume subtask report (round {_round}/{_MAX_ORCHESTRATION_ROUNDS})...",
                 )
                 await executor.execute_task()
             except Exception:  # noqa: BLE001 — 续跑失败按失败收口，不吞异常细节
@@ -759,8 +840,7 @@ class TaskGraphExecutionEngine:
                 break
         else:
             self.logger.warning(
-                f"Task {task_node_id} hit max orchestration rounds ({_MAX_ORCHESTRATION_ROUNDS}), "
-                f"forcing finalize with status {final_status.value}",
+                f"Task {task_node_id} hit max orchestration rounds ({_MAX_ORCHESTRATION_ROUNDS}), forcing finalize with status {final_status.value}",
             )
 
         # 【状态和解】orchestration 续跑前会把 COMPLETED 节点 reset 回 PENDING
@@ -778,8 +858,7 @@ class TaskGraphExecutionEngine:
                 _graph_status = current_task.status
             if _graph_status == TaskStatus.PENDING:
                 self.logger.info(
-                    f"Task {task_node_id} status reconcile: PENDING -> RUNNING hop "
-                    f"before final {final_status.value} (resume turn ended without re-finalizing)",
+                    f"Task {task_node_id} status reconcile: PENDING -> RUNNING hop before final {final_status.value} (resume turn ended without re-finalizing)",
                 )
                 await self._update_task_status(task_node_id, TaskStatus.RUNNING)
 
@@ -788,15 +867,9 @@ class TaskGraphExecutionEngine:
         # （E2E 2026-09-18：报告回注后父任务无任何 LLM 轮次，图却标记完成）。
         # FAST FAIL 降级 FAILED 并写机器可读原因；不新增 completed_degraded
         # 枚举（状态机/前端/持久化连锁改动，违背 KISS），FAILED 可经既有重试补救。
-        if (
-            final_status == TaskStatus.COMPLETED
-            and getattr(current_task, "parent_id", None) is None
-            and not self._stop_requested
-            and self._has_unconsumed_subtask_report()
-        ):
+        if final_status == TaskStatus.COMPLETED and getattr(current_task, "parent_id", None) is None and not self._stop_requested and self._has_unconsumed_subtask_report():
             self.logger.warning(
-                f"Task {task_node_id} finish protection: unconsumed subtask report at completion, "
-                f"degrading COMPLETED -> FAILED",
+                f"Task {task_node_id} finish protection: unconsumed subtask report at completion, degrading COMPLETED -> FAILED",
             )
             await self._emit_error_event(
                 task_node_id,
@@ -821,8 +894,7 @@ class TaskGraphExecutionEngine:
 
         if not executed_subtask_ids and not subgraph_executed:
             self.logger.info(
-                f"Task {task_node_id} executor finished with no subtasks or subgraph, "
-                f"using current status: {final_status.value}",
+                f"Task {task_node_id} executor finished with no subtasks or subgraph, using current status: {final_status.value}",
             )
 
         # 更新任务状态
@@ -837,7 +909,7 @@ class TaskGraphExecutionEngine:
         task_node_id: str,
         attempts: int = 3,
         delay: float = 0.1,
-    ) -> List[TaskNode]:
+    ) -> list[TaskNode]:
         """带宽限期地获取子任务
 
         防御性兜底：new_task 工具现为同步确认式创建（await 写入图后才返回），
@@ -894,12 +966,10 @@ class TaskGraphExecutionEngine:
             self.logger.info(
                 f"Task {task_node_id} has sub_graph; executing sub_graph root nodes",
             )
-            sub_graph_roots: List[TaskNode] = []
+            sub_graph_roots: list[TaskNode] = []
             if hasattr(current_task.sub_graph, "get_all_nodes"):
                 try:
-                    sub_graph_roots = [
-                        n for n in current_task.sub_graph.get_all_nodes() if getattr(n, "parent_id", None) is None
-                    ]
+                    sub_graph_roots = [n for n in current_task.sub_graph.get_all_nodes() if getattr(n, "parent_id", None) is None]
                 except Exception:  # noqa: BLE001 — 子图遍历失败不应导致父任务崩溃
                     self.logger.exception("Failed to traverse sub_graph nodes: ")
                     return current_task.status
@@ -919,7 +989,7 @@ class TaskGraphExecutionEngine:
         )
         return current_task.status
 
-    async def _execute_subtasks_and_check_status(self, subtasks: List[TaskNode]) -> TaskStatus:
+    async def _execute_subtasks_and_check_status(self, subtasks: list[TaskNode]) -> TaskStatus:
         """并行执行子任务并检查状态，并将子任务结果摘要回注父对话
 
         Args:
@@ -951,10 +1021,10 @@ class TaskGraphExecutionEngine:
 
     async def _inject_subtask_summaries(
         self,
-        subtasks: List[TaskNode],
-        subtask_results: List[TaskStatus],
+        subtasks: list[TaskNode],
+        subtask_results: list[TaskStatus],
         msg_snapshot: int,
-        max_chars: int = 2000,
+        max_chars: int = 300,
     ) -> None:
         """把子任务执行结果摘要写入父对话（P1: 结果回传）
 
@@ -965,7 +1035,9 @@ class TaskGraphExecutionEngine:
             subtasks: 子任务列表
             subtask_results: 对应的执行状态
             msg_snapshot: 子任务执行前的对话消息数（用于提取增量消息）
-            max_chars: 每个子任务结果的最大字符数
+            max_chars: 每个子任务结果的最大字符数（C5/L4 报告回注瘦身：300 字
+                摘要 + 产物文件路径指针 —— 全文报告回注会爆父上下文，N 份并行
+                时尤甚；需要全文时父任务按 artifact 指针读文件）
         """
         import json as _json
 
@@ -981,7 +1053,7 @@ class TaskGraphExecutionEngine:
             return
 
         # flag off 共享路径的位置匹配兜底：从子任务执行期间新增的消息里按序提取
-        completion_results: List[str] = []
+        completion_results: list[str] = []
         snapshot_valid = msg_snapshot <= len(conversation.messages)
         new_msgs = conversation.messages[msg_snapshot:] if snapshot_valid else []
         for msg in new_msgs:
@@ -1031,8 +1103,7 @@ class TaskGraphExecutionEngine:
                 # P1a ④ SSOT 收敛：节点 result 缺失才会走到旧提取链 —— 记弃用日志，
                 # 命中率归零后即可退役扫描链（docs/子任务组织管理交互方案.md §P1a）
                 self.logger.warning(
-                    f"[SSOT-deprecated] subtask {node.task_node_id} has no node-level result; "
-                    f"falling back to conversation scan chain (isolated_conv={iso_conv is not None})",
+                    f"[SSOT-deprecated] subtask {node.task_node_id} has no node-level result; falling back to conversation scan chain (isolated_conv={iso_conv is not None})",
                 )
                 # §8 扫描兜底命中率埋点（fire-and-forget）
                 try:
@@ -1073,6 +1144,11 @@ class TaskGraphExecutionEngine:
             # P1b ⑧ 报告回显：验收标准 + 成本/耗时（父 LLM 判定"完成"vs"完成但未达标"的数据源）
             _bits = [f"status={status.value}"]
             _data_meta = node.data
+            # C5/L4 产物指针：output_file 在场时报告只带路径，父任务按需读文件
+            # （全文回注爆父上下文；结果摘要本身也被 max_chars 截到 300 字）
+            _output_file = (getattr(_data_meta, "metadata", None) or {}).get("output_file")
+            if _output_file:
+                _bits.append(f"artifact={_output_file}")
             _acceptance = getattr(_data_meta, "acceptance_criteria", None)
             if _acceptance:
                 has_acceptance = True
@@ -1082,9 +1158,7 @@ class TaskGraphExecutionEngine:
             _completed = getattr(_data_meta, "completed_at", None)
             _duration_s = int((_completed - _started).total_seconds()) if (_started and _completed) else None
             if _tokens is not None or _duration_s is not None:
-                _bits.append(
-                    f"cost={_tokens if _tokens is not None else '?'}tokens/{_duration_s if _duration_s is not None else '?'}s"
-                )
+                _bits.append(f"cost={_tokens if _tokens is not None else '?'}tokens/{_duration_s if _duration_s is not None else '?'}s")
             lines.append(
                 f"- Subtask {node.task_node_id}: {', '.join(_bits)}, description={desc}\n  result: {result_text}",
             )
@@ -1095,16 +1169,12 @@ class TaskGraphExecutionEngine:
 
         # 有验收标准的报告必须给出判定指令：父 LLM 逐条对照，未达标不得当作已完成
         if has_acceptance:
-            lines.append(
-                "判定提示: 请逐条对照各子任务的 acceptance 验收标准核对 result；"
-                "达标=完成。未达标=完成但未达标，需补救/重新派发并回显未达标原因，不得当作已完成。"
-            )
+            lines.append("判定提示: 请逐条对照各子任务的 acceptance 验收标准核对 result；达标=完成。未达标=完成但未达标，需补救/重新派发并回显未达标原因，不得当作已完成。")
 
         report = "\n".join(lines)
         conversation.say(UserMessage(content=report))
         self.logger.info(
-            f"Injected subtask execution report into conversation {conversation.id} "
-            f"({len(subtasks)} subtasks, report {len(report)} chars)",
+            f"Injected subtask execution report into conversation {conversation.id} ({len(subtasks)} subtasks, report {len(report)} chars)",
         )
         try:
             await self._user_workspace.save_current_conversation()
@@ -1177,17 +1247,13 @@ class TaskGraphExecutionEngine:
             # 【修复】rate_limit / 余额不足错误已由 task_node_executor._send_error_to_frontend
             # 发送了详细的 rate_limit_exceeded 错误事件到前端。此处再发一次会造成
             # 用户看到重复错误消息。跳过本次发射，避免重复。
-            self.logger.info(
-                f"Skipping duplicate error event for {error_class} (already sent by task_node_executor): {error_message[:200]}"
-            )
+            self.logger.info(f"Skipping duplicate error event for {error_class} (already sent by task_node_executor): {error_message[:200]}")
             return
         elif error_class in ("LLMError", "LLMResponseError") or "Provider error" in error_message:
             # 【修复】所有 LLM API 错误（400/401/402 等）已由 task_node_executor 的
             # except LLMError 块发送了 llm_api_error 错误事件到前端。
             # 此处再发一次会造成用户看到重复错误消息。跳过，避免重复。
-            self.logger.info(
-                f"Skipping duplicate error event for {error_class} (LLM error already sent by task_node_executor): {error_message[:200]}"
-            )
+            self.logger.info(f"Skipping duplicate error event for {error_class} (LLM error already sent by task_node_executor): {error_message[:200]}")
             return
         elif "500" in error_message:
             user_friendly_message = "LLM服务暂时不可用，请稍后重试。"
@@ -1242,7 +1308,7 @@ class TaskGraphExecutionEngine:
         await self._update_task_status(task_node_id, TaskStatus.FAILED)
         return TaskStatus.FAILED
 
-    def _topological_sort_subtasks(self, subtasks: List[TaskNode]) -> List[List[TaskNode]]:
+    def _topological_sort_subtasks(self, subtasks: list[TaskNode]) -> list[list[TaskNode]]:
         """Phase 3: Topologically sort subtasks into execution waves.
 
         Groups nodes by their dependency depth so that all nodes in wave N
@@ -1257,8 +1323,8 @@ class TaskGraphExecutionEngine:
         """
         # Build in-degree map (count of unfinished predecessors within this subtask set)
         subtask_ids = {s.task_node_id for s in subtasks}
-        in_degree: Dict[str, int] = {}
-        dependents: Dict[str, List[str]] = {}  # node -> list of nodes that depend on it
+        in_degree: dict[str, int] = {}
+        dependents: dict[str, list[str]] = {}  # node -> list of nodes that depend on it
 
         for s in subtasks:
             in_degree[s.task_node_id] = 0
@@ -1272,17 +1338,15 @@ class TaskGraphExecutionEngine:
                 dependents.setdefault(s.parent_id, []).append(s.task_node_id)
 
         # Topological sort into waves
-        waves: List[List[TaskNode]] = []
+        waves: list[list[TaskNode]] = []
         id_to_node = {s.task_node_id: s for s in subtasks}
-        remaining = set(s.task_node_id for s in subtasks)
+        remaining = {s.task_node_id for s in subtasks}
 
         while remaining:
             current_wave_ids = [nid for nid in remaining if in_degree.get(nid, 0) == 0]
             if not current_wave_ids:
                 # Cycle detected (shouldn't happen in a valid DAG) — break remaining into flat list
-                self.logger.warning(
-                    "Cycle detected in subtask dependencies, flattening remaining nodes into single wave"
-                )
+                self.logger.warning("Cycle detected in subtask dependencies, flattening remaining nodes into single wave")
                 current_wave_ids = list(remaining)
 
             current_wave = [id_to_node[nid] for nid in current_wave_ids if nid in id_to_node]
@@ -1296,7 +1360,7 @@ class TaskGraphExecutionEngine:
 
         return waves
 
-    async def _execute_subtasks_parallel(self, subtasks: List[TaskNode]) -> List[TaskStatus]:
+    async def _execute_subtasks_parallel(self, subtasks: list[TaskNode]) -> list[TaskStatus]:
         """Phase 3: 并行执行子任务（拓扑排序 + 信号量限制最大并行数）
 
         先按拓扑排序分组为 waves，同一 wave 内的节点无依赖关系，可并行执行。
@@ -1315,7 +1379,7 @@ class TaskGraphExecutionEngine:
             wave_sizes = [len(w) for w in waves]
             self.logger.info(f"Subtask waves (topological): {wave_sizes} total_nodes={len(subtasks)}")
 
-        all_results: Dict[str, TaskStatus] = {}
+        all_results: dict[str, TaskStatus] = {}
 
         # P3 部分屏障（依赖失败闸门）：集合内依赖（父节点）终结于 FAILED/ABORTED/
         # CANCELLED 时，其后继 wave 节点不再起跑 —— 缺上游产物的执行只会烧 token
@@ -1327,7 +1391,7 @@ class TaskGraphExecutionEngine:
 
         try:
             for wave_idx, wave in enumerate(waves):
-                runnable_wave: List[TaskNode] = []
+                runnable_wave: list[TaskNode] = []
                 for node in wave:
                     dep_id = getattr(node, "parent_id", None)
                     dep_status = all_results.get(dep_id) if dep_id in subtask_ids else None
@@ -1373,8 +1437,7 @@ class TaskGraphExecutionEngine:
                     continue
                 if len(waves) > 1:
                     self.logger.info(
-                        f"Wave {wave_idx + 1}/{len(waves)}: executing {len(runnable_wave)} nodes "
-                        f"(skipped {len(wave) - len(runnable_wave)} by dependency gate)...",
+                        f"Wave {wave_idx + 1}/{len(waves)}: executing {len(runnable_wave)} nodes (skipped {len(wave) - len(runnable_wave)} by dependency gate)...",
                     )
 
                 # 创建执行任务（同一 wave 内并行）
@@ -1410,17 +1473,14 @@ class TaskGraphExecutionEngine:
                                 )
 
             # Return results in original subtask order
-            ordered_results = [all_results.get(s.task_node_id, TaskStatus.FAILED) for s in subtasks]
-            return ordered_results
+            return [all_results.get(s.task_node_id, TaskStatus.FAILED) for s in subtasks]
 
         finally:
             # 清理执行任务
             for subtask in subtasks:
                 self._execution_tasks.pop(subtask.task_node_id, None)
 
-    def _process_single_subtask_result(
-        self, result: Any, subtask: TaskNode
-    ) -> TaskStatus:
+    def _process_single_subtask_result(self, result: Any, subtask: TaskNode) -> TaskStatus:
         """Process a single subtask result and return its status."""
         if isinstance(result, TaskStatus):
             return result
@@ -1483,9 +1543,9 @@ class TaskGraphExecutionEngine:
 
     def _process_subtask_results(
         self,
-        results: List[Any],
-        subtasks: List[TaskNode],
-    ) -> List[TaskStatus]:
+        results: list[Any],
+        subtasks: list[TaskNode],
+    ) -> list[TaskStatus]:
         """处理子任务执行结果
 
         Args:
@@ -1785,7 +1845,7 @@ class TaskGraphExecutionEngine:
             )
             raise  # Fast fail: re-raise unexpected errors
 
-    async def get_task_execution_status(self, task_node_id: str) -> Dict[str, Any]:
+    async def get_task_execution_status(self, task_node_id: str) -> dict[str, Any]:
         """获取任务执行状态
 
         Args:

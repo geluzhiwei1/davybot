@@ -63,6 +63,7 @@ TOOL_GROUPS = {
     "workflow": {
         "tools": [
             "new_task",
+            "new_task_batch",
             "update_todo_list",
             "get_task_status",
             "timer",

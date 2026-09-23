@@ -700,7 +700,8 @@ class WebSocketManager:
                     _ok = await self.send_message(
                         _sid,
                         MessageSerializer.create_heartbeat_message(
-                            session_id=_sid, message="server-ping",
+                            session_id=_sid,
+                            message="server-ping",
                         ),
                     )
                     if _ok:

@@ -511,7 +511,7 @@ async def test_new_task_result_carries_agent_and_conversation_fields(monkeypatch
     tool = wtf.NewTaskTool(task_graph=graph, workspace_root=None)
     monkeypatch.setattr(tool, "_load_available_modes", lambda: {"pdca": "PDCA 模式"})
 
-    raw = await tool._run(mode="pdca", message="do something", agent="worker", acceptance="报告包含全部 7 段")
+    raw = await tool._run(mode="pdca", message="do something", agent="worker", acceptance="报告包含全部 7 段", deliverable="交付/do.md")
     result = json.loads(raw)
 
     assert result["status"] == "created"

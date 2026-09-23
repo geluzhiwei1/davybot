@@ -28,6 +28,10 @@ class StatusBar(Static):
     pdca_domain = reactive("")
     pdca_completion = reactive(0)
 
+    # C24：子任务缩略段（空串 = 无活动子任务，整段隐藏；有失败整段警示色）
+    subtask_summary = reactive("")
+    subtask_has_failure = reactive(False)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.update_text()
@@ -102,6 +106,14 @@ class StatusBar(Static):
         """
         self.update_text()
 
+    def watch_subtask_summary(self, _old: str, _new: str) -> None:
+        """C24：子任务缩略段变化时重绘"""
+        self.update_text()
+
+    def watch_subtask_has_failure(self, _old: bool, _new: bool) -> None:
+        """C24：失败警示色变化时重绘"""
+        self.update_text()
+
     def update_text(self) -> None:
         """Update the status text (single line; ellipsis handles overflow)."""
         model_display = self.model or _("N/A")
@@ -119,6 +131,13 @@ class StatusBar(Static):
             text.append(
                 f" │ {phase_emoji} PDCA {self.pdca_phase.upper()} {self.pdca_completion:.0f}%",
                 style="yellow",
+            )
+
+        # C24：子任务常驻缩略段（无活动子任务时整段隐藏）
+        if self.subtask_summary:
+            text.append(
+                f" │ {self.subtask_summary}",
+                style="bold red" if self.subtask_has_failure else "green",
             )
 
         self.update(text)
@@ -266,3 +285,43 @@ class StatusBar(Static):
             self.set_pdca_phase(summary.get("current_phase", ""))
             self.set_pdca_domain(summary.get("domain", ""))
             self.set_pdca_completion(summary.get("completion_percentage", 0))
+
+    def set_subtask_summary(self) -> None:
+        """C24：从 app.agent_bridge.subtask_states 计算缩略段
+
+        形如 `子任务 4/6 ✓3 ✗1 · 新加坡(3/5)`（末段 = 最活跃项 todo 步数，
+        空间由 ellipsis 裁剪）。无活动子任务时整段隐藏（summary 置空）。
+        异常安全：计算失败保持旧值（纯 UI 态）。
+        """
+        try:
+            bridge = getattr(self.app, "agent_bridge", None)
+            states = getattr(bridge, "subtask_states", None) or {}
+            if not states:
+                self.subtask_summary = ""
+                self.subtask_has_failure = False
+                return
+            terminal = {"completed", "failed", "aborted", "cancelled"}
+            items = list(states.values())
+            total = len(items)
+            done = sum(1 for s in items if str(s.get("status", "")) in terminal)
+            completed = sum(1 for s in items if str(s.get("status", "")) == "completed")
+            failed = sum(1 for s in items if str(s.get("status", "")) in ("failed", "aborted", "cancelled"))
+            summary = f"子任务 {done}/{total}"
+            if completed:
+                summary += f" ✓{completed}"
+            if failed:
+                summary += f" ✗{failed}"
+            # 空间允许时追加最活跃项步数（首个带 todos 的非终态项）
+            if done < total:
+                for s in items:
+                    if str(s.get("status", "")) in terminal:
+                        continue
+                    todos = s.get("todos") or {}
+                    if todos.get("total"):
+                        ident = str(s.get("item_identity") or "")[:8]
+                        summary += f" · {ident}({todos.get('completed', 0)}/{todos.get('total', 0)})"
+                        break
+            self.subtask_summary = summary
+            self.subtask_has_failure = failed > 0
+        except Exception:  # noqa: BLE001 — 纯 UI 态，计算失败保持旧值
+            pass

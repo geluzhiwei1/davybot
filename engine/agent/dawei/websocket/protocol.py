@@ -71,6 +71,7 @@ class MessageType(StrEnum):
     TASK_STATUS_UPDATE = "task_status_update"  # 任务状态更新
     TASK_GRAPH_UPDATE = "task_graph_update"  # 任务图更新
     SUBTASK_LIFECYCLE = "subtask_lifecycle"  # 子任务生命周期事件（created/started/completed/failed/aborted/steered）
+    SUBTASK_PROGRESS = "subtask_progress"  # 子任务 todo 步级进度事件（C25，纯 UI 态不进会话历史）
 
     # ==================== 流式消息（LLM输出流）====================
     STREAM_REASONING = "stream_reasoning"  # 流式推理内容（思考过程）
@@ -1506,6 +1507,30 @@ class SubtaskLifecycleMessage(BaseWebSocketMessage):
         return cls(**data)
 
 
+class SubtaskProgressMessage(BaseWebSocketMessage):
+    """子任务 todo 步级进度消息（C25/§3.8：纯 UI 态，不进任何会话历史）
+
+    诚实语义：只报已发生的状态变化（todos 快照），不预测"即将完成"。
+    """
+
+    type: MessageType = MessageType.SUBTASK_PROGRESS
+    task_id: str = Field(..., description="父任务ID")
+    subtask_id: str = Field(..., description="子任务节点ID")
+    parent_id: str | None = Field(None, description="父任务ID")
+    batch_id: str | None = Field(None, description="批量派发组ID（new_task_batch 展开）")
+    item_identity: str | None = Field(None, description="批量条目身份")
+    todos: Dict[str, Any] = Field(..., description="todo 步级摘要: {total, completed, current(≤40字)}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
+        return self.to_websocket_format()
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SubtaskProgressMessage":
+        """从字典创建实例"""
+        return cls(**data)
+
+
 class TodoUpdateMessage(BaseWebSocketMessage):
     """TODO列表更新消息"""
 
@@ -1881,6 +1906,7 @@ class MessageValidator:
         MessageType.TASK_STATUS_UPDATE: TaskStatusUpdateMessage,
         MessageType.TASK_GRAPH_UPDATE: TaskGraphUpdateMessage,
         MessageType.SUBTASK_LIFECYCLE: SubtaskLifecycleMessage,
+        MessageType.SUBTASK_PROGRESS: SubtaskProgressMessage,
         # 流式消息
         MessageType.STREAM_REASONING: StreamReasoningMessage,
         MessageType.STREAM_CONTENT: StreamContentMessage,
@@ -2579,6 +2605,7 @@ __all__ = [
     "TaskNodeProgressMessage",
     "TaskNodeCompleteMessage",
     "SubtaskLifecycleMessage",
+    "SubtaskProgressMessage",
     # 联合类型
     "WebSocketMessage",
     # 验证和序列化

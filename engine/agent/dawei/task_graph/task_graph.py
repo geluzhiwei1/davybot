@@ -443,7 +443,12 @@ class TaskGraph:
             # agent_execution.max_active_subtasks。结构不变量，锁内原子判定：
             # 工具层预检只是友好 fast-path，批量并行派发的并发竞态（检查与挂接
             # 之间让出锁）由此处兜底。
+            # C9（2026-09-23）batch 合法形态放行：new_task_batch 展开的节点带
+            # metadata.batch_id —— 正确的批量并行不该被广度闸惩罚（token 防线
+            # 已移到每子任务预算 + dispatch_identity 去重），单次硬顶由工具层
+            # R5 max_batch_items（默认 16）把守。
             parent_node = self._nodes[parent_id]
+            _is_batch_item = bool((getattr(task_data, "metadata", None) or {}).get("batch_id"))
             try:
                 from dawei.config.settings import get_settings
 
@@ -462,7 +467,7 @@ class TaskGraph:
                 for cid in (parent_node.child_ids or [])
                 if cid in self._nodes and self._nodes[cid].status in _BREADTH_ACTIVE
             ]
-            if len(active_ids) >= max_active:
+            if len(active_ids) >= max_active and not _is_batch_item:
                 try:
                     from dawei.agentic.subtask_metrics import get_metrics
 
@@ -575,6 +580,25 @@ class TaskGraph:
             source="task_graph_persistence",
         )
 
+        # C12：task_graph_update(node_added) 广播（新前端 task-store.applyGraphUpdate
+        # 数据源；data 契约 = {task_id, status, ...节点属性}）
+        from dawei.websocket.protocol import TaskGraphUpdateMessage
+
+        await self._ws_broadcast(
+            TaskGraphUpdateMessage(
+                session_id="",
+                graph_id=self.task_node_id,
+                update_type="node_added",
+                data={
+                    "task_id": task_data.task_node_id,
+                    "status": task_data.status.value if hasattr(task_data.status, "value") else str(task_data.status),
+                    "parent_id": parent_id,
+                    "description": str(task_data.description or "")[:200],
+                    "mode": task_data.mode,
+                },
+            ),
+        )
+
         self.logger.info(
             f"Subtask created - task_id: {task_data.task_node_id}, parent_id: {parent_id}, mode: {task_data.mode}",
         )
@@ -630,6 +654,21 @@ class TaskGraph:
             return []
 
     # ==================== 任务操作 ====================
+
+    async def _ws_broadcast(self, msg) -> None:
+        """C12：WS 广播辅助（fire-and-forget，异常吞掉只记日志）
+
+        TUI 模式 websocket_server 为 None → 跳过；workspace_id 缺失时由
+        broadcast 层按会话路由。
+        """
+        try:
+            from dawei.websocket.ws_server import websocket_server
+
+            if websocket_server is None:
+                return
+            await websocket_server.websocket_manager.broadcast(msg, workspace_id=self.workspace_id)
+        except Exception as e:  # noqa: BLE001 — 广播失败不影响图谱主流程
+            self.logger.warning(f"WS broadcast failed ({type(msg).__name__}): {e}")
 
     @handle_errors(component="task_graph", operation="update_task_status")
     @log_performance("task_graph.update_task_status")
@@ -748,6 +787,20 @@ class TaskGraph:
                     await websocket_server.websocket_manager.broadcast(ws_msg, workspace_id=self.workspace_id)
             except Exception as ws_err:
                 self.logger.warning(f"WS broadcast failed for node {task_id}: {ws_err}")
+
+            # C12：task_status_update 广播（新前端 task-store.markNodeStatus 数据源；
+            # 新 app 不处理 task_node_start/complete，运行/终态变迁全靠本消息）
+            from dawei.websocket.protocol import TaskStatusUpdateMessage
+
+            await self._ws_broadcast(
+                TaskStatusUpdateMessage(
+                    session_id="",
+                    task_id=task_id,
+                    graph_id=self.task_node_id,
+                    old_status=old_status.value if old_status else "none",
+                    new_status=status.value,
+                ),
+            )
 
         self.logger.info(
             f"Task status updated - task_id: {task_id}, from: {current_status.value if current_status else None}, to: {status.value}",
@@ -1003,6 +1056,18 @@ class TaskGraph:
                 "source": "task_graph",
             },
             self.event_bus,  # positional event_bus
+        )
+
+        # C12：task_graph_update(node_removed) 广播（新前端 task-store.applyGraphUpdate）
+        from dawei.websocket.protocol import TaskGraphUpdateMessage
+
+        await self._ws_broadcast(
+            TaskGraphUpdateMessage(
+                session_id="",
+                graph_id=self.task_node_id,
+                update_type="node_removed",
+                data={"task_id": task_id},
+            ),
         )
 
         self.logger.info(f"Task deleted - task_id: {task_id}")

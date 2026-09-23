@@ -109,6 +109,27 @@ class DuplicateSubtaskError(AgenticError):
         self.existing_status = existing_status
 
 
+class SubtaskGranularityError(AgenticError):
+    """子任务粒度契约违规（§3.1 L1 R1-R3：巨子任务创建层熔断）。
+
+    事故（demo 2026-09-22 c5d42736）：一份 message 塞进 6 份文件 × 4 检查
+    维度，最终轮单次 LLM 长生成超网关 300s 流超时 → 504 → 三级失败。
+    与 DuplicateSubtaskError（同目标重派）区分：这是"单任务大小"维度的
+    创建层信号——父 LLM 应把 N 件同构工作拆成 N 个子任务（一个子任务 =
+    一个交付物），而非合并串行。工具层据此返回可操作的 error result。
+    """
+
+    def __init__(self, rule: str, evidence: str, hint: str):
+        super().__init__(
+            f"Subtask granularity contract violated ({rule}): {evidence}",
+            error_code="SUBTASK_GRANULARITY",
+            details={"rule": rule, "evidence": evidence, "hint": hint},
+        )
+        self.rule = rule
+        self.evidence = evidence
+        self.hint = hint
+
+
 class ConfigurationError(AgenticError):
     """配置错误"""
 

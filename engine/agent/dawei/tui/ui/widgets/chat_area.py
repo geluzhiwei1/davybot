@@ -202,10 +202,7 @@ class ChatArea(VerticalScroll):
         """Add a skill loading status message."""
         if success:
             note = Text(
-                "✅ "
-                + _("Loaded skill '{skill_name}' to context ({char_count} chars)").format(
-                    skill_name=skill_name, char_count=f"{char_count:,}"
-                ),
+                "✅ " + _("Loaded skill '{skill_name}' to context ({char_count} chars)").format(skill_name=skill_name, char_count=f"{char_count:,}"),
                 style="bold green",
             )
         else:

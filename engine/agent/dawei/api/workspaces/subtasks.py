@@ -4,7 +4,7 @@
 """子任务委派 API（§6.2 UI 协议层，服务 davybot-app 工作区可视化）
 
 端点：
-- GET  /api/workspaces/{ws}/subtasks                            树 bootstrap（parent_id/depth/agent/conversation_id）
+- GET  /api/workspaces/{ws}/subtasks                            树 bootstrap（parent_id/depth/agent/conversation_id/batch_id/item_identity）
 - GET  /api/workspaces/{ws}/subtasks/{id}/conversation          子代理线程抽屉：会话完整历史（降级感知）
 - GET  /api/workspaces/{ws}/agents/profiles                     Agent Profile 列表（P3-0 注册表直读）
 - POST /api/workspaces/{ws}/subtasks/{id}/steer                 运行中操控（复用 MessageTaskTool / P3-2）
@@ -70,6 +70,10 @@ async def list_subtasks(workspace_id: str, request: Request):
                 "conversation_id": getattr(d, "conversation_id", None),
                 "description": str(getattr(d, "description", "") or "")[:200],
                 "child_ids": list(getattr(t, "child_ids", []) or []),
+                # C16：batch 分组展示（new_task_batch 展开的节点 metadata 带
+                # batch_id/item_identity；单发 new_task 缺省 → None）
+                "batch_id": meta.get("batch_id"),
+                "item_identity": meta.get("item_identity"),
             }
         )
 
@@ -253,10 +257,7 @@ async def rerun_subtask(workspace_id: str, request: Request, task_node_id: str, 
     if not reset_ok:
         raise HTTPException(
             status_code=409,
-            detail=(
-                f"Task {task_node_id} not rerunnable (status={_status_value(getattr(node, 'status', None))}); "
-                "RUNNING → abort first; CANCELLED stays cancelled (first-come-first-served)"
-            ),
+            detail=(f"Task {task_node_id} not rerunnable (status={_status_value(getattr(node, 'status', None))}); RUNNING → abort first; CANCELLED stays cancelled (first-come-first-served)"),
         )
 
     # 可选重跑指令：节点已 PENDING → MessageTaskTool PENDING 路径追加到描述

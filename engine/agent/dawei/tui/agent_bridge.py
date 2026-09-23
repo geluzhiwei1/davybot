@@ -66,6 +66,11 @@ class AgentBridge:
         self._event_handlers: Dict[TaskEventType, str] = {}
         self._is_initialized = False
 
+        # C23：轻量子任务状态 dict（id → {status, item_identity, batch_id,
+        # parent_id, ts, todos}）。SUBTASK_* 事件到达时在 _forward_event 记账，
+        # 供 SubtaskPanel/StatusBar 渲染 —— 纯 UI 态，不进任何会话历史。
+        self.subtask_states: Dict[str, Dict[str, Any]] = {}
+
         logger.debug(f"AgentBridge created for workspace: {self.workspace_path}")
 
     async def initialize(self) -> None:
@@ -173,6 +178,15 @@ class AgentBridge:
             TaskEventType.PDCA_PHASE_ADVANCED,
             TaskEventType.PDCA_CYCLE_COMPLETED,
             TaskEventType.PDCA_DOMAIN_DETECTED,
+            # C23：子任务生命周期 + todo 步级进度（TUI 进程内直收，
+            # 此前订阅清单不含 SUBTASK_* → TUI 对子任务完全失明）
+            TaskEventType.SUBTASK_CREATED,
+            TaskEventType.SUBTASK_STARTED,
+            TaskEventType.SUBTASK_COMPLETED,
+            TaskEventType.SUBTASK_FAILED,
+            TaskEventType.SUBTASK_ABORTED,
+            TaskEventType.SUBTASK_STEERED,
+            TaskEventType.SUBTASK_PROGRESS,
         ]
 
         # NOTE: CORE_EVENT_BUS has been removed - using agent.event_bus instead
@@ -226,6 +240,10 @@ class AgentBridge:
         """
         logger.debug(f"[AGENT_BRIDGE] _forward_event called: {event_type.value}")
 
+        # C23：SUBTASK_* 事件先记账到状态 dict（异常安全 —— 纯 UI 态
+        # 记账失败只记日志，绝不阻断向 UI 队列的转发）
+        self._update_subtask_state(event_type, event)
+
         # Create event dict for UI
         event_dict = {
             "event_type": event_type,
@@ -247,6 +265,37 @@ class AgentBridge:
             logger.critical(f"Failed to forward event to UI queue: {e}", exc_info=True)
             # Re-raise - UI queue failures are critical
             raise RuntimeError(f"Event forwarding failed: {e}")
+
+    def _update_subtask_state(self, event_type: TaskEventType, event: TaskEvent) -> None:
+        """C23：从 SUBTASK_* 事件维护轻量状态 dict
+
+        生命周期事件写 status/item_identity/batch_id；subtask_progress 额外
+        写 todos 摘要 {total, completed, current}。非 SUBTASK_* 事件直接返回。
+        """
+        try:
+            if not str(event_type.value).startswith("subtask_"):
+                return
+            data = getattr(event, "data", None)
+            if not isinstance(data, dict):
+                return
+            subtask_id = data.get("subtask_id")
+            if not subtask_id:
+                return
+            state = self.subtask_states.setdefault(str(subtask_id), {})
+            if data.get("parent_id"):
+                state["parent_id"] = str(data["parent_id"])
+            if data.get("batch_id"):
+                state["batch_id"] = str(data["batch_id"])
+            if data.get("item_identity"):
+                state["item_identity"] = str(data["item_identity"])[:40]
+            if event_type is TaskEventType.SUBTASK_PROGRESS:
+                state["todos"] = data.get("todos") or {}
+            else:
+                # 生命周期事件：status（TaskStatus value）优先，缺省回落事件名
+                state["status"] = str(data.get("status") or data.get("event") or event_type.value.replace("subtask_", ""))
+            state["ts"] = str(getattr(event, "timestamp", "") or "")
+        except Exception:  # noqa: BLE001 — 纯 UI 态记账失败不影响事件转发
+            logger.exception("[AGENT_BRIDGE] Failed to update subtask state dict: ")
 
     async def send_message(self, message: str) -> None:
         """Send user message to Agent (direct call)

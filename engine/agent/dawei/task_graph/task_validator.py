@@ -62,6 +62,32 @@ class TaskDataValidationRule(ValidationRule):
         elif len(description_text) < 10:
             result.add_warning("Task description is very short (less than 10 characters)")
 
+        # C4/L1 粒度观察线（R4，warning 不阻断）：500-800 之间的超长指令与
+        # 疑似复数交付进 metrics 观察误伤率，作为 R1-R3 硬闸收紧的依据。
+        # 只对子任务（有父）生效；根任务描述天然较长。
+        if getattr(task_data, "parent_task_id", None) or (
+            task_data.metadata and task_data.metadata.get("parent_task_id")
+        ):
+            try:
+                from .granularity import (
+                    SUBTASK_MESSAGE_WARN_CHARS,
+                    detect_plural_deliverables,
+                )
+
+                if len(description_text) > SUBTASK_MESSAGE_WARN_CHARS:
+                    result.add_warning(
+                        f"Subtask message is long ({len(description_text)} > {SUBTASK_MESSAGE_WARN_CHARS} chars); "
+                        "consider splitting into one subtask per deliverable"
+                    )
+                _plural = detect_plural_deliverables(description_text)
+                if _plural:
+                    result.add_warning(
+                        f"Subtask message may bundle multiple deliverables (evidence: '{_plural}'); "
+                        "one subtask = one deliverable"
+                    )
+            except Exception:  # noqa: BLE001 — 观察规则失败不阻断验证
+                pass
+
         # 检查模式
         if not task_data.mode or not task_data.mode.strip():
             result.add_error("Task mode is required")

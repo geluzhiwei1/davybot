@@ -43,6 +43,23 @@ class SubtaskMetrics:
     redispatch_total: int = 0  # 同父同目标(strip 精确匹配)重派次数
     redispatch_by_prior: dict[str, int] = field(default_factory=dict)  # 按前次终态分布
 
+    # ── C15 粒度/批量/单项失败（docs/子任务编排最优架构方案.md §4 C15）──
+    granularity_rejected_total: int = 0  # 粒度硬闸 R1-R3 熔断次数
+    granularity_by_rule: dict[str, int] = field(default_factory=dict)  # 按 R1/R2/R3 分布
+    batch_dispatch_total: int = 0  # new_task_batch 派发次数
+    batch_items_total: int = 0  # 批量条目总数
+    batch_items_created: int = 0  # 批量创建成功数
+    batch_items_duplicate: int = 0  # 批量去重命中数
+    batch_items_error: int = 0  # 批量单项错误数（模板/粒度/创建失败）
+    subtask_terminal_total: int = 0  # 子任务终态计数（parent_id 非空）
+    subtask_terminal_by_status: dict[str, int] = field(default_factory=dict)  # 按终态分布
+    batch_item_terminal_total: int = 0  # 批量条目到达终态数（单项失败率分母）
+    batch_item_failed_total: int = 0  # 批量条目非 COMPLETED 终态数（分子）
+
+    # ── C13/C15 自动重试命中率 ──
+    llm_retry_scheduled_total: int = 0  # 瞬时错误自动重试发起次数（事件粒度）
+    llm_retry_success_total: int = 0  # 经历过重试后最终成功的任务数（任务粒度）
+
     _start_time: float = field(default_factory=time.time)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -77,6 +94,44 @@ class SubtaskMetrics:
             self.redispatch_total += 1
             self.redispatch_by_prior[prior_status] = self.redispatch_by_prior.get(prior_status, 0) + 1
 
+    def record_granularity_rejected(self, rule: str = "unknown") -> None:
+        """C15：记录一次粒度硬闸熔断（rule=R1/R2/R3）。"""
+        with self._lock:
+            self.granularity_rejected_total += 1
+            self.granularity_by_rule[rule] = self.granularity_by_rule.get(rule, 0) + 1
+
+    def record_batch_dispatch(self, items: int, created: int, duplicate: int = 0, error: int = 0) -> None:
+        """C15：记录一次 new_task_batch 派发（含逐项结果分布）。"""
+        with self._lock:
+            self.batch_dispatch_total += 1
+            self.batch_items_total += items
+            self.batch_items_created += created
+            self.batch_items_duplicate += duplicate
+            self.batch_items_error += error
+
+    def record_subtask_terminal(self, status: str, batch_item: bool = False) -> None:
+        """C15：记录一次子任务终态转换（graph executor 状态写回 choke point）。
+
+        batch_item=True 时额外累计批量单项终态/失败（单项失败率分子分母）。
+        """
+        with self._lock:
+            self.subtask_terminal_total += 1
+            self.subtask_terminal_by_status[status] = self.subtask_terminal_by_status.get(status, 0) + 1
+            if batch_item:
+                self.batch_item_terminal_total += 1
+                if status != "completed":
+                    self.batch_item_failed_total += 1
+
+    def record_llm_retry_scheduled(self) -> None:
+        """C13/C15：记录一次瞬时错误自动重试发起（事件粒度）。"""
+        with self._lock:
+            self.llm_retry_scheduled_total += 1
+
+    def record_llm_retry_success(self) -> None:
+        """C13/C15：记录一个经历过自动重试后最终成功的任务（任务粒度）。"""
+        with self._lock:
+            self.llm_retry_success_total += 1
+
     def get_summary(self) -> dict:
         """指标摘要（含 §8 验收表派生比率）。"""
         with self._lock:
@@ -95,6 +150,24 @@ class SubtaskMetrics:
                 "redispatch_total": self.redispatch_total,
                 "redispatch_by_prior": dict(self.redispatch_by_prior),
                 "redispatch_rate": round(self.redispatch_total / max(self.creations_total, 1), 4),
+                # C15 粒度/批量/单项失败率
+                "granularity_rejected_total": self.granularity_rejected_total,
+                "granularity_by_rule": dict(self.granularity_by_rule),
+                "batch_dispatch_total": self.batch_dispatch_total,
+                "batch_items_total": self.batch_items_total,
+                "batch_items_created": self.batch_items_created,
+                "batch_items_duplicate": self.batch_items_duplicate,
+                "batch_items_error": self.batch_items_error,
+                "batch_item_creation_rate": round(self.batch_items_created / max(self.batch_items_total, 1), 4),
+                "subtask_terminal_total": self.subtask_terminal_total,
+                "subtask_terminal_by_status": dict(self.subtask_terminal_by_status),
+                "batch_item_terminal_total": self.batch_item_terminal_total,
+                "batch_item_failed_total": self.batch_item_failed_total,
+                "batch_item_failure_rate": round(self.batch_item_failed_total / max(self.batch_item_terminal_total, 1), 4),
+                # C13/C15 自动重试命中率（任务粒度成功 / 事件粒度发起）
+                "llm_retry_scheduled_total": self.llm_retry_scheduled_total,
+                "llm_retry_success_total": self.llm_retry_success_total,
+                "llm_retry_success_rate": round(self.llm_retry_success_total / max(self.llm_retry_scheduled_total, 1), 4),
             }
 
     def reset(self) -> None:
@@ -108,6 +181,19 @@ class SubtaskMetrics:
             self.scan_fallback_shared = 0
             self.redispatch_total = 0
             self.redispatch_by_prior.clear()
+            self.granularity_rejected_total = 0
+            self.granularity_by_rule.clear()
+            self.batch_dispatch_total = 0
+            self.batch_items_total = 0
+            self.batch_items_created = 0
+            self.batch_items_duplicate = 0
+            self.batch_items_error = 0
+            self.subtask_terminal_total = 0
+            self.subtask_terminal_by_status.clear()
+            self.batch_item_terminal_total = 0
+            self.batch_item_failed_total = 0
+            self.llm_retry_scheduled_total = 0
+            self.llm_retry_success_total = 0
             self._start_time = time.time()
 
 

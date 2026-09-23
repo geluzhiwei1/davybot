@@ -57,6 +57,7 @@ class TaskEventType(Enum):
     SUBTASK_FAILED = "subtask_failed"  # 子任务失败
     SUBTASK_ABORTED = "subtask_aborted"  # 子任务被 abort_task 级联取消
     SUBTASK_STEERED = "subtask_steered"  # message_task 注入 steer / 续跑指令
+    SUBTASK_PROGRESS = "subtask_progress"  # 子任务 todo 步级进度（C25，纯 UI 态）
 
     # ========== 工具执行 (4个) ==========
     TOOL_STARTED = "tool_started"  # 工具开始执行

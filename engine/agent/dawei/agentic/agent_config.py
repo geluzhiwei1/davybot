@@ -97,7 +97,10 @@ class Config:
         self.enable_skills = True
         self.enable_mcp = True
         self.auto_approve_tools = True
-        self.max_concurrent_subtasks = 3
+        # C9 闸门重划（2026-09-23）：创建侧 3→8（batch 合法形态不再被广度闸惩罚）；
+        # 执行侧信号量新增字段（TaskGraphExecutionEngine getattr 读取，此前恒回落 2）
+        self.max_concurrent_subtasks = 8
+        self.max_parallel_tasks = 3
 
         # 配置元数据
         self._config_version = "1.0.0"
@@ -153,6 +156,7 @@ class Config:
             "enable_mcp",
             "auto_approve_tools",
             "max_concurrent_subtasks",
+            "max_parallel_tasks",
         }
 
         # 只更新预期的配置项
@@ -201,6 +205,7 @@ class Config:
             "default_ttl",
             "tool_execution_timeout",
             "max_concurrent_subtasks",
+            "max_parallel_tasks",
         }
 
         # 定义浮点数类型配置项
@@ -246,6 +251,7 @@ class Config:
             f"{prefix}ENABLE_MCP": "enable_mcp",
             f"{prefix}AUTO_APPROVE_TOOLS": "auto_approve_tools",
             f"{prefix}MAX_CONCURRENT_SUBTASKS": "max_concurrent_subtasks",
+            f"{prefix}MAX_PARALLEL_TASKS": "max_parallel_tasks",
         }
 
         for env_var, attr_name in env_mappings.items():
@@ -477,6 +483,7 @@ class Config:
             "enable_mcp",
             "auto_approve_tools",
             "max_concurrent_subtasks",
+            "max_parallel_tasks",
             "_config_version",
             "_last_modified",
         }

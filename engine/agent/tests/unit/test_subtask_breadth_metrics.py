@@ -21,14 +21,13 @@ import pytest
 
 from dawei.agentic.errors import SubtaskBreadthLimitExceededError
 from dawei.agentic.subtask_metrics import SubtaskMetrics, get_metrics
+from dawei.agentic.task_graph_excutor import TaskGraphExecutionEngine
 from dawei.conversation.conversation import Conversation
 from dawei.core.events import SimpleEventBus
 from dawei.entity.task_types import TaskStatus
 from dawei.task_graph.task_graph import TaskGraph
 from dawei.task_graph.task_node_data import TaskContext, TaskData, TaskPriority
 from dawei.tools.custom_tools import workflow_tools_fixed as wtf
-
-from dawei.agentic.task_graph_excutor import TaskGraphExecutionEngine
 
 pytestmark = pytest.mark.unit
 
@@ -53,7 +52,12 @@ async def _make_graph() -> tuple[TaskGraph, str]:
     return graph, "root-1"
 
 
-def _subtask_data(node_id: str, description: str = "goal X", status: TaskStatus = TaskStatus.PENDING) -> TaskData:
+def _subtask_data(
+    node_id: str,
+    description: str = "goal X",
+    status: TaskStatus = TaskStatus.PENDING,
+    metadata: dict | None = None,
+) -> TaskData:
     return TaskData(
         task_node_id=node_id,
         description=description,
@@ -62,6 +66,7 @@ def _subtask_data(node_id: str, description: str = "goal X", status: TaskStatus 
         context=TaskContext(user_id="u1", session_id="s1", message_id="m1"),
         todos=[],
         priority=TaskPriority.MEDIUM,
+        metadata=metadata or {},
     )
 
 
@@ -73,11 +78,20 @@ def fresh_metrics():
     get_metrics().reset()
 
 
+@pytest.fixture
+def gate3(monkeypatch):
+    """C9 闸门重划（2026-09-23）：默认 max_active_subtasks 3→8。本文件既有
+    用例以 3 为刻画粒度（语义测试不随默认值漂移），显式压回 3。"""
+    from dawei.config.settings import get_settings
+
+    monkeypatch.setattr(get_settings().agent_execution, "max_active_subtasks", 3)
+
+
 # ==================== 广度闸（图谱层）====================
 
 
-async def test_breadth_limit_enforced_at_graph_level(fresh_metrics):
-    """3 个活跃子任务(默认上限)后，第 4 个创建被拒且不挂接节点"""
+async def test_breadth_limit_enforced_at_graph_level(fresh_metrics, gate3):
+    """3 个活跃子任务(压回上限)后，第 4 个创建被拒且不挂接节点"""
     graph, root_id = await _make_graph()
     for i in range(3):
         node = await graph.create_subtask(root_id, _subtask_data(f"sub-{i}"))
@@ -115,7 +129,7 @@ async def test_cancelled_children_do_not_count(fresh_metrics):
     assert node is not None
 
 
-async def test_interactive_counts_towards_breadth(fresh_metrics):
+async def test_interactive_counts_towards_breadth(fresh_metrics, gate3):
     """回归守卫：INTERACTIVE(追问等待)占用在飞名额——此前两侧闸门均漏计"""
     graph, root_id = await _make_graph()
     await graph.create_subtask(root_id, _subtask_data("sub-a", status=TaskStatus.PENDING))
@@ -128,7 +142,7 @@ async def test_interactive_counts_towards_breadth(fresh_metrics):
         await graph.create_subtask(root_id, _subtask_data("sub-overflow"))
 
 
-async def test_concurrent_creates_exactly_one_wins(fresh_metrics):
+async def test_concurrent_creates_exactly_one_wins(fresh_metrics, gate3):
     """锁内原子判定：上限 3、已有 2 个活跃，并发 2 个创建恰好 1 个成功（TOCTOU 兜底）"""
     graph, root_id = await _make_graph()
     await graph.create_subtask(root_id, _subtask_data("sub-0"))
@@ -144,6 +158,28 @@ async def test_concurrent_creates_exactly_one_wins(fresh_metrics):
     assert len(wins) == 1
     assert len(rejects) == 1
     assert len(graph._nodes[root_id].child_ids) == 3
+
+
+async def test_batch_item_bypasses_breadth_gate(fresh_metrics, gate3):
+    """C9：metadata.batch_id 在场（new_task_batch 展开项）→ 满 active 也放行；
+    同状态下普通子任务仍被拒（合法批量不惩罚，零散堆叠照拦）。"""
+    graph, root_id = await _make_graph()
+    for i in range(3):
+        await graph.create_subtask(root_id, _subtask_data(f"sub-{i}"))
+
+    with pytest.raises(SubtaskBreadthLimitExceededError):
+        await graph.create_subtask(root_id, _subtask_data("sub-plain"))
+
+    node = await graph.create_subtask(
+        root_id,
+        _subtask_data(
+            "sub-batch",
+            description="batch item goal",
+            metadata={"batch_id": "b1", "item_identity": "file-0"},
+        ),
+    )
+    assert node is not None
+    assert "sub-batch" in graph._nodes[root_id].child_ids
 
 
 async def test_redispatch_detected_and_counted_not_blocked(fresh_metrics):
@@ -228,9 +264,9 @@ def make_engine(graph, conversation=None):
     engine._user_workspace = FakeWorkspace(graph, conversation)
     engine._node_executors = {}
     engine.logger = SimpleNamespace(
-        warning=lambda *a, **k: None,
-        info=lambda *a, **k: None,
-        exception=lambda *a, **k: None,
+        warning=lambda *_a, **_k: None,
+        info=lambda *_a, **_k: None,
+        exception=lambda *_a, **_k: None,
     )
     return engine
 

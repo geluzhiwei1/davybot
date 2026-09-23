@@ -142,9 +142,7 @@ class TestModeConfigV2:
         import logging
 
         with caplog.at_level(logging.WARNING):
-            mode = ModeConfig.from_dict(
-                {"slug": "firm-x", "name": "X", "groups": ["read"], "aliases": ["legacy-x"]}
-            )
+            mode = ModeConfig.from_dict({"slug": "firm-x", "name": "X", "groups": ["read"], "aliases": ["legacy-x"]})
         assert "groups" not in mode.to_dict()
         assert "aliases" not in mode.to_dict()
         assert sum("deprecated" in r.message for r in caplog.records) == 1
@@ -183,9 +181,7 @@ class TestModeConfigV2:
     # ---- 命名规范（§4.8，Phase 1 告警级）
 
     def test_naming_ok(self):
-        mode = ModeConfig.from_dict(
-            {"slug": "firm-case-manager", "name": "🪃 Case Manager", "kind": "business", "priority": 60}
-        )
+        mode = ModeConfig.from_dict({"slug": "firm-case-manager", "name": "🪃 Case Manager", "kind": "business", "priority": 60})
         assert mode.validation_issues(known_team_codes={"firm"}) == []
 
     def test_naming_bad_prefix_flagged(self):
@@ -286,12 +282,7 @@ class TestModeRegistry:
         assert registry.resolve(ModeSelectionContext(task_mode="acme-task")) == "acme-task"
         assert registry.resolve(ModeSelectionContext(mention_slug="acme-mention")) == "acme-mention"
         # 优先级：explicit 覆盖 task/mention
-        assert (
-            registry.resolve(
-                ModeSelectionContext(explicit_slug="acme-explicit", task_mode="acme-task", mention_slug="acme-mention")
-            )
-            == "acme-explicit"
-        )
+        assert registry.resolve(ModeSelectionContext(explicit_slug="acme-explicit", task_mode="acme-task", mention_slug="acme-mention")) == "acme-explicit"
         # 全空 → 默认入口 orchestrator（非 pdca）
         assert registry.resolve(ModeSelectionContext()) == "orchestrator"
         # 链上未知 slug → 告警后落到下一级（会话不中断）
@@ -387,7 +378,8 @@ class TestNewTaskCanDelegateGuard:
     async def test_non_delegable_mode_rejected(self):
         import json
 
-        out = json.loads(await self._tool()._run(mode="orchestrator", message="x", acceptance="验收标准示例"))
+        # C2 起 deliverable 必填——补齐后才能抵达 can_delegate 闸门（验收 #5 语义不变）
+        out = json.loads(await self._tool()._run(mode="orchestrator", message="x", acceptance="验收标准示例", deliverable="交付/测试.md"))
         assert out["status"] == "error"
         assert "can_delegate" in out["message"]
         # 可派目标仍列出供 LLM 修正路由
@@ -398,6 +390,7 @@ class TestNewTaskCanDelegateGuard:
         import json
 
         # pdca 可派：越过 can_delegate 防护；无 task_graph 走既有 FAST FAIL 分支
-        out = json.loads(await self._tool()._run(mode="pdca", message="x", acceptance="验收标准示例"))
+        # （deliverable 必填为 C2 新契约，补齐以真正抵达该分支）
+        out = json.loads(await self._tool()._run(mode="pdca", message="x", acceptance="验收标准示例", deliverable="交付/测试.md"))
         blob = json.dumps(out, ensure_ascii=False)
         assert "can_delegate" not in blob

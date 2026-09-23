@@ -134,6 +134,7 @@ from dawei.tui.ui.widgets.command_palette import CommandPalette, get_default_com
 from dawei.tui.ui.widgets.custom_header import CustomHeader
 from dawei.tui.ui.widgets.pdca_panel import PDCAPanel
 from dawei.tui.ui.widgets.status_bar import StatusBar
+from dawei.tui.ui.widgets.subtask_panel import SubtaskPanel
 from dawei.tui.ui.widgets.thinking_panel import ThinkingPanel
 from dawei.tui.ui.widgets.toast_notifications import ToastManager
 from dawei.tui.ui.widgets.tool_panel import ToolPanel
@@ -198,6 +199,14 @@ class GeweiTUIApp(App):
         TaskEventType.PDCA_PHASE_ADVANCED: "_handle_pdca_phase_advanced",
         TaskEventType.PDCA_CYCLE_COMPLETED: "_handle_pdca_cycle_completed",
         TaskEventType.PDCA_DOMAIN_DETECTED: "_handle_pdca_domain_detected",
+        # C23：子任务生命周期 + todo 步级进度（handler 异常安全，纯 UI 态）
+        TaskEventType.SUBTASK_CREATED: "_handle_subtask_event",
+        TaskEventType.SUBTASK_STARTED: "_handle_subtask_event",
+        TaskEventType.SUBTASK_COMPLETED: "_handle_subtask_event",
+        TaskEventType.SUBTASK_FAILED: "_handle_subtask_event",
+        TaskEventType.SUBTASK_ABORTED: "_handle_subtask_event",
+        TaskEventType.SUBTASK_STEERED: "_handle_subtask_event",
+        TaskEventType.SUBTASK_PROGRESS: "_handle_subtask_progress",
     }
 
     # Command handler registry - maps command actions to handler methods
@@ -286,6 +295,7 @@ class GeweiTUIApp(App):
                 yield PDCAPanel(id="pdca_panel")
                 yield ThinkingPanel(id="thinking_panel")
                 yield ToolPanel(id="tool_panel")
+                yield SubtaskPanel(id="subtask_panel")  # C24：第 4 面板
 
         yield Footer()
 
@@ -691,6 +701,72 @@ class GeweiTUIApp(App):
         except Exception as e:
             logger.error(f"Error handling skills loaded event: {e}", exc_info=True)
             # Don't crash TUI for skills loading errors
+
+    # ==================== C23：子任务事件（异常安全 —— 纯 UI 态） ====================
+
+    def _handle_subtask_event(self, data: Any) -> None:
+        """Handle SUBTASK_* lifecycle events
+
+        状态 dict 已由 agent_bridge._update_subtask_state 记账；此处只在
+        终态（completed/failed/aborted）时向聊天流落一条 [子任务通知]，
+        并刷新 SubtaskPanel/StatusBar（C24 组件，缺失时静默跳过）。
+        与 Web 端同一文案模板（§3.3），≤3 行。
+        """
+        try:
+            subtask_id = str(self._get_attr(data, "subtask_id", "") or "")
+            if not subtask_id:
+                return
+            event_name = str(self._get_attr(data, "event", "") or "")
+            status = str(self._get_attr(data, "status", "") or event_name)
+            state = self._subtask_state(subtask_id)
+            identity = str(state.get("item_identity") or self._get_attr(data, "item_identity", "") or "")
+            if event_name in ("completed", "failed", "aborted"):
+                line = f"[子任务通知] {subtask_id[:8]} {event_name}"
+                if identity:
+                    line += f" · {identity[:40]}"
+                reason = self._get_attr(data, "reason", None)
+                if reason:
+                    line += f" · {str(reason)[:60]}"
+                try:
+                    self.query_one("#chat_area", ChatArea).add_info(line)
+                except Exception:  # noqa: BLE001 — UI 挂了只跳过本条通知
+                    pass
+            logger.debug(f"[TUI] subtask {subtask_id[:8]} {event_name} ({status})")
+            self._refresh_subtask_ui()
+        except Exception:  # noqa: BLE001 — 子任务通知失败绝不炸事件轮询循环
+            logger.exception("[TUI] subtask lifecycle handler failed: ")
+
+    def _handle_subtask_progress(self, data: Any) -> None:
+        """Handle subtask_progress (C25 todo 步级) — 状态 dict 已在 bridge 更新"""
+        try:
+            subtask_id = str(self._get_attr(data, "subtask_id", "") or "")
+            if subtask_id:
+                logger.debug(f"[TUI] subtask progress {subtask_id[:8]}: {self._get_attr(data, 'todos', {})}")
+            self._refresh_subtask_ui()
+        except Exception:  # noqa: BLE001
+            logger.exception("[TUI] subtask progress handler failed: ")
+
+    def _subtask_state(self, subtask_id: str) -> dict:
+        """读 bridge 状态 dict 的安全视图（bridge 缺失返回空 dict）"""
+        bridge = self.agent_bridge
+        return (bridge.subtask_states.get(subtask_id) or {}) if bridge else {}
+
+    def _refresh_subtask_ui(self) -> None:
+        """C24 挂点：SubtaskPanel / StatusBar 子任务段刷新（组件缺失时静默跳过）"""
+        try:
+            panel = self.query_one("#subtask_panel")
+            refresh = getattr(panel, "refresh_from_bridge", None)
+            if callable(refresh):
+                refresh()
+        except Exception:  # noqa: BLE001 — NoMatches（面板未挂载）等静默跳过
+            pass
+        try:
+            status_bar = self.query_one("#status_bar", StatusBar)
+            update = getattr(status_bar, "set_subtask_summary", None)
+            if callable(update):
+                update()
+        except Exception:  # noqa: BLE001
+            pass
 
     def _handle_pdca_cycle_started(self, data: Any) -> None:
         """Handle PDCA cycle started event
