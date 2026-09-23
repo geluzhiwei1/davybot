@@ -149,12 +149,18 @@ def env(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(env):
+    from fastapi import APIRouter
+
     from dawei.api.shares import router as shares_router
     from dawei.api.workspaces.share import router as owner_router
 
     app = FastAPI()
     app.include_router(shares_router)
-    app.include_router(owner_router)
+    # 与生产一致: owner router 挂在父路由 (prefix=/api/workspaces) 之下,
+    # 防止 prefix 拼接类回归 (2026-09-23 双重前缀事故即此盲区)
+    parent = APIRouter(prefix="/api/workspaces")
+    parent.include_router(owner_router)
+    app.include_router(parent)
     return TestClient(app)
 
 

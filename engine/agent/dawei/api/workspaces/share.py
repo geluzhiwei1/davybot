@@ -31,7 +31,10 @@ from dawei.workspace.workspace_share_manager import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/api/workspaces/{workspace_id}/share",
+    # 注意: 本 router 挂在父路由 workspaces/__init__.py (prefix=/api/workspaces) 之下,
+    # prefix 必须只写相对段 — FastAPI include_router 会拼接父 prefix, 写全路径会双重前缀
+    # (2026-09-23 发布事故: 线上实际注册成 /api/workspaces/api/workspaces/{wid}/share)。
+    prefix="/{workspace_id}/share",
     tags=["workspace-share-owner"],
     dependencies=[Depends(require_workspace_access)],
 )

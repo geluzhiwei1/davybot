@@ -149,11 +149,16 @@ export function clearShareToken(shareId: string): void {
 
 // ── Viewer 端点（独立 fetch） ───────────────────────────────────────
 
-/** 提取后端 {"detail": "..."} 错误文案（防爆破提示等需要原样展示） */
+/** 提取后端错误文案（防爆破提示等需要原样展示）
+ *  兼容两种形态: FastAPI 原生 {"detail"} 与全局统一异常包装 {"error","message"} */
 async function detailOf(res: Response): Promise<string> {
   try {
     const body = await res.json();
-    if (body && typeof body.detail === "string") return body.detail;
+    if (body && typeof body === "object") {
+      if (typeof body.detail === "string") return body.detail;
+      if (typeof body.error === "string") return body.error;
+      if (typeof body.message === "string") return body.message;
+    }
   } catch {
     // ignore
   }
