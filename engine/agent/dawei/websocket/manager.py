@@ -8,6 +8,7 @@
 
 import asyncio
 import contextlib
+import os
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from dawei.core.datetime_compat import UTC
@@ -125,7 +126,14 @@ class WebSocketManager:
         self.logger = get_logger(__name__)
 
         # 任务取消配置
-        self._task_cancel_delay = 3  # 断开连接后3秒取消任务
+        # WS 断开后延迟 N 秒取消该 session 的 agent 任务（等待重连窗口）。
+        # 默认 3s（本地/桌面习惯）；saas/web 部署建议调大（如 300）——浏览器
+        # 后台 tab 会被限流/回收 socket，切走几分钟回来不应杀掉正在跑的任务
+        # （demo.normnomos.com 2026-09-22 切 tab 丢消息事故）。0 = 禁用自动取消。
+        try:
+            self._task_cancel_delay = float(os.getenv("DAWEI_WS_TASK_CANCEL_DELAY", "3"))
+        except ValueError:
+            self._task_cancel_delay = 3
         self._pending_cancel_tasks: Dict[str, asyncio.Task] = {}  # session_id -> cancel_task
 
         # 初始化WebSocket状态管理器
@@ -860,6 +868,8 @@ class WebSocketManager:
         # 创建新的延迟取消任务
         async def cancel_tasks_after_delay():
             try:
+                if self._task_cancel_delay <= 0:
+                    return  # 自动取消已禁用（DAWEI_WS_TASK_CANCEL_DELAY=0）
                 await asyncio.sleep(self._task_cancel_delay)
 
                 # 检查连接是否已恢复
