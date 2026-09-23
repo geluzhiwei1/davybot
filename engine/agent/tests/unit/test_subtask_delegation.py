@@ -1617,6 +1617,60 @@ def test_check_budget_accepts_numeric_string_nodes(monkeypatch):
     assert reason3 is not None and "timeout" in reason3
 
 
+def test_root_exempts_global_budget_gate(monkeypatch):
+    """2026-09-23 UC-ENG-002 九跑回归：根任务（无 parent_id）豁免全局 subtask
+    闸门。九跑实证根作为编排者跨 3 个执行期累计 210k tokens，触 200k 全局崖
+    死在收尾验证后一步（rc=1，交付物 6/6 已齐）。豁免只针对"全局兜底"，
+    根节点自声明值仍生效（FAST FAIL 不放松）。"""
+    import time as _time
+    from types import SimpleNamespace
+
+    # 全局闸门全开：预算 100 / 超时 1000
+    ae = SimpleNamespace(subtask_token_budget=100, subtask_timeout=1000)
+    monkeypatch.setattr("dawei.config.settings.get_settings", lambda: SimpleNamespace(agent_execution=ae))
+
+    # ① 根豁免：用量 9999 ≫ 100、loop 起点已在 2000s 前 ≫ 1000 —— 两道全局
+    #    崖均不触发（修复前这里即九跑 rc=1 的根因）
+    root = _bare_executor()
+    root.task_node = FakeTaskNode("root", status=TaskStatus.RUNNING)  # parent_id=None
+    root._tokens_used = 9999
+    root._loop_started_at = _time.monotonic() - 2000
+    assert root._check_budget_and_deadline() is None
+
+    # ② 子任务不豁免：同用量 → 全局预算崖生效
+    sub = _bare_executor()  # task_node = FakeTaskNode("sub", parent_id="root")
+    sub._tokens_used = 9999
+    sub._loop_started_at = _time.monotonic()
+    reason = sub._check_budget_and_deadline()
+    assert reason is not None and "token_budget" in reason and "100" in reason
+
+    # ②' 子任务全局超时崖同样生效
+    sub_t = _bare_executor()
+    sub_t._loop_started_at = _time.monotonic() - 2000
+    reason_t = sub_t._check_budget_and_deadline()
+    assert reason_t is not None and "timeout" in reason_t
+
+    # ③ 根自声明仍生效：token_budget=50、用量 60 → 触崖（FAST FAIL 不放松）
+    root_decl = _bare_executor()
+    root_decl.task_node = FakeTaskNode("root")
+    root_decl.task_node.data.token_budget = 50
+    root_decl.task_node.data.timeout_seconds = None
+    root_decl._tokens_used = 60
+    root_decl._loop_started_at = _time.monotonic()
+    reason_d = root_decl._check_budget_and_deadline()
+    assert reason_d is not None and "token_budget" in reason_d and "50" in reason_d
+
+    # ③' 根自声明超时同语义：timeout_seconds=1、已过 2s → 触崖
+    root_dt = _bare_executor()
+    root_dt.task_node = FakeTaskNode("root")
+    root_dt.task_node.data.token_budget = None
+    root_dt.task_node.data.timeout_seconds = 1
+    root_dt._tokens_used = 0
+    root_dt._loop_started_at = _time.monotonic() - 2
+    reason_dt = root_dt._check_budget_and_deadline()
+    assert reason_dt is not None and "timeout" in reason_dt
+
+
 async def test_fail_with_completion_injects_and_marks_failed():
     """超限失败：task_completion 失败 JSON 注入会话 + 状态置 FAILED"""
     from dawei.agentic.subtask_conversation import extract_task_completion

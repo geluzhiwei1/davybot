@@ -190,6 +190,12 @@ class TaskNodeExecutionEngine:
         （C14 起默认 200_000 / 900，此前 -1 全关）。>0 时作为全局上限：节点声明
         值更小则取节点值，节点未声明则用全局值。
 
+        P3-A（2026-09-23 九跑）：根任务（无 parent_id）豁免全局闸门。根是编排
+        者——挂起/续跑跨多个执行期，_tokens_used 跨期累计，九跑实证根 210k 触
+        200k 全局崖、死在收尾验证后一步（rc=1，交付物 6/6 已齐）。全局 subtask
+        闸门只约束子任务；根节点自声明 token_budget/timeout_seconds 仍生效
+        （FAST FAIL 不放松）。
+
         Returns:
             超限时返回 task_completion 失败 JSON（build_budget_failure_result），
             由调用方注入会话并置 FAILED；未超限返回 None。
@@ -209,6 +215,9 @@ class TaskNodeExecutionEngine:
 
             data = getattr(self.task_node, "data", None)
 
+            # P3-A：根任务（无 parent_id）豁免全局 subtask 闸门（见 docstring）。
+            _is_root = not getattr(self.task_node, "parent_id", None)
+
             # 有效预算 = 节点声明值为主；全局闸门 >0 时取 min(节点, 全局)、
             # 节点未声明时用全局值；全局 -1（默认）只关闭"全局兜底"，
             # 不吞掉节点自己的声明（首版实现 -1 时连节点值也跳过，
@@ -224,14 +233,14 @@ class TaskNodeExecutionEngine:
                 return f if f > 0 else None
 
             budget = _pos_num(getattr(data, "token_budget", None))
-            if cfg_budget > 0:
+            if cfg_budget > 0 and not _is_root:
                 budget = float(cfg_budget) if budget is None else min(budget, float(cfg_budget))
             if budget is not None and self._tokens_used >= budget:
                 return build_budget_failure_result("token_budget", used=self._tokens_used, limit=int(budget))
 
-            # 超时同语义：节点声明值为主，全局闸门 >0 时取 min
+            # 超时同语义：节点声明值为主，全局闸门 >0 时取 min（根豁免全局）
             timeout = _pos_num(getattr(data, "timeout_seconds", None))
-            if cfg_timeout > 0:
+            if cfg_timeout > 0 and not _is_root:
                 timeout = float(cfg_timeout) if timeout is None else min(timeout, float(cfg_timeout))
             if timeout is not None and deadline_exceeded(self._loop_started_at, timeout):
                 used_s = int(time.monotonic() - self._loop_started_at) if self._loop_started_at is not None else 0
