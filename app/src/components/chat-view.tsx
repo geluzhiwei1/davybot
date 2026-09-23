@@ -484,6 +484,17 @@ export function ChatView({
         {extraTopBarNode}
         {/* Right-side panel toggles — all three panels independently hideable */}
         <div className="ml-auto flex items-center gap-1.5 min-w-0">
+          {/* 工作区分享（biz 任务页均复用 ChatView 顶栏，一处生效全覆盖） */}
+          {workspace && (
+            <button
+              onClick={() => setShareOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border border-border hover:border-brand/40 hover:text-brand transition shrink-0"
+              title={tRoutesB("workspaces.share")}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{tRoutesB("workspaces.share")}</span>
+            </button>
+          )}
           {/* Open workspace settings drawer (LLM providers / MCP / agents …) */}
           {workspace && (
             <button
@@ -496,16 +507,6 @@ export function ChatView({
             >
               <Settings className="w-3.5 h-3.5" />
               <span className="hidden md:inline">{t("chatView.settings.short")}</span>
-            </button>
-          )}
-          {/* 工作区分享（biz 任务页均复用 ChatView 顶栏，一处生效全覆盖） */}
-          {workspace && (
-            <button
-              onClick={() => setShareOpen(true)}
-              className="inline-flex items-center text-xs px-2 py-1 rounded-md border border-border hover:border-brand/40 hover:text-brand transition shrink-0"
-              title={tRoutesB("workspaces.share")}
-            >
-              <Share2 className="w-3.5 h-3.5" />
             </button>
           )}
           {/* 面板 toggle 排:<md 隐藏 —— 移动端已有顶部子视图 Tab 行(方案
