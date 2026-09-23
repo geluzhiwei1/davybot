@@ -12,18 +12,29 @@ See upgrade_v2.md §3.7 B & C for design rationale.
 Aligned with OpenAPI spec at /api/v1/legal/openapi.json (97 endpoints).
 """
 
+import contextvars
 import logging
 import os
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/knowledge", tags=["knowledge-uni"])
+# 用户 Authorization 头捕获(router 级依赖写入,contextvar 传递)。
+# kb-searcher 多租户按用户 JWT 鉴权,不转发则一律 401 → 静默降级 local_fallback
+# (2026-09-23 demo 实锤:unified /search 永远 local_fallback,根因即此)。
+_kb_proxy_auth: contextvars.ContextVar[str | None] = contextvars.ContextVar("kb_proxy_auth", default=None)
+
+
+async def _capture_auth(request: Request) -> None:
+    _kb_proxy_auth.set(request.headers.get("authorization"))
+
+
+router = APIRouter(prefix="/api/knowledge", tags=["knowledge-uni"], dependencies=[Depends(_capture_auth)])
 
 # nn-kb-searcher API base URL（E1: 无云端缺省 —— 未配置即 503 关闭）
 _UNISEARCHER_API_URL = os.environ.get("UNISEARCHER_API_URL", "").rstrip("/")
@@ -53,10 +64,14 @@ async def _proxy_request(
             detail="knowledge service not configured: set UNISEARCHER_API_URL to enable (E1: no cloud default)",
         )
     url = f"{_UNISEARCHER_API_URL}{path}"
+    headers: dict[str, str] = {}
+    auth = _kb_proxy_auth.get()
+    if auth:
+        headers["Authorization"] = auth
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             return await client.request(
-                method, url, json=json_data, params=params
+                method, url, json=json_data, params=params, headers=headers or None
             )
     except httpx.ConnectError:
         logger.warning("nn-kb-searcher unreachable at %s", url)
@@ -510,7 +525,7 @@ async def upload_document(
                 data["kb_id"] = kb_id
             if doc_type:
                 data["doc_type"] = doc_type
-            resp = await client.post(url, files=files, data=data)
+            resp = await client.post(url, files=files, data=data, headers={"Authorization": _kb_proxy_auth.get()} if _kb_proxy_auth.get() else None)
         return _forward_response(resp)
     except httpx.ConnectError:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Knowledge service unavailable")
@@ -840,7 +855,7 @@ async def upload_uni_kb_document(
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             files = {"file": (file.filename, await file.read(), file.content_type or "application/octet-stream")}
-            resp = await client.post(url, files=files)
+            resp = await client.post(url, files=files, headers={"Authorization": _kb_proxy_auth.get()} if _kb_proxy_auth.get() else None)
         return _forward_response(resp)
     except httpx.ConnectError:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Knowledge service unavailable")

@@ -570,7 +570,7 @@ class LegalSearchTool(CustomBaseTool):
         result = await _call_kb_searcher("POST", "/search", json_data=body, timeout=15.0)
 
         if "error" in result:
-            return f"Error: {result['error']}"
+            return f"Error: {result['error']}" + (f" — {str(result.get('detail'))[:300]}" if result.get("detail") else "")
 
         results = result.get("results", [])
         total = result.get("total", 0)
@@ -677,7 +677,7 @@ class LegalAskTool(CustomBaseTool):
         result = await _call_kb_searcher("POST", "/ask", json_data=payload, timeout=30.0)
 
         if "error" in result:
-            return f"Error: {result['error']}"
+            return f"Error: {result['error']}" + (f" — {str(result.get('detail'))[:300]}" if result.get("detail") else "")
 
         answer = result.get("answer") or result.get("response") or "No answer available."
         citations = result.get("citations") or result.get("sources") or []
@@ -747,7 +747,7 @@ class LegalDocumentTool(CustomBaseTool):
         result = await _call_kb_searcher("GET", f"/documents/{document_id}/metadata")
 
         if "error" in result:
-            return f"Error: {result['error']}"
+            return f"Error: {result['error']}" + (f" — {str(result.get('detail'))[:300]}" if result.get("detail") else "")
 
         lines = [
             "## Legal Document Detail",
@@ -1070,7 +1070,7 @@ class LegalSearchFacetsTool(CustomBaseTool):
             body["fields"] = fields
         result = await _call_kb_searcher("POST", "/search/facets", json_data=body, timeout=20)
         if "error" in result:
-            return f"Error: {result['error']}"
+            return f"Error: {result['error']}" + (f" — {str(result.get('detail'))[:300]}" if result.get("detail") else "")
         facets = result.get("facets") or result.get("aggregations") or result
         if not isinstance(facets, dict):
             return "（无分面数据）"
@@ -1110,7 +1110,7 @@ class LegalGraphSearchTool(CustomBaseTool):
             params["entity_type"] = entity_type
         result = await _call_kb_searcher("GET", "/graph/entities", params=params, timeout=20)
         if "error" in result:
-            return f"Error: {result['error']}"
+            return f"Error: {result['error']}" + (f" — {str(result.get('detail'))[:300]}" if result.get("detail") else "")
         items = result.get("entities") or result.get("items") or result.get("results") or []
         if not items:
             return f"图谱中未找到 '{query}' 相关实体。"
@@ -1175,7 +1175,7 @@ class LegalAnalyticsTool(CustomBaseTool):
         else:
             return f"不支持的 metric: {metric}（可选 trend/lifecycle/jurisdiction_heatmap/top_authorities）"
         if "error" in result:
-            return f"Error: {result['error']}"
+            return f"Error: {result['error']}" + (f" — {str(result.get('detail'))[:300]}" if result.get("detail") else "")
 
         lines = [f"## 法律分析：{metric}\n"]
         # Generic rendering: show series/buckets/counts if present
@@ -1219,7 +1219,7 @@ class LegalDocumentTimelineTool(CustomBaseTool):
     async def _async_run(self, document_id: str, as_of: str | None = None) -> str:
         result = await _call_kb_searcher("GET", f"/documents/{document_id}/timeline", timeout=20)
         if "error" in result:
-            return f"Error: {result['error']}"
+            return f"Error: {result['error']}" + (f" — {str(result.get('detail'))[:300]}" if result.get("detail") else "")
         versions = result.get("versions") or result.get("timeline") or result.get("items") or []
         lines = [f"## 文献 `{document_id}` 版本时间线（{len(versions)} 个版本）\n"]
         for v in versions[:20] if isinstance(versions, list) else []:
