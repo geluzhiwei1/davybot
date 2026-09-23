@@ -124,15 +124,20 @@ def test_resolve_unknown_id_is_noop():
     assert ApprovalGate().resolve("does-not-exist", True) is False
 
 
-def test_provider_failure_fails_open():
-    """A policy-provider error must NEVER block execution (fail-open)."""
+def test_provider_failure_fails_closed():
+    """Policy-provider error → FAIL-CLOSED（2026-09-23 八跑教训，契约反转）。
+
+    旧 fail-open（provider 抛错 → enabled=False 静默放行）在八跑中把
+    security.json 配置非法（containerRuntime="e2b" 未收录）静默放行 53 次。
+    新契约：解析失败 → 全量审批 + 无通道即拒绝（deny），宁可吵闹不可失守。
+    """
 
     def boom():
         raise RuntimeError("policy provider exploded")
 
     g = ApprovalGate()
     g.set_policy_provider(boom)
-    assert asyncio.run(g.request_approval("execute_command")) is True
+    assert asyncio.run(g.request_approval("execute_command")) is False
 
 
 def test_low_risk_skips_approval_even_when_enabled():
