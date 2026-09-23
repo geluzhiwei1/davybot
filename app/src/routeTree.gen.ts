@@ -16,7 +16,6 @@ import { Route as RegularTasksRouteImport } from "./routes/regular-tasks"
 import { Route as NoTenantRouteImport } from "./routes/no-tenant"
 import { Route as MemoryRouteImport } from "./routes/memory"
 import { Route as LoginRouteImport } from "./routes/login"
-import { Route as KnowledgeRouteImport } from "./routes/knowledge"
 import { Route as FilesRouteImport } from "./routes/files"
 import { Route as ExpertsRouteImport } from "./routes/experts"
 import { Route as AutomationRouteImport } from "./routes/automation"
@@ -66,11 +65,6 @@ const MemoryRoute = MemoryRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: "/login",
   path: "/login",
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KnowledgeRoute = KnowledgeRouteImport.update({
-  id: "/knowledge",
-  path: "/knowledge",
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -159,7 +153,6 @@ export interface FileRoutesByFullPath {
   "/automation": typeof AutomationRoute
   "/experts": typeof ExpertsRouteWithChildren
   "/files": typeof FilesRoute
-  "/knowledge": typeof KnowledgeRoute
   "/login": typeof LoginRoute
   "/memory": typeof MemoryRoute
   "/no-tenant": typeof NoTenantRoute
@@ -184,7 +177,6 @@ export interface FileRoutesByTo {
   "/automation": typeof AutomationRoute
   "/experts": typeof ExpertsRouteWithChildren
   "/files": typeof FilesRoute
-  "/knowledge": typeof KnowledgeRoute
   "/login": typeof LoginRoute
   "/memory": typeof MemoryRoute
   "/no-tenant": typeof NoTenantRoute
@@ -209,7 +201,6 @@ export interface FileRoutesById {
   "/automation": typeof AutomationRoute
   "/experts": typeof ExpertsRouteWithChildren
   "/files": typeof FilesRoute
-  "/knowledge": typeof KnowledgeRoute
   "/login": typeof LoginRoute
   "/memory": typeof MemoryRoute
   "/no-tenant": typeof NoTenantRoute
@@ -236,7 +227,6 @@ export interface FileRouteTypes {
     | "/automation"
     | "/experts"
     | "/files"
-    | "/knowledge"
     | "/login"
     | "/memory"
     | "/no-tenant"
@@ -261,7 +251,6 @@ export interface FileRouteTypes {
     | "/automation"
     | "/experts"
     | "/files"
-    | "/knowledge"
     | "/login"
     | "/memory"
     | "/no-tenant"
@@ -285,7 +274,6 @@ export interface FileRouteTypes {
     | "/automation"
     | "/experts"
     | "/files"
-    | "/knowledge"
     | "/login"
     | "/memory"
     | "/no-tenant"
@@ -311,7 +299,6 @@ export interface RootRouteChildren {
   AutomationRoute: typeof AutomationRoute
   ExpertsRoute: typeof ExpertsRouteWithChildren
   FilesRoute: typeof FilesRoute
-  KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
   MemoryRoute: typeof MemoryRoute
   NoTenantRoute: typeof NoTenantRoute
@@ -375,13 +362,6 @@ declare module "@tanstack/react-router" {
       path: "/login"
       fullPath: "/login"
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    "/knowledge": {
-      id: "/knowledge"
-      path: "/knowledge"
-      fullPath: "/knowledge"
-      preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/files": {
@@ -526,7 +506,6 @@ const rootRouteChildren: RootRouteChildren = {
   AutomationRoute: AutomationRoute,
   ExpertsRoute: ExpertsRouteWithChildren,
   FilesRoute: FilesRoute,
-  KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
   MemoryRoute: MemoryRoute,
   NoTenantRoute: NoTenantRoute,
