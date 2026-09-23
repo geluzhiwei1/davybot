@@ -16,7 +16,8 @@
 - N3: 命令读写分类 (ro 模式预拦截)
 - N4: eBPF 网络策略加载
 - N6: PiiSafeLogger 集成
-- SaaS: 可选 WorkspaceStore 集成 (worktree 改为 s3fs 挂载点)
+- SaaS: WorkspaceStore SDK 同步 (rustfs; 2026-09-22 实装: 本地↔Store↔沙箱
+  双向同步替代 s3fs 挂载方案, 工作区 host-mount 不再是硬依赖)
 
 依赖: e2b Python SDK (pip install e2b) — 延迟导入, 不可用时 provider_factory 自动降级
 """
@@ -80,6 +81,10 @@ class SandboxSession:
     user_id: UserId
     workspace_id: str
     mount_mode: str  # "ro" | "rw"
+    # rustfs 链路 (2026-09-22): 销毁时兜底回拉需要 Store key 与本地路径;
+    # virtiofs 链路不填, 保持空串
+    workspace_key: str = ""
+    workspace_path: str = ""
     created_at: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
     is_paused: bool = False
@@ -198,6 +203,40 @@ class CubeSandboxProvider(SandboxProvider):
         # N4: 网络策略
         self._network_policy: dict[str, Any] | None = None
 
+        # === rustfs 链路 (2026-09-22): SaaS 工作区走 Store SDK 同步 ===
+        # WorkspaceStore 就绪且后端非 local (rustfs/minio/s3) 时:
+        # 沙箱不再 host-mount 工作区 (dawei-src 只读挂载保留),
+        # 创建后 本地→Store→沙箱 推送, 命令成功后 沙箱→Store→本地 回拉。
+        # 显式配置 S3 后端但初始化失败 → 大声 ERROR + 回退 virtiofs
+        # (BASE_DIR 守卫保证 virtiofs 路径在 CubeMaster 白名单内, 降级可见非静默)。
+        self._workspace_store = None
+        self._use_store_sync = False
+        self._init_workspace_store()
+
+    def _init_workspace_store(self) -> None:
+        """初始化 WorkspaceStore; 仅非 local 后端启用 SDK 同步链路"""
+        try:
+            from dawei.sandbox.workspace_store import LocalBackend, get_workspace_store
+
+            store = get_workspace_store()
+        except Exception as e:
+            logger.exception(
+                "[E2B] WorkspaceStore 初始化失败 (WORKSPACE_STORE_* 配置异常?), 工作区回退 virtiofs host-mount: %s",
+                e,
+            )
+            return
+        if isinstance(store.backend, LocalBackend):
+            logger.info(
+                "[E2B] WorkspaceStore 后端为 local, 工作区走 virtiofs host-mount",
+            )
+            return
+        self._workspace_store = store
+        self._use_store_sync = True
+        logger.info(
+            "[E2B] WorkspaceStore 就绪 (backend=%s), 工作区走 Store SDK 同步 (rustfs)",
+            type(store.backend).__name__,
+        )
+
     # ================================================================
     # SandboxProvider 接口实现
     # ================================================================
@@ -282,7 +321,10 @@ class CubeSandboxProvider(SandboxProvider):
             if cap > 0 and int(timeout) > cap:
                 logger.info(
                     "[E2B] 用户 %s 显式超时上限 %ss 生效 (请求 %ss → %ss)",
-                    ctx.user_id, cap, timeout, cap,
+                    ctx.user_id,
+                    cap,
+                    timeout,
+                    cap,
                 )
                 return cap
         except Exception as e:
@@ -342,6 +384,8 @@ class CubeSandboxProvider(SandboxProvider):
             user_id=ctx.user_id,
             workspace_id=str(ctx.workspace_id),
             mount_mode=mount_mode,
+            workspace_key=ctx.workspace_key,
+            workspace_path=str(validated_path),
         )
         self._sessions[key] = session
         logger.info(
@@ -421,7 +465,7 @@ class CubeSandboxProvider(SandboxProvider):
         sandbox = E2BSandbox.create(
             template=self.template_id,
             api_key=self.api_key,
-            **self._build_mount_config(workspace_path, mount_mode),
+            **self._build_mount_config(workspace_path, mount_mode, ctx),
         )
 
         # === P2/F2 步骤 1: 细粒度遮蔽 (fail-closed) ===
@@ -480,10 +524,50 @@ class CubeSandboxProvider(SandboxProvider):
         # === Fix #2 (2026-09-14): 补装常用命令 (模板缺 zip/bzip2/xz/wget/git/file/jq) ===
         self._install_common_tools(sandbox)
 
+        # === rustfs 链路 (2026-09-22): 本地 → Store → 沙箱 推送 ===
+        # 必须在 _setup_run_user 之前: SDK files.write 以 envd 身份(root)落盘,
+        # 随后的 uid 归档治理 (chown heal) 才能把推送产物归到 run-user 名下。
+        if self._use_store_sync:
+            self._sync_workspace_into_sandbox(sandbox, workspace_path, ctx)
+
         # === Option B (2026-09-14): 建 run-user + 历史文件归档治理 (uid 对齐) ===
         self._setup_run_user(sandbox, mount_mode)
 
         return sandbox
+
+    def _sync_workspace_into_sandbox(
+        self,
+        sandbox: Any,
+        workspace_path: Path,
+        ctx: TrustedContext,
+    ) -> None:
+        """rustfs 链路: 本地 → Store → 沙箱 (无 host-mount)
+
+        顺序: 先推送后打 marker —— 推送产物 mtime 早于 marker,
+        pull (find -newer marker) 只捕获会话内新变更, 避免全量回传。
+
+        FAST FAIL: 本地有文件但一个都没推上去 (errors>0 且 uploaded==0)
+        时抛异常 —— rustfs 显式启用却静默空工作区跑任务 = 错数据。
+        """
+        store = self._workspace_store
+        up_stats = store.sync_local_to_store(ctx.workspace_key, workspace_path)
+        push_stats = store.push_to_sandbox(sandbox, ctx.workspace_key)
+        store.init_marker(sandbox)
+        logger.info(
+            "[E2B] 工作区 Store 同步完成 (key=%s): local→store=%s, store→sandbox=%s",
+            ctx.workspace_key,
+            up_stats.as_dict(),
+            push_stats.as_dict(),
+        )
+        if up_stats.errors > 0:
+            logger.warning(
+                "[E2B] local→store 存在失败文件 (%d 个), 沙箱内可能缺文件",
+                up_stats.errors,
+            )
+            if up_stats.uploaded == 0:
+                raise RuntimeError(
+                    f"WorkspaceStore 同步完全失败 (uploaded=0, errors={up_stats.errors}): workspace_key={ctx.workspace_key}, 检查 WORKSPACE_STORE_* 配置与 rustfs 可用性",
+                )
 
     def _ensure_dawei_available(self, sandbox: Any, ctx: TrustedContext) -> None:
         """P3: 确保沙箱内可以 import dawei 并运行工具
@@ -828,6 +912,7 @@ class CubeSandboxProvider(SandboxProvider):
         self,
         workspace_path: Path,
         mount_mode: str,
+        ctx: TrustedContext | None = None,
     ) -> dict[str, Any]:
         """构建 CubeSandbox 挂载配置
 
@@ -839,13 +924,30 @@ class CubeSandboxProvider(SandboxProvider):
         使沙箱内可 import dawei 而无需 pip install。
         """
         read_only = mount_mode == "ro"
-        mounts: list[dict[str, Any]] = [
-            {
-                "hostPath": str(workspace_path.resolve()),
-                "mountPath": "/workspace",
-                "readOnly": read_only,
-            },
-        ]
+        mounts: list[dict[str, Any]] = []
+
+        # rustfs 链路 (2026-09-22): 工作区不 host-mount —— hostPath 不再
+        # 依赖 CubeMaster allowed_host_mount_prefixes, 内容走 Store SDK 同步。
+        # dawei-src 只读挂载保留 (服务端控制的路径, 在白名单内)。
+        if not self._use_store_sync:
+            mounts.append(
+                {
+                    "hostPath": str(workspace_path.resolve()),
+                    "mountPath": "/workspace",
+                    "readOnly": read_only,
+                },
+            )
+        else:
+            # 本地工作区目录兜底创建 (sync_local_to_store 需要; 沙箱侧
+            # /workspace 由 F2 mount script 与 init_marker 自行 mkdir)
+            try:
+                workspace_path.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+            logger.info(
+                "[E2B] Store SDK 同步模式: 工作区 %s 不做 host-mount, 内容走 WorkspaceStore",
+                getattr(ctx, "workspace_id", workspace_path.name),
+            )
 
         # P3: 挂载 agent 源码 (只读), 使 dawei 在沙箱内可导入
         dawei_src = self._find_dawei_source_path()
@@ -976,6 +1078,11 @@ class CubeSandboxProvider(SandboxProvider):
             exit_code = getattr(result, "exit_code", 0)
             stdout = getattr(result, "stdout", "")
             stderr = getattr(result, "stderr", "")
+
+            # === rustfs 链路 (2026-09-22): 命令成功后 沙箱→Store→本地 回拉 ===
+            # (与 AgentENVProvider 同款挂载点; ro 模式沙箱内不应有产物, 跳过)
+            if exit_code == 0 and self._use_store_sync and session.mount_mode == "rw":
+                self._sync_sandbox_back(session)
 
             return SandboxResult(
                 success=exit_code == 0,
@@ -1278,10 +1385,35 @@ class CubeSandboxProvider(SandboxProvider):
     # 会话销毁
     # ================================================================
 
+    def _sync_sandbox_back(self, session: SandboxSession) -> None:
+        """rustfs 链路: 沙箱 → Store → 本地 (命令成功后/销毁前回拉)
+
+        非致命: 回拉失败仅 warning (沙箱产物下次 push 前以本地为准),
+        与 AgentENVProvider 语义一致。
+        """
+        store = self._workspace_store
+        if not store or not session.workspace_key:
+            return
+        try:
+            pull_stats = store.pull_from_sandbox(session.sandbox, session.workspace_key)
+            if pull_stats.downloaded > 0 and session.workspace_path:
+                store.sync_store_to_local(session.workspace_key, session.workspace_path)
+            if pull_stats.downloaded > 0:
+                logger.info(
+                    "[E2B] 沙箱产物回拉 (key=%s): %s",
+                    session.workspace_key,
+                    pull_stats.as_dict(),
+                )
+        except Exception as e:
+            logger.warning("[E2B] 沙箱→Store 回拉失败 (非致命): %s", e)
+
     def _destroy_session_by_key(self, key: str) -> None:
         """销毁指定 key 的沙箱会话"""
         session = self._sessions.pop(key, None)
         if session and session.sandbox:
+            # rustfs 链路: 销毁前兜底回拉 (exit≠0 命令/后台进程的产物)
+            if self._use_store_sync and session.mount_mode == "rw":
+                self._sync_sandbox_back(session)
             try:
                 session.sandbox.kill()
             except Exception as e:

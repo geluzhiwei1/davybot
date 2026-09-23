@@ -18,6 +18,8 @@
   WORKSPACE_STORE_SECRET_KEY     S3 secret key
   WORKSPACE_STORE_ENCRYPTION_KEY 32字节 hex (AES-256 key for .dawei/)
   WORKSPACE_STORE_LOCAL_ROOT     local 后端根目录 (默认 $DAWEI_HOME/workspace-store)
+  WORKSPACE_STORE_SSE            aes256 = 开启服务端 SSE (默认关 — 未配 KMS 的
+                                 rustfs/minio 会拒绝 SSE-S3 请求, web02 实测)
 """
 
 from __future__ import annotations
@@ -43,9 +45,9 @@ logger = logging.getLogger(__name__)
 class FileMeta:
     """文件元数据 (用于增量同步)"""
 
-    rel: str               # 相对 workspace 根的路径 (e.g. "src/main.py")
+    rel: str  # 相对 workspace 根的路径 (e.g. "src/main.py")
     size: int = 0
-    etag: str = ""         # S3 ETag 或本地 md5
+    etag: str = ""  # S3 ETag 或本地 md5
     mtime: float = 0.0
 
     @classmethod
@@ -55,9 +57,7 @@ class FileMeta:
             rel=rel,
             size=int(obj.get("Size", 0)),
             etag=obj.get("ETag", "").strip('"'),
-            mtime=obj.get("LastModified", type("X", (), {"timestamp": lambda _: 0.0})()).timestamp()
-            if hasattr(obj.get("LastModified"), "timestamp")
-            else 0.0,
+            mtime=obj.get("LastModified", type("X", (), {"timestamp": lambda _: 0.0})()).timestamp() if hasattr(obj.get("LastModified"), "timestamp") else 0.0,
         )
 
     @classmethod
@@ -157,7 +157,13 @@ class LocalBackend(StorageBackend):
         for p in base.rglob("*"):
             if not p.is_file():
                 continue
+            # 与 S3Backend.list 对齐: 剥掉 key 首段 (ws-<id>/),
+            # rel 统一含 FILES_NS 前缀 (e.g. "files/foo.docx")
             rel = str(p.relative_to(self.root))
+            if "/" in rel:
+                rel = rel.split("/", 1)[1]
+            else:
+                rel = ""
             results.append(FileMeta.from_local(rel, p))
         return results
 
@@ -182,6 +188,12 @@ class S3Backend(StorageBackend):
     boto3 是可选依赖, 导入失败时构造抛出 ImportError。
     【2026-09-13 fail-fast】WorkspaceStore.create 不再捕获该 ImportError
     降级到 LocalBackend —— 显式配置 S3 后端时缺依赖必须炸出来。
+
+    SSE (2026-09-22): 服务端加密改为 opt-in (sse="aes256")。
+    无条件发 ServerSideEncryption=AES256 会被未配 KMS/
+    RUSTFS_SSE_S3_MASTER_KEY 的 rustfs/minio 直接拒掉 (InvalidRequest,
+    web02 实测)。敏感数据保护走客户端 AESCipher (WORKSPACE_STORE_ENCRYPTION_KEY),
+    不依赖服务端 SSE。
     """
 
     def __init__(
@@ -191,6 +203,7 @@ class S3Backend(StorageBackend):
         access_key: str,
         secret_key: str,
         region: str = "us-east-1",
+        sse: str = "",
     ):
         try:
             import boto3
@@ -201,6 +214,7 @@ class S3Backend(StorageBackend):
             ) from e
 
         self.bucket = bucket
+        self.sse = sse.strip().lower()
         self.client = boto3.client(
             "s3",
             endpoint_url=endpoint,
@@ -223,11 +237,14 @@ class S3Backend(StorageBackend):
                 logger.warning("[WorkspaceStore] bucket 创建失败 (可能已存在): %s", e)
 
     def put(self, key: str, data: bytes) -> str:
+        kwargs: dict[str, Any] = {}
+        if self.sse == "aes256":
+            kwargs["ServerSideEncryption"] = "AES256"
         resp = self.client.put_object(
             Bucket=self.bucket,
             Key=key,
             Body=data,
-            ServerSideEncryption="AES256",
+            **kwargs,
         )
         return resp.get("ETag", "").strip('"')
 
@@ -250,9 +267,7 @@ class S3Backend(StorageBackend):
                         rel=rel,
                         size=int(obj.get("Size", 0)),
                         etag=obj.get("ETag", "").strip('"'),
-                        mtime=obj.get("LastModified").timestamp()
-                        if obj.get("LastModified")
-                        else 0.0,
+                        mtime=obj.get("LastModified").timestamp() if obj.get("LastModified") else 0.0,
                     ),
                 )
         return results
@@ -306,8 +321,7 @@ class AESCipher:
             self._fernet = Fernet(fernet_key)
         except ImportError:
             logger.warning(
-                "[WorkspaceStore] cryptography 未安装, 客户端加密不可用, "
-                "依赖 S3 服务端 SSE",
+                "[WorkspaceStore] cryptography 未安装, 客户端加密不可用, 依赖 S3 服务端 SSE",
             )
             self._fernet = None
 
@@ -341,10 +355,17 @@ class WorkspaceStore:
         store.pull_from_sandbox(sandbox, "ws-abc123")
     """
 
-    # 需要加密的子树
+    # 需要加密的子树 (按路径段匹配, 兼容 "files/.dawei/x" 带 namespace 前缀的 key)
     ENCRYPT_PREFIXES = (".dawei/",)
     # 单文件大小限制 (避免 SDK 10MB 限制)
     MAX_INLINE_FILE_SIZE = 10 * 1024 * 1024
+    # Store 内工作区内容的 namespace 前缀:
+    #   store key = ws-<id>/files/<workspace-rel>  ↔  沙箱 /workspace/<workspace-rel>
+    # pull/push/本地同步三端必须共用同一约定, 否则回传文件对 push 不可见。
+    FILES_NS = "files/"
+    # .dawei/ 下允许进出 Store 的子目录 (与 CubeSandboxProvider F2 PASSTHROUGH 对齐);
+    # 其余 .dawei/ 子树为服务端状态 (会话/凭据/任务图), 不得进 Store。
+    DAWEI_SYNC_WHITELIST = frozenset({"files", "agents", "skills"})
     # 同步时跳过的路径
     DEFAULT_IGNORE = frozenset(
         {
@@ -399,21 +420,19 @@ class WorkspaceStore:
                     access_key=os.environ.get("WORKSPACE_STORE_ACCESS_KEY", ""),
                     secret_key=os.environ.get("WORKSPACE_STORE_SECRET_KEY", ""),
                     region=os.environ.get("WORKSPACE_STORE_REGION", "us-east-1"),
+                    sse=os.environ.get("WORKSPACE_STORE_SSE", ""),
                 )
                 logger.info("[WorkspaceStore] S3 后端已就绪: %s", backend)
                 actual = s3
             except ImportError as e:
                 raise RuntimeError(
-                    f"WORKSPACE_STORE_BACKEND={backend} 但 boto3 不可用: {e}. "
-                    "安装: uv pip install 'davybot[workspace-store]' 或 uv pip install boto3. "
-                    "如确实要用本地存储, 显式设 WORKSPACE_STORE_BACKEND=local",
+                    f"WORKSPACE_STORE_BACKEND={backend} 但 boto3 不可用: {e}. 安装: uv pip install 'davybot[workspace-store]' 或 uv pip install boto3. 如确实要用本地存储, 显式设 WORKSPACE_STORE_BACKEND=local",
                 ) from e
         elif backend == "local":
             actual = cls._local_backend()
         else:
             raise ValueError(
-                f"未知 WORKSPACE_STORE_BACKEND={backend!r}, "
-                "合法值: rustfs | minio | s3 | local",
+                f"未知 WORKSPACE_STORE_BACKEND={backend!r}, 合法值: rustfs | minio | s3 | local",
             )
 
         # 加密
@@ -448,7 +467,8 @@ class WorkspaceStore:
         return key
 
     def _should_encrypt(self, rel: str) -> bool:
-        return any(rel.startswith(p) for p in self.ENCRYPT_PREFIXES)
+        # 按路径段匹配: ".dawei/x" 与 "files/.dawei/x" (带 namespace 前缀) 都命中
+        return ".dawei" in rel.split("/")
 
     def _should_ignore(self, rel: str, ignore: frozenset[str] | None = None) -> bool:
         ignore = ignore or self.DEFAULT_IGNORE
@@ -524,13 +544,18 @@ class WorkspaceStore:
                 # 大文件暂不分块, 跳过(后续 phase 补)
                 logger.warning(
                     "[WorkspaceStore] 跳过超大文件 %s (%d bytes, 限制 %d)",
-                    rel, fm.size, self.MAX_INLINE_FILE_SIZE,
+                    rel,
+                    fm.size,
+                    self.MAX_INLINE_FILE_SIZE,
                 )
                 stats.skipped += 1
                 continue
             try:
                 data = self.get_file(workspace_id, rel)
-                sandbox.files.write(f"/workspace/{rel}", data)
+                # store "files/" namespace 剥离后映射到沙箱工作区根,
+                # 与 virtiofs 布局一致 (agent 在沙箱内看到 /workspace/<rel>)
+                ws_rel = rel[len(self.FILES_NS) :] if rel.startswith(self.FILES_NS) else rel
+                sandbox.files.write(f"/workspace/{ws_rel}", data)
                 stats.uploaded += 1
                 stats.bytes_transferred += len(data)
             except Exception as e:
@@ -539,7 +564,8 @@ class WorkspaceStore:
 
         stats.duration_ms = int((time.time() - start) * 1000)
         logger.info(
-            "[WorkspaceStore] push_to_sandbox: %s", stats.as_dict(),
+            "[WorkspaceStore] push_to_sandbox: %s",
+            stats.as_dict(),
         )
         return stats
 
@@ -557,13 +583,7 @@ class WorkspaceStore:
 
         try:
             # 找出本次会话变更的文件 (相对 /tmp/.ws-init, 沙箱启动时 touch)
-            list_cmd = (
-                "find /workspace -type f "
-                "-not -path '*/.dawei/*' "
-                "-not -path '*/.git/*' "
-                "-newer /tmp/.ws-init "
-                "-printf '%T@ %s %p\\n' 2>/dev/null"
-            )
+            list_cmd = "find /workspace -type f -not -path '*/.dawei/*' -not -path '*/.git/*' -newer /tmp/.ws-init -printf '%T@ %s %p\\n' 2>/dev/null"
             result = sandbox.commands.run(list_cmd, cwd="/workspace", timeout=30)
         except Exception as e:
             logger.warning("[WorkspaceStore] pull 列举失败: %s", e)
@@ -577,13 +597,18 @@ class WorkspaceStore:
                 continue
             _mtime, _size, path = parts
             if path.startswith("/workspace/"):
-                rel = path[len("/workspace/"):]
+                rel = path[len("/workspace/") :]
             else:
                 continue
 
             try:
-                data = sandbox.files.read(path, timeout=10)
-                self.put_file(workspace_id, rel, data)
+                # e2b 2.x Filesystem.read(path) 不接受 timeout kwarg (web02 实测
+                # 2.49.1: TypeError: unexpected keyword argument 'timeout')
+                data = sandbox.files.read(path)
+                # 写入统一 files/ namespace —— pull 的产物必须对
+                # push_to_sandbox / sync_store_to_local 可见 (2026-09-22 修复:
+                # 旧实现裸写 rel, 回传文件落在 namespace 外, 下次 push 不可见)
+                self.put_file(workspace_id, f"{self.FILES_NS}{rel}", data)
                 stats.downloaded += 1
                 stats.bytes_transferred += len(data)
             except Exception as e:
@@ -592,8 +617,126 @@ class WorkspaceStore:
 
         stats.duration_ms = int((time.time() - start) * 1000)
         logger.info(
-            "[WorkspaceStore] pull_from_sandbox: %s", stats.as_dict(),
+            "[WorkspaceStore] pull_from_sandbox: %s",
+            stats.as_dict(),
         )
+        return stats
+
+    # ================================================================
+    # 本地 ↔ Store 同步 (CubeSandboxProvider rustfs 链路, 2026-09-22)
+    # ================================================================
+
+    def _dawei_sync_allowed(self, ws_rel: str) -> bool:
+        """.dawei/ 子树白名单: 仅 files/agents/skills 可进出 Store。
+
+        其余 .dawei/ 内容 (chat-history/configs/task_graphs/凭据等) 是
+        服务端状态, 进 Store 即跨信任边界泄露 —— fail-closed 拒绝。
+        """
+        parts = ws_rel.split("/")
+        if parts[0] != ".dawei":
+            return True
+        return len(parts) >= 2 and parts[1] in self.DAWEI_SYNC_WHITELIST
+
+    def sync_local_to_store(
+        self,
+        workspace_id: str,
+        local_root: Path | str,
+        ignore: frozenset[str] | None = None,
+    ) -> SyncStats:
+        """本地工作区目录 → Store (etags 增量, 未变化跳过)
+
+        上传范围: 工作区根文件 + .dawei/{files,agents,skills};
+        与 F2 PASSTHROUGH 对齐, 敏感子树 fail-closed 排除。
+        """
+        stats = SyncStats()
+        start = time.time()
+        root = Path(local_root)
+        if not root.is_dir():
+            stats.duration_ms = int((time.time() - start) * 1000)
+            return stats
+
+        remote = {fm.rel: fm for fm in self.list_files(workspace_id)}
+
+        for p in sorted(root.rglob("*")):
+            if not p.is_file() or p.is_symlink():
+                continue
+            ws_rel = p.relative_to(root).as_posix()
+            if self._should_ignore(ws_rel, ignore) or not self._dawei_sync_allowed(ws_rel):
+                stats.skipped += 1
+                continue
+            size = p.stat().st_size
+            if size > self.MAX_INLINE_FILE_SIZE:
+                logger.warning(
+                    "[WorkspaceStore] 跳过超大文件 %s (%d bytes, 限制 %d)",
+                    ws_rel,
+                    size,
+                    self.MAX_INLINE_FILE_SIZE,
+                )
+                stats.skipped += 1
+                continue
+            key_rel = f"{self.FILES_NS}{ws_rel}"
+            fm = remote.get(key_rel)
+            local_etag = hashlib.md5(p.read_bytes()).hexdigest() if size < 8 * 1024 * 1024 else ""
+            if fm and fm.size == size and local_etag and fm.etag == local_etag:
+                stats.skipped += 1
+                continue
+            try:
+                self.put_file(workspace_id, key_rel, p.read_bytes())
+                stats.uploaded += 1
+                stats.bytes_transferred += size
+            except Exception as e:
+                logger.warning("[WorkspaceStore] local→store %s 失败: %s", ws_rel, e)
+                stats.errors += 1
+
+        stats.duration_ms = int((time.time() - start) * 1000)
+        logger.info("[WorkspaceStore] sync_local_to_store: %s", stats.as_dict())
+        return stats
+
+    def sync_store_to_local(
+        self,
+        workspace_id: str,
+        local_root: Path | str,
+        ignore: frozenset[str] | None = None,
+    ) -> SyncStats:
+        """Store → 本地工作区目录 (沙箱产物回写, 供 web 文件管理器/上传方读取)
+
+        同样受 .dawei 白名单约束: Store 里即使出现敏感子树 key 也不落盘。
+        """
+        stats = SyncStats()
+        start = time.time()
+        root = Path(local_root)
+        root.mkdir(parents=True, exist_ok=True)
+
+        for fm in self.list_files(workspace_id):
+            rel = fm.rel
+            if not rel.startswith(self.FILES_NS):
+                stats.skipped += 1
+                continue
+            ws_rel = rel[len(self.FILES_NS) :]
+            if self._should_ignore(ws_rel, ignore) or not self._dawei_sync_allowed(ws_rel):
+                stats.skipped += 1
+                continue
+            if fm.size > self.MAX_INLINE_FILE_SIZE:
+                logger.warning(
+                    "[WorkspaceStore] 跳过超大对象 %s (%d bytes)",
+                    ws_rel,
+                    fm.size,
+                )
+                stats.skipped += 1
+                continue
+            try:
+                data = self.get_file(workspace_id, rel)
+                dest = root / ws_rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(data)
+                stats.downloaded += 1
+                stats.bytes_transferred += len(data)
+            except Exception as e:
+                logger.warning("[WorkspaceStore] store→local %s 失败: %s", ws_rel, e)
+                stats.errors += 1
+
+        stats.duration_ms = int((time.time() - start) * 1000)
+        logger.info("[WorkspaceStore] sync_store_to_local: %s", stats.as_dict())
         return stats
 
     # ================================================================
