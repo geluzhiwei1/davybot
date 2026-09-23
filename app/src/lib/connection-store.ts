@@ -47,6 +47,10 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => {
       if (state === "connected") {
         const wsId = wsClient.getWorkspaceId();
         if (wsId) {
+          // Re-sync chat history — messages pushed while the socket was down
+          // are dropped server-side (no replay); the persisted conversation
+          // is the source of truth (chat-store patches the gap).
+          emit("ws:resync_history", { wsId });
           // Restore task graph UI state
           taskGraphApi
             .getGraphs(wsId)
@@ -163,3 +167,33 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => {
     },
   };
 });
+
+// ── Tab visibility / network recovery ─────────────────────────────────
+// Background tabs get their timers throttled and the WS reaped (server
+// timeout 180s; frames for disconnected sessions are dropped, no replay).
+// When the user comes back to the tab (or the network returns), make sure
+// the socket is up immediately and re-sync chat history from the server
+// (source of truth). This fixes "messages stuck at old text after
+// switching tabs" — demo.normnomos.com 2026-09-22.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    const st = wsClient.state;
+    if (st === "reconnecting" || st === "disconnected") {
+      // Don't wait out the backoff timer — reconnect now (same workspace).
+      // "error" is skipped: after auth rejection (1008) reconnecting would
+      // just loop back to the login redirect.
+      wsClient.connect();
+    } else if (st === "connected") {
+      const wsId = wsClient.getWorkspaceId();
+      if (wsId) emit("ws:resync_history", { wsId });
+    }
+  });
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    if (wsClient.state === "reconnecting" || wsClient.state === "disconnected") {
+      wsClient.connect();
+    }
+  });
+}

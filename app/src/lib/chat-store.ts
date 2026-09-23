@@ -123,7 +123,11 @@ interface ChatStore {
    * complete。用户点击停止与收到 agent_stopped 时调用。
    */
   finalizeStaleStreams: (conversationId: string) => void;
-  loadHistory: (conversationId: string, workspaceId: string) => Promise<void>;
+  loadHistory: (
+    conversationId: string,
+    workspaceId: string,
+    opts?: { force?: boolean },
+  ) => Promise<void>;
   /** Ensure a conversation entry exists for the given ID (no-op if already present). */
   ensureConversation: (
     id: string,
@@ -514,10 +518,19 @@ export const useChatStore = create<ChatStore>((set, get) => {
       });
     },
 
-    async loadHistory(conversationId, workspaceId) {
-      // Skip if already loaded
+    async loadHistory(conversationId, workspaceId, opts) {
       const existing = get().conversations.get(conversationId);
-      if (existing && existing.messages.length > 0) return;
+      if (opts?.force) {
+        // Re-sync path (WS reconnect / tab became visible again): pull server
+        // truth and patch messages missed while the socket was down. Server
+        // drops WS frames for disconnected sessions (no replay), but the
+        // conversation JSON on disk has everything.
+        // Skip while streaming — live events are arriving, don't clobber.
+        if (existing?.isStreaming) return;
+      } else {
+        // Skip if already loaded
+        if (existing && existing.messages.length > 0) return;
+      }
 
       try {
         const res = await historyApi.getMessages(workspaceId, conversationId);
@@ -639,6 +652,16 @@ export const useChatStore = create<ChatStore>((set, get) => {
           };
         });
 
+        // Force-resync guard: only overwrite local messages when the server is
+        // strictly ahead (messages were missed while disconnected). Equal count
+        // → in sync, skip (avoids flicker on every tab-switch resync); fewer →
+        // local has messages the server hasn't persisted yet (e.g. just sent),
+        // skip so we don't drop them.
+        if (opts?.force && existing) {
+          const localCount = existing.messages.filter((m) => m.status !== "error").length;
+          if (filtered.length <= localCount) return;
+        }
+
         set((s) => {
           const next = new Map(s.conversations);
           let conv = next.get(conversationId);
@@ -662,6 +685,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
         });
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
+        if (opts?.force) {
+          // Background re-sync — stay silent (no error banner) unless we have
+          // nothing locally; the next resync/user action will retry.
+          console.debug("[ChatStore] force resync failed:", errMsg);
+          return;
+        }
         console.error("[ChatStore] loadHistory failed:", e);
         set((s) => ({
           historyLoadErrors: { ...s.historyLoadErrors, [conversationId]: errMsg },
@@ -1564,4 +1593,20 @@ on("ws:message", (detail) => {
 
 on("ws:connection_lost", () => {
   useChatStore.getState().interruptAllStreams();
+});
+
+// Re-sync missed chat messages after a WS reconnect or when the tab becomes
+// visible again. The server drops WS frames for disconnected sessions (no
+// replay queue), but every message is persisted in the conversation JSON —
+// so re-pull history and let loadHistory's force path patch the gap.
+// Triggered by connection-store (reconnect / visibilitychange).
+on("ws:resync_history", (detail) => {
+  const { wsId } = (detail ?? {}) as { wsId?: string };
+  if (!wsId) return;
+  const { conversations, loadHistory } = useChatStore.getState();
+  for (const [convId, conv] of conversations) {
+    if (conv.messages.length > 0 && !conv.isStreaming) {
+      void loadHistory(convId, wsId, { force: true });
+    }
+  }
 });
