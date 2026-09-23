@@ -14,7 +14,7 @@ import { useSubtaskStore } from "./subtask-store";
 import { useTaskStore } from "./task-store";
 import { useTodoStore } from "./todo-store";
 import type { ParallelTaskInfo } from "./types/parallel-tasks";
-import type { SubtaskLifecyclePayload } from "./types/subtask";
+import type { SubtaskLifecyclePayload, SubtaskProgressPayload } from "./types/subtask";
 import type { TodoItem, TodoStatus, TodoPriority } from "./types/todos";
 import { wsClient } from "./ws-client";
 import { BIZ_AGENT_STATUS_SINKS } from "./biz-registry";
@@ -155,6 +155,16 @@ function handleMonitoringMessage(msg: Record<string, unknown>): void {
       const wsId = (msg.workspace_id as string) || wsClient.getWorkspaceId() || "";
       if (!wsId) break;
       useSubtaskStore.getState().applyLifecycle(wsId, msg as unknown as SubtaskLifecyclePayload);
+      break;
+    }
+
+    // ── Subtask todo 步级进度（C25/§3.8，驱动批次进度卡 todo 行 / 树节点步级）──
+    // 后端契约：{ type: "subtask_progress", subtask_id, todos: {total, completed, current?},
+    //            parent_id?, batch_id?, item_identity? }（exclude_none）
+    case "subtask_progress": {
+      const wsId = (msg.workspace_id as string) || wsClient.getWorkspaceId() || "";
+      if (!wsId) break;
+      useSubtaskStore.getState().applyProgress(wsId, msg as unknown as SubtaskProgressPayload);
       break;
     }
 

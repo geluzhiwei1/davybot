@@ -51,6 +51,10 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => {
           // are dropped server-side (no replay); the persisted conversation
           // is the source of truth (chat-store patches the gap).
           emit("ws:resync_history", { wsId });
+          // C22：子任务树/进度卡刷新恢复 —— bootstrap 触发点上移至 WS
+          // connected（此前仅监控树挂载时触发，聊天页刷新后卡片静止）。
+          // subtask-store 监听并自行 REST bootstrap（本 store 不直接耦合）。
+          emit("ws:resync_subtasks", { wsId });
           // Restore task graph UI state
           taskGraphApi
             .getGraphs(wsId)

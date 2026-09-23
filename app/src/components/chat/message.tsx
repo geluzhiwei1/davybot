@@ -7,13 +7,13 @@
  *   - other blocks (text, tool_call, tool_result, error, etc.): inside main bubble
  */
 import { dateLocale } from "@/lib/date-locale";
-import { memo, type ReactNode, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatMessage as ChatMessageModel, ContentBlock } from "@/lib/types";
 import { getExpert, toExperts } from "@/lib/experts";
 import { useMarketTeamsStore } from "@/lib/market-teams-store";
 import { ExpertIcon, getCategoryHue } from "@/components/expert-icon";
-import { User, Bot, Loader2, ListChecks } from "lucide-react";
+import { User, Bot, Loader2, ListChecks, Layers, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   TextContent,
@@ -27,8 +27,9 @@ import { renderMarkdown } from "./content/markdown";
 import { renderTextWithMentions } from "./content/mention-text";
 import { MessageActions } from "./message-actions";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { DisplayMode } from "@/lib/chat-store";
-import type { SubtaskCardContentBlock } from "@/lib/types";
+import type { SubtaskBatchCardContentBlock, SubtaskCardContentBlock } from "@/lib/types";
 import type { SubtaskStatus } from "@/lib/types/subtask";
 import { findSubtaskNode, findSubtaskWorkspace, toSubtaskStatus } from "@/lib/subtask-card";
 import { parseSubtaskReport, type SubtaskReport } from "@/lib/subtask-report";
@@ -41,11 +42,14 @@ function ContentBlockRenderer({
   block,
   isStreaming,
   reasoningDefaultOpen,
+  subtaskBatchDefaultOpen,
   messageRendererExt,
 }: {
   block: ContentBlock;
   isStreaming?: boolean;
   reasoningDefaultOpen?: boolean;
+  /** C21 渲染分档：detailed 模式下批量进度卡默认展开 */
+  subtaskBatchDefaultOpen?: boolean;
   /** E3: Custom message renderer extension — if a custom render is returned, use it instead of the default */
   messageRendererExt?: (block: ContentBlock) => ReactNode | null;
 }) {
@@ -84,6 +88,8 @@ function ContentBlockRenderer({
       return <ToolExecutionBlock block={block} />;
     case "subtask_card":
       return <SubtaskCardBlock block={block} />;
+    case "subtask_batch_card":
+      return <SubtaskBatchCardBlock block={block} defaultOpen={subtaskBatchDefaultOpen} />;
     case "system_command_result":
       return <SystemCommandBlock block={block} />;
     // audio, video, file — placeholder
@@ -243,6 +249,143 @@ function SubtaskCardBlock({ block }: { block: SubtaskCardContentBlock }) {
   );
 }
 
+// ── Subtask Batch Card（C21/§3.8.1 批量进度卡：Collapsible 总览 + 逐项行）──
+
+/** 行内 todo 步级字符进度条：▓▓▓░░ 3/5（+ 当前步文案，C25 数据） */
+function batchTodoStepText(todos: { total: number; completed: number; current?: string }): string {
+  const width = 5;
+  const total = Math.max(todos.total, 1);
+  const filled = Math.min(Math.round((todos.completed / total) * width), width);
+  const bar = "▓".repeat(filled) + "░".repeat(width - filled);
+  const cur = todos.current ? ` · ${todos.current}` : "";
+  return `${bar} ${todos.completed}/${todos.total}${cur}`;
+}
+
+function SubtaskBatchCardBlock({
+  block,
+  defaultOpen,
+}: {
+  block: SubtaskBatchCardContentBlock;
+  defaultOpen?: boolean;
+}) {
+  const { t } = useTranslation("chatUi");
+  const [open, setOpen] = useState(Boolean(defaultOpen));
+  // 实时状态联动 subtask-store（同 subtask_card；无实时节点时回落 pending 快照）
+  const buckets = useSubtaskStore((s) => s.workspaceSubtasks);
+  const openThread = useSubtaskStore((s) => s.openThread);
+
+  const items = block.itemIds.map((id, i) => {
+    const live = findSubtaskNode(buckets, id);
+    return {
+      id,
+      identity: live?.itemIdentity ?? block.itemIdentities[i] ?? id.slice(0, 8),
+      status: (live?.status ?? "pending") as SubtaskStatus,
+      todos: live?.todos ?? null,
+    };
+  });
+  const terminal = (s: SubtaskStatus) => s === "completed" || s === "failed" || s === "aborted";
+  const done = items.filter((it) => terminal(it.status)).length;
+  const failed = items.filter((it) => it.status === "failed" || it.status === "aborted").length;
+  const allDone = done === items.length && items.length > 0;
+
+  const openThreadForItem = (id: string) => {
+    const target = findSubtaskWorkspace(buckets, id) ?? wsClient.getWorkspaceId();
+    if (target) openThread(target, id);
+  };
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div
+        className={cn(
+          "rounded-lg border px-3 py-2 my-1 text-xs",
+          failed > 0 ? "border-red-200 bg-red-50/50" : "border-border bg-muted/20",
+        )}
+      >
+        {/* 头部总览一行：标题 + 进度条 + done/total + 失败数（耗时无可靠后端时钟源，不展示） */}
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex items-center gap-2 w-full text-left">
+            <ChevronRight
+              className={cn("w-3 h-3 shrink-0 transition-transform", open && "rotate-90")}
+            />
+            <Layers className="w-3 h-3 shrink-0 text-brand" />
+            <span className="font-medium shrink-0">{t("message.subtaskBatch.title")}</span>
+            {block.mode && (
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5 shrink-0">
+                {block.mode}
+              </Badge>
+            )}
+            <span className="text-[10px] text-muted-foreground shrink-0">
+              {t("message.subtaskBatch.count", { count: items.length })}
+            </span>
+            {/* 手写进度条（仿 tool-call-content.tsx） */}
+            <span className="flex-1 min-w-[48px] h-1.5 bg-muted rounded-full overflow-hidden mx-1">
+              <span
+                className={cn(
+                  "block h-full rounded-full transition-all",
+                  failed > 0 ? "bg-red-400" : "bg-brand",
+                )}
+                style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }}
+              />
+            </span>
+            <span className="text-[10px] text-muted-foreground shrink-0">
+              {done}/{items.length}
+              {failed > 0 && (
+                <span className="text-red-500"> · {t("message.subtaskBatch.failed", { count: failed })}</span>
+              )}
+              {allDone && <span className="text-green-600"> · {t("message.subtaskBatch.allDone")}</span>}
+            </span>
+          </button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          {/* 逐项行：状态图标 + identity + todo 步级（running 项）；点行 → 线程抽屉（C19） */}
+          <div className="divide-y divide-border/40 mt-1">
+            {items.map((it, i) => (
+              <div
+                key={it.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openThreadForItem(it.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") openThreadForItem(it.id);
+                }}
+                title={t("message.subtask.viewThread")}
+                className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-muted/40 rounded px-1 -mx-1"
+              >
+                {SUBTASK_STATUS_ICONS[it.status]}
+                <span className="truncate max-w-[45%]" title={it.identity}>
+                  {it.identity}
+                </span>
+                {/* todo 步级（C25：running 项实时；终态项显示定格终步） */}
+                {it.todos && (
+                  <span className="font-mono text-[10px] text-muted-foreground truncate">
+                    {batchTodoStepText(it.todos)}
+                  </span>
+                )}
+                <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                  {t(SUBTASK_STATUS_LABEL_KEYS[it.status])}
+                </span>
+                <span className="font-mono text-[10px] text-muted-foreground/60 shrink-0">
+                  #{i + 1}
+                </span>
+              </div>
+            ))}
+          </div>
+          {/* 派发即有未创建项（duplicate/error）→ 提示去看工具结果详情 */}
+          {block.createdCount < block.totalItems && (
+            <div className="text-[10px] text-amber-600 dark:text-amber-400 pt-1">
+              {t("message.subtaskBatch.partial", {
+                created: block.createdCount,
+                total: block.totalItems,
+              })}
+            </div>
+          )}
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
 // ── Subtask Report Card（P2 UI：[子任务执行报告] 结构化卡片）─────────
 // 后端 _inject_subtask_summaries 以 UserMessage 纯文本回注报告；此处把
 // 报告文本解析为结构化条目渲染卡片，替代右侧用户裸文本气泡。
@@ -367,6 +510,10 @@ interface MessageProps {
  * - minimal: only text + error blocks
  * - default: reasoning (collapsed), tool_execution, text, error — hide tool_call/tool_result details
  * - detailed: all blocks
+ *
+ * C21 渲染分档：subtask_batch_card 走 other 桶 —— minimal 隐藏（other 仅
+ * text/error），default 折叠仅头部（defaultOpen=false），detailed 展开
+ * （subtaskBatchDefaultOpen=true 传入渲染器），与 tool_call 块同款分档。
  */
 function filterBlocksByMode(
   blocks: ContentBlock[],
@@ -682,6 +829,7 @@ function ChatMessageBase({
                     isStreaming={
                       isStreaming && i === otherBlocks.length - 1 && block.type === "text"
                     }
+                    subtaskBatchDefaultOpen={displayMode === "detailed"}
                     messageRendererExt={messageRendererExt}
                   />
                 ))}

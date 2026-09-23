@@ -135,6 +135,9 @@ describe("findSubtaskNode", () => {
     description: "任务 " + id,
     lastEvent: "started",
     steerMessages: [],
+    batchId: null,
+    itemIdentity: null,
+    todos: null,
     createdAt: 1,
     updatedAt: 2,
   });
@@ -166,6 +169,9 @@ describe("findSubtaskWorkspace", () => {
     description: "",
     lastEvent: "created",
     steerMessages: [],
+    batchId: null,
+    itemIdentity: null,
+    todos: null,
     createdAt: 1,
     updatedAt: 1,
   });

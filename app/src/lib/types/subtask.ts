@@ -30,6 +30,28 @@ export interface SubtaskLifecyclePayload {
   metadata?: Record<string, unknown>;
 }
 
+/** todo 步级摘要（C25 subtask_progress 的 todos 快照） */
+export interface SubtaskTodos {
+  total: number;
+  completed: number;
+  /** 当前进行中的 todo 文案（≤40 字，可缺省） */
+  current?: string;
+}
+
+/** WS subtask_progress 载荷（C25/§3.8 todo 步级进度，纯 UI 态）
+ *  后端 SubtaskProgressMessage to_websocket_format = model_dump(exclude_none) */
+export interface SubtaskProgressPayload {
+  type: "subtask_progress";
+  session_id?: string;
+  /** 父任务 id（后端填充，仅作展示参考） */
+  task_id?: string;
+  subtask_id: string;
+  parent_id?: string;
+  batch_id?: string;
+  item_identity?: string;
+  todos: SubtaskTodos;
+}
+
 /** REST GET /api/workspaces/{ws}/subtasks 列表项（树 bootstrap） */
 export interface SubtaskInfo {
   task_id: string;
@@ -42,6 +64,10 @@ export interface SubtaskInfo {
   conversation_id: string | null;
   description: string;
   child_ids: string[];
+  /** 批量派发组 ID（new_task_batch 展开；单发 new_task = null） */
+  batch_id?: string | null;
+  /** 批量条目身份（C16 batch 分组展示用） */
+  item_identity?: string | null;
 }
 
 /** store 内部子任务节点（WS 事件 + REST bootstrap 归一化后的形态） */
@@ -59,6 +85,12 @@ export interface SubtaskNode {
   lastEvent: SubtaskLifecycleEventName | null;
   /** steer 指令历史（metadata.message） */
   steerMessages: string[];
+  /** 批量派发组 ID（C16 batch 分组展示；null = 单发/未知） */
+  batchId: string | null;
+  /** 批量条目身份（批次内条目名；null = 未知） */
+  itemIdentity: string | null;
+  /** todo 步级摘要（C25 subtask_progress 维护；null = 未上报） */
+  todos: SubtaskTodos | null;
   createdAt: number;
   updatedAt: number;
 }

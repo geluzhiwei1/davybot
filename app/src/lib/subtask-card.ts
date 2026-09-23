@@ -106,6 +106,57 @@ export function findSubtaskNode(
   return undefined;
 }
 
+/** 批量进度卡信息（C21/§3.8.1，chat-store 提取产物，进 SubtaskBatchCardContentBlock） */
+export interface SubtaskBatchCardInfo {
+  batchId: string;
+  mode: string | null;
+  itemIds: string[];
+  itemIdentities: string[];
+  totalItems: number;
+  createdCount: number;
+  isError: boolean;
+}
+
+/**
+ * 从 new_task_batch 工具结果提取批量进度卡信息。
+ * 后端结果形如 { batch_id, mode, status, created_count, results:[{identity,
+ * status, subtask_id?}, …] }；仅收录 status=created 的 subtask_id。
+ * 全部创建失败（无任何 subtask_id）→ null：错误明细由普通 tool_result 块可见，不进卡。
+ */
+export function extractSubtaskBatchCard(toolName: string, result: unknown): SubtaskBatchCardInfo | null {
+  if (toolName !== "new_task_batch") return null;
+
+  const obj = parseResultObject(result);
+  if (!obj) return null;
+
+  const batchId = obj.batch_id;
+  if (typeof batchId !== "string" || !batchId) return null;
+
+  const itemIds: string[] = [];
+  const itemIdentities: string[] = [];
+  const results = Array.isArray(obj.results) ? obj.results : [];
+  for (const r of results) {
+    if (!r || typeof r !== "object") continue;
+    const rr = r as Record<string, unknown>;
+    const sid = rr.subtask_id;
+    if (typeof sid !== "string" || !sid) continue; // created 之外的（error/duplicate）不进卡
+    itemIds.push(sid);
+    itemIdentities.push(typeof rr.identity === "string" && rr.identity ? rr.identity : sid.slice(0, 8));
+  }
+  if (!itemIds.length) return null;
+
+  return {
+    batchId,
+    mode: typeof obj.mode === "string" ? obj.mode : null,
+    itemIds,
+    itemIdentities,
+    totalItems: typeof obj.created_count === "number" ? Math.max(results.length, obj.created_count) : results.length,
+    createdCount:
+      typeof obj.created_count === "number" ? obj.created_count : itemIds.length,
+    isError: obj.status === "error",
+  };
+}
+
 /** 跨工作区桶定位归属工作区 id（卡片点击打开线程抽屉用；未命中 → null） */
 export function findSubtaskWorkspace(
   buckets: Record<string, Record<string, SubtaskNode>>,

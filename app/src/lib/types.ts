@@ -262,6 +262,22 @@ export interface SubtaskCardContentBlock {
   executionTime?: number;
 }
 
+/** UI-B 批量进度卡块（C21/§3.8.1：new_task_batch 工具结果派生）
+ *  纯 UI 组件态，不写入消息历史；实时状态由渲染端经 subtask-store 联动 */
+export interface SubtaskBatchCardContentBlock {
+  type: "subtask_batch_card";
+  batchId: string;
+  mode: string | null;
+  /** 成功创建的子任务 id（渲染端经 subtask-store 联动实时状态） */
+  itemIds: string[];
+  /** 与 itemIds 对齐的条目 identity（store 无实时节点时的行标签兜底） */
+  itemIdentities: string[];
+  /** 请求条目总数（含 duplicate/error 未创建项） */
+  totalItems: number;
+  createdCount: number;
+  isError: boolean;
+}
+
 export type ErrorCategory = "auth" | "credits" | "rate_limit" | "server" | "network" | "unknown";
 
 export interface ErrorContentBlock {
@@ -310,6 +326,7 @@ export type ContentBlock =
   | ToolResultContentBlock
   | ToolExecutionContentBlock
   | SubtaskCardContentBlock
+  | SubtaskBatchCardContentBlock
   | ErrorContentBlock
   | SimpleTextContentBlock
   | SystemCommandResultContentBlock;

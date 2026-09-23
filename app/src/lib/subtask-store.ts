@@ -4,18 +4,26 @@
  * 数据来源：
  * - WS `subtask_lifecycle` 广播 → applyLifecycle()（monitoring-ws 分发，工作区归属
  *   由调用方解析：显式 msg.workspace_id > wsClient.getWorkspaceId()）
+ * - WS `subtask_progress` 广播 → applyProgress()（C25/§3.8 todo 步级，纯 UI 态）
  * - REST GET /subtasks bootstrap → restoreFromBootstrap()（重连/首载兜底）
  *
  * 状态机（event → status，msg.status 显式值优先）：
  *   created→pending  started→running  completed→completed  failed→failed
  *   aborted→aborted  steered→保持原状态（仅记录指令）
+ *
+ * 批次（C16）：new_task_batch 展开的子任务带 batchId/itemIdentity（lifecycle
+ * 从 metadata 捕获 / progress 载荷直带 / bootstrap 从 REST 读取），
+ * selectBatchGroups() 产出批次聚合视图供进度卡与面板分组渲染。
  */
 import { create } from "zustand";
+import { on } from "./event-bus";
+import { subtaskApi } from "./api/subtask";
 import type {
   SubtaskInfo,
   SubtaskLifecycleEventName,
   SubtaskLifecyclePayload,
   SubtaskNode,
+  SubtaskProgressPayload,
   SubtaskStatus,
   SubtaskTreeNode,
 } from "./types/subtask";
@@ -60,6 +68,8 @@ interface SubtaskStoreState {
   // Actions
   /** WS subtask_lifecycle 事件 → upsert（乱序事件自动兜底建节点） */
   applyLifecycle: (workspaceId: string, msg: SubtaskLifecyclePayload) => void;
+  /** WS subtask_progress 事件 → upsert todos 步级（乱序先于 lifecycle 到达时建 running 骨架） */
+  applyProgress: (workspaceId: string, msg: SubtaskProgressPayload) => void;
   /** REST bootstrap → 整体替换该工作区桶（后端为权威结构） */
   restoreFromBootstrap: (workspaceId: string, subtasks: SubtaskInfo[]) => void;
   clearWorkspace: (workspaceId: string) => void;
@@ -117,9 +127,60 @@ export const useSubtaskStore = create<SubtaskStoreState>((set, get) => ({
         description: prev?.description ?? "",
         lastEvent: m.event,
         steerMessages,
+        batchId: (m.metadata?.batch_id as string | undefined) ?? prev?.batchId ?? null,
+        itemIdentity: (m.metadata?.item_identity as string | undefined) ?? prev?.itemIdentity ?? null,
+        todos: prev?.todos ?? null,
         createdAt: prev?.createdAt ?? now,
         updatedAt: now,
       };
+
+      return {
+        workspaceSubtasks: {
+          ...s.workspaceSubtasks,
+          [workspaceId]: { ...bucket, [subtaskId]: node },
+        },
+      };
+    });
+  },
+
+  applyProgress: (workspaceId, m) => {
+    const subtaskId = m?.subtask_id;
+    if (!subtaskId || !m.todos) return;
+
+    const now = Date.now();
+    set((s) => {
+      const bucket = s.workspaceSubtasks[workspaceId] ?? {};
+      const prev = bucket[subtaskId];
+
+      const node: SubtaskNode = prev
+        ? {
+            ...prev,
+            // 步级推进 = 已在执行：pending 提升为 running；终态不被迟到的 progress 回退
+            status: prev.status === "pending" ? "running" : prev.status,
+            batchId: m.batch_id ?? prev.batchId,
+            itemIdentity: m.item_identity ?? prev.itemIdentity,
+            todos: m.todos,
+            updatedAt: now,
+          }
+        : {
+            // 乱序兜底：progress 先于 lifecycle 到达 → 建 running 骨架
+            task_id: subtaskId,
+            parent_id: m.parent_id ?? null,
+            status: "running",
+            agent: null,
+            model: null,
+            mode: null,
+            depth: null,
+            conversation_id: null,
+            description: m.item_identity ?? "",
+            lastEvent: null,
+            steerMessages: [],
+            batchId: m.batch_id ?? null,
+            itemIdentity: m.item_identity ?? null,
+            todos: m.todos,
+            createdAt: now,
+            updatedAt: now,
+          };
 
       return {
         workspaceSubtasks: {
@@ -146,6 +207,9 @@ export const useSubtaskStore = create<SubtaskStoreState>((set, get) => ({
         description: item.description ?? "",
         lastEvent: null,
         steerMessages: [],
+        batchId: item.batch_id ?? null,
+        itemIdentity: item.item_identity ?? null,
+        todos: null, // todo 步级是纯 UI 态，bootstrap 不含 → 等后续 WS 补
         createdAt: now + i, // 保序列表顺序 → 树内子节点排序
         updatedAt: now + i,
       };
@@ -167,6 +231,25 @@ export const useSubtaskStore = create<SubtaskStoreState>((set, get) => ({
     ),
   getSubtask: (workspaceId, taskId) => get().workspaceSubtasks[workspaceId]?.[taskId],
 }));
+
+// ── C22：WS connected/重连 → REST bootstrap 恢复 ─────────────────────
+// connection-store 在 connected 时 emit（ws:resync_subtasks）；此处订阅并自行
+// 拉取（事件总线解耦，同 ws:resync_history → chat-store 先例）。此前 bootstrap
+// 仅在监控树挂载时触发，聊天页刷新后子任务卡片/批次进度静止。
+on("ws:resync_subtasks", (detail) => {
+  const { wsId } = (detail ?? {}) as { wsId?: string };
+  if (!wsId) return;
+  subtaskApi
+    .list(wsId)
+    .then((res) => {
+      if (res.success) {
+        useSubtaskStore.getState().restoreFromBootstrap(wsId, res.subtasks ?? []);
+      }
+    })
+    .catch((err) => {
+      console.error("[Subtask] bootstrap restore failed:", err);
+    });
+});
 
 // ── 树组装 selector（纯函数，组件与测试共用） ─────────────────────────
 
@@ -221,4 +304,65 @@ export function selectSubtaskTree(nodes: Record<string, SubtaskNode>): SubtaskTr
   }
 
   return roots;
+}
+
+// ── batch 分组 selector（C16：纯函数，进度卡 / 树面板分组渲染共用） ────
+
+/** 批次终态集合（SubtaskStatus 值域内） */
+const BATCH_TERMINAL = new Set<SubtaskStatus>(["completed", "failed", "aborted"]);
+
+/** 批次聚合视图（batchId → 成员 + 汇总；单发子任务不进组） */
+export interface SubtaskBatchGroup {
+  batchId: string;
+  /** 成员按 createdAt 升序（派发展开序） */
+  items: SubtaskNode[];
+  /** 终态成员数（completed/failed/aborted） */
+  done: number;
+  completed: number;
+  failed: number;
+  /** 成员 todo 合计（任一成员上报过才有，否则 null） */
+  todos: { total: number; completed: number } | null;
+  updatedAt: number;
+}
+
+/**
+ * 扁平节点表 → 批次分组。
+ * - batchId 为 null（new_task 单发 / 未知）的节点不进组（由树视图单独承载）
+ * - 组间按 updatedAt 升序（最新活跃批次靠后；渲染层可自行反转）
+ */
+export function selectBatchGroups(nodes: Record<string, SubtaskNode>): SubtaskBatchGroup[] {
+  const groups = new Map<string, SubtaskNode[]>();
+  for (const node of Object.values(nodes)) {
+    if (!node.batchId) continue;
+    const list = groups.get(node.batchId) ?? [];
+    list.push(node);
+    groups.set(node.batchId, list);
+  }
+
+  const result: SubtaskBatchGroup[] = [];
+  for (const [batchId, items] of groups) {
+    items.sort((a, b) => a.createdAt - b.createdAt);
+    let todosTotal = 0;
+    let todosCompleted = 0;
+    let hasTodos = false;
+    for (const it of items) {
+      if (it.todos) {
+        hasTodos = true;
+        todosTotal += it.todos.total;
+        todosCompleted += it.todos.completed;
+      }
+    }
+    result.push({
+      batchId,
+      items,
+      done: items.filter((i) => BATCH_TERMINAL.has(i.status)).length,
+      completed: items.filter((i) => i.status === "completed").length,
+      failed: items.filter((i) => i.status === "failed" || i.status === "aborted").length,
+      todos: hasTodos ? { total: todosTotal, completed: todosCompleted } : null,
+      updatedAt: Math.max(...items.map((i) => i.updatedAt)),
+    });
+  }
+
+  result.sort((a, b) => a.updatedAt - b.updatedAt);
+  return result;
 }

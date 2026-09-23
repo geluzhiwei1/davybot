@@ -24,7 +24,7 @@ import { useTaskStore } from "./task-store";
 import { on } from "./event-bus";
 import { useAgentStore } from "./agent-store";
 import { useMonitoringStore } from "./monitoring-store";
-import { extractSubtaskCard } from "./subtask-card";
+import { extractSubtaskBatchCard, extractSubtaskCard } from "./subtask-card";
 import { STORAGE_KEYS } from "./env";
 // 循环依赖：store.ts ↔ chat-store.ts。仅在本模块的 action 函数内部调用
 // useStore.getState()（运行时两边的 Zustand store 都已创建完成），不在顶层使用。
@@ -1137,6 +1137,13 @@ export const useChatStore = create<ChatStore>((set, get) => {
                 executionTime,
               };
               blocks.push(cardBlock);
+            }
+
+            // C21/§3.8.1：new_task_batch → 批量进度卡块（纯 UI 组件态；
+            // 全部创建失败不进卡——错误明细由 tool_result 块承载）
+            const batchCard = extractSubtaskBatchCard(toolName, result);
+            if (batchCard) {
+              blocks.push({ type: "subtask_batch_card", ...batchCard });
             }
             if (toolName === "attempt_completion" && !isError) {
               let resultText = "";
