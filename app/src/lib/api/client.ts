@@ -18,6 +18,20 @@ export async function handleTokenRefresh(): Promise<boolean> {
   return useAuthStore.getState().refreshAccessToken();
 }
 
+// ── 公开页判定（与 __root.tsx isPublicPage 同口径，但按 window.location 实时取值）
+// 登录页 / 工作区分享 /share/ / 报告分享 /shared-report/ 免登录可达；
+// 401 强制登出、ws:auth-error 等全局跳转在公开页必须静默（否则匿名访客被
+// 踢去登录页，分享链接等于废掉）。路径含 basepath（如 /app-ui/share/x）。
+export function isPublicWindowPath(): boolean {
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
+  const p = window.location.pathname;
+  return (
+    p === `${base}/login` ||
+    p.startsWith(`${base}/shared-report/`) ||
+    p.startsWith(`${base}/share/`)
+  );
+}
+
 // ── ApiError ────────────────────────────────────────────────────────
 
 /** Extract a readable error message from unknown catch values. */
@@ -136,7 +150,10 @@ export async function request<T>(
       useAuthStore.getState().logout();
       localStorage.removeItem(STORAGE_KEYS.authToken);
       localStorage.removeItem(STORAGE_KEYS.refreshToken);
-      window.location.href = (import.meta.env.BASE_URL + "login").replace(/\/+/g, "/");
+      // 公开页（/share/ 等）不清场跳登录——匿名/过期 token 访客仍可浏览
+      if (!isPublicWindowPath()) {
+        window.location.href = (import.meta.env.BASE_URL + "login").replace(/\/+/g, "/");
+      }
       throw new ApiError(401, "Unauthorized", "Session expired — please log in again");
     }
 
@@ -162,7 +179,10 @@ export async function request<T>(
       useAuthStore.getState().logout();
       localStorage.removeItem(STORAGE_KEYS.authToken);
       localStorage.removeItem(STORAGE_KEYS.refreshToken);
-      window.location.href = (import.meta.env.BASE_URL + "login").replace(/\/+/g, "/");
+      // 公开页不清场跳登录（同上）
+      if (!isPublicWindowPath()) {
+        window.location.href = (import.meta.env.BASE_URL + "login").replace(/\/+/g, "/");
+      }
       throw new ApiError(401, "Unauthorized", "Session expired");
     }
   }
@@ -225,7 +245,10 @@ export async function requestMultipart<T>(
       useAuthStore.getState().logout();
       localStorage.removeItem(STORAGE_KEYS.authToken);
       localStorage.removeItem(STORAGE_KEYS.refreshToken);
-      window.location.href = (import.meta.env.BASE_URL + "login").replace(/\/+/g, "/");
+      // 公开页不清场跳登录（同 request()）
+      if (!isPublicWindowPath()) {
+        window.location.href = (import.meta.env.BASE_URL + "login").replace(/\/+/g, "/");
+      }
       throw new ApiError(401, "Unauthorized", "Session expired");
     }
   }

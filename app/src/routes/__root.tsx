@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { TabBar } from "@/components/tab-bar";
 import { MobileTabBar } from "@/components/mobile-shell/mobile-tab-bar";
 import { useAuthStore } from "@/lib/auth-store";
+import { isPublicWindowPath } from "@/lib/api/client";
 import { useRuntimeStore } from "@/lib/stores/runtime-store";
 import { UpdateNotification } from "@/components/ui/update-notification";
 import { BIZ_ROOT_DOCKS } from "@/lib/biz-registry";
@@ -112,8 +113,11 @@ function RootComponent() {
   // WS 鉴权失败(后端以 1008 关闭,见 nn-bot websocket.py _authenticate_ws)时,
   // ws-client 会停止重连并派发 "ws:auth-error"。此处统一收口:
   // 提示并跳转登录页,替代旧的"无限重连转圈"死路。
+  // 公开页例外（/share/ 分享页匿名可达,WS 匿名连接被拒不代表要登录）——
+  // 按 window.location 实时判定,不吃闭包过期值。
   useEffect(() => {
     const onWsAuthError = () => {
+      if (isPublicWindowPath()) return;
       toast.error(t("root.sessionExpired"));
       window.location.href = loginHref;
     };
