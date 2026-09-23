@@ -32,6 +32,7 @@ import {
   PenTool,
   Send,
   Settings,
+  Share2,
   Shield,
   Ticket,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import type { ContentBlock } from "@/lib/types";
 import { AgentDegradedBanner } from "@/components/agent-degraded-banner";
 import { marketApi, type TeamHierarchyEntry } from "@/lib/market-api";
 import { BIZ_WORKSPACE_EMPTY_STATES, BIZ_WORKSPACE_EMPTY_COMPONENTS } from "@/lib/biz-registry";
+import { WorkspaceShareDialog } from "@/components/workspaces/share-dialog";
 
 /** Stable empty array ref — avoids new [] on every render */
 const EMPTY_ARR: never[] = [];
@@ -76,7 +78,10 @@ export function ChatView({
   inputPlaceholder,
 }: Props) {
   const { t } = useTranslation("commonUi");
+  const { t: tRoutesB } = useTranslation("routesB");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 工作区分享弹窗（与工作区列表页同一 WorkspaceShareDialog）
+  const [shareOpen, setShareOpen] = useState(false);
   const marketTeams = useMarketTeamsStore((s) => s.teams);
   const fetchTeams = useMarketTeamsStore((s) => s.fetchTeams);
   const allExperts = useMemo(() => toExperts(marketTeams), [marketTeams]);
@@ -493,6 +498,16 @@ export function ChatView({
               <span className="hidden md:inline">{t("chatView.settings.short")}</span>
             </button>
           )}
+          {/* 工作区分享（biz 任务页均复用 ChatView 顶栏，一处生效全覆盖） */}
+          {workspace && (
+            <button
+              onClick={() => setShareOpen(true)}
+              className="inline-flex items-center text-xs px-2 py-1 rounded-md border border-border hover:border-brand/40 hover:text-brand transition shrink-0"
+              title={tRoutesB("workspaces.share")}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+          )}
           {/* 面板 toggle 排:<md 隐藏 —— 移动端已有顶部子视图 Tab 行(方案
               Phase 2),同一职能双入口挤爆顶栏(真机反馈的"竖排图标条") */}
           <div className="hidden md:flex items-center gap-1.5">
@@ -719,6 +734,16 @@ export function ChatView({
         onResponse={(text) => respondFollowup(task.id, text)}
         onCancel={() => cancelFollowup(task.id)}
       />
+
+      {/* ── Workspace share dialog（临时任务无 workspace，不渲染） ── */}
+      {workspace && (
+        <WorkspaceShareDialog
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+        />
+      )}
     </div>
   );
 }
