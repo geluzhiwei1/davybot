@@ -56,6 +56,9 @@ from dawei.core.security_auditor import _redact, security_auditor
 
 logger = logging.getLogger(__name__)
 
+# 策略解析失败 ERROR 去重（fail-closed 路径用）：只发一次，拒绝不放松
+_POLICY_FAIL_LOGGED = False
+
 #: Async callback that delivers a ``tool_approval_request`` dict to the client(s).
 #: Returns True if delivered to an interactive client, False if no channel is
 #: available for this request (e.g. headless / no matching session).
@@ -92,9 +95,24 @@ class ApprovalGate:
             from dawei.core.security_manager import security_manager
 
             return security_manager.get_policy().approval
-        except Exception as e:  # pragma: no cover - never let policy read break flow
-            logger.warning(f"ApprovalGate: policy resolution failed ({e}); using safe default")
-            return EffectiveApprovalPolicy()
+        except Exception as e:  # noqa: BLE001 — fail-closed（FAST FAIL，2026-09-23 八跑教训）
+            # 八跑事故：security.json 配置非法（containerRuntime="e2b" 未被
+            # Literal 收录）→ get_policy() 抛 ValidationError → 旧"safe default"
+            # enabled=False 等于静默放行。配置非法时必须收紧而非放松：
+            # 全量工具进审批 + 无通道即拒绝。ERROR 只发一次防刷屏。
+            global _POLICY_FAIL_LOGGED
+            if not _POLICY_FAIL_LOGGED:
+                _POLICY_FAIL_LOGGED = True
+                logger.error(
+                    f"ApprovalGate: policy resolution FAILED ({e}); using FAIL-CLOSED default "
+                    "(enabled=True, required_for_risk='low', no_channel_behavior='deny'). "
+                    "Fix the security config (e.g. ~/.normnomos/configs/*/security.json); this error will not be re-logged.",
+                )
+            return EffectiveApprovalPolicy(
+                enabled=True,
+                required_for_risk="low",
+                no_channel_behavior="deny",
+            )
 
     def decide(self, tool_name: str, risk: str | None = None) -> str:
         """Return ``"allow"`` or ``"needs_approval"`` (never raises)."""

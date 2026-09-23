@@ -123,7 +123,9 @@ class CubeSandboxProvider(SandboxProvider):
     """
 
     def __init__(self, config: dict[str, Any] | None = None):
-        self.config = config or {}
+        # None-safe: __init__ 内多处直接用 config.get (签名允许 None, 2026-09-23 冒烟踩雷)
+        config = config or {}
+        self.config = config
 
         # E2B SDK 配置
         self.template_id = os.environ.get("DAWEI_SANDBOX_TEMPLATE", "code-interpreter")
@@ -133,7 +135,7 @@ class CubeSandboxProvider(SandboxProvider):
             "E2B_API_KEY",
             os.environ.get("DAWEI_SANDBOX_API_KEY", "e2b_0000000000000000000000000000000000000000"),
         )
-        self.sync_strategy = config.get("sync_strategy", "auto")  # virtiofs | sdk | auto
+        self.sync_strategy = self.config.get("sync_strategy", "auto")  # virtiofs | sdk | auto
 
         # 超时配置 (env DAWEI_SANDBOX_COMMAND_TIMEOUT 可覆盖缺省 30s;
         # SandboxFacade 不传 config, 长命令 pip/npm 需在部署侧调高)
@@ -195,7 +197,17 @@ class CubeSandboxProvider(SandboxProvider):
         )
 
         # N1: WebSocket grace 期
-        self.disconnect_grace_seconds = config.get("disconnect_grace", 60)
+        # 【2026-09-23 demo.normnomos.com 事故修复】默认 60s 过短: 用户切 tab/
+        # 网络抖动断开 60s 后沙箱即被销毁, 下次工具调用重建沙箱 + pip 重装依赖
+        # (~126s) → 叠加 330s 工具等待上限, 任务必死 (list_files 338.68s 超时被杀)。
+        # 新默认 600s ≥ ws_manager 的 300s 重连取消窗口 (DAWEI_WS_TASK_CANCEL_DELAY),
+        # 保证"断开→重连"全程沙箱存活, 重连后依赖免重装、排空队列即恢复。
+        # env DAWEI_SANDBOX_DISCONNECT_GRACE 可覆盖; 0 = 立即销毁 (旧行为)。
+        try:
+            _grace_env = float(os.environ.get("DAWEI_SANDBOX_DISCONNECT_GRACE", "600"))
+        except ValueError:
+            _grace_env = 600
+        self.disconnect_grace_seconds = config.get("disconnect_grace", _grace_env)
         self._pending_commands: dict[str, list[CommandQueueEntry]] = {}
         self._scheduled_destroy: dict[str, float] = {}
         self._disconnected: dict[str, bool] = {}
@@ -281,11 +293,20 @@ class CubeSandboxProvider(SandboxProvider):
         if key in self._sessions and not self._disconnected.get(key, False):
             return self._execute_on_session(key, command, ctx, timeout=timeout)
 
-        # === 情形 2: 会话断开但在 grace 期内, 命令入队 ===
+        # === 情形 2: 会话断开但在 grace 期内 → 直接在存活沙箱上执行 ===
+        # 【2026-09-23 修复】旧逻辑: 入队死等重连 (wait_for future, 最长 grace 秒),
+        # grace 期内不重连则整段等待作废 (SandboxTimeoutError) — grace 提到 600s 后
+        # 这等于让工具任务干等 10 分钟然后失败。命令执行本身不依赖 WS
+        # (结果同步返回 tool_executor), 只有进度推送依赖; WS 侧已有
+        # 断开延迟取消 + 重连接管 (websocket/manager._rebind_workspace_tasks)。
+        # 因此 grace 期内沙箱还活着就直接执行, FAST FAIL 优于排队干等。
         if self._disconnected.get(key, False):
             destroy_at = self._scheduled_destroy.get(key, 0)
-            if time.time() < destroy_at:
-                return self._enqueue_command(key, command, ctx)
+            if time.time() < destroy_at and key in self._sessions:
+                logger.info(
+                    "[E2B] grace 期内命令直接执行 (沙箱存活): %s", key,
+                )
+                return self._execute_on_session(key, command, ctx, timeout=timeout)
             # grace 期已过
             self._cleanup_disconnected_session(key)
 

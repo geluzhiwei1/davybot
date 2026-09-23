@@ -35,6 +35,15 @@ CORE_TOOLS: set[str] = {
     "call_acp_agent",
     # 工作流辅助
     "new_task",
+    # 委派/编排原语（与 new_task 同级——协议口诀单件 run_task、N≥2 同构
+    # new_task_batch、阻塞收口 wait_tasks 都是 orchestrator 的"大脑"操作；
+    # 若留在 Tier-2，模型不知道存在就不会 search_tools 激活，modes.yaml 的
+    # "必须 new_task_batch" 形同虚设 —— 2026-09-23 UC-ENG-002 二跑实锤：
+    # 工具已注册仍 0 次调用，18 次 new_task 兜底）
+    "new_task_batch",
+    "run_task",
+    "wait_tasks",
+    "get_task_status",
     "ask_followup_question",
 }
 

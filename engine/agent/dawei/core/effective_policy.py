@@ -189,7 +189,11 @@ class EffectiveSandboxPolicy(BaseModel):
     """Merged container-sandbox security (workspace overrides user defaults)."""
 
     enable_sandbox: bool = False
-    container_runtime: Literal["docker", "podman", "auto"] = "auto"
+    # "e2b"（2026-09-23 八跑 53× fail-open 根因）：default_user/security.json
+    # 配了 containerRuntime="e2b"，沙箱系统也真支持（provider_factory/
+    # agentenv_provider），但本 Literal 未收录 → get_policy() 每次抛
+    # ValidationError → 工具权限检查被 fail-open 静默放行。收录即根治。
+    container_runtime: Literal["docker", "podman", "e2b", "auto"] = "auto"
     drop_all_capabilities: bool = True
     no_new_privileges: bool = True
     sandbox_disable_network: bool = True
@@ -440,9 +444,9 @@ class WorkspaceSecurityOverride(BaseModel):
     allow_pipe_commands: bool | None = None
     command_execution_timeout: int | None = Field(default=None, ge=1, le=3600)
 
-    # sandbox domain
+    # sandbox domain（"e2b" 收录与 EffectiveSandboxPolicy 同步，见其注释）
     enable_sandbox: bool | None = None
-    container_runtime: Literal["docker", "podman", "auto"] | None = None
+    container_runtime: Literal["docker", "podman", "e2b", "auto"] | None = None
     drop_all_capabilities: bool | None = None
     no_new_privileges: bool | None = None
     sandbox_disable_network: bool | None = None

@@ -55,11 +55,7 @@ def _acquire_workspace_run_lock(workspace_path: str) -> tuple[int | None, str | 
             pass
         if fd is not None:
             os.close(fd)
-        return None, (
-            f"工作区已有 agent run 在执行（持锁 pid={holder}）：{workspace_path}。"
-            "请等待其完成后再运行；若确认持锁进程已死亡，删除 "
-            f"{lock_file} 后重试。如确需并发（不推荐），设 DAWEI_RUN_LOCK=0。"
-        )
+        return None, (f"工作区已有 agent run 在执行（持锁 pid={holder}）：{workspace_path}。请等待其完成后再运行；若确认持锁进程已死亡，删除 {lock_file} 后重试。如确需并发（不推荐），设 DAWEI_RUN_LOCK=0。")
     except OSError as e:
         # 锁目录不可写等：FAST FAIL——宁可不跑，不可并发写坏工作区
         if fd is not None:
@@ -197,8 +193,31 @@ class AgentRunner:
             # 4. 等待任务完成（确保所有异步操作完成）
             await asyncio.sleep(0.5)
 
-            # 5. 返回成功结果
+            # 4.5 【FAST FAIL】根任务终态决定退出码：process_message 正常返回
+            # 不代表根成功（2026-09-23 UC-ENG-002 七跑实锤：根 212k 触崖 FAILED，
+            # CLI 仍报 completed/rc=0，用例断言与真实状态脱节）。best-effort 查询，
+            # 读取失败不吞执行成功。
+            root_status: str | None = None
+            try:
+                task_graph = getattr(self.user_workspace, "task_graph", None)
+                if task_graph is not None:
+                    root_task = await task_graph.get_root_task()
+                    if root_task is not None and getattr(root_task, "status", None) is not None:
+                        root_status = str(getattr(root_task.status, "value", root_task.status))
+            except Exception:  # noqa: BLE001 — 状态查询失败不改变成功语义
+                self.logger.debug("run: failed to read root task terminal status", exc_info=True)
+
             duration = time.time() - start_time
+            if root_status in ("failed", "aborted", "cancelled"):
+                self.logger.warning(f"Root task ended in terminal state '{root_status}' (duration {duration:.0f}s)")
+                return {
+                    "success": False,
+                    "message": f"Root task ended in '{root_status}'",
+                    "duration": duration,
+                    "error": f"root task terminal status: {root_status}",
+                }
+
+            # 5. 返回成功结果
             return {
                 "success": True,
                 "message": "Agent execution completed successfully",

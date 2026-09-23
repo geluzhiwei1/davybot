@@ -213,16 +213,24 @@ class TaskNodeExecutionEngine:
             # 节点未声明时用全局值；全局 -1（默认）只关闭"全局兜底"，
             # 不吞掉节点自己的声明（首版实现 -1 时连节点值也跳过，
             # committed 测试 test_check_budget_and_deadline_branches 因此红）。
-            budget = getattr(data, "token_budget", None)
-            budget = float(budget) if isinstance(budget, (int, float)) and budget > 0 else None
+            # 数字字符串容错（2026-09-23 UC-ENG-002 七跑）：修复前创建的节点可能
+            # 落库 str（TaskData 不 coerce）——isinstance 硬判会静默忽略节点声明，
+            # 与"预算蒸发→全局 200k 接管"事故同型；创建侧已同步强转。
+            def _pos_num(v) -> float | None:  # noqa: ANN001 — 容错提取正数（int/float/数字 str）
+                try:
+                    f = float(v)
+                except (TypeError, ValueError):
+                    return None
+                return f if f > 0 else None
+
+            budget = _pos_num(getattr(data, "token_budget", None))
             if cfg_budget > 0:
                 budget = float(cfg_budget) if budget is None else min(budget, float(cfg_budget))
             if budget is not None and self._tokens_used >= budget:
                 return build_budget_failure_result("token_budget", used=self._tokens_used, limit=int(budget))
 
             # 超时同语义：节点声明值为主，全局闸门 >0 时取 min
-            timeout = getattr(data, "timeout_seconds", None)
-            timeout = float(timeout) if isinstance(timeout, (int, float)) and timeout > 0 else None
+            timeout = _pos_num(getattr(data, "timeout_seconds", None))
             if cfg_timeout > 0:
                 timeout = float(cfg_timeout) if timeout is None else min(timeout, float(cfg_timeout))
             if timeout is not None and deadline_exceeded(self._loop_started_at, timeout):
@@ -232,16 +240,90 @@ class TaskNodeExecutionEngine:
             self.logger.exception("budget/deadline check failed: ")
         return None
 
+    def _harvest_output_file(self) -> str | None:
+        """修复3（2026-09-23 八跑收割）：预算/超时触崖时检查交付物是否已落盘。
+
+        metadata.output_file 已声明、解析后位于工作区根目录内、是文件且非空
+        → 返回解析后的绝对路径；其余（未声明/越界/空文件/IO 失败/无工作区）
+        一律返回 None。越界路径绝不收割（防 output_file 指向工作区外被
+        误判为"已交付"）。
+        """
+        try:
+            from pathlib import Path
+
+            meta = getattr(getattr(self.task_node, "data", None), "metadata", None) or {}
+            raw = str(meta.get("output_file") or "").strip()
+            if not raw:
+                return None
+            ws_root = getattr(self._user_workspace, "absolute_path", None)
+            if not ws_root:
+                return None
+            root = Path(ws_root).resolve()
+            p = Path(raw).resolve() if Path(raw).is_absolute() else (root / raw).resolve()
+            if not p.is_relative_to(root):
+                return None
+            if not p.is_file() or p.stat().st_size <= 0:
+                return None
+            return str(p)
+        except Exception:  # noqa: BLE001 — 收割检查失败不影响原失败路径
+            self.logger.exception("harvest check failed: ")
+            return None
+
     async def _fail_with_completion(self, failure_payload: str) -> None:
         """P3-3：超限失败 —— task_completion 失败 JSON 注入会话（父任务 summary 链路可见）+ 置 FAILED。
 
         FAST FAIL：不重试（重试只会再烧一遍预算/超时），原因即结果。
         失败原因同时写入 TaskNode.result（单一事实源），父任务从节点读。
+
+        修复3（八跑收割）：触崖前交付物已完整落盘（metadata.output_file 非
+        空且在工作区内）时降级 FAILED → COMPLETED+harvested —— 八跑实证
+        2 个子任务全文已写盘、只是收尾打磨烧穿预算，"失败且丢交付"与事实
+        相悖。降级信息对父任务可见（result 带 harvested/kind/used/limit），
+        验收判定交给父 LLM（读 output_file 对 acceptance）。
         """
         import json as _json
 
         from dawei.entity.lm_messages import UserMessage
 
+        # 解析 payload（kind/used/limit 供审计与收割降级信息复用）
+        _kind = _used = _limit = None
+        reason = failure_payload
+        try:
+            parsed = _json.loads(failure_payload)
+            if isinstance(parsed, dict):
+                reason = parsed.get("result") or failure_payload
+                _kind, _used, _limit = parsed.get("kind"), parsed.get("used"), parsed.get("limit")
+        except (ValueError, TypeError):
+            reason = failure_payload
+
+        # 修复3：收割检查 —— 交付物已落盘则降级 COMPLETED（原因与用量全量可见）
+        harvested_path = self._harvest_output_file()
+        if harvested_path is not None:
+            harvested_note = (
+                f"[harvested] {reason} —— 交付物已在触崖前完整写入 {harvested_path}"
+                f"（kind={_kind}, used={_used}, limit={_limit}），按收割降级记 COMPLETED；"
+                "请按 acceptance 验收该文件。"
+            )
+            conv = self.active_conversation
+            if conv is not None:
+                try:
+                    conv.say(UserMessage(content=harvested_note))
+                except Exception:  # noqa: BLE001 — 注入失败不影响状态迁移
+                    self.logger.exception("Failed to inject harvested completion: ")
+            try:
+                task_graph = getattr(self._user_workspace, "task_graph", None)
+                if task_graph is not None and hasattr(task_graph, "set_task_result"):
+                    await task_graph.set_task_result(self.task_node.task_node_id, harvested_note)
+            except Exception:  # noqa: BLE001 — 节点写失败不影响状态迁移
+                self.logger.exception("Failed to record harvested result on task node: ")
+            self.task_node.update_status(TaskStatus.COMPLETED)
+            self.logger.warning(
+                f"Task {self.task_node.task_node_id} budget/timeout exceeded but deliverable harvested "
+                f"({harvested_path}); downgraded FAILED->COMPLETED (kind={_kind}, used={_used}, limit={_limit})",
+            )
+            return
+
+        # —— 未收割：原 FAST FAIL 失败路径 ——
         conv = self.active_conversation
         if conv is not None:
             try:
@@ -252,17 +334,11 @@ class TaskNodeExecutionEngine:
         # 【单一事实源】失败原因写入节点（从 payload 提取 result 字段，兼容非 JSON）
         _audit = ""
         try:
-            try:
-                parsed = _json.loads(failure_payload)
-                reason = (parsed.get("result") if isinstance(parsed, dict) else None) or failure_payload
-                # P2-C 预算审计:日志带上 used/limit(此前只有"超限"二字,排障无从对账)
-                if isinstance(parsed, dict):
-                    _audit = f" (kind={parsed.get('kind')}, used={parsed.get('used')}, limit={parsed.get('limit')})"
-            except (ValueError, TypeError):
-                reason = failure_payload
             task_graph = getattr(self._user_workspace, "task_graph", None)
             if task_graph is not None and hasattr(task_graph, "set_task_result"):
                 await task_graph.set_task_result(self.task_node.task_node_id, reason)
+            if _kind is not None:
+                _audit = f" (kind={_kind}, used={_used}, limit={_limit})"
         except Exception:  # noqa: BLE001 — 节点写失败不影响状态迁移
             self.logger.exception("Failed to record failure result on task node: ")
 
@@ -1327,6 +1403,20 @@ class TaskNodeExecutionEngine:
 
             await self.process_message()
 
+            # P1 【父任务只需要子任务结果】（2026-09-23 UC-ENG-002 七跑实锤）：
+            # 本轮结束后仍有未终结子任务 → 立即挂起本执行期。实测根任务派发
+            # 6 项 batch 后用 get_task_status 空转轮询 10 轮（每轮重发 75 个
+            # 工具 schema + 全部历史 ≈14k tokens，累计 ~140k 白烧）——而
+            # PENDING 子任务只会在父执行期结束后由引擎编排循环启动
+            # （task_graph_excutor），执行期内轮询的对象永远不会动。
+            # 结构性切断：挂起（保持 RUNNING 非终态）→ 引擎执行子任务并回注
+            # [子任务执行报告] → 自动续跑本对话。run_task 内联路径的子任务
+            # 在工具调用内已到终态，不会误触发挂起。
+            _unfinished = await self._unfinished_subtask_count()
+            if _unfinished > 0:
+                await self._suspend_turn_for_subtasks(_unfinished)
+                break
+
             # 【防御性】检测连续无进展 — 如果 process_message 完成但消息数没有增加，
             # 说明 LLM 返回了空内容（静默失败）。
             current_msg_count = 0
@@ -1538,6 +1628,54 @@ class TaskNodeExecutionEngine:
                         return False
             return True
         return None
+
+    async def _unfinished_subtask_count(self) -> int:
+        """P1：统计本节点名下未终结（非终态）子任务数。
+
+        查询失败（无 task_graph / 图不可用 / 异常）→ 返回 0 = 维持旧行为，
+        绝不因查询问题阻断任务循环。终态集合与 AttemptCompletionTool 阻断
+        口径互补：FAILED/ABORTED/CANCELLED 已终态，由引擎 FAST FAIL /
+        报告回注处理，父任务无需为其挂起。
+        """
+        try:
+            task_graph = getattr(self._user_workspace, "task_graph", None)
+            if task_graph is None:
+                return 0
+            subtasks = await task_graph.get_subtasks(self.task_node.task_node_id)
+            terminal = {
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.ABORTED,
+                TaskStatus.CANCELLED,
+            }
+            return sum(1 for st in subtasks if getattr(st, "status", None) not in terminal)
+        except Exception:  # noqa: BLE001 — 查询失败退回旧行为（不挂起）
+            self.logger.debug("unfinished subtask count unavailable, skipping suspension", exc_info=True)
+            return 0
+
+    async def _suspend_turn_for_subtasks(self, count: int) -> None:
+        """P1：挂起本执行期 —— 写入指引面包屑后由调用方 break。
+
+        节点保持 RUNNING（非终态）：引擎编排循环执行完子任务、回注
+        [子任务执行报告] 后会自动续跑本对话。面包屑教会 LLM"挂起是预期
+        行为、无需轮询"，避免续跑轮次再犯同样的空转。
+        """
+        self.logger.info(
+            f"Task {self.task_node.task_node_id} suspending turn: {count} unfinished subtask(s) in flight, engine will execute them and resume this conversation",
+        )
+        conv = self.active_conversation
+        if conv is None:
+            return
+        try:
+            from dawei.entity.lm_messages import UserMessage
+
+            conv.say(
+                UserMessage(
+                    content=(f"[父任务挂起] 检测到 {count} 个未完成子任务：本执行期结束，子任务由引擎接管执行。全部完成后 [子任务执行报告] 将注入本对话并自动续跑 —— 无需轮询 get_task_status。"),
+                ),
+            )
+        except Exception:  # noqa: BLE001 — 面包屑写失败不影响挂起语义
+            self.logger.exception("Failed to inject suspension breadcrumb: ")
 
     async def _execute_tool_call_todo(self, todo: TodoItem) -> None:
         """执行工具调用类型的TODO"""

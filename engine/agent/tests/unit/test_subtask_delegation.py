@@ -1581,6 +1581,42 @@ def test_check_budget_and_deadline_branches():
     assert ex3._check_budget_and_deadline() is None  # 无限制 → 继续
 
 
+def test_check_budget_accepts_numeric_string_nodes(monkeypatch):
+    """2026-09-23 UC-ENG-002 七跑回归：修复前创建的节点可落库 str 预算/超时
+    （TaskData 不 coerce）——判定点须容错提取，否则节点声明被静默忽略、
+    全局 200k 兜底接管（预算蒸发，根/子任务 209k~216k 集体触崖）。"""
+    import time as _time
+    from types import SimpleNamespace
+
+    # 关闭全局闸门以隔离"节点声明值"语义（-1 = 只关兜底，不吞节点值）
+    ae = SimpleNamespace(subtask_token_budget=-1, subtask_timeout=-1)
+    monkeypatch.setattr("dawei.config.settings.get_settings", lambda: SimpleNamespace(agent_execution=ae))
+
+    ex = _bare_executor()
+    ex.task_node.data.token_budget = "80000"  # type: ignore[assignment] — 历史节点形态
+    ex.task_node.data.timeout_seconds = None
+    ex._tokens_used = 80000
+    ex._loop_started_at = _time.monotonic()
+    reason = ex._check_budget_and_deadline()
+    assert reason is not None and "token_budget" in reason and "80000" in reason
+
+    # 非数字垃圾（"80k"）→ 视为未声明，不抛异常
+    ex2 = _bare_executor()
+    ex2.task_node.data.token_budget = "80k"  # type: ignore[assignment]
+    ex2.task_node.data.timeout_seconds = None
+    ex2._tokens_used = 10**9
+    ex2._loop_started_at = _time.monotonic()
+    assert ex2._check_budget_and_deadline() is None  # 垃圾值=未声明+全局关闭 → 不限
+
+    # 数字字符串 timeout 同语义（历史节点 "900"）
+    ex3 = _bare_executor()
+    ex3.task_node.data.token_budget = None
+    ex3.task_node.data.timeout_seconds = "1"  # type: ignore[assignment]
+    ex3._loop_started_at = _time.monotonic() - 2  # 已过 deadline
+    reason3 = ex3._check_budget_and_deadline()
+    assert reason3 is not None and "timeout" in reason3
+
+
 async def test_fail_with_completion_injects_and_marks_failed():
     """超限失败：task_completion 失败 JSON 注入会话 + 状态置 FAILED"""
     from dawei.agentic.subtask_conversation import extract_task_completion
@@ -1618,3 +1654,287 @@ def test_workflow_inputs_accept_timeout_budget():
 
     with pytest.raises(pydantic.ValidationError):
         wtf.NewTaskInput(mode="pdca", message="x", acceptance="验收标准")
+
+
+# ==================== P1（2026-09-23 UC-ENG-002 七跑）: 未终结子任务在途 → 父执行期挂起 ====================
+
+
+def _loop_executor(graph, conv):
+    """驱动 _run_task_loop 的最小 executor：真实 Conversation + FakeTaskGraph。
+
+    事故背景：根任务派发 6 项 batch 后 get_task_status 空转轮询 10 轮
+    （累计 ~140k tokens 白烧）——PENDING 子任务只会在父执行期结束后由
+    引擎编排循环启动，执行期内轮询的对象永远不会动。
+    """
+    from dawei.conversation.conversation import Conversation
+
+    conv = conv or Conversation(title="parent")
+    ex = _bare_executor()
+    ex.task_node = FakeTaskNode("parent", status=TaskStatus.RUNNING)
+    ex.task_node.task_node_id = "parent"
+    ex._conversation = conv
+    ex._user_workspace = SimpleNamespace(current_conversation=conv, task_graph=graph)
+    ex._agent = None  # _run_task_loop 的 stop 检查访问
+    ex._tool_message_handler = SimpleNamespace(has_attempt_completion=False)
+    return ex, conv
+
+
+def _counting_process_message(ex, conv, *, set_completion=False):
+    """替身 process_message：计数 + 追加一条消息（模拟 LLM 轮真实进展）"""
+    calls = {"n": 0}
+
+    async def _fake():
+        calls["n"] += 1
+        conv.messages.append(msg_plain(f"round {calls['n']}"))
+        if set_completion:
+            ex._tool_message_handler.has_attempt_completion = True
+
+    ex.process_message = _fake
+    return calls
+
+
+async def test_task_loop_suspends_when_subtasks_unfinished():
+    """PENDING+RUNNING 子任务在途 → 恰 1 轮后挂起：节点保持 RUNNING（非终态，
+    供引擎编排循环续跑）+ 面包屑教会 LLM 无需轮询 get_task_status"""
+    graph = FakeTaskGraph(
+        [
+            FakeTaskNode("parent", status=TaskStatus.RUNNING),
+            FakeTaskNode("s1", status=TaskStatus.PENDING, parent_id="parent"),
+            FakeTaskNode("s2", status=TaskStatus.RUNNING, parent_id="parent"),
+        ],
+    )
+    ex, conv = _loop_executor(graph, None)
+    calls = _counting_process_message(ex, conv)
+
+    await ex._run_task_loop()
+
+    assert calls["n"] == 1  # 派发轮后立即挂起，零轮询轮
+    assert ex.task_node.status == TaskStatus.RUNNING  # 非终态：等引擎续跑
+    breadcrumb = conv.messages[-1].content
+    assert "[父任务挂起]" in breadcrumb
+    assert "2 个未完成子任务" in breadcrumb
+    assert "get_task_status" in breadcrumb  # 教学指引
+
+
+async def test_task_loop_natural_end_when_all_subtasks_terminal():
+    """对照组：子任务全终态（COMPLETED/FAILED）→ 不挂起，走旧自然收尾路径
+    （attempt_completion → COMPLETED），无面包屑注入"""
+    graph = FakeTaskGraph(
+        [
+            FakeTaskNode("parent", status=TaskStatus.RUNNING),
+            FakeTaskNode("ok", status=TaskStatus.COMPLETED, parent_id="parent"),
+            FakeTaskNode("bad", status=TaskStatus.FAILED, parent_id="parent"),
+        ],
+    )
+    ex, conv = _loop_executor(graph, None)
+    calls = _counting_process_message(ex, conv, set_completion=True)
+
+    await ex._run_task_loop()
+
+    assert calls["n"] == 1
+    assert ex.task_node.status == TaskStatus.COMPLETED  # 自然收尾语义不变
+    assert not any("[父任务挂起]" in getattr(m, "content", "") for m in conv.messages)
+
+
+async def test_task_loop_no_subtasks_unchanged():
+    """无子任务（普通对话任务）→ 零行为变化：自然收尾照旧"""
+    graph = FakeTaskGraph([FakeTaskNode("parent", status=TaskStatus.RUNNING)])
+    ex, conv = _loop_executor(graph, None)
+    calls = _counting_process_message(ex, conv, set_completion=True)
+
+    await ex._run_task_loop()
+
+    assert calls["n"] == 1
+    assert ex.task_node.status == TaskStatus.COMPLETED
+
+
+async def test_unfinished_count_degrades_to_zero_on_query_failure():
+    """task_graph 查询异常 → 0（维持旧行为），挂起检查绝不炸任务循环"""
+    ex, _ = _loop_executor(object(), None)  # object() 无 get_subtasks → AttributeError
+    assert await ex._unfinished_subtask_count() == 0
+
+    ex2, _ = _loop_executor(None, None)
+    ex2._user_workspace = SimpleNamespace(current_conversation=None, task_graph=None)
+    assert await ex2._unfinished_subtask_count() == 0
+
+
+# ==================== P2（2026-09-23 UC-ENG-002 八跑）: 容错 coerce + fail-closed + 触崖收割 ====================
+
+# 八跑事故链：LLM 传 "timeout":"10m" → pydantic 拒 3 次 → LLM 丢掉 token_budget
+# → 节点预算蒸发、全局 200k 兜底接管 → 2/6 子任务 215k+ 触崖 FAILED。
+# 三项修复：schema 容错 coerce / 安全检查 fail-closed / 触崖收割降级。
+
+
+def _coercion_bases():
+    return (
+        (wtf.NewTaskInput, dict(mode="pdca", message="x", acceptance="a", deliverable="交付/x.md")),
+        (wtf.RunTaskInput, dict(mode="pdca", message="x")),
+        (wtf.NewTaskBatchInput, dict(mode="pdca", template="t", items=[{"identity": "i1"}], acceptance_template="a", deliverable_template="d")),
+    )
+
+
+def test_timeout_field_tolerates_human_formats():
+    """修复1：600 / '600' / '10m' / '90s' / '1h' 全收（三 Input 模型一致）"""
+    for cls, base in _coercion_bases():
+        assert cls(**base, timeout="10m").timeout == 600.0
+        assert cls(**base, timeout="600").timeout == 600.0
+        assert cls(**base, timeout=90).timeout == 90.0
+        assert cls(**base, timeout="90s").timeout == 90.0
+        assert cls(**base, timeout="1h").timeout == 3600.0
+        assert cls(**base, timeout=None).timeout is None
+
+
+def test_budget_field_tolerates_human_formats():
+    """修复1：80000 / '80000' / '20k' 全收；float 归一 int"""
+    for cls, base in _coercion_bases():
+        assert cls(**base, token_budget="20k").token_budget == 20000
+        assert cls(**base, token_budget="80000").token_budget == 80000
+        assert cls(**base, token_budget=80000).token_budget == 80000
+        assert cls(**base, token_budget=8e4).token_budget == 80000
+        assert cls(**base, token_budget=None).token_budget is None
+
+
+def test_timeout_budget_garbage_still_rejected():
+    """修复1 反向守卫：真垃圾教学式 FAST FAIL（宁可拒绝也不静默吞参）"""
+    import pydantic
+
+    base = dict(mode="pdca", message="x", acceptance="a", deliverable="交付/x.md")
+    for bad in ("abc", True, "10x", "m10"):
+        with pytest.raises(pydantic.ValidationError):
+            wtf.NewTaskInput(**base, timeout=bad)
+    for bad in ("abc", True, "8k0", "0x20"):
+        with pytest.raises(pydantic.ValidationError):
+            wtf.NewTaskInput(**base, token_budget=bad)
+
+
+def test_dynamic_mode_schema_inherits_coercion_validators():
+    """P1-1 动态 schema（create_model 子类）继承容错验证器——动态清单注入不退化为严格拒绝"""
+    schema = wtf._dynamic_mode_args_schema(wtf.NewTaskInput, "mode", "Slug of mode.", None)
+    inst = schema(mode="pdca", message="x", acceptance="a", deliverable="交付/x.md", timeout="10m", token_budget="20k")
+    assert inst.timeout == 600.0
+    assert inst.token_budget == 20000
+
+
+# ---------- 修复2：安全策略 fail-closed ----------
+
+
+def test_effective_policy_accepts_e2b_runtime():
+    """八跑 53× fail-open 根因回归：containerRuntime="e2b"（沙箱系统真支持）必须被收录"""
+    from dawei.core.effective_policy import EffectiveSandboxPolicy, WorkspaceSecurityOverride
+
+    assert EffectiveSandboxPolicy(container_runtime="e2b").container_runtime == "e2b"
+    # workspace 覆盖层（camelCase 别名）同步收录
+    assert WorkspaceSecurityOverride(containerRuntime="e2b").container_runtime == "e2b"
+
+
+def test_check_permission_fails_closed_on_bad_policy(monkeypatch):
+    """配置非法（get_policy 抛错）→ 拒绝执行；旧 fail-open 曾静默放行 53 次/跑"""
+    import logging
+
+    import dawei.core.security_manager as sm_mod
+    from dawei.tools.tool_executor import ToolExecutor
+
+    def _boom():
+        raise RuntimeError("bad security config")
+
+    monkeypatch.setattr(sm_mod.security_manager, "get_policy", _boom)
+    ex = ToolExecutor.__new__(ToolExecutor)
+    ex.logger = logging.getLogger("test-tool-executor")
+    ex.user_workspace = None
+    assert ex.check_permission("read_file") is False  # fail-closed
+
+
+def test_approval_gate_fail_closed_on_bad_policy():
+    """策略解析失败 → fail-closed 默认（全量审批 + 无通道即拒绝），而非 enabled=False 静默放行"""
+    from dawei.core.approval_gate import ApprovalGate
+
+    def _boom():
+        raise RuntimeError("bad security config")
+
+    gate = ApprovalGate()
+    gate.set_policy_provider(_boom)
+    policy = gate._policy()
+    assert policy.enabled is True
+    assert policy.required_for_risk == "low"
+    assert policy.no_channel_behavior == "deny"
+    assert gate.decide("read_file") == "needs_approval"  # 收紧而非放行
+
+
+# ---------- 修复3：预算/超时触崖收割 ----------
+
+
+class _RecordingResultGraph:
+    """set_task_result 记录仪（节点结果写入断言用）"""
+
+    def __init__(self):
+        self.results: dict[str, str] = {}
+
+    async def set_task_result(self, node_id, result):
+        self.results[node_id] = result
+
+
+def _harvest_executor(ws_root, output_file, graph=None):
+    """带工作区根目录的 bare executor（收割检查需要 absolute_path 锚定）"""
+    ex = _bare_executor()
+    ex._user_workspace = SimpleNamespace(
+        current_conversation=None,
+        absolute_path=str(ws_root),
+        task_graph=graph,
+    )
+    if output_file is not None:
+        ex.task_node.data.metadata["output_file"] = output_file
+    return ex
+
+
+_FAIL_PAYLOAD = '{"type": "task_completion", "status": "failed", "result": "[token_budget_exceeded] 用量超限", "kind": "token_budget", "used": 215458, "limit": 200000}'
+
+
+async def test_budget_fail_harvests_existing_deliverable(tmp_path):
+    """修复3：触崖时交付物已落盘 → FAILED 降级 COMPLETED；harvested/路径/用量对父任务全量可见"""
+    from dawei.conversation.conversation import Conversation
+
+    out = tmp_path / "交付" / "报告.md"
+    out.parent.mkdir(parents=True)
+    out.write_text("# 完整报告\n……", encoding="utf-8")
+
+    graph = _RecordingResultGraph()
+    conv = Conversation(title="iso")
+    ex = _harvest_executor(tmp_path, "交付/报告.md", graph=graph)
+    ex._conversation = conv
+
+    await ex._fail_with_completion(_FAIL_PAYLOAD)
+
+    assert ex.task_node.status == TaskStatus.COMPLETED  # 降级
+    recorded = graph.results["sub"]
+    assert "[harvested]" in recorded
+    assert "215458" in recorded and "200000" in recorded  # 审计信息保留
+    assert "[harvested]" in conv.messages[-1].content  # 会话注入（summary 链路可见）
+
+
+async def test_budget_fail_keeps_failed_without_output_file(tmp_path):
+    """未声明 output_file → 原 FAST FAIL 路径（FAILED）不变"""
+    ex = _harvest_executor(tmp_path, None)
+    await ex._fail_with_completion(_FAIL_PAYLOAD)
+    assert ex.task_node.status == TaskStatus.FAILED
+
+
+async def test_budget_fail_no_harvest_outside_workspace(tmp_path):
+    """越界路径（绝对/穿越）绝不收割 —— 防工作区外文件被误判为已交付"""
+    ex = _harvest_executor(tmp_path, "/etc/hostname")
+    await ex._fail_with_completion(_FAIL_PAYLOAD)
+    assert ex.task_node.status == TaskStatus.FAILED
+
+    outside = tmp_path.parent / "harvest-outside-marker.md"
+    outside.write_text("x", encoding="utf-8")
+    ex2 = _harvest_executor(tmp_path, "../harvest-outside-marker.md")
+    await ex2._fail_with_completion(_FAIL_PAYLOAD)
+    assert ex2.task_node.status == TaskStatus.FAILED
+
+
+async def test_budget_fail_no_harvest_empty_file(tmp_path):
+    """空文件（0 字节）不算已交付"""
+    empty = tmp_path / "空.md"
+    empty.write_text("", encoding="utf-8")
+    ex = _harvest_executor(tmp_path, "空.md")
+    await ex._fail_with_completion(_FAIL_PAYLOAD)
+    assert ex.task_node.status == TaskStatus.FAILED

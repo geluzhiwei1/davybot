@@ -339,6 +339,11 @@ async def get_workspace_tasks(workspace_id: str, request: Request):
     await _ensure_workspace_initialized(workspace, request)
 
     task_graph = workspace.task_graph
+    if task_graph is None:
+        # 🔥 修复：工作区从未运行过 Agent 时 task_graph 尚未初始化，
+        # 此前直接 AttributeError('NoneType' ... get_all_tasks') → HTTP 500
+        logger.warning(f"Task graph not initialized for workspace {workspace_id}")
+        raise HTTPException(status_code=404, detail=f"Task graph not initialized for workspace {workspace_id}")
     all_tasks = await task_graph.get_all_tasks()
 
     tasks_info = []

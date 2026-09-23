@@ -49,6 +49,10 @@ SNAPSHOT_TOOLS = {
     "insert_text_content",
 }
 
+# 安全策略解析失败去重键（fail-closed）：同一错误只 ERROR 一次防刷屏，
+# 但每次调用仍然拒绝 —— 拒绝本身不因"已见过"而放松。
+_POLICY_CHECK_FAILURES: set[str] = set()
+
 
 class ToolExecutor(IToolCallService):
     """Tool executor with comprehensive execution management.
@@ -310,8 +314,19 @@ class ToolExecutor(IToolCallService):
                     f"Tool '{tool_name}' not in security policy allowed_tools",
                 )
                 return False
-        except Exception as e:  # noqa: BLE001 — fail-open（与 approval gate 同策略），但必须可见
-            self.logger.warning(f"Security tool policy check failed for '{tool_name}': {e}; allowing")
+        except Exception as e:  # noqa: BLE001 — fail-closed（FAST FAIL，2026-09-23 八跑教训）
+            # 八跑事故：security.json containerRuntime="e2b" 未被 Literal 收录 →
+            # get_policy() 每轮抛 ValidationError → 旧 fail-open 静默放行 53 次，
+            # 安全层形同虚设。"配置非法"必须拒绝执行（宁可吵闹不可失守）；
+            # 同一错误只 ERROR 一次防刷屏，拒绝不放松。修复路径见 ERROR 文案。
+            _fail_key = f"{type(e).__name__}:{e}"
+            if _fail_key not in _POLICY_CHECK_FAILURES:
+                _POLICY_CHECK_FAILURES.add(_fail_key)
+                self.logger.error(
+                    f"Security tool policy check FAILED for '{tool_name}': {e}; DENYING all tools (fail-closed). "
+                    "Fix the security config (e.g. ~/.normnomos/configs/*/security.json) — identical errors will not be re-logged.",
+                )
+            return False
 
         # Check workspace-level denied_tools (explicit deny takes precedence)
         if self.user_workspace is not None:

@@ -126,9 +126,9 @@ export function FloatingInput({ task, workspace, placeholder, wide }: Props) {
   // Flatten file tree for ResourceMention
   const allWorkspaceFiles = useMemo(() => {
     if (!workspace) return [];
-    const flatten = (items: typeof fileTree): { id: string; name: string; kind?: string }[] => {
+    const flatten = (items: typeof fileTree): { id: string; name: string; path?: string; kind?: string }[] => {
       return items.flatMap((item) => {
-        const current = { id: item.path, name: item.name, kind: item.type as string | undefined };
+        const current = { id: item.path, name: item.name, path: item.path, kind: item.type as string | undefined };
         const children =
           "children" in item ? (item as { children?: typeof fileTree }).children : undefined;
         return children && children.length > 0 ? [current, ...flatten(children)] : [current];

@@ -203,6 +203,104 @@ async def test_batch_output_file_template_writes_contract(pdca_modes, gates8):
     assert "≤500 字摘要" in note
 
 
+async def test_batch_raw_dict_items_from_async_task_path(pdca_modes, gates8):
+    """2026-09-23 UC-ENG-002 回归：异步任务路径（task_manager）传入原始 dict
+    （未经 args_schema 解析），_run 必须收敛为 BatchItem 而非 AttributeError 炸整批。"""
+    graph = FakeTaskGraph([FakeTaskNode("root", status=TaskStatus.RUNNING)])
+    tool = _make_batch_tool(graph)
+    raw_items = [{"identity": f"file-{i}", "path": f"交付/{i}.docx"} for i in range(2)]
+
+    out = await _dispatch(tool, raw_items)
+
+    assert out["status"] == "dispatched"
+    assert out["created_count"] == 2
+    assert [r["status"] for r in out["results"]] == ["created", "created"]
+    for _parent, data in graph.created_subtasks:
+        assert data.metadata["created_by"] == "NewTaskBatchTool"
+
+
+async def test_batch_invalid_raw_items_error_visible(pdca_modes, gates8):
+    """dict 收敛失败（缺 identity）→ error JSON 对 LLM 可见，不抛异常"""
+    graph = FakeTaskGraph([FakeTaskNode("root", status=TaskStatus.RUNNING)])
+    tool = _make_batch_tool(graph)
+
+    out = await _dispatch(tool, [{"path": "交付/0.docx"}])
+
+    assert out["status"] == "error"
+    assert out["error"] == "invalid_items"
+    assert "identity" in out["message"]
+
+
+async def test_batch_bare_field_placeholders_expand(pdca_modes, gates8):
+    """2026-09-23 UC-ENG-002 六跑回归：LLM 自然写法 items=[{"N":1}] + "合同-{N}.txt"
+    （裸字段占位符）必须展开成功，而非整批 template_placeholder 0/N。"""
+    graph = FakeTaskGraph([FakeTaskNode("root", status=TaskStatus.RUNNING)])
+    tool = _make_batch_tool(graph)
+
+    out = await _dispatch(
+        tool,
+        [wtf.BatchItem(identity=f"合同-{i}", N=i) for i in range(1, 3)],
+        template="读取 输入/合同-{N}.txt 并审查",
+        acceptance_template="合同-{N} 报告含两个小节",
+        deliverable_template="交付/审查报告/合同-{N}-审查.md",
+    )
+
+    assert out["status"] == "dispatched"
+    assert out["created_count"] == 2
+    descs = [data.description for _p, data in graph.created_subtasks]
+    assert "合同-1.txt" in descs[0] and "合同-2.txt" in descs[1]
+    assert graph.created_subtasks[0][1].metadata.get("output_file") is None  # 未传 output_file_template（键不落盘）
+    assert graph.created_subtasks[0][1].metadata["deliverable"] == "交付/审查报告/合同-1-审查.md"
+
+
+async def test_batch_numeric_string_budget_lands_on_node(pdca_modes, gates8):
+    """2026-09-23 UC-ENG-002 七跑回归：LLM 传 token_budget:"80000"/timeout:"600"
+    数字字符串（异步路径无 schema 解析）→ 唯一落库点强转 int/float 真正生效，
+    不再蒸发成 str 被判定点忽略（→ 全局 200k 兜底接管）。"""
+    graph = FakeTaskGraph([FakeTaskNode("root", status=TaskStatus.RUNNING)])
+    tool = _make_batch_tool(graph)
+
+    out = await _dispatch(
+        tool,
+        [wtf.BatchItem(identity="file-0", path="交付/0.docx")],
+        token_budget="80000",
+        timeout="600",
+    )
+    assert out["created_count"] == 1
+    data = graph.created_subtasks[0][1]
+    assert data.token_budget == 80000 and isinstance(data.token_budget, int)
+    assert data.timeout_seconds == 600.0
+
+
+async def test_batch_garbage_budget_errors_per_item(pdca_modes, gates8):
+    """非数字预算（"80k"）→ 逐项 error 对 LLM 可见（FAST FAIL，不静默吞参）"""
+    graph = FakeTaskGraph([FakeTaskNode("root", status=TaskStatus.RUNNING)])
+    tool = _make_batch_tool(graph)
+
+    out = await _dispatch(tool, [wtf.BatchItem(identity="a", path="交付/a.docx")], token_budget="80k")
+    assert out["created_count"] == 0
+    err = out["results"][0]
+    assert err["status"] == "error" and "token_budget" in err["message"]
+
+
+async def test_batch_unknown_placeholder_teaches_keys(pdca_modes, gates8):
+    """未知占位符逐项 error 且错误信息教学（说明支持的形式与该 item 的键清单）"""
+    graph = FakeTaskGraph([FakeTaskNode("root", status=TaskStatus.RUNNING)])
+    tool = _make_batch_tool(graph)
+
+    out = await _dispatch(
+        tool,
+        [wtf.BatchItem(identity="file-0", path="交付/0.docx")],
+        template="处理 {no_such_field}",
+    )
+
+    assert out["created_count"] == 0
+    err = out["results"][0]
+    assert err["error"] == "template_placeholder"
+    assert "{item.<field>}" in err["message"]
+    assert "path" in err["message"]  # 键清单含该 item 实有字段
+
+
 def test_batch_schema_constraints():
     """schema 层：template≤600、identity 1-200、items≥1"""
     import pydantic

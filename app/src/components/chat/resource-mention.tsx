@@ -47,7 +47,7 @@ const TABS: TabDef[] = [
 
 interface Props {
   visible: boolean;
-  workspaceFiles?: { id: string; name: string; kind?: string }[];
+  workspaceFiles?: { id: string; name: string; path?: string; kind?: string }[];
   /** Experts to list in the "experts" tab (from dynamic market teams) */
   experts?: Expert[];
   onSelect: (item: MentionItem) => void;
@@ -250,7 +250,7 @@ export function ResourceMention({
 
 function buildItems(
   tab: TabId,
-  workspaceFiles: { id: string; name: string; kind?: string }[],
+  workspaceFiles: { id: string; name: string; path?: string; kind?: string }[],
   experts: Expert[],
   query: string,
 ): MentionItem[] {
@@ -259,18 +259,24 @@ function buildItems(
   switch (tab) {
     case "files":
       return workspaceFiles
-        .filter((f) => f.name.toLowerCase().includes(q))
+        .filter((f) => f.name.toLowerCase().includes(q) || (f.path?.toLowerCase().includes(q) ?? false))
         .slice(0, 20)
-        .map((f) => ({
-          id: f.id,
-          name: f.name,
-          description:
-            f.kind === "ai"
-              ? i18n.t("mention.file.aiGenerated", { ns: "chatUi" })
-              : i18n.t("mention.file.userUploaded", { ns: "chatUi" }),
-          icon: FileText,
-          type: "file" as const,
-        }));
+        .map((f) => {
+          // 副标题显示文件路径(去掉首部 "/", 根目录文件路径===文件名时回退来源标签)
+          const path = f.path?.replace(/^\/+/, "");
+          return {
+            id: f.id,
+            name: f.name,
+            description:
+              path && path !== f.name
+                ? path
+                : f.kind === "ai"
+                  ? i18n.t("mention.file.aiGenerated", { ns: "chatUi" })
+                  : i18n.t("mention.file.userUploaded", { ns: "chatUi" }),
+            icon: FileText,
+            type: "file" as const,
+          };
+        });
 
     case "experts":
       return experts
@@ -297,6 +303,9 @@ function buildItems(
           .map((r) => {
             // Look up expert for icon if this was an expert mention
             const expert = experts.find((e) => e.id === r.id || e.name === r.name);
+            // 文件类最近引用: id 即路径, 副标题显示路径(与"文件"tab 一致)
+            const recentPath =
+              !expert && r.type === "file" ? r.id.replace(/^\/+/, "") : "";
             return {
               id: r.id,
               name: r.name,
@@ -308,7 +317,10 @@ function buildItems(
                     expertHue: getCategoryHue(expert.category),
                     description: expert.description,
                   }
-                : { icon: FileText }),
+                : {
+                    icon: FileText,
+                    ...(recentPath && recentPath !== r.name ? { description: recentPath } : {}),
+                  }),
             };
           });
       } catch {

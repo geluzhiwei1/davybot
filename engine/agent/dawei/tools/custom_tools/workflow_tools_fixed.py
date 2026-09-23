@@ -7,7 +7,7 @@ import time
 import unicodedata
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from dawei.logg.logging import get_logger
 from dawei.tools.custom_base_tool import CustomBaseTool
@@ -56,6 +56,48 @@ def _dispatch_identity(
     ident = (item_identity or "").strip() or _normalize_desc_key(message, prefix_len=_DISPATCH_IDENTITY_MSG_WINDOW)
     key = f"{mode}\x1f{(deliverable or '').strip()}\x1f{ident}"
     return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+
+
+# ---------- P2（2026-09-23 UC-ENG-002 八跑）：timeout/token_budget 容错解析 ----------
+# 八跑实锤：LLM 传 "10m"/"20k" 人类格式 → float/int 字段直接 ValidationError；
+# 被拒 3 次后 LLM 第 4 次干脆丢掉 token_budget 参数 → 节点预算蒸发、全局
+# 200k 兜底接管、子任务完美主义螺旋烧到 215k 触崖。schema 层 mode="before"
+# 归一：数字 / 数字串 / 带单位人类格式全收；真垃圾仍教学式 ValidationError
+# （FAST FAIL：宁可拒绝也不静默吞参）。
+_DURATION_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([smh]?)\s*$", re.IGNORECASE)
+_BUDGET_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([km]?)\s*$", re.IGNORECASE)
+
+
+def _coerce_timeout_field(v):
+    """timeout 容错：600 / "600" / "10m" / "90s" / "1h" → 秒（float）；None 直通。"""
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        raise ValueError("timeout 不接受布尔值，传秒数（如 600 / '10m'）")
+    if isinstance(v, (int, float)):
+        return float(v)
+    m = _DURATION_RE.match(str(v))
+    if not m:
+        raise ValueError(f"timeout 无法解析: {v!r}（支持秒数 600、'600'、'10m'、'90s'、'1h'）")
+    unit = (m.group(2) or "s").lower()
+    return float(m.group(1)) * {"s": 1.0, "m": 60.0, "h": 3600.0}[unit]
+
+
+def _coerce_budget_field(v):
+    """token_budget 容错：80000 / "80000" / "80k" → int；None 直通。"""
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        raise ValueError("token_budget 不接受布尔值，传 token 数（如 80000 / '80k'）")
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        return int(v)
+    m = _BUDGET_RE.match(str(v))
+    if not m:
+        raise ValueError(f"token_budget 无法解析: {v!r}（支持 80000、'80000'、'80k'）")
+    unit = (m.group(2) or "").lower()
+    return int(float(m.group(1)) * {"": 1, "k": 1_000, "m": 1_000_000}[unit])
 
 
 def _import_task_graph_components():
@@ -562,11 +604,11 @@ class NewTaskInput(BaseModel):
     )
     timeout: float | None = Field(
         None,
-        description="Optional wall-clock timeout in seconds for the subtask (P3-3). Exceeding it fails the subtask fast with the reason returned to the parent. None/0 = no limit.",
+        description="Optional wall-clock timeout in seconds for the subtask (P3-3); accepts 600, '600', '10m', '90s' or '1h'. Exceeding it fails the subtask fast with the reason returned to the parent. None/0 = no limit.",
     )
     token_budget: int | None = Field(
         None,
-        description="Optional token budget for the subtask (P3-3). Exceeding it fails the subtask fast with the reason returned to the parent. None/0 = no limit.",
+        description="Optional token budget for the subtask (P3-3); accepts 80000, '80000' or '80k'. Exceeding it fails the subtask fast with the reason returned to the parent. None/0 = no limit.",
     )
     tools: list[str] | None = Field(
         None,
@@ -578,6 +620,17 @@ class NewTaskInput(BaseModel):
             "calls return a visible error). Overrides the agent profile's allow/deny."
         ),
     )
+
+    # P2 容错解析（八跑实锤）：LLM 传 "10m"/"80k" 不再被拒到丢参
+    @field_validator("timeout", mode="before")
+    @classmethod
+    def _parse_timeout(cls, v):
+        return _coerce_timeout_field(v)
+
+    @field_validator("token_budget", mode="before")
+    @classmethod
+    def _parse_token_budget(cls, v):
+        return _coerce_budget_field(v)
 
 
 class NewTaskTool(CustomBaseTool):
@@ -932,8 +985,22 @@ class NewTaskTool(CustomBaseTool):
 
             # C6 钉死（事故：LLM 传 timeout:"600" 字符串，节点落库 null）：
             # 在唯一落库点把 timeout_seconds 强转 float —— schema 层校验与否都安全。
+            # 非数字（如 "10m"）→ 带参数名的 ValueError（教学式 FAST FAIL）。
             if timeout_seconds is not None:
-                timeout_seconds = float(timeout_seconds)
+                try:
+                    timeout_seconds = float(timeout_seconds)
+                except (TypeError, ValueError) as _to_err:
+                    raise ValueError(f'timeout 必须是数字（秒），收到 {timeout_seconds!r}，如 600 或 "600"') from _to_err
+            # C6 同型补齐（2026-09-23 UC-ENG-002 七跑实锤）：LLM 传 token_budget:"80000"
+            # 数字字符串时 TaskData 原样落库 str，判定点 isinstance 忽略 → 节点预算
+            # 蒸发、全局 200k 兜底接管（与调用者意图相悖）。唯一落库点强转 int；
+            # 非数字（如 "80k"）→ 带参数名的 ValueError → 逐项 error 对 LLM 可见
+            # （FAST FAIL，绝不静默吞参）。
+            if token_budget is not None:
+                try:
+                    token_budget = int(float(token_budget))
+                except (TypeError, ValueError) as _tb_err:
+                    raise ValueError(f'token_budget 必须是数字（token 数），收到 {token_budget!r}，如 80000 或 "80000"') from _tb_err
 
             # C3/L1 粒度硬闸 R1-R3（new_task / run_task 共用此入口）：
             # 事故根因是"单任务大小"维度零约束 —— 一份 message 涵盖 6 份文件 ×
@@ -1379,12 +1446,23 @@ class RunTaskInput(BaseModel):
     )
     timeout: float | None = Field(
         None,
-        description="Optional wall-clock timeout in seconds for the subtask (P3-3). Exceeding it fails the subtask fast with the reason returned as the tool result. None/0 = no limit.",
+        description="Optional wall-clock timeout in seconds for the subtask (P3-3); accepts 600, '600', '10m', '90s' or '1h'. Exceeding it fails the subtask fast with the reason returned as the tool result. None/0 = no limit.",
     )
     token_budget: int | None = Field(
         None,
-        description="Optional token budget for the subtask (P3-3). Exceeding it fails the subtask fast with the reason returned as the tool result. None/0 = no limit.",
+        description="Optional token budget for the subtask (P3-3); accepts 80000, '80000' or '80k'. Exceeding it fails the subtask fast with the reason returned as the tool result. None/0 = no limit.",
     )
+
+    # P2 容错解析（八跑实锤）：与 NewTaskInput 同款
+    @field_validator("timeout", mode="before")
+    @classmethod
+    def _parse_timeout(cls, v):
+        return _coerce_timeout_field(v)
+
+    @field_validator("token_budget", mode="before")
+    @classmethod
+    def _parse_token_budget(cls, v):
+        return _coerce_budget_field(v)
 
 
 class RunTaskTool(CustomBaseTool):
@@ -1573,7 +1651,7 @@ class NewTaskBatchInput(BaseModel):
     template: str = Field(
         ...,
         max_length=600,
-        description=("Instruction template, ONE deliverable per item, using {item.<field>} placeholders (e.g. {item.path}, {item.report_path}) or bare {item}. Each item is expanded into its own self-contained subtask message. Escape literal braces as {{ }}."),
+        description=("Instruction template, ONE deliverable per item. Placeholders: {item.<field>} (e.g. {item.path}) OR a bare field name this item carries (e.g. {path}, {N}); bare {item} inserts the whole item. Each item is expanded into its own self-contained subtask message. Escape literal braces as {{ }}."),
     )
     items: list[BatchItem] = Field(
         ...,
@@ -1596,9 +1674,26 @@ class NewTaskBatchInput(BaseModel):
     )
     agent: str = Field("default", description="Agent profile name applied to all items.")
     context: str | None = Field(None, description="Optional extra context appended to every item's metadata.context_note.")
-    timeout: float | None = Field(None, description="Optional wall-clock timeout in seconds applied to every item.")
-    token_budget: int | None = Field(None, description="Optional token budget applied to every item.")
+    timeout: float | None = Field(
+        None,
+        description="Optional wall-clock timeout in seconds applied to every item (P3-3); accepts 600, '600', '10m', '90s' or '1h'. None/0 = no limit.",
+    )
+    token_budget: int | None = Field(
+        None,
+        description="Optional token budget applied to every item (P3-3); accepts 80000, '80000' or '80k'. None/0 = no limit.",
+    )
     tools: list[str] | None = Field(None, description="Optional minimal tool allowlist applied to every item.")
+
+    # P2 容错解析（八跑实锤）：与 NewTaskInput/RunTaskInput 同款，逐项展开前归一
+    @field_validator("timeout", mode="before")
+    @classmethod
+    def _parse_timeout(cls, v):
+        return _coerce_timeout_field(v)
+
+    @field_validator("token_budget", mode="before")
+    @classmethod
+    def _parse_token_budget(cls, v):
+        return _coerce_budget_field(v)
 
 
 class NewTaskBatchTool(CustomBaseTool):
@@ -1628,8 +1723,19 @@ class NewTaskBatchTool(CustomBaseTool):
 
     @staticmethod
     def _fmt(tpl: str, item: BatchItem) -> str:
-        """模板展开：{item.<field>} / {item}；未知占位符抛 KeyError/AttributeError（对 LLM 可见）"""
-        return tpl.format(item=item)
+        """模板展开：{item.<field>} / {item} / 裸 {<field>}（item 字段直通）；
+        未知占位符抛 KeyError/AttributeError（对 LLM 可见）。
+
+        裸字段直通（2026-09-23 UC-ENG-002 六跑实锤）：LLM 对 "template + items"
+        的自然理解是直接引用 item 键（items=[{"N":1}] + "合同-{N}.txt"），
+        只认 {item.<field>} 会让整批 0/6 展开——两种形式都支持。
+        """
+        try:
+            fields = dict(item.model_dump())
+        except Exception:  # noqa: BLE001 — 非 pydantic 兜底（鸭子类型）
+            fields = dict(vars(item))
+        fields.pop("item", None)  # 防与固定 kwargs 键冲突
+        return tpl.format(item=item, **fields)
 
     async def _run(
         self,
@@ -1649,6 +1755,23 @@ class NewTaskBatchTool(CustomBaseTool):
         import uuid as _uuid
 
         from dawei.agentic.errors import DuplicateSubtaskError, SubtaskGranularityError
+
+        # ---------- 输入归一：异步任务路径（task_manager）传入原始 dict，
+        # 未经 args_schema 解析为 BatchItem —— 统一收敛，否则 it.identity 属性访问
+        # 直接 AttributeError 炸整批（2026-09-23 UC-ENG-002 四跑实锤）----------
+        if items and not isinstance(items[0], BatchItem):
+            try:
+                items = [it if isinstance(it, BatchItem) else BatchItem(**it) for it in items]
+            except Exception as e:  # noqa: BLE001 — 逐项字段错误对 LLM 可见
+                return _json.dumps(
+                    {
+                        "type": "new_task_batch",
+                        "status": "error",
+                        "error": "invalid_items",
+                        "message": f"items failed to parse as BatchItem (each needs a non-empty 'identity' plus free fields for template placeholders): {e}",
+                    },
+                    indent=2,
+                )
 
         # ---------- R5：条目硬顶 / identity 唯一性（fast-fail，对 LLM 可见）----------
         try:
@@ -1761,12 +1884,16 @@ class NewTaskBatchTool(CustomBaseTool):
                 deliverable = self._fmt(deliverable_template, item)
                 output_file = self._fmt(output_file_template, item) if output_file_template else None
             except (KeyError, AttributeError, IndexError, ValueError) as e:
+                try:
+                    _keys = sorted(item.model_dump().keys())  # noqa: BLE001 — 教学用键清单
+                except Exception:  # noqa: BLE001
+                    _keys = []
                 dispatch_results.append(
                     {
                         "identity": item.identity,
                         "status": "error",
                         "error": "template_placeholder",
-                        "message": f"template references a field this item does not have: {e}",
+                        "message": (f"template references a field this item does not have: {e}. Supported: {{item.<field>}}, bare {{<field>}} for keys this item carries (this item has: {_keys})."),
                     },
                 )
                 continue

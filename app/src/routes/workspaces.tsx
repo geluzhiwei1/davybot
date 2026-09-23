@@ -793,6 +793,15 @@ function WorkspacesPage() {
               variant="ghost"
               size="icon"
               className="h-7 w-7 hidden sm:inline-flex"
+              title={t("workspaces.share")}
+              onClick={() => setShareTarget({ id: ws.id, name: ws.name })}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 hidden sm:inline-flex"
               title={t("workspaces.workspaceSettings")}
               onClick={() => {
                 setFilesDrawerFor(ws.id);

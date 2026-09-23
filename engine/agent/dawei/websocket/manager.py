@@ -135,6 +135,11 @@ class WebSocketManager:
         except ValueError:
             self._task_cancel_delay = 3
         self._pending_cancel_tasks: Dict[str, asyncio.Task] = {}  # session_id -> cancel_task
+        # session_id -> workspace_id（连接断开后保留，用于同 workspace 重连时接管任务）。
+        # 背景（demo.normnomos.com 2026-09-23 事故）：前端重连会生成新 session_id，
+        # 旧任务的 _task_to_session_map 仍指向死 session → 300s 宽限期到任务被误杀，
+        # 尽管用户已重新连上。
+        self._session_workspace_history: Dict[str, str] = {}
 
         # 初始化WebSocket状态管理器
         self._state_manager = WebSocketStateManager(
@@ -233,6 +238,10 @@ class WebSocketManager:
         # 通知连接监听器
         await self._notify_connection_listeners("connect", session_id, connection_info)
 
+        # 同 workspace 重连接管：把旧 session 的运行中任务迁到新连接（在监听器之后，
+        # 确保连接已完全注册）
+        await self._rebind_workspace_tasks(session_id, workspace_id)
+
         self.logger.info(
             "WebSocket connection established",
             context={"session_id": session_id, "component": "websocket_manager"},
@@ -315,6 +324,10 @@ class WebSocketManager:
         # Now, safely remove the connection from the active list
         async with self._lock:
             self.active_connections.pop(session_id, None)
+
+        # 记录 session -> workspace 历史，供同 workspace 重连时接管任务
+        if connection_info.workspace_id:
+            self._session_workspace_history[session_id] = connection_info.workspace_id
 
         connection_info.is_alive = False
 
@@ -1009,6 +1022,9 @@ class WebSocketManager:
                 },
             )
 
+            # 任务已终结，session 工作区历史不再需要（防泄漏）
+            self._session_workspace_history.pop(session_id, None)
+
         except Exception as e:
             self.logger.exception(
                 f"Error cancelling session tasks for {session_id}: {e}",
@@ -1028,4 +1044,73 @@ class WebSocketManager:
             self.logger.info(
                 f"Cancelled pending task cancellation for session {session_id}",
                 context={"session_id": session_id, "component": "websocket_manager"},
+            )
+
+    async def _rebind_workspace_tasks(self, session_id: str, workspace_id: str | None):
+        """同 workspace 重连时接管旧 session 的运行中任务
+
+        前端重连会生成新 session_id，而 ChatHandler._task_to_session_map 仍把
+        运行中任务指向旧（已断开）session：结果推送发到死连接、且旧 session 的
+        延迟取消定时器（DAWEI_WS_TASK_CANCEL_DELAY，web 部署常为 300s）到期后
+        任务被误杀——即使用户早已重连。此处按 workspace_id 识别"同一用户的
+        重连"，将旧任务重绑到新连接并撤销待取消定时器。
+
+        Args:
+            session_id: 新连接的会话ID
+            workspace_id: 新连接归属的工作空间ID（None 则不做接管）
+        """
+        if not workspace_id:
+            return
+        try:
+            old_sessions = [
+                sid
+                for sid, ws in self._session_workspace_history.items()
+                if ws == workspace_id and sid != session_id
+            ]
+            if not old_sessions:
+                return
+
+            # 1) 撤销旧 session 的延迟取消定时器（任务保命）
+            for sid in old_sessions:
+                await self.cancel_pending_task_cancellation(sid)
+
+            # 2) 把旧 session 名下运行中的任务重绑到新 session
+            from dawei.websocket.handlers.chat import chat_handler_instance
+
+            if not chat_handler_instance:
+                self.logger.warning(
+                    "ChatHandler instance not available, skip task rebinding",
+                    context={"session_id": session_id, "component": "websocket_manager"},
+                )
+                return
+
+            task_map = chat_handler_instance._task_to_session_map
+            rebound_task_ids = [tid for tid, sid in task_map.items() if sid in old_sessions]
+            for tid in rebound_task_ids:
+                task_map[tid] = session_id
+
+            # 3) 清理历史（旧 session 已被接管，不再需要）
+            for sid in old_sessions:
+                self._session_workspace_history.pop(sid, None)
+
+            if rebound_task_ids:
+                self.logger.info(
+                    f"Rebound {len(rebound_task_ids)} running tasks to new session {session_id} "
+                    f"(workspace {workspace_id}, old sessions: {old_sessions[:3]})",
+                    context={
+                        "session_id": session_id,
+                        "workspace_id": workspace_id,
+                        "task_ids": rebound_task_ids[:5],
+                        "component": "websocket_manager",
+                    },
+                )
+                increment_counter(
+                    "websocket_manager.task_rebinds",
+                    tags={"workspace_id": workspace_id},
+                )
+        except Exception as e:
+            # 接管失败不影响新连接本身（FAST FAIL：如实记日志）
+            self.logger.exception(
+                f"Error rebinding workspace tasks for session {session_id}: {e}",
+                context={"session_id": session_id, "workspace_id": workspace_id, "component": "websocket_manager"},
             )
