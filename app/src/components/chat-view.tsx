@@ -144,11 +144,31 @@ export function ChatView({
   }, [openFiles.length]);
 
   // Load conversation history for workspace tasks.
+  // 🔧 2026-09-24 事故（任务 64d83937 页面空白）：后端会话 JSON 周期性落盘，
+  // 任务刚创建/刚启动时历史 GET 可能早于首次落盘而返回空。此前单次拉取且
+  // effect deps 不再变化 = 永不重试，页面停留空白。这里改为：会话仍为空时
+  // 有界重试（5s × 6 次 ≈ 30s）；更长延迟的场景由 ws:resync_history（重连/
+  // 回前台补拉）与终态事件对账（chat-store scheduleHistoryReconcile）兜底。
   useEffect(() => {
-    if (task.workspaceId && task.id && chatMessages.length === 0) {
-      useChatStore.getState().loadHistory(task.id, task.workspaceId);
-    }
-  }, [task.id, task.workspaceId, chatMessages.length]);
+    const taskId = task.id;
+    const workspaceId = task.workspaceId;
+    if (!(taskId && workspaceId)) return;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tryLoad = () => {
+      const store = useChatStore.getState();
+      const conv = store.conversations.get(taskId);
+      // 已有消息或 live 流式在途 → 无需继续重试
+      if (conv && (conv.messages.length > 0 || conv.isStreaming)) return;
+      if (attempts++ >= 6) return;
+      void store.loadHistory(taskId, workspaceId);
+      timer = setTimeout(tryLoad, 5000);
+    };
+    tryLoad();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [task.id, task.workspaceId]);
 
   // 对话引导自动启动：合规工作区由 launchChat 预置了开场白。WS 已连、会话存在且
   // 无历史消息时，自动发出该开场白，驱动 Agent 按 AGENT_INSTRUCTIONS.md 开始多轮对话。

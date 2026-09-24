@@ -919,6 +919,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
               });
               return { conversations: next };
             });
+            // 终态：与磁盘对账（见 scheduleHistoryReconcile 注释）
+            scheduleHistoryReconcile(convId, msg.workspace_id);
             // Cross-store sync: stream ended → stop in agent-store
             if (msg.task_id) {
               useAgentStore.getState().stopAgentByTaskId(msg.task_id);
@@ -1224,6 +1226,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
             });
             return { conversations: next };
           });
+          // 终态：与磁盘对账（见 scheduleHistoryReconcile 注释）
+          scheduleHistoryReconcile(convId, msg.workspace_id);
           // Cross-store sync: agent completed → stop in agent-store
           if (msg.task_id) {
             useAgentStore.getState().stopAgentByTaskId(msg.task_id);
@@ -1237,6 +1241,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
         // 此前已落盘消息的转圈在终态事件路径外永不复位）。
         agent_stopped() {
           get().finalizeStaleStreams(convId);
+          // 终态：与磁盘对账（见 scheduleHistoryReconcile 注释）
+          scheduleHistoryReconcile(convId, msg.workspace_id);
           // 跨 store 同步：停止 agent-store 里的执行态
           if (msg.task_id) {
             useAgentStore.getState().stopAgentByTaskId(msg.task_id);
@@ -1300,6 +1306,9 @@ export const useChatStore = create<ChatStore>((set, get) => {
             });
             return { conversations: next };
           });
+          // 终态：与磁盘对账（见 scheduleHistoryReconcile 注释；子任务报错
+          // 路由到父会话的 error 也会走到这里 —— 正是 2026-09-24 事故的自愈点）
+          scheduleHistoryReconcile(convId, msg.workspace_id);
           // Cross-store sync: error occurred → stop in agent-store
           if (msg.task_id) {
             useAgentStore.getState().stopAgentByTaskId(msg.task_id);
@@ -1591,6 +1600,29 @@ export const useChatStore = create<ChatStore>((set, get) => {
   };
 });
 
+// ── Terminal-event history reconcile ────────────────────────────────
+// 生产事故 2026-09-24（任务 64d83937 页面空白）：任务页打开时的历史 GET 早于
+// 后端首次落盘（返回空），随后 WS 会话在服务端已断（帧被丢弃），流式事件
+// 全部丢失——此后再无任何路径回拉历史，页面永久空白直到手动刷新。终态事件
+// （完成/停止/出错）是天然的补拉时机：后端此时已把完整消息写入会话 JSON，
+// 延迟 2s（留出最终落盘时间）强制回拉一次即可与磁盘对账。
+// loadHistory 的 force 守卫保证仅在服务端消息严格多于本地时才覆盖。
+const reconcileTimers = new Map<string, ReturnType<typeof setTimeout>>();
+function scheduleHistoryReconcile(conversationId: string, wsId?: string) {
+  if (reconcileTimers.has(conversationId)) return;
+  const timer = setTimeout(() => {
+    reconcileTimers.delete(conversationId);
+    const workspaceId = wsId ?? wsClient.getWorkspaceId();
+    if (!workspaceId) return;
+    const { conversations, loadHistory } = useChatStore.getState();
+    const conv = conversations.get(conversationId);
+    // 会话不存在或仍在流式（live 事件在途）时不补拉
+    if (!conv || conv.isStreaming) return;
+    void loadHistory(conversationId, workspaceId, { force: true });
+  }, 2000);
+  reconcileTimers.set(conversationId, timer);
+}
+
 // ── Event bus subscriptions (decoupled from connection-store) ───────
 
 on("ws:message", (detail) => {
@@ -1612,7 +1644,11 @@ on("ws:resync_history", (detail) => {
   if (!wsId) return;
   const { conversations, loadHistory } = useChatStore.getState();
   for (const [convId, conv] of conversations) {
-    if (conv.messages.length > 0 && !conv.isStreaming) {
+    // 🔧 2026-09-24 事故：此前只回拉本地已有消息的会话——当历史 GET 早于后端
+    // 落盘返回空、或流式事件随断线丢失时，本地 messages 恒为 0，重连/回前台
+    // 也永远不会补拉，任务页永久空白。空会话同样强制回拉（磁盘为准；
+    // loadHistory 的 force 守卫保证只在服务端严格领先时才覆盖本地）。
+    if (!conv.isStreaming) {
       void loadHistory(convId, wsId, { force: true });
     }
   }
