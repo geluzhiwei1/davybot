@@ -796,9 +796,15 @@ class TaskGraphExecutionEngine:
                     executed_subtask_ids.add(_s.task_node_id)
 
             if children_status != TaskStatus.COMPLETED:
-                # 【FAST FAIL】子任务有失败 → 父任务直接判失败，不再续跑父 LLM
-                final_status = TaskStatus.FAILED
-                break
+                # 2026-09-23 demo 事故改版：子任务有失败也不再 FAST FAIL 定死父任务。
+                # 报告已回注（_inject_subtask_summaries 含失败原因），必须续跑父 LLM
+                # 消费报告后自行决策（重派/补救/attempt_completion 收尾/自行失败）。
+                # 旧语义"任一子任务非 COMPLETED → 父任务 FAILED 且 0 轮消费报告"
+                # 与面包屑承诺的"自动续跑"相悖（6/6 token 超限批次实证：报告注入
+                # 后父任务停死）。父任务终态由续跑执行期自己决定。
+                self.logger.warning(
+                    f"Task {task_node_id} orchestration round {_round}/{_MAX_ORCHESTRATION_ROUNDS}: subtasks finished with {children_status.value}, report injected, resuming parent to decide next step...",
+                )
 
             if self._stop_requested:
                 final_status = current_task.status
@@ -1013,10 +1019,11 @@ class TaskGraphExecutionEngine:
         except Exception:  # noqa: BLE001 — 摘要回注失败不影响主流程
             self.logger.exception("Failed to inject subtask summaries into parent conversation: ")
 
-        # 检查子任务执行结果
+        # 检查子任务执行结果（聚合状态仅供编排循环日志/决策参考——
+        # 2026-09-23 起子任务失败不再定死父任务终态，父任务续跑消费报告后自行决策）
         if all(result == TaskStatus.COMPLETED for result in subtask_results):
             return TaskStatus.COMPLETED
-        # 如果有子任务失败，父任务也标记为失败
+        # 有非 COMPLETED 子任务 → 聚合为 FAILED（仅表示"本批有失败"，非父任务终态）
         return TaskStatus.FAILED
 
     async def _inject_subtask_summaries(

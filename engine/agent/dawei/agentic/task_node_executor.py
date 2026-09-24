@@ -1680,7 +1680,7 @@ class TaskNodeExecutionEngine:
 
             conv.say(
                 UserMessage(
-                    content=(f"[父任务挂起] 检测到 {count} 个未完成子任务：本执行期结束，子任务由引擎接管执行。全部完成后 [子任务执行报告] 将注入本对话并自动续跑 —— 无需轮询 get_task_status。"),
+                    content=(f"[父任务挂起] 检测到 {count} 个未完成子任务：本执行期结束，子任务由引擎接管执行。子任务结束后（无论成败）[子任务执行报告] 将注入本对话并自动续跑，由你根据报告决策下一步（重派失败项/补救/收尾）—— 无需轮询 get_task_status。"),
                 ),
             )
         except Exception:  # noqa: BLE001 — 面包屑写失败不影响挂起语义

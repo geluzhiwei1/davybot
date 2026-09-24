@@ -7,7 +7,7 @@
 - C13 瞬时 LLM provider 错误自动重试：分类器（502/503/504 SSE 包装 /
   stream timeout / 流中断）、node executor 不发致命前端错误（重试待定）、
   graph executor 同节点重试与耗尽 fast-fail
-- C14 子任务预算全局闸门默认值：subtask_timeout=900 / subtask_token_budget=200_000
+- C14 子任务预算全局闸门默认值：subtask_timeout=900 / subtask_token_budget=-1（token 不限）
 - C15 粒度/批量/单项失败率/自动重试命中率指标埋点
 
 不依赖 LLM / 网络 / 持久化，全部走内存 fake。
@@ -254,14 +254,14 @@ async def test_c13_non_transient_provider_error_fast_raises(graph_engine, metric
 
 
 def test_c14_default_budget_gates(monkeypatch):
-    """默认 subtask_timeout=900 / subtask_token_budget=200_000（env 可覆盖为 -1 关闭）"""
+    """默认 subtask_timeout=900 / subtask_token_budget=-1（2026-09-23 demo 事故后默认不限，env 可设正数开启）"""
     monkeypatch.delenv("AGENT_SUBTASK_TIMEOUT", raising=False)
     monkeypatch.delenv("AGENT_SUBTASK_TOKEN_BUDGET", raising=False)
     from dawei.config.settings import AgentExecutionConfig
 
     cfg = AgentExecutionConfig(_env_file="/nonexistent/.env")  # 隔离宿主 .env 漂移
     assert cfg.subtask_timeout == 900
-    assert cfg.subtask_token_budget == 200_000
+    assert cfg.subtask_token_budget == -1
 
 
 def test_c14_env_can_disable_gates(monkeypatch):
@@ -273,6 +273,76 @@ def test_c14_env_can_disable_gates(monkeypatch):
     cfg = AgentExecutionConfig(_env_file="/nonexistent/.env")
     assert cfg.subtask_timeout == -1
     assert cfg.subtask_token_budget == -1
+
+
+# ==================== C16: 子任务失败也续跑父任务（父任务自决策） ====================
+
+
+class _OrchestratingExecutor:
+    """父任务执行器 fake：首轮"派发即收工"（COMPLETED），续跑轮消费
+    [子任务执行报告] 后按 resume_status 自决策终态。"""
+
+    def __init__(self, node, resume_status=TaskStatus.COMPLETED):
+        self._node = node
+        self._resume_status = resume_status
+        self.calls = 0
+
+    async def execute_task(self):
+        self.calls += 1
+        self._node.status = TaskStatus.COMPLETED if self.calls == 1 else self._resume_status
+        self._node.data.status = self._node.status
+
+
+async def test_c16_failed_subtasks_still_resume_parent(graph_engine):
+    """子任务聚合 FAILED 也必须续跑父任务消费报告，父任务自行决策终态
+
+    2026-09-23 demo 事故回归：6/6 子任务 token 超限 → 报告已注入父对话，
+    旧 FAST FAIL 分支直接置父任务 FAILED 且 0 轮消费报告（承诺的"自动续跑"落空）。"""
+    root = _FakeNode("root-1")
+    root.status = TaskStatus.RUNNING
+    executor = _OrchestratingExecutor(root, resume_status=TaskStatus.COMPLETED)
+    subs = [_FakeNode("sub-1", parent_id="root-1"), _FakeNode("sub-2", parent_id="root-1")]
+
+    graph_engine._get_subtasks_with_grace = AsyncMock(return_value=subs)
+    graph_engine._execute_subtasks_and_check_status = AsyncMock(return_value=TaskStatus.FAILED)
+
+    result = await graph_engine._execute_task_and_handle_completion(root, root.task_node_id, executor)
+
+    assert result is TaskStatus.COMPLETED  # 父任务消费报告后自决策完成，非引擎强判 FAILED
+    assert executor.calls == 2  # 首轮派发 + 续跑消费报告（旧行为此处为 1 且 FAILED）
+    graph_engine._execute_subtasks_and_check_status.assert_awaited_once()
+
+
+async def test_c16_failed_subtasks_parent_may_self_fail(graph_engine):
+    """父任务消费失败报告后也可自行决策失败（终态来自父，不来自子任务聚合）"""
+    root = _FakeNode("root-1")
+    root.status = TaskStatus.RUNNING
+    executor = _OrchestratingExecutor(root, resume_status=TaskStatus.FAILED)
+    subs = [_FakeNode("sub-1", parent_id="root-1")]
+
+    graph_engine._get_subtasks_with_grace = AsyncMock(return_value=subs)
+    graph_engine._execute_subtasks_and_check_status = AsyncMock(return_value=TaskStatus.FAILED)
+
+    result = await graph_engine._execute_task_and_handle_completion(root, root.task_node_id, executor)
+
+    assert result is TaskStatus.FAILED
+    assert executor.calls == 2  # 失败是父任务续跑后的自决策，而非跳过续跑的强判
+
+
+async def test_c16_completed_subtasks_resume_unchanged(graph_engine):
+    """全 COMPLETED 子任务批次：续跑路径不回归（父任务照常消费报告后收尾）"""
+    root = _FakeNode("root-1")
+    root.status = TaskStatus.RUNNING
+    executor = _OrchestratingExecutor(root, resume_status=TaskStatus.COMPLETED)
+    subs = [_FakeNode("sub-1", parent_id="root-1")]
+
+    graph_engine._get_subtasks_with_grace = AsyncMock(return_value=subs)
+    graph_engine._execute_subtasks_and_check_status = AsyncMock(return_value=TaskStatus.COMPLETED)
+
+    result = await graph_engine._execute_task_and_handle_completion(root, root.task_node_id, executor)
+
+    assert result is TaskStatus.COMPLETED
+    assert executor.calls == 2
 
 
 # ==================== C15: 指标计数与派生比率 ====================

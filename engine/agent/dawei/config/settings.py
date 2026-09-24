@@ -517,10 +517,11 @@ class AgentExecutionConfig(BaseSettings):
     # env: AGENT_SUBTASK_TIMEOUT
     subtask_timeout: int = Field(default=900)
     # 子任务 token 预算全局闸门；-1=不限。
-    # C14 默认打开 200_000：批量 fan-out 单项预算受此兜底，总吞吐由执行信号量
-    # （max_parallel_tasks）控制。节点显式声明值更小则取节点值。
+    # 2026-09-23 demo 事故：6/6 合同起草子任务各烧 204k~226k > 200k 全局崖，批量
+    # abort（2 个触崖收割、4 个 failed）。默认改为 -1 不限；需要兜底时 env 显式
+    # 设正数。节点显式声明值仍生效（min 语义）。
     # env: AGENT_SUBTASK_TOKEN_BUDGET
-    subtask_token_budget: int = Field(default=200_000)
+    subtask_token_budget: int = Field(default=-1)
 
 
 # ============================================================================
