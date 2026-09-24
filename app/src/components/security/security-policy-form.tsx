@@ -594,8 +594,7 @@ export function SecurityPolicyForm({ scope, workspaceId }: SecurityPolicyFormPro
             {showRaw ? t("security.hideJson") : t("security.showJson")}
           </Button>
           <Button size="sm" className="h-7" onClick={save} disabled={!dirty || saving}>
-            <Save className="w-3 h-3 mr-1" />{" "}
-            {saving ? t("security.saving") : t("security.save")}
+            <Save className="w-3 h-3 mr-1" /> {saving ? t("security.saving") : t("security.save")}
           </Button>
         </div>
       </div>

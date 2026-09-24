@@ -87,7 +87,8 @@ const enUS = {
   "message.subtaskBatch.count": "{{count}} items",
   "message.subtaskBatch.failed": "{{count}} failed",
   "message.subtaskBatch.allDone": "All done",
-  "message.subtaskBatch.partial": "Partially created {{created}}/{{total}} (duplicates/failures in tool result)",
+  "message.subtaskBatch.partial":
+    "Partially created {{created}}/{{total}} (duplicates/failures in tool result)",
   "message.subtaskReport.title": "Subtask Execution Report",
   "message.subtaskReport.count": "{{count}} subtasks",
   "message.subtaskReport.acceptance": "Acceptance",

@@ -703,9 +703,7 @@ function WorkspacesPage() {
   const openWorkspace = async (wsId: string) => {
     // Navigate directly to the most recent task, or create a new one
     // （子任务会话不作为落点 —— 用户打开工作区应进入用户创建的任务）
-    const wsTasks = tasks.filter(
-      (t) => t.workspaceId === wsId && t.taskType !== "subtask",
-    );
+    const wsTasks = tasks.filter((t) => t.workspaceId === wsId && t.taskType !== "subtask");
     if (wsTasks.length > 0) {
       navigate({
         to: "/workspace/$workspaceId/task/$taskId",

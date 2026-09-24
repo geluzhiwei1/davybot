@@ -13,12 +13,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { Home, Menu } from "lucide-react";
-import {
-  SIDEBAR_CONFIG,
-  isExactRoute,
-  navTitle,
-  type SidebarItem,
-} from "@/lib/sidebar-config";
+import { SIDEBAR_CONFIG, isExactRoute, navTitle, type SidebarItem } from "@/lib/sidebar-config";
 import { resolveIcon } from "@/lib/icon-map";
 import { useTabsStore } from "@/lib/tabs-store";
 import { useAuthStore } from "@/lib/auth-store";

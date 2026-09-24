@@ -111,11 +111,7 @@ export const SIDEBAR_CONFIG: SidebarGroup[] = [...CORE_SIDEBAR_GROUPS, ...BIZ_SI
  * 缺键回退配置原文(FAST FAIL 不挡渲染 —— zh 不配键即显示 manifest 原文,英文翻
  * 译集中在 en-US/commonUi.ts 的 sidebar.nav 段)。key 为空(非模块项)直接回退。
  */
-export function navTitle(
-  t: TFunction,
-  key: string | null | undefined,
-  fallback: string,
-): string {
+export function navTitle(t: TFunction, key: string | null | undefined, fallback: string): string {
   return key ? t(`sidebar.nav.${key}`, { defaultValue: fallback, ns: "commonUi" }) : fallback;
 }
 

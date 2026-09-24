@@ -330,9 +330,14 @@ function SubtaskBatchCardBlock({
             <span className="text-[10px] text-muted-foreground shrink-0">
               {done}/{items.length}
               {failed > 0 && (
-                <span className="text-red-500"> · {t("message.subtaskBatch.failed", { count: failed })}</span>
+                <span className="text-red-500">
+                  {" "}
+                  · {t("message.subtaskBatch.failed", { count: failed })}
+                </span>
               )}
-              {allDone && <span className="text-green-600"> · {t("message.subtaskBatch.allDone")}</span>}
+              {allDone && (
+                <span className="text-green-600"> · {t("message.subtaskBatch.allDone")}</span>
+              )}
             </span>
           </button>
         </CollapsibleTrigger>

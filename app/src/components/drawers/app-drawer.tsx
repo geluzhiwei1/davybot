@@ -14,8 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 
-export type DrawerId =
-  "agents" | "llm" | "scheduled" | "workspace-settings" | "evolution";
+export type DrawerId = "agents" | "llm" | "scheduled" | "workspace-settings" | "evolution";
 
 interface Props {
   id: DrawerId;

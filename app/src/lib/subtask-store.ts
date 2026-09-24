@@ -128,7 +128,8 @@ export const useSubtaskStore = create<SubtaskStoreState>((set, get) => ({
         lastEvent: m.event,
         steerMessages,
         batchId: (m.metadata?.batch_id as string | undefined) ?? prev?.batchId ?? null,
-        itemIdentity: (m.metadata?.item_identity as string | undefined) ?? prev?.itemIdentity ?? null,
+        itemIdentity:
+          (m.metadata?.item_identity as string | undefined) ?? prev?.itemIdentity ?? null,
         todos: prev?.todos ?? null,
         createdAt: prev?.createdAt ?? now,
         updatedAt: now,

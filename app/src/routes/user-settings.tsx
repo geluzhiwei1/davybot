@@ -151,7 +151,8 @@ const HEADER_PRESETS: { label: string; headers: Record<string, string> }[] = [
     label: "Cursor",
     headers: {
       "User-Agent": "cursor/0.50.7",
-      "x-cursor-checksum": "10istratorcursor(loader/Coq7mDNJcn4jWqkH7OEvCLlf1Ejs2dWUwRpRLCXWsQJfgELIWABA3mLX0tBnoC77+dtD+H2ACa2O4uTtinWB1A==)",
+      "x-cursor-checksum":
+        "10istratorcursor(loader/Coq7mDNJcn4jWqkH7OEvCLlf1Ejs2dWUwRpRLCXWsQJfgELIWABA3mLX0tBnoC77+dtD+H2ACa2O4uTtinWB1A==)",
     },
   },
 ];

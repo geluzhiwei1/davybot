@@ -259,7 +259,9 @@ function buildItems(
   switch (tab) {
     case "files":
       return workspaceFiles
-        .filter((f) => f.name.toLowerCase().includes(q) || (f.path?.toLowerCase().includes(q) ?? false))
+        .filter(
+          (f) => f.name.toLowerCase().includes(q) || (f.path?.toLowerCase().includes(q) ?? false),
+        )
         .slice(0, 20)
         .map((f) => {
           // 副标题显示文件路径(去掉首部 "/", 根目录文件路径===文件名时回退来源标签)
@@ -304,8 +306,7 @@ function buildItems(
             // Look up expert for icon if this was an expert mention
             const expert = experts.find((e) => e.id === r.id || e.name === r.name);
             // 文件类最近引用: id 即路径, 副标题显示路径(与"文件"tab 一致)
-            const recentPath =
-              !expert && r.type === "file" ? r.id.replace(/^\/+/, "") : "";
+            const recentPath = !expert && r.type === "file" ? r.id.replace(/^\/+/, "") : "";
             return {
               id: r.id,
               name: r.name,

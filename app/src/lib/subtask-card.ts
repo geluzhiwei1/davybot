@@ -123,7 +123,10 @@ export interface SubtaskBatchCardInfo {
  * status, subtask_id?}, …] }；仅收录 status=created 的 subtask_id。
  * 全部创建失败（无任何 subtask_id）→ null：错误明细由普通 tool_result 块可见，不进卡。
  */
-export function extractSubtaskBatchCard(toolName: string, result: unknown): SubtaskBatchCardInfo | null {
+export function extractSubtaskBatchCard(
+  toolName: string,
+  result: unknown,
+): SubtaskBatchCardInfo | null {
   if (toolName !== "new_task_batch") return null;
 
   const obj = parseResultObject(result);
@@ -141,7 +144,9 @@ export function extractSubtaskBatchCard(toolName: string, result: unknown): Subt
     const sid = rr.subtask_id;
     if (typeof sid !== "string" || !sid) continue; // created 之外的（error/duplicate）不进卡
     itemIds.push(sid);
-    itemIdentities.push(typeof rr.identity === "string" && rr.identity ? rr.identity : sid.slice(0, 8));
+    itemIdentities.push(
+      typeof rr.identity === "string" && rr.identity ? rr.identity : sid.slice(0, 8),
+    );
   }
   if (!itemIds.length) return null;
 
@@ -150,9 +155,11 @@ export function extractSubtaskBatchCard(toolName: string, result: unknown): Subt
     mode: typeof obj.mode === "string" ? obj.mode : null,
     itemIds,
     itemIdentities,
-    totalItems: typeof obj.created_count === "number" ? Math.max(results.length, obj.created_count) : results.length,
-    createdCount:
-      typeof obj.created_count === "number" ? obj.created_count : itemIds.length,
+    totalItems:
+      typeof obj.created_count === "number"
+        ? Math.max(results.length, obj.created_count)
+        : results.length,
+    createdCount: typeof obj.created_count === "number" ? obj.created_count : itemIds.length,
     isError: obj.status === "error",
   };
 }
