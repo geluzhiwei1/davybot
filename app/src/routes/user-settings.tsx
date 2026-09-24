@@ -81,7 +81,7 @@ import { cn } from "@/lib/utils";
 
 // ── Tab trigger style（对齐 WorkspaceSettingsDrawer）─────────────────
 const tabCls =
-  "text-xs justify-start text-muted-foreground data-[state=active]:bg-brand/10 data-[state=active]:text-brand data-[state=active]:font-medium rounded-md px-2.5 py-1.5 text-left font-normal";
+  "text-xs justify-start text-muted-foreground data-[state=active]:bg-brand/10 data-[state=active]:text-brand data-[state=active]:font-medium rounded-md px-2.5 py-1.5 text-left font-normal shrink-0 whitespace-nowrap";
 
 // ── 导航分组（label/text 为 i18n key，渲染时经 t() 翻译）─────────────
 const NAV_GROUPS: { label: string; items: { value: string; icon: ReactNode; text: string }[] }[] = [
@@ -256,12 +256,13 @@ function UserSettingsPage() {
         <User className="w-5 h-5 text-brand" />
         <h1 className="text-base font-semibold flex-1">{t("user.drawer.title")}</h1>
       </div>
-      <Tabs defaultValue="llm" className="flex-1 flex flex-row min-h-0">
-        <TabsList className="flex flex-col w-44 shrink-0 items-stretch justify-start rounded-none border-r border-border/60 bg-transparent p-2 gap-0.5 overflow-y-auto scrollbar-thin h-auto">
+      {/* 移动端: tab 栏横向滚动占满宽度; md+ 恢复左侧竖栏 */}
+      <Tabs defaultValue="llm" className="flex-1 flex flex-col md:flex-row min-h-0">
+        <TabsList className="flex flex-row md:flex-col w-full md:w-44 shrink-0 items-stretch justify-start rounded-none border-b md:border-b-0 md:border-r border-border/60 bg-transparent p-2 gap-0.5 overflow-x-auto md:overflow-y-auto scrollbar-thin h-auto">
           {navGroups.flatMap((g) => [
             <div
               key={`lbl-${g.label}`}
-              className="text-[10px] uppercase tracking-wide text-muted-foreground/70 px-2.5 pt-2.5 pb-1"
+              className="hidden md:block text-[10px] uppercase tracking-wide text-muted-foreground/70 px-2.5 pt-2.5 pb-1"
             >
               {t(g.label)}
             </div>,
@@ -274,7 +275,7 @@ function UserSettingsPage() {
           ])}
         </TabsList>
 
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
           <TabsContent value="llm" className="p-4 mt-0">
             {saasReadonly ? (
               <SaasReadonly>
