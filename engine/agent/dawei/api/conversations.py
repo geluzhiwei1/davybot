@@ -85,6 +85,79 @@ def load_conversation_file(file_path: Path) -> Dict[str, Any]:
     }
 
 
+def _annotate_subtask_parent_conversations(conversations: List[Dict[str, Any]], workspace_id: str) -> None:
+    """任务列表嵌套（2026-09-24）：为 subtask 会话计算 parent_conversation_id。
+
+    子任务会话（task_type=subtask）不再与父任务并列平铺，前端按本字段折叠到
+    父任务行内。归父优先级：
+    1. 图节点链上 metadata.root_conversation_id（new_task/new_task_batch 派发时
+       盖章；P2-7 指针不切换，盖章值恒为主会话）
+    2. 时间窗回退（盖章上线前的旧数据）：派发发生在某用户会话活跃期内 →
+       归入 created_at ≤ 派发 ≤ updated_at 且 updated_at 最新的会话；仅一个
+       候选时直接归入
+    3. 全部失败 → None（保持平铺，绝不丢数据）
+
+    只读持久化 JSON，不初始化 workspace 对象（列表接口保持零副作用）。
+    """
+    for c in conversations:
+        c.setdefault("parent_conversation_id", None)
+    subs = [c for c in conversations if c.get("task_type") == "subtask" and c.get("source_task_id")]
+    if not subs:
+        return
+
+    # 加载工作区任务图节点（磁盘只读；多图文件全部合并，键为 task_node_id）
+    nodes: Dict[str, Dict[str, Any]] = {}
+    try:
+        ws_info = workspace_manager.get_workspace_by_id(workspace_id)
+        graphs_dir = Path(ws_info["path"]) / ".dawei" / "task_graphs"
+        for graph_file in graphs_dir.glob("*.json"):
+            with graph_file.open(encoding="utf-8") as f:
+                graph = json.load(f)
+            for node_id, node in (graph.get("nodes") or {}).items():
+                nodes[node_id] = node
+    except Exception:  # noqa: BLE001 — 图不可读则退回时间窗回退
+        logger.exception("Failed to load task graphs for subtask grouping: ")
+
+    def _iso(value: Any) -> datetime | None:
+        try:
+            return datetime.fromisoformat(str(value)) if value else None
+        except (TypeError, ValueError):
+            return None
+
+    user_convs = [c for c in conversations if c.get("task_type") != "subtask"]
+    for sub in subs:
+        parent_id: str | None = None
+        # 1) 祖先链（含自身）找 root_conversation_id 盖章
+        current = nodes.get(sub["source_task_id"])
+        guard = 0
+        while current is not None and guard < 32:
+            guard += 1
+            stamped = ((current.get("data") or {}).get("metadata") or {}).get("root_conversation_id")
+            if stamped:
+                parent_id = str(stamped)
+                break
+            parent = current.get("parent_id")
+            current = nodes.get(parent) if parent else None
+
+        # 2) 时间窗回退（旧数据）
+        if parent_id is None:
+            sub_created = _iso(sub.get("created_at"))
+            if sub_created is not None:
+                best: tuple[str, datetime] | None = None
+                for u in user_convs:
+                    u_created = _iso(u.get("created_at"))
+                    u_updated = _iso(u.get("updated_at"))
+                    if u_created and u_updated and u_created <= sub_created <= u_updated:
+                        if best is None or u_updated > best[1]:
+                            best = (u["id"], u_updated)
+                if best:
+                    parent_id = best[0]
+                elif len(user_convs) == 1:
+                    parent_id = user_convs[0]["id"]
+
+        sub["parent_conversation_id"] = parent_id
+
+
 @router.get("")
 async def get_workspace_conversations(
     workspace_id: str,
@@ -126,6 +199,9 @@ async def get_workspace_conversations(
             # 按 task_type 过滤
             if task_type is None or conversation.get("task_type") == task_type:
                 conversations.append(conversation)
+
+    # 任务列表嵌套：subtask 会话标注归父（盖章优先，旧数据时间窗回退）
+    _annotate_subtask_parent_conversations(conversations, workspace_id)
 
     # Sort conversations
     reverse_order = sort_order == "desc"
@@ -353,21 +429,65 @@ async def save_workspace_conversation(workspace_id: str, conversation_id: str, c
     }
 
 
+def _resolve_subtask_child_ids(
+    chat_history_dir: Path, workspace_id: str, parent_conversation_id: str
+) -> List[str]:
+    """级联删除支持（2026-09-24）：解析折叠在指定父会话下的子任务会话 id 列表。
+
+    必须在删除父会话文件**之前**调用 —— 归父计算依赖完整会话列表（父文件先
+    消失会让时间窗回退误判甚至把子任务错挂到其他唯一候选上）。单个会话文件
+    损坏只跳过该文件，不阻断整体解析。
+    """
+    conversations: List[Dict[str, Any]] = []
+    for file_path in chat_history_dir.glob("*.json"):
+        try:
+            conversations.append(load_conversation_file(file_path))
+        except Exception:  # noqa: BLE001 — 损坏文件跳过
+            logger.warning("Skipping unreadable conversation file: %s", file_path)
+    _annotate_subtask_parent_conversations(conversations, workspace_id)
+    return [
+        c["id"]
+        for c in conversations
+        if c.get("parent_conversation_id") == parent_conversation_id
+    ]
+
+
 @router.delete("/{conversation_id}")
 async def delete_workspace_conversation(workspace_id: str, conversation_id: str):
-    """Delete a specific conversation from a workspace."""
+    """Delete a specific conversation from a workspace.
+
+    级联（2026-09-24）：删除父任务时，折叠其下的子任务会话一并删除
+    （前端任务列表以嵌套分组呈现，子任务不是用户的独立资产）。
+    """
     chat_history_dir = get_chat_history_dir_for_workspace(workspace_id)
     conversation_file = chat_history_dir / f"{conversation_id}.json"
 
     if not conversation_file.exists():
         raise HTTPException(status_code=404, detail=f"Conversation '{conversation_id}' not found")
 
+    # 先解析级联子会话（父文件仍在盘，归父计算才可靠），再统一删除
+    cascaded_ids: List[str] = []
+    try:
+        cascaded_ids = _resolve_subtask_child_ids(chat_history_dir, workspace_id, conversation_id)
+    except Exception:  # noqa: BLE001 — 级联解析失败不阻断父会话删除
+        logger.exception("Failed to resolve subtask children for cascade delete: ")
+
     conversation_file.unlink()
+    for child_id in cascaded_ids:
+        try:
+            (chat_history_dir / f"{child_id}.json").unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to cascade delete subtask conversation %s: ", child_id)
 
     return {
         "success": True,
         "conversation_id": conversation_id,
-        "message": "Conversation deleted successfully",
+        "cascaded_conversation_ids": cascaded_ids,
+        "message": (
+            f"Conversation deleted successfully (+{len(cascaded_ids)} subtask conversations)"
+            if cascaded_ids
+            else "Conversation deleted successfully"
+        ),
     }
 
 

@@ -81,6 +81,10 @@ export interface Task {
   model?: string;
   createdAt: number;
   updatedAt: number;
+  /** 会话类别："subtask" = 编排器自动创建的子任务会话（非用户直接创建） */
+  taskType?: string;
+  /** 子任务会话归属的父（主）会话 id；null = 无父，平铺兜底展示 */
+  parentConversationId?: string | null;
 }
 
 export type FileKind = "upload" | "ai";
@@ -469,6 +473,8 @@ export const useStore = create<State>()((set, get) => ({
           name?: string;
           created_at?: string;
           updated_at?: string;
+          task_type?: string;
+          parent_conversation_id?: string | null;
         }) => ({
           id: c.id || c.conversation_id || nanoid(10),
           title: c.title || c.name || "对话",
@@ -480,6 +486,9 @@ export const useStore = create<State>()((set, get) => ({
           model: saved.model,
           createdAt: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
           updatedAt: c.updated_at ? new Date(c.updated_at).getTime() : Date.now(),
+          // 子任务会话元数据：任务列表据此把自动创建的子任务折叠进父任务行
+          taskType: c.task_type || "user",
+          parentConversationId: c.parent_conversation_id ?? null,
         }),
       );
 
@@ -767,14 +776,28 @@ export const useStore = create<State>()((set, get) => ({
   },
   deleteTask: (id) => {
     const task = get().tasks.find((t) => t.id === id);
-    // Delete from backend
+    // Delete from backend（级联：后端一并删除折叠其下的子任务会话）
     if (task?.workspaceId) {
-      conversationApi.deleteScoped(task.workspaceId, id).catch((e) => {
-        console.error("[Store] deleteTask backend failed:", e);
-        toastError("删除同步失败，刷新后可能恢复", e);
-      });
+      conversationApi
+        .deleteScoped(task.workspaceId, id)
+        .then((res) => {
+          // 后端实际级联清单兜底移除（防本地 parentConversationId 缺失的旧缓存）
+          const cascaded = res.cascaded_conversation_ids ?? [];
+          if (cascaded.length > 0) {
+            set((s) => ({ tasks: s.tasks.filter((t) => !cascaded.includes(t.id)) }));
+          }
+        })
+        .catch((e) => {
+          console.error("[Store] deleteTask backend failed:", e);
+          toastError("删除同步失败，刷新后可能恢复", e);
+        });
     }
-    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+    // 本地立即移除：父任务 + 折叠其下的子任务会话
+    set((s) => ({
+      tasks: s.tasks.filter(
+        (t) => t.id !== id && !(t.taskType === "subtask" && t.parentConversationId === id),
+      ),
+    }));
   },
   moveTask: (id, workspaceId) =>
     set((s) => ({

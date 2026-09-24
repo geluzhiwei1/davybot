@@ -50,8 +50,12 @@ import {
   Eraser,
   Network,
   Eye,
+  ChevronDown,
+  ChevronRight,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { groupTasksByParent } from "@/lib/task-grouping";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -302,10 +306,15 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
     if (!confirmDeleteTask) return;
     const targetId = confirmDeleteTask.id;
     // If we're deleting the currently-viewed task, find the next sibling
+    // （候选排除被级联删除的子任务会话 — 不能导航进即将消失的会话）
     const isCurrentTask = targetId === task.id;
     deleteTask(targetId);
     if (isCurrentTask) {
-      const remaining = allTasks.filter((ot) => ot.id !== targetId);
+      const remaining = allTasks.filter(
+        (ot) =>
+          ot.id !== targetId &&
+          !(ot.taskType === "subtask" && ot.parentConversationId === targetId),
+      );
       const next = remaining.length > 0 ? remaining[0] : null;
       if (next) {
         navigatePanel({
@@ -448,6 +457,17 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
   const allTasks = useStore(
     useShallow((s) => s.tasks.filter((t) => t.workspaceId === workspace.id)),
   );
+  // 任务列表嵌套：子任务会话（taskType=subtask）折叠进父任务行，不再平铺
+  const { groups: taskGroups, orphans: orphanSubtasks } = groupTasksByParent(allTasks);
+  const userTaskCount = taskGroups.length;
+  const firstUserTask = taskGroups[0]?.parent;
+  const [expandedTaskParents, setExpandedTaskParents] = useState<Set<string>>(new Set());
+  // 当前会话为子任务时自动展开其父行（保证活动会话可见、上下文可定位）
+  const activeParentId = task.parentConversationId ?? null;
+  const effectiveExpandedTaskParents =
+    activeParentId && allTasks.some((t) => t.id === activeParentId)
+      ? new Set([...expandedTaskParents, activeParentId])
+      : expandedTaskParents;
   const createTask = useStore((s) => s.createTask);
   const getOrCreateEmptyTask = useStore((s) => s.getOrCreateEmptyTask);
   const deleteTask = useStore((s) => s.deleteTask);
@@ -456,9 +476,11 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
   const renameWorkspace = useStore((s) => s.renameWorkspace);
   const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
   const [confirmDeleteFile, setConfirmDeleteFile] = useState<string | null>(null);
-  const [confirmDeleteTask, setConfirmDeleteTask] = useState<{ id: string; title: string } | null>(
-    null,
-  );
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState<{
+    id: string;
+    title: string;
+    subCount?: number;
+  } | null>(null);
   const [confirmClearWs, setConfirmClearWs] = useState(false);
   const [clearingWs, setClearingWs] = useState(false);
   const [editingWsName, setEditingWsName] = useState(false);
@@ -577,7 +599,7 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
                 )}
               </div>
               <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
-                <span>{uiT("wsPanel.tasksCount", { count: allTasks.length })}</span>
+                <span>{uiT("wsPanel.tasksCount", { count: userTaskCount })}</span>
                 <span>{uiT("wsPanel.filesFull", { count: workspace.files.length })}</span>
                 <span>
                   {uiT("wsPanel.createdAt", {
@@ -639,13 +661,13 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
                 </button>
                 <button
                   onClick={() => {
-                    if (!allTasks[0]) return;
+                    if (!firstUserTask) return;
                     navigatePanel({
                       to: "/workspace/$workspaceId/task/$taskId",
-                      params: { workspaceId: workspace.id, taskId: allTasks[0].id },
+                      params: { workspaceId: workspace.id, taskId: firstUserTask.id },
                     });
                   }}
-                  disabled={!allTasks[0]}
+                  disabled={!firstUserTask}
                   className="text-[10px] px-2 py-1 rounded-md border border-border hover:border-brand/30 hover:bg-brand/5 transition flex items-center gap-1 disabled:opacity-40"
                 >
                   <Clock className="w-3 h-3" />
@@ -742,7 +764,7 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
             {/* Task list */}
             <div>
               <div className="text-[10px] font-medium text-muted-foreground mb-1.5">
-                {uiT("wsPanel.taskList", { count: allTasks.length })}
+                {uiT("wsPanel.taskList", { count: userTaskCount })}
               </div>
               {allTasks.length === 0 ? (
                 <div className="text-[11px] text-muted-foreground text-center py-4">
@@ -750,8 +772,13 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {allTasks.map((t) => {
+                  {/* 顶层行 = 用户创建的任务；子任务会话折叠其内（归父失败者平铺兜底） */}
+                  {[
+                    ...taskGroups.map((g) => ({ task: g.parent, children: g.children })),
+                    ...orphanSubtasks.map((s) => ({ task: s, children: [] as Task[] })),
+                  ].map(({ task: t, children }) => {
                     const isRenaming = renameTarget?.id === t.id;
+                    const expanded = effectiveExpandedTaskParents.has(t.id);
                     return (
                       <div
                         key={t.id}
@@ -789,18 +816,51 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
                               className="flex-1 min-w-0 text-[11px] px-2 py-1.5 bg-transparent border-none outline-none"
                             />
                           ) : (
-                            <button
-                              onClick={() =>
-                                navigatePanel({
-                                  to: "/workspace/$workspaceId/task/$taskId",
-                                  params: { workspaceId: workspace.id, taskId: t.id },
-                                })
-                              }
-                              className="flex-1 flex items-center gap-1.5 min-w-0 px-2 py-1.5"
-                            >
-                              <MessageSquare className="w-3 h-3 shrink-0 text-muted-foreground" />
-                              <span className="text-[11px] truncate">{t.title}</span>
-                            </button>
+                            <>
+                              {children.length > 0 && (
+                                <button
+                                  onClick={() =>
+                                    setExpandedTaskParents((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(t.id)) next.delete(t.id);
+                                      else next.add(t.id);
+                                      return next;
+                                    })
+                                  }
+                                  className="shrink-0 p-1 ml-1 rounded hover:bg-brand/10 text-muted-foreground hover:text-brand transition"
+                                  aria-label={uiT("wsOverview.subtaskCount", {
+                                    count: children.length,
+                                  })}
+                                >
+                                  {expanded ? (
+                                    <ChevronDown className="w-3 h-3" />
+                                  ) : (
+                                    <ChevronRight className="w-3 h-3" />
+                                  )}
+                                </button>
+                              )}
+                              <button
+                                onClick={() =>
+                                  navigatePanel({
+                                    to: "/workspace/$workspaceId/task/$taskId",
+                                    params: { workspaceId: workspace.id, taskId: t.id },
+                                  })
+                                }
+                                className="flex-1 flex items-center gap-1.5 min-w-0 px-2 py-1.5"
+                              >
+                                {t.taskType === "subtask" ? (
+                                  <Workflow className="w-3 h-3 shrink-0 text-muted-foreground/70" />
+                                ) : (
+                                  <MessageSquare className="w-3 h-3 shrink-0 text-muted-foreground" />
+                                )}
+                                <span className="text-[11px] truncate">{t.title}</span>
+                                {children.length > 0 && !expanded && (
+                                  <span className="text-[9px] text-muted-foreground/70 shrink-0">
+                                    {uiT("wsOverview.subtaskCount", { count: children.length })}
+                                  </span>
+                                )}
+                              </button>
+                            </>
                           )}
                           {!isRenaming && (
                             <>
@@ -817,7 +877,11 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setConfirmDeleteTask({ id: t.id, title: t.title });
+                                  setConfirmDeleteTask({
+                                    id: t.id,
+                                    title: t.title,
+                                    subCount: children.length,
+                                  });
                                 }}
                                 className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition"
                                 title={uiT("wsPanel.deleteTask")}
@@ -849,6 +913,31 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
                                 })}
                               </span>
                             )}
+                          </div>
+                        )}
+                        {/* 折叠区：编排器自动创建的子任务会话（嵌套在父任务行内） */}
+                        {expanded && children.length > 0 && (
+                          <div className="border-t border-border/40 py-0.5">
+                            {children.map((sub) => (
+                              <button
+                                key={sub.id}
+                                onClick={() =>
+                                  navigatePanel({
+                                    to: "/workspace/$workspaceId/task/$taskId",
+                                    params: { workspaceId: workspace.id, taskId: sub.id },
+                                  })
+                                }
+                                className={cn(
+                                  "w-full flex items-center gap-1.5 pl-6 pr-2 py-1 rounded-sm hover:bg-brand/5 transition",
+                                  sub.id === task.id && "bg-brand/10",
+                                )}
+                              >
+                                <Workflow className="w-2.5 h-2.5 shrink-0 text-muted-foreground/70" />
+                                <span className="text-[10px] truncate text-muted-foreground">
+                                  {sub.title}
+                                </span>
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1696,6 +1785,13 @@ export function WorkspacePanel({ task, workspace, extraTabs, overviewHeaderSlot 
             </AlertDialogTitle>
             <AlertDialogDescription>
               {uiT("wsPanel.deleteTask.desc", { title: confirmDeleteTask?.title ?? "" })}
+              {(confirmDeleteTask?.subCount ?? 0) > 0 && (
+                <span className="block mt-1 text-destructive">
+                  {uiT("wsPanel.deleteTask.cascade", {
+                    count: confirmDeleteTask?.subCount ?? 0,
+                  })}
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

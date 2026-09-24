@@ -10,7 +10,18 @@ export const conversationApi = {
   list: (workspaceId: string) =>
     request<{
       success: boolean;
-      conversations: Array<{ id: string; title: string; created_at: string }>;
+      conversations: Array<{
+        id: string;
+        title: string;
+        created_at: string;
+        updated_at?: string;
+        /** 会话类别："user"（用户创建）| "subtask"（编排器自动创建的子任务会话） */
+        task_type?: string;
+        /** subtask 会话对应的任务图节点 id */
+        source_task_id?: string | null;
+        /** 子任务会话归属的父（主）会话 id；null = 无父（平铺兜底） */
+        parent_conversation_id?: string | null;
+      }>;
     }>(`/api/workspaces/${workspaceId}/conversations`),
 
   create: (workspaceId: string, title?: string) =>
@@ -29,11 +40,15 @@ export const conversationApi = {
       body: JSON.stringify({ title }),
     }),
 
-  /** DELETE /api/workspaces/{wsId}/conversations/{id} — delete conversation (workspace-scoped) */
+  /** DELETE /api/workspaces/{wsId}/conversations/{id} — delete conversation (workspace-scoped).
+   *  级联：删除父任务时，折叠其下的子任务会话一并删除（cascaded_conversation_ids）。 */
   deleteScoped: (workspaceId: string, conversationId: string) =>
-    request<ApiResponse>(`/api/workspaces/${workspaceId}/conversations/${conversationId}`, {
-      method: "DELETE",
-    }),
+    request<ApiResponse & { cascaded_conversation_ids?: string[] }>(
+      `/api/workspaces/${workspaceId}/conversations/${conversationId}`,
+      {
+        method: "DELETE",
+      },
+    ),
 };
 
 // ── Conversation History API ───────────────────────────────────────

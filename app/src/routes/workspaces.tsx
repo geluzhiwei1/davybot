@@ -702,7 +702,10 @@ function WorkspacesPage() {
 
   const openWorkspace = async (wsId: string) => {
     // Navigate directly to the most recent task, or create a new one
-    const wsTasks = tasks.filter((t) => t.workspaceId === wsId);
+    // （子任务会话不作为落点 —— 用户打开工作区应进入用户创建的任务）
+    const wsTasks = tasks.filter(
+      (t) => t.workspaceId === wsId && t.taskType !== "subtask",
+    );
     if (wsTasks.length > 0) {
       navigate({
         to: "/workspace/$workspaceId/task/$taskId",
@@ -771,7 +774,10 @@ function WorkspacesPage() {
                 </Badge>
               )}
               <Badge variant="secondary" className="text-[10px]">
-                {t("workspaces.taskCount", { count: wsTasks.length })}
+                {t("workspaces.taskCount", {
+                  // 计数口径 = 用户创建的任务（子任务会话折叠在父任务内，不计）
+                  count: wsTasks.filter((tt) => tt.taskType !== "subtask").length,
+                })}
               </Badge>
               {showCollectionBadge && collName && (
                 <Badge

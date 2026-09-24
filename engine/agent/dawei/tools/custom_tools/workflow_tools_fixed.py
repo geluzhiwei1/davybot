@@ -1162,6 +1162,18 @@ class NewTaskTool(CustomBaseTool):
                 task_images=root_task.data.context.task_images,
             )
 
+            # 任务列表嵌套分组（2026-09-24）：记录派发时的主会话 id，/conversations
+            # 据此把子任务会话折叠到父任务下（parent_conversation_id）。P2-7 隔离
+            # 会话不切换 workspace.current_conversation 指针，派发时刻该指针恒指
+            # 根会话；取不到（无活动引擎/无会话）则不盖章，列表端时间窗回退兜底。
+            _root_conv_id = None
+            try:
+                _engine = get_active_execution_engine()
+                _conv = getattr(getattr(_engine, "_user_workspace", None), "current_conversation", None)
+                _root_conv_id = getattr(_conv, "id", None)
+            except Exception:  # noqa: BLE001 — 盖章失败不影响派发
+                _root_conv_id = None
+
             subtask_data = TaskData(
                 task_node_id=str(uuid.uuid4()),  # P0-4/F7: 字段名是 task_node_id（此前 task_id= 必然 TypeError）
                 description=message,
@@ -1182,6 +1194,7 @@ class NewTaskTool(CustomBaseTool):
                     "dispatch_identity": _new_identity,
                     **({"batch_id": batch_id} if batch_id else {}),
                     **({"item_identity": item_identity} if item_identity else {}),
+                    **({"root_conversation_id": _root_conv_id} if _root_conv_id else {}),
                     **profile_meta,
                 },
             )
