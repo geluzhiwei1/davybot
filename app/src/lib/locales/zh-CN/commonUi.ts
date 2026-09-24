@@ -19,7 +19,7 @@ const zhCN = {
   // ── app-sidebar ──
   "sidebar.unpin": "取消固定",
   "sidebar.pin": "固定到首页",
-  "sidebar.home": "首页",  // 导航域 zh 键(=manifest 中文原题, 与 defaultValue fallback 等值; 补齐 audit:i18n 双向对齐, 2026-09-22)
+  "sidebar.home": "首页", // 导航域 zh 键(=manifest 中文原题, 与 defaultValue fallback 等值; 补齐 audit:i18n 双向对齐, 2026-09-22)
   "sidebar.nav.agents": "合规智能体",
   "sidebar.nav.common-tools": "法律AI工具",
   "sidebar.nav.common-tools.contract-draft": "合同起草",
@@ -396,8 +396,9 @@ const zhCN = {
   "toolPage.renamed": "已重命名",
   "toolPage.deleted": "已删除「{{name}}」",
   "toolPage.create": "新建",
+  "toolPage.wizardStart": "向导启动",
   "toolPage.recentWorkspaces": "最近工作区",
-  "toolPage.empty": "还没有{{title}}工作区，点击右上角「新建」开始",
+  "toolPage.empty": "还没有{{title}}工作区，点击「新建」开始",
   "toolPage.temporary": "临时",
   "toolPage.sessionCount": "{{count}} 个会话",
   "toolPage.updatedAt": "更新于 {{time}}",

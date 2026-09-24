@@ -337,34 +337,43 @@ export function ToolPage({
           />
         </div>
       ) : (
-        <div className="max-w-4xl mx-auto px-6 py-10">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
-              <Icon className="w-6 h-6 text-brand-foreground" />
+        <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-10">
+          {/* Header — 移动端纵向堆叠（图标+标题一行、按钮独占一行平分宽度），
+              sm+ 恢复单行右对齐；min-w-0 防止按钮挤压文本列 */}
+          <div className="flex flex-col gap-4 mb-6 sm:mb-8 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand shrink-0">
+                <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-brand-foreground" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold truncate">{title}</h1>
+                <p className="text-sm text-muted-foreground">{subtitle}</p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">{title}</h1>
-              <p className="text-sm text-muted-foreground">{subtitle}</p>
-            </div>
-            {wizard && (
+            <div className="flex items-center gap-2 sm:ml-auto sm:shrink-0">
+              {wizard && (
+                <Button
+                  variant="outline"
+                  className="gap-1.5 flex-1 sm:flex-initial"
+                  onClick={() => setShowWizard(true)}
+                  disabled={creating}
+                >
+                  <Wand2 className="w-4 h-4" /> {t("toolPage.wizardStart")}
+                </Button>
+              )}
               <Button
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => setShowWizard(true)}
+                className="gap-1.5 flex-1 sm:flex-initial"
+                onClick={() => void handleCreate()}
                 disabled={creating}
               >
-                <Wand2 className="w-4 h-4" /> 向导启动
+                {creating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {t("toolPage.create")}
               </Button>
-            )}
-            <Button className="gap-1.5" onClick={() => void handleCreate()} disabled={creating}>
-              {creating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-              {t("toolPage.create")}
-            </Button>
+            </div>
           </div>
 
           {/* Recent workspaces */}
@@ -385,7 +394,7 @@ export function ToolPage({
                 <span className="text-sm">{t("common.loading")}</span>
               </div>
             ) : sortedWorkspaces.length === 0 ? (
-              <div className="bg-card/40 border border-dashed border-border rounded-2xl p-14 text-center">
+              <div className="bg-card/40 border border-dashed border-border rounded-2xl p-8 sm:p-14 text-center">
                 <Icon className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
                 <p className="text-sm text-muted-foreground mb-4">
                   {t("toolPage.empty", { title })}
@@ -438,7 +447,7 @@ export function ToolPage({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="gap-1 text-xs h-7 opacity-0 group-hover:opacity-100 transition"
+                            className="gap-1 text-xs h-7 opacity-0 group-hover:opacity-100 max-md:opacity-100 transition"
                             onClick={() => handleOpenWorkspace(ws.id)}
                           >
                             {t("toolPage.open")} <ArrowRight className="w-3 h-3" />
@@ -448,7 +457,7 @@ export function ToolPage({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 max-md:opacity-100 transition"
                               >
                                 <MoreHorizontal className="w-4 h-4" />
                               </Button>
