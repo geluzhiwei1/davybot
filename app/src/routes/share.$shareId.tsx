@@ -36,6 +36,7 @@ import { renderMarkdown } from "@/components/chat/content/markdown";
 import { useAuthStore } from "@/lib/auth-store";
 import { getBasepath } from "@/router";
 import { ApiError } from "@/lib/api/client";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   ShareLockedError,
   clearShareToken,
@@ -50,7 +51,7 @@ import {
 } from "@/lib/api/share";
 
 export const Route = createFileRoute("/share/$shareId")({
-  head: () => ({ meta: [{ title: "工作区分享 · 只读 — NormNomos" }] }),
+  head: () => ({ meta: [{ title: `工作区分享 · 只读 — ${BRAND_NAME}` }] }),
   component: SharePage,
 });
 

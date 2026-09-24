@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
+import { BRAND_NAME } from "@/lib/brand";
 import { useQuickChat } from "@/hooks/use-quick-chat";
 import { usePinnedStore } from "@/lib/pinned-store";
 import { resolveIcon } from "@/lib/icon-map";
@@ -48,7 +49,7 @@ function HomePage() {
         {/* Hero — 品牌 + 快速开始 */}
         <div className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            <span className="text-gradient-brand">NormNomos</span>
+            <span className="text-gradient-brand">{BRAND_NAME}</span>
             <span className="text-foreground"> · {t("index.heroTagline")}</span>
           </h1>
           <p className="text-muted-foreground mt-3 max-w-2xl">{t("index.heroDesc")}</p>

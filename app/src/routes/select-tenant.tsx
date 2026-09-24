@@ -10,6 +10,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Building2, User as UserIcon, ChevronRight, LogOut } from "lucide-react";
 import { useAuthStore, type TenantSummary } from "@/lib/auth-store";
+import { BRAND_NAME } from "@/lib/brand";
 import { toastError } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,7 +125,7 @@ function SelectTenantPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gradient-brand">NormNomos</h1>
+          <h1 className="text-3xl font-bold text-gradient-brand">{BRAND_NAME}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{tr("selectTenant.subtitle")}</p>
         </div>
 

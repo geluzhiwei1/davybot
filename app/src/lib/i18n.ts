@@ -9,6 +9,7 @@
  */
 import i18n, { type Resource } from "i18next";
 import { initReactI18next } from "react-i18next";
+import { SERVER_BUILD } from "./env";
 import zh from "./i18n/zh";
 import en from "./i18n/en";
 
@@ -42,13 +43,27 @@ for (const [path, mod] of Object.entries(localeGlob)) {
 resources.zh.translation = zh;
 resources.en.translation = en;
 
-i18n.use(initReactI18next).init({
-  resources,
-  lng: getInitialLanguage(),
-  fallbackLng: "zh",
-  defaultNS: "translation",
-  interpolation: { escapeValue: false },
-});
+/**
+ * server 自包含构建品牌词替换:译文(metaTitle/文案)中的 NormNomos → davybot。
+ * 组件内硬编码品牌词走 src/lib/brand.ts;此处覆盖全部 i18n 字符串。
+ */
+const brandPostProcessor = {
+  type: "postProcessor" as const,
+  name: "davybot-brand",
+  process: (value: string) => (SERVER_BUILD ? value.replace(/NormNomos/g, "davybot") : value),
+};
+
+i18n
+  .use(brandPostProcessor)
+  .use(initReactI18next)
+  .init({
+    resources,
+    lng: getInitialLanguage(),
+    fallbackLng: "zh",
+    defaultNS: "translation",
+    interpolation: { escapeValue: false },
+    postProcess: ["davybot-brand"],
+  });
 
 /** Switch language and persist the choice. Called by LanguageSelector. */
 export async function setLanguage(lang: string) {

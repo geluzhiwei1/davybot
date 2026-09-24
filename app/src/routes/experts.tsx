@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { toExperts } from "@/lib/experts";
+import { BRAND_NAME } from "@/lib/brand";
 import { useMarketTeamsStore } from "@/lib/market-teams-store";
 import { ExpertIcon, getCategoryHue } from "@/components/expert-icon";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +10,7 @@ import { useTranslation } from "react-i18next";
 export const Route = createFileRoute("/experts")({
   head: () => ({
     meta: [
-      { title: "法律专家广场 — NormNomos" },
+      { title: `法律专家广场 — ${BRAND_NAME}` },
       {
         name: "description",
         content: "12 位法律合规 AI 专家：制裁合规、出口管制、数据合规、境外投资、反垄断、ESG 等。",

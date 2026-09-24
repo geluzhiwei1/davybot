@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { BRAND_NAME } from "@/lib/brand";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   Sidebar,
@@ -623,7 +624,7 @@ export function AppSidebar() {
             </div>
             {!collapsed && (
               <div className="flex flex-col leading-tight">
-                <span className="text-sm font-semibold tracking-tight">NormNomos</span>
+                <span className="text-sm font-semibold tracking-tight">{BRAND_NAME}</span>
                 <span className="text-[10px] text-muted-foreground">{t("sidebar.tagline")}</span>
               </div>
             )}

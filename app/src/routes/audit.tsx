@@ -34,10 +34,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuditStore, AUDIT_ACTION_LABELS, type AuditAction } from "@/lib/audit-store";
+import { BRAND_NAME } from "@/lib/brand";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/audit")({
-  head: () => ({ meta: [{ title: "操作审计 — NormNomos" }] }),
+  head: () => ({ meta: [{ title: `操作审计 — ${BRAND_NAME}` }] }),
   component: AuditPage,
 });
 

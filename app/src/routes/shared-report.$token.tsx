@@ -9,9 +9,10 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useParams } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import { sharedReportApi, type SharedReport } from "@/lib/api/shared-report";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const Route = createFileRoute("/shared-report/$token")({
-  head: () => ({ meta: [{ title: "调研报告 · 只读分享 — NormNomos" }] }),
+  head: () => ({ meta: [{ title: `调研报告 · 只读分享 — ${BRAND_NAME}` }] }),
   component: SharedReportPage,
 });
 

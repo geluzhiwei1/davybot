@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   User,
   Palette,
@@ -2038,7 +2039,7 @@ function AboutTab() {
           <Info className="w-5 h-5 text-[oklch(0.16_0.03_250)]" strokeWidth={2.5} />
         </div>
         <div className="flex flex-col leading-tight">
-          <span className="text-base font-semibold">NormNomos</span>
+          <span className="text-base font-semibold">{BRAND_NAME}</span>
           <span className="text-xs text-muted-foreground">{t("user.about.tagline")}</span>
         </div>
       </div>
@@ -2056,7 +2057,7 @@ function AboutTab() {
           <span>AI-Native Agent Engine</span>
         </div>
         <p className="text-xs text-muted-foreground pt-2 text-center">
-          © {new Date().getFullYear()} NormNomos. All rights reserved.
+          © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
         </p>
       </div>
     </div>

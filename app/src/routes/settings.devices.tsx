@@ -9,6 +9,7 @@
  * 的 device_id 比对;纯浏览器访问时全部显示为远程设备。
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { BRAND_NAME } from "@/lib/brand";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CapabilityGate } from "@/components/capability-gate";
@@ -138,7 +139,7 @@ function MyDevicesPageInner() {
         {/* 原「返回设置」按钮随 /settings 枢纽页移除;本页入口 = 用户菜单「我的设备」/ accounts 徽标 */}
         <h1 className="text-2xl font-bold mb-1">我的设备</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          登录本账号的桌面版(NormNomos Light)设备清单。在线设备可被 Web 端远程驱动 (浏览器轨/本机
+          登录本账号的桌面版({BRAND_NAME} Light)设备清单。在线设备可被 Web 端远程驱动 (浏览器轨/本机
           MCP);可疑设备可立即远程登出。
         </p>
 

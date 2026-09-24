@@ -3,6 +3,7 @@
  * Global view showing all tasks from all workspaces.
  */
 import { dateLocale } from "@/lib/date-locale";
+import { BRAND_NAME } from "@/lib/brand";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -69,7 +70,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/automation")({
-  head: () => ({ meta: [{ title: "定时任务 — NormNomos" }] }),
+  head: () => ({ meta: [{ title: `定时任务 — ${BRAND_NAME}` }] }),
   component: AutomationPage,
 });
 

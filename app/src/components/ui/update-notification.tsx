@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { useUpdate } from "@/hooks/use-update";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 export function UpdateNotification() {
   const { t } = useTranslation("miscUi");
@@ -73,7 +74,7 @@ export function UpdateNotification() {
               <Download className="h-5 w-5 animate-pulse" />
               {t("update.downloadingTitle")}
             </DialogTitle>
-            <DialogDescription>NormNomos v{updateVersion}</DialogDescription>
+            <DialogDescription>{BRAND_NAME} v{updateVersion}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4">
             <Progress value={downloadProgress} className="h-3" />

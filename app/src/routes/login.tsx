@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useCaps } from "@/lib/stores/runtime-store";
 import { getApiBaseUrl } from "@/lib/env";
+import { BRAND_NAME } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,7 +102,7 @@ function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gradient-brand">NormNomos</h1>
+          <h1 className="text-3xl font-bold text-gradient-brand">{BRAND_NAME}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{t("login.tagline")}</p>
         </div>
 

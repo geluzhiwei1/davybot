@@ -7,7 +7,7 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 /**
  * Dev middleware: serve index.html for all SPA routes so client-side routing works.
@@ -87,6 +87,31 @@ function demoCssDownlevel(): Plugin {
   };
 }
 
+/**
+ * Server 自包含构建(--mode server)品牌词:页面 <title> 与 PWA manifest 换为 davybot。
+ * 组件/译文中的品牌词由 src/lib/brand.ts + i18n 后处理器按 SERVER_BUILD 切换;
+ * 此处只兜底 HTML 入口与 public/ 静态资产(构建期原样拷贝,不经源码)。
+ */
+function brandServer(): Plugin {
+  return {
+    name: "brand-server",
+    transformIndexHtml(html) {
+      return html.replace(/<title>[^<]*<\/title>/, "<title>davybot — AI 智能体平台</title>");
+    },
+    closeBundle() {
+      const manifest = resolve(__dirname, "dist/manifest.webmanifest");
+      if (!existsSync(manifest)) return;
+      writeFileSync(
+        manifest,
+        readFileSync(manifest, "utf-8")
+          // 完整 slogan 先替换(与 <title> 一致:davybot — AI 智能体平台)
+          .replace(/NormNomos — AI 法律智能体平台/g, "davybot — AI 智能体平台")
+          .replace(/NormNomos/g, "davybot"),
+      );
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   // Server-side env (vite.config runs in Node): SANCTIONS_PROXY_TARGET picks
   // where the /sanctions proxy points. Default keeps localhost:8012 (e.g. an
@@ -103,6 +128,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       ...(mode === "demo" ? [demoCssDownlevel()] : []),
+      ...(mode === "server" ? [brandServer()] : []),
       TanStackRouterVite({
         quoteStyle: "double",
         routesDirectory: "./src/routes",
