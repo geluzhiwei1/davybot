@@ -1,0 +1,183 @@
+name: Publish PyPI
+
+# 唯一发布通道 (main 分支): 构建 davybot wheel → 零云冒烟 → 发布 PyPI + GitHub Release。
+# 认证沿用仓库已有配置 (与旧分支 release.yml 一致, 已成功发布过 0.2.8):
+#   - secrets.PYPI_API_TOKEN (repo secret)
+#   - environment "pypi" (secret 可能挂在该环境下; 也可在环境上配 required reviewers 作人工确认)
+#
+# 触发:
+#   - push tag v*          → 自动发布 (版本取自 tag)
+#   - workflow_dispatch    → 传 version 输入则发布指定版本; 不传 = 干跑 (只构建 + 冒烟, 不发布)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.2.9). Leave empty for dry run (build + smoke only)'
+        required: false
+        type: string
+
+concurrency:
+  group: publish-pypi-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20.19.0"
+  PYTHON_VERSION: "3.12"
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build & smoke-test wheel
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # fetch-depth 0: setuptools_scm 版本推导需要完整 git 历史 + tags
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # 前端先行: package-data 含 frontend/**/*, staged 产物随 wheel 发布
+      - name: Build core web UI
+        working-directory: app
+        run: |
+          npm ci
+          npm run build:server
+
+      - name: Stage frontend into engine
+        run: rsync -a --delete app/dist/ engine/agent/dawei/frontend/
+
+      # 版本解析 (对齐旧 release.yml): 手动输入 > tag 推导; hash 后缀版本 fail
+      - name: Resolve version
+        id: version
+        working-directory: engine/agent
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            V="${{ inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V=""  # 干跑: 不发布, 版本由 setuptools_scm 现场推导
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "expect=$V" >> "$GITHUB_OUTPUT"
+          echo "resolved version: '${V:-<dry-run, scm auto>}'"
+
+      - name: Build wheel & sdist
+        working-directory: engine/agent
+        env:
+          # 手动版本 → 强制 setuptools_scm 采用 (对齐旧 release.yml 的 PRETEND_VERSION 用法)
+          SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DAVYBOT: ${{ steps.version.outputs.version }}
+        run: |
+          rm -rf dist/ build/ *.egg-info
+          uv build
+
+      # 防呆 1: wheel 文件名必须匹配期望版本 (挡 +g<hash> 这类 PyPI 不兼容版本)
+      - name: Assert wheel version
+        working-directory: engine/agent
+        run: |
+          if [ -n "${{ steps.version.outputs.expect }}" ]; then
+            ls dist/ | grep -E "^davybot-${{ steps.version.outputs.expect }}(-py3-none-any\.whl|-\.tar\.gz)$" \
+              || { echo "unexpected dist files:"; ls dist/; exit 1; }
+          fi
+
+      # 防呆 2: wheel 必须内嵌前端 (staging 失败 / package-data 漏配即 fail)
+      - name: Assert frontend bundled in wheel
+        working-directory: engine/agent
+        run: |
+          WHEEL=$(ls dist/davybot-*.whl)
+          python3 -m zipfile -l "$WHEEL" | grep -q 'dawei/frontend/index.html' \
+            || { echo "frontend missing in $WHEEL"; exit 1; }
+          echo "frontend OK in $WHEEL"
+
+      # 零云冒烟 (E5): 干净 venv 安装 wheel → 冷启 → runtime-info / app-ui 断言。
+      - name: Smoke-test wheel (zero-cloud)
+        working-directory: engine/agent
+        run: |
+          uv venv /tmp/smoke-venv
+          uv pip install --python /tmp/smoke-venv/bin/python dist/davybot-*.whl
+          /tmp/smoke-venv/bin/dawei --help
+          /tmp/smoke-venv/bin/dawei server start --host 127.0.0.1 --port 8931 > /tmp/dawei-wheel-smoke.log 2>&1 &
+          SRV=$!
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:8931/api/health > /dev/null && break
+            sleep 2
+          done
+          /tmp/smoke-venv/bin/python - <<'EOF'
+          import json, urllib.request
+          info = json.load(urllib.request.urlopen("http://127.0.0.1:8931/api/runtime-info"))
+          assert info.get("deployment_class") == "local", f"deployment_class: {info}"
+          assert info.get("capabilities") == ["relay"], f"capabilities: {info}"
+          print("runtime-info OK:", info)
+          EOF
+          UI_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8931/app-ui/)
+          [ "$UI_CODE" = "200" ] || { echo "app-ui HTTP $UI_CODE"; tail -50 /tmp/dawei-wheel-smoke.log; exit 1; }
+          kill $SRV || true
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: engine/agent/dist/davybot-*
+          if-no-files-found: error
+
+  release:
+    name: Publish to PyPI
+    needs: build
+    # tag 构建 → 自动发布; 手动触发仅当填了 version 才发布
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/davybot
+    permissions:
+      contents: write  # gh release create
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      # 认证对齐旧 release.yml: repo 已有的 PYPI_API_TOKEN + skip-existing
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/
+          skip-existing: true
+          trusted-publishing: none
+
+      # 与旧发布一致: 同步建 GitHub Release 并挂 wheel/sdist 资产
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          if gh release view "$VERSION" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "release $VERSION exists, skip"
+          else
+            gh release create "$VERSION" \
+              --repo "${{ github.repository }}" \
+              --notes "Release $VERSION" \
+              dist/*
+          fi
