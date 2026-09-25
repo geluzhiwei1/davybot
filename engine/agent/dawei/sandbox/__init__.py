@@ -66,8 +66,9 @@ from dawei.sandbox.subprocess_provider import CommandExecutor, SubprocessProvide
 # 使用时: from dawei.sandbox.docker_provider import DockerProvider
 # 或:     from dawei.sandbox import DockerProvider (会触发 docker import)
 
-# E2BProvider: 延迟导入, 避免 e2b SDK 未安装时 __init__ 失败
-# 使用时: from dawei.sandbox.e2b_provider import E2BProvider
+# E2BProvider: 随 davybot-biz（saas 桶）分发, 经 S4 loader 装载
+# 使用时: from dawei.sandbox.saas_loader import load_saas_module
+#         E2BProvider = load_saas_module("cubesandbox").E2BProvider
 
 __all__ = [
     # v2 核心
@@ -103,11 +104,13 @@ __version__ = "4.2.0"
 
 
 # === v4.2 SaaS 扩展 (延迟导入, 仅按需加载) ===
-# E2BProvider / CubeSandboxProvider: dawei.sandbox.cubesandbox_provider
-# AgentENVProvider:                  dawei.sandbox.agentenv_provider
-# SaaSGateway:                       dawei.sandbox.saas_gateway
+# 云 provider（随 davybot-biz，经 entry point group dawei.sandbox_providers 装载）:
+# E2BProvider / CubeSandboxProvider: entry 'cubesandbox'
+# AgentENVProvider:                  entry 'agentenv'
+# SaaSGateway:                       entry 'saas_gateway'
+# BackendSelector:                   entry 'backend_selector'
+# 核心内置（本包内）:
 # WorkspaceStore:                    dawei.sandbox.workspace_store
-# BackendSelector:                   dawei.sandbox.backend_selector
 
 
 def _lazy_saas_imports():
@@ -116,15 +119,11 @@ def _lazy_saas_imports():
     用法:
         from dawei.sandbox import _lazy_saas_imports as saas
         provider = saas.CubeSandboxProvider(...)
+
+    云 provider 经 saas_loader（S4）解析 —— biz 缺席时 ImportError 指明原因。
     """
-    from dawei.sandbox.agentenv_provider import AgentENVProvider, AgentENVSandboxSession
-    from dawei.sandbox.backend_selector import BackendSelector, WorkspaceMeta
     from dawei.sandbox.base import BackendType
-    from dawei.sandbox.cubesandbox_provider import (
-        CubeSandboxProvider,
-        E2BProvider,
-    )
-    from dawei.sandbox.saas_gateway import SaaSGateway, is_saas_gateway_enabled
+    from dawei.sandbox.saas_loader import load_saas_module
     from dawei.sandbox.workspace_store import (
         FileMeta,
         SyncStats,
@@ -133,16 +132,21 @@ def _lazy_saas_imports():
         reset_workspace_store,
     )
 
+    _agentenv = load_saas_module("agentenv")
+    _backend = load_saas_module("backend_selector")
+    _cube = load_saas_module("cubesandbox")
+    _gateway = load_saas_module("saas_gateway")
+
     return {
-        "CubeSandboxProvider": CubeSandboxProvider,
-        "E2BProvider": E2BProvider,
-        "AgentENVProvider": AgentENVProvider,
-        "AgentENVSandboxSession": AgentENVSandboxSession,
-        "SaaSGateway": SaaSGateway,
-        "is_saas_gateway_enabled": is_saas_gateway_enabled,
+        "CubeSandboxProvider": _cube.CubeSandboxProvider,
+        "E2BProvider": _cube.E2BProvider,
+        "AgentENVProvider": _agentenv.AgentENVProvider,
+        "AgentENVSandboxSession": _agentenv.AgentENVSandboxSession,
+        "SaaSGateway": _gateway.SaaSGateway,
+        "is_saas_gateway_enabled": _gateway.is_saas_gateway_enabled,
         "BackendType": BackendType,
-        "BackendSelector": BackendSelector,
-        "WorkspaceMeta": WorkspaceMeta,
+        "BackendSelector": _backend.BackendSelector,
+        "WorkspaceMeta": _backend.WorkspaceMeta,
         "WorkspaceStore": WorkspaceStore,
         "FileMeta": FileMeta,
         "SyncStats": SyncStats,

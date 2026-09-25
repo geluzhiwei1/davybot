@@ -65,6 +65,31 @@ class TestAuditChecks:
         assert not report[key], f"{AUDIT_CHECKS[key]}: {report[key]}"
 
 
+def _cloud_provider_paths() -> list[str]:
+    """云沙箱 provider 模块路径（S4 entry points 解析; biz 缺席 → 空列表）。
+
+    6b-2 拆库后云 provider 随 davybot-biz 分发（dawei_biz.saas.*），
+    核心开源形态（仅 docker/subprocess）不测缺席项 — 与 audit 检查 7 语义一致。
+    """
+    cloud_classes = {
+        "e2b": "E2BProvider",
+        "cubesandbox": "CubeSandboxProvider",
+        "agentenv": "AgentENVProvider",
+        "saas_gateway": "SaaSGateway",
+    }
+    paths: list[str] = []
+    try:
+        from dawei.sandbox.saas_loader import available_saas_providers, load_saas_module
+
+        for name in available_saas_providers():
+            class_name = cloud_classes.get(name)
+            if class_name:
+                paths.append(f"{load_saas_module(name).__name__}:{class_name}")
+    except Exception:  # noqa: BLE001 — biz 缺席 = 仅核心 provider
+        pass
+    return paths
+
+
 @pytest.mark.unit
 class TestSandboxProviderContract:
     """显式 provider 契约测试（audit 检查 7 的细粒度版, 失败信息精确到类.方法）
@@ -77,13 +102,9 @@ class TestSandboxProviderContract:
     PROVIDERS = [
         "dawei.sandbox.subprocess_provider:SubprocessProvider",
         "dawei.sandbox.docker_provider:DockerProvider",
-        "dawei.sandbox.e2b_provider:E2BProvider",
-        "dawei.sandbox.cubesandbox_provider:CubeSandboxProvider",
-        "dawei.sandbox.agentenv_provider:AgentENVProvider",
-        "dawei.sandbox.saas_gateway:SaaSGateway",
     ]
 
-    @pytest.mark.parametrize("provider_path", PROVIDERS)
+    @pytest.mark.parametrize("provider_path", PROVIDERS + _cloud_provider_paths())
     @pytest.mark.parametrize("method", ["execute_command", "execute_command_async"])
     def test_accepts_timeout_kwarg(self, provider_path: str, method: str) -> None:
         module_path, class_name = provider_path.rsplit(":", 1)

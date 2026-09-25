@@ -466,47 +466,19 @@ class ToolExecutor(IToolCallService):
         except Exception as e:
             self.logger.warning(f"set security context at execute_tool entry failed: {e}")
 
-        # MarketingAgent 编队可观测性(E1 徽标):market 工具组被调用 → 当前子智能体
-        # 进入 tool 态(仅 market-team mode 生效;失败不阻断工具执行)。
-        if tool_name.startswith("market_"):
-            try:
-                from dawei.websocket.market_fleet import note_market_tool_call
+        # 编队 tool 态可观测性(E1 徽标):工具被调用 → 所属编队当前子智能体进入
+        # tool 态。阶段六 6a(S5):核心不再感知 social/market/research 各编队——
+        # 经扩展钩子注册表分发,各观察者自门控(工具前缀 + mode;失败不阻断工具执行)。
+        try:
+            from dawei.core.ext_hooks import notify_tool_call_observers
 
-                await note_market_tool_call(
-                    getattr(self.user_workspace, "workspace_id", "") or "",
-                    getattr(self._agent, "current_mode", None),
-                    tool_name,
-                )
-            except Exception as e:  # noqa: BLE001
-                self.logger.debug(f"market fleet note failed: {e}")
-
-        # SocialAgent 编队可观测性(E1 徽标):social 工具组被调用 → 当前子智能体
-        # 进入 tool 态(仅 social-team mode 生效;创作工坊 social-tools 会话不受影响)。
-        if tool_name.startswith("social_"):
-            try:
-                from dawei.websocket.social_fleet import note_social_tool_call
-
-                await note_social_tool_call(
-                    getattr(self.user_workspace, "workspace_id", "") or "",
-                    getattr(self._agent, "current_mode", None),
-                    tool_name,
-                )
-            except Exception as e:  # noqa: BLE001
-                self.logger.debug(f"social fleet note failed: {e}")
-
-        # GeluResearch 编队可观测性(E1 徽标,镜像 social):research 工具组被调用 →
-        # 当前子智能体进入 tool 态(仅 gelu-research-team mode 生效)。
-        if tool_name.startswith("research_"):
-            try:
-                from dawei.websocket.research_fleet import note_research_tool_call
-
-                await note_research_tool_call(
-                    getattr(self.user_workspace, "workspace_id", "") or "",
-                    getattr(self._agent, "current_mode", None),
-                    tool_name,
-                )
-            except Exception as e:  # noqa: BLE001
-                self.logger.debug(f"research fleet note failed: {e}")
+            await notify_tool_call_observers(
+                getattr(self.user_workspace, "workspace_id", "") or "",
+                getattr(self._agent, "current_mode", None),
+                tool_name,
+            )
+        except Exception as e:  # noqa: BLE001
+            self.logger.debug(f"fleet tool-call notify failed: {e}")
 
         # Permission check for Plan mode
         _uid = self._audit_user_id()

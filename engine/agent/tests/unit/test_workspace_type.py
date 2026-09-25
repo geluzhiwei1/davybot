@@ -209,10 +209,12 @@ class TestWorkspaceLifecycle:
         )
 
     def test_all_production_imports_from_canonical(self):
-        """验证关键生产代码从 canonical 路径导入。"""
-        from dawei.workspace.ip_workspace_service import (
-            WorkspaceLifecycle as svc_lc,
-        )
+        """验证关键生产代码从 canonical 路径导入。
+
+        ip_workspace_service（原第三条腿）已随 6b 拆库迁至 davybot-biz
+        （dawei_biz.services.ip_workspace_service，仍从 canonical 导入）；
+        核心测试不得依赖 biz —— 该断言腿移除，核心侧覆盖 crud/twm 两处。
+        """
         from dawei.api.workspaces.crud import (
             WorkspaceLifecycle as crud_lc,
         )
@@ -220,7 +222,6 @@ class TestWorkspaceLifecycle:
             WorkspaceLifecycle as tm_lc,
         )
 
-        assert svc_lc is WorkspaceLifecycle
         assert crud_lc is WorkspaceLifecycle
         assert tm_lc is WorkspaceLifecycle
 

@@ -301,24 +301,33 @@ async def _create_compliance_workspace(
         except Exception as e:
             logger.error(f"[COMPLIANCE] Failed to install resources for {workspace_id}: {e}", exc_info=True)
 
-    # 4. Initialize from compliance template
+    # 4. Initialize from business template (compliance etc.) via ext_hooks —
+    #    核心不 import 业务模板管理器（§18.3 缝改造）；biz 缺席 = 无初始化器 = 跳过。
     compliance_init_result = None
     if request.compliance_template:
         try:
-            from dawei.workspace.compliance_template import ComplianceTemplateManager
-            manager = ComplianceTemplateManager()
-            compliance_init_result = await manager.init_workspace_from_template(
+            from dawei.core.ext_hooks import run_workspace_template_initializers
+
+            compliance_init_result = await run_workspace_template_initializers(
                 workspace_path=str(workspace_path),
                 template_slug=request.compliance_template,
                 form_data=request.compliance_form_data or {},
                 storage=workspace_storage,
             )
-            logger.info(
-                "[COMPLIANCE] Template '%s' initialized for workspace %s: %s",
-                request.compliance_template,
-                workspace_id,
-                compliance_init_result,
-            )
+            if compliance_init_result is not None:
+                logger.info(
+                    "[COMPLIANCE] Template '%s' initialized for workspace %s: %s",
+                    request.compliance_template,
+                    workspace_id,
+                    compliance_init_result,
+                )
+            else:
+                logger.warning(
+                    "[COMPLIANCE] No template initializer claimed '%s' for workspace %s "
+                    "(biz absent or unknown slug)",
+                    request.compliance_template,
+                    workspace_id,
+                )
         except Exception as e:
             logger.error(
                 "[COMPLIANCE] Failed to init compliance template for workspace %s: %s",

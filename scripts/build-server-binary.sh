@@ -67,11 +67,33 @@ if [[ -n "${DAWEI_RUNTIME_STAMP:-}" ]]; then
   echo "==> Mode stamp: ${DAWEI_RUNTIME_STAMP}"
 fi
 
+# ---- Biz backend inclusion (拆库方案 §18 S8 缝) ----
+# DAWEI_BIZ_PKG: davybot-biz 项目目录 (engine/biz)。设置后 uv run 以 --with 注入
+# 临时构建层 (wheel 化安装, 非 editable — 冻结干净), build-binary.py 检测到
+# dawei_biz 即 --collect-all dawei_biz + --copy-metadata davybot-biz (注册缝
+# entry points 冻结可见)。未设 = 核心纯净构建 (desktop/server, 业务不在场 = 不存在)。
+# 调用方: davy-ops build-saas.sh (saas) / 闭源 enterprise workflow (enterprise desktop)。
+BIZ_WITH_ARGS=()
+if [[ -n "${DAWEI_BIZ_PKG:-}" ]]; then
+  if [[ ! -d "$DAWEI_BIZ_PKG" ]]; then
+    echo "ERROR: DAWEI_BIZ_PKG set but not a dir: $DAWEI_BIZ_PKG" >&2
+    exit 1
+  fi
+  BIZ_WITH_ARGS=(--with "$DAWEI_BIZ_PKG")
+  echo "==> Biz backend: $DAWEI_BIZ_PKG (davybot-biz, frozen into bundle)"
+fi
+
 echo "==> Building dawei server binary via build-binary.py"
 echo "    Agent dir: $AGENT_DIR"
 
 cd "$AGENT_DIR"
-uv run --python 3.12 --with pyinstaller python scripts/build-binary.py "${STAMP_ARGS[@]}" "$@"
+# --with e2b --with boto3 --with cryptography: saas 部署所需 ([sandbox]/[workspace-store]
+# extras; CubeSandbox SDK + WorkspaceStore S3)。build-binary.py find_spec 守卫按需
+# collect; desktop 走 build-desktop.sh 自有入口, 不经本脚本。(2026-09-22 demo 两事故
+# 的修复对齐 —— 见 project/scripts/build-server-binary.sh 同段注释。)
+uv run --python 3.12 --with pyinstaller "${BIZ_WITH_ARGS[@]}" \
+  --with e2b --with boto3 --with cryptography \
+  python scripts/build-binary.py "${STAMP_ARGS[@]}" "$@"
 
 # Show result
 BIN="dist/dawei"

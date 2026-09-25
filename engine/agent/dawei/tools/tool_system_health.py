@@ -102,6 +102,9 @@ def audit() -> dict[str, Any]:
         from dawei.tools import tool_catalog as tc
 
         catalog = getattr(tc, "TOOL_CATALOG", None)
+        if catalog is None and hasattr(tc, "get_catalog"):
+            # S2 拆库后：核心目录 + biz 注册条目合一（biz 缺席 = 仅核心目录）
+            catalog = tc.get_catalog()
         if catalog is None:
             # 兜底: 扫描模块级 list
             catalog = next(
@@ -131,14 +134,23 @@ def audit() -> dict[str, Any]:
     # 7. SandboxProvider timeout 契约（facade 强制透传 timeout, provider 必须接受）
     provider_issues: list[str] = []
     try:
-        from dawei.sandbox.agentenv_provider import AgentENVProvider
-        from dawei.sandbox.cubesandbox_provider import CubeSandboxProvider
         from dawei.sandbox.docker_provider import DockerProvider
-        from dawei.sandbox.e2b_provider import E2BProvider
-        from dawei.sandbox.saas_gateway import SaaSGateway
         from dawei.sandbox.subprocess_provider import SubprocessProvider
 
-        for cls in (SubprocessProvider, DockerProvider, E2BProvider, CubeSandboxProvider, AgentENVProvider, SaaSGateway):
+        providers = [SubprocessProvider, DockerProvider]
+
+        # 云 provider 随 davybot-biz（S4 entry points）—— 缺席如实标注, 不算不健康
+        try:
+            from dawei.sandbox.saas_loader import load_saas_module
+
+            providers.append(load_saas_module("agentenv").AgentENVProvider)
+            providers.append(load_saas_module("cubesandbox").CubeSandboxProvider)
+            providers.append(load_saas_module("cubesandbox").E2BProvider)
+            providers.append(load_saas_module("saas_gateway").SaaSGateway)
+        except ImportError as e:
+            provider_issues.append(f"cloud providers skipped: {str(e)[:120]}")
+
+        for cls in providers:
             for meth in ("execute_command", "execute_command_async"):
                 sig = inspect.signature(getattr(cls, meth))
                 if "timeout" not in sig.parameters:

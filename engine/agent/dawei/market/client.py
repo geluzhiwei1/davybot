@@ -3,6 +3,10 @@
 
 """Self-contained HTTP client for the normnomos agent market API.
 
+同名异物消歧：本模块是「资源市场」（装 skill/agent/mcp/knowledge/team）；
+与 davybot-biz 的 market_tools.py（「市场情报」，BUSINESS_MARKET_API_URL →
+market-flow 营销数据 API）无任何关系。
+
 Talks directly to the nn-user-system ``agent_market`` service
 (no default base — requires ``MARKET_API_URL`` or an explicit ``base_url=``).
 

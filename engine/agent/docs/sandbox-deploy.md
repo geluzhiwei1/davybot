@@ -200,7 +200,7 @@ curl -sf http://127.0.0.1:3000/health && echo "CubeSandbox OK"
 # 验证沙箱创建 + tmpfs 遮蔽
 cd agent && uv run python -c "
 from unittest.mock import patch, MagicMock
-from dawei.sandbox.e2b_provider import E2BProvider
+from dawei_biz.saas.e2b_provider import E2BProvider
 from dawei.sandbox.base import from_user_workspace
 
 provider = E2BProvider({})

@@ -115,17 +115,9 @@ from dawei.api import (
     auth,
     checklists,
     checkpoints,
-    compliance,
     conversations,
-    deep_research,  # 深度研究 · 通用框架 (pipelines/share, PRD-gelu-diaoyan §10 #4)
-    deep_research_product,  # 深度研究 · 产品调研 (PRD-gelu-diaoyan)
-    ip_routes,
-    ip_templates,
-    ip_workspace,
     knowledge_bases,
     knowledge_domains,
-    knowledge_uni,
-    license,
     market,
     privacy,
     runtime_api,  # 运行模式统一 API (/api/runtime-info)
@@ -133,19 +125,15 @@ from dawei.api import (
     container_runtime,
     skills,
     system,
-    templates_sync,
     tools,
     websocket,
     workspaces,
     users,
-    admin_sandbox,  # 沙箱管理 Admin API (§14.19)
     sandbox_system,  # 沙箱系统 API (前端安全设置页面)
     shares,  # 工作区分享 Viewer 公开端点 (/api/shares, 方案 §5.2)
 )
 # Internal server-to-server endpoints (not in dawei.api.__init__ to keep that
 # namespace user-facing). Imported here for explicit router registration.
-from dawei.api.internal_agent_stream import router as internal_agent_stream_router
-from dawei.social.router import router as social_router
 from dawei.api.users.security import router as users_security_router
 from dawei.api import global_scheduled_tasks
 from dawei.api.exception_handlers import register_exception_handlers
@@ -280,17 +268,17 @@ async def lifespan(app: FastAPI):
     await evolution_scheduler.start()
     print("[Dawei Server] Evolution scheduler started")
 
-    # Initialize Remote Ping Service — E2 门控:
-    # 仅 auth cap(saas/desktop) 且显式 SUPPORT_SYSTEM_URL 才启动;
-    # 自包含形态(server/tui)零外呼,开源版默认不向云端心跳。
-    from dawei.runtime import get_capabilities
+    # 进程生命周期钩子（S5 ext_hooks 注册表，§18.5-G1 倒挂清零）—— saas ping
+    # 等进程级业务服务由 davybot-biz 在 import 时注册，核心只分发不感知；
+    # E2 门控（auth cap + 显式 SUPPORT_SYSTEM_URL）在各钩子内部，
+    # 自包含形态(server/tui)零外呼，业务缺席 = 无钩子 = 无行为。
+    from dawei.core.ext_hooks import run_lifecycle_startup
 
-    if "auth" in get_capabilities() and os.getenv("SUPPORT_SYSTEM_URL", "").strip():
-        from dawei.remote import start_ping_service
-        await start_ping_service()
-        print("[Dawei Server] Remote ping service started")
+    hooks_started = await run_lifecycle_startup()
+    if hooks_started:
+        print(f"[Dawei Server] {hooks_started} lifecycle hook(s) started")
     else:
-        print("[Dawei Server] Remote ping service disabled (auth cap absent or SUPPORT_SYSTEM_URL unset)")
+        print("[Dawei Server] No lifecycle hooks registered (biz absent = no behavior)")
 
     # 沙箱空闲清理循环 (2026-09-14 修复: cleanup_idle 此前无任何调度方,
     # 空闲沙箱 (>pause 不暂停 / >destroy 不销毁) 会一直常驻)
@@ -336,8 +324,11 @@ async def lifespan(app: FastAPI):
     except ValueError:
         pass  # Not initialized, nothing to clean
 
-    from dawei.remote import stop_ping_service
-    await _safe_shutdown("Remote ping service", stop_ping_service())
+    from dawei.core.ext_hooks import run_lifecycle_shutdown
+
+    hooks_stopped = await run_lifecycle_shutdown()
+    if hooks_stopped:
+        print(f"[Dawei Server] {hooks_stopped} lifecycle hook(s) shut down")
 
     # 停止空闲清理循环 + 销毁全部沙箱会话 (2026-09-14 修复: 此前优雅停机
     # 不销毁沙箱, 进程退出后 _sessions 内存映射丢失, 远端 MicroVM 成孤儿,
@@ -454,7 +445,6 @@ def create_app(host: str = "0.0.0.0", port: int = 8431) -> FastAPI:
 
     # Include all API routers
     app.include_router(tools.router)
-    app.include_router(social_router)
     app.include_router(websocket.router)
     app.include_router(workspaces.router)
     app.include_router(users.router)
@@ -470,28 +460,38 @@ def create_app(host: str = "0.0.0.0", port: int = 8431) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(knowledge_bases.router)
     app.include_router(knowledge_domains.router)
-    app.include_router(knowledge_uni.router)
     app.include_router(market.router)
-    # NOTE: ip_templates.router → ip_workspace.router → ip_routes.router
-    # ip_routes has catch-all /api/ip/{module}/{task_id} that shadows others.
-    app.include_router(ip_templates.router)
-    app.include_router(ip_workspace.router)
-    app.include_router(ip_workspace.portfolio_router)
-    app.include_router(ip_routes.router)
-    app.include_router(compliance.router)
-    app.include_router(deep_research.router)  # 深度研究 · 通用框架 (pipelines/share)
-    app.include_router(deep_research_product.router)  # 深度研究 · 产品调研
-    app.include_router(templates_sync.router)
-    app.include_router(license.router)
+    # 业务路由（knowledge_uni/ip×5/compliance/deep_research×2/templates_sync）
+    # 已随 6b 拆库迁至 davybot-biz，经下方 S3 entry points 装载（ip 链顺序由
+    # dawei_biz.routers 聚合器保证）。
     app.include_router(privacy.router)
     app.include_router(container_runtime.router)
-    app.include_router(admin_sandbox.router)  # 沙箱 Admin (供 nn-user-system SaaS 代理)
     app.include_router(sandbox_system.router)  # 沙箱系统 API (前端安全设置页面)
     app.include_router(runtime_api.router)  # 运行模式统一 API (/api/runtime-info)
-    # Internal server-to-server endpoints (nn-flow orchestrator dispatch).
-    # Mounted with prefix from router (already has /api/internal/agent prefix).
-    # Auth: DAWEI_INTERNAL_TOKEN env var or loopback-only when unset.
-    app.include_router(internal_agent_stream_router)
+    # saas 桶路由（license/admin_sandbox/internal_agent_stream + users remote）
+    # 亦经 S3 聚合器装载。
+
+    # ── 阶段六 6b（拆库方案 §18.3-S3）：业务路由经 entry points 装载 ──────────
+    # 值 = dawei_biz.routers 聚合模块（暴露有序 routers 列表；social/ip/compliance/
+    # deep_research/knowledge_uni/templates_sync 等业务路由全在此）。
+    # 缺席 = 零路由（核心-only 形态）；装了 biz 但加载/注册失败 = FAST FAIL，
+    # 不允许半 boot。
+    from importlib.metadata import entry_points
+
+    for _ep in entry_points(group="dawei.routers"):
+        try:
+            _mod = _ep.load()
+            _biz_routers = list(getattr(_mod, "routers", None) or [])
+            if not _biz_routers:
+                _r = getattr(_mod, "router", None)
+                if _r is None:
+                    raise AttributeError(f"module {_ep.value} exposes no 'router(s)'")
+                _biz_routers = [_r]
+            for _r in _biz_routers:
+                app.include_router(_r)
+            logger.info(f"[S3] loaded {len(_biz_routers)} biz routers from entry '{_ep.name}'")
+        except Exception as e:
+            raise RuntimeError(f"[S3] biz router entry '{_ep.name}' ({_ep.value}) failed: {e}") from e
 
     # Register unified exception handlers
     register_exception_handlers(app)

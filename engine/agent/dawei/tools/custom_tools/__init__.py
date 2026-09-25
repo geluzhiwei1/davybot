@@ -13,6 +13,10 @@ This package provides a comprehensive set of tools organized by functionality:
 - Knowledge Tools: Knowledge base search and RAG
 - Docx Tools: DOCX reading, editing, diffing
 - Cost Tools: LLM usage cost tracking and optimization
+
+阶段六（拆库方案 §18.3-S1）：业务工具模块（sanctions/normflow/market/research/
+social_draft/legal_knowledge）不再经本 __init__ re-export —— 由 CustomToolProvider
+显式装载；6b 改 entry points（dawei.tools）随 dawei_biz 包迁移。
 """
 
 # Original tools
@@ -29,102 +33,19 @@ from .docx_read_tool import DocxReadStructuredTool
 from .edit_tools import InsertContentTool, WriteToFileTool
 from .expand_tool_result import ExpandToolResultTool
 
-# Knowledge base tools
+# Knowledge base tools（通用本地知识栈；Legal* 已拆至 legal_knowledge_tools.py）
 from .knowledge_tool import (
     KnowledgeRAGTool,
     KnowledgeSearchTool,
-    LegalAnalyticsTool,
-    LegalAskTool,
-    LegalDocumentTimelineTool,
-    LegalDocumentTool,
-    LegalGraphSearchTool,
-    LegalKnowledgeBasesTool,
-    LegalSearchFacetsTool,
-    LegalSearchTool,
 )
 from .mcp_tools import AccessMCPResource, ConnectMCPServer, DisconnectMCPServer, ListMCPServers, UseMCPTool
-
-# Market Flow business tools (multi-tenant, per-user JWT — MarketingAgent 编队, group "market")
-from .market_tools import (
-    MARKET_TOOLS,
-    MarketCalibrationTool,
-    MarketCompetitorContentsTool,
-    MarketCompetitorProfileTool,
-    MarketDashboardTool,
-    MarketDraftActionTool,
-    MarketEvaluateDemandTool,
-    MarketGenerateProfileTool,
-    MarketGenerateReportTool,
-    MarketGeoChecksTool,
-    MarketGeoSummaryTool,
-    MarketGetEventTool,
-    MarketGetSignalTool,
-    MarketInsightFeedbackTool,
-    MarketListActionsTool,
-    MarketListBriefsTool,
-    MarketListCompetitorsTool,
-    MarketListEventsTool,
-    MarketListInsightsTool,
-    MarketListKeywordSetsTool,
-    MarketListOpportunitiesTool,
-    MarketListProductsTool,
-    MarketListSignalsTool,
-    MarketRunGeoTool,
-    MarketRunPipelineTool,
-    MarketRunSnapshotTool,
-    MarketRunSourceTool,
-    MarketSeoChecksTool,
-    MarketTrendsTool,
-)
 
 # Memory tools
 from .memory_tools import SaveMemoryTool
 
-# NormFlow business tools (multi-tenant, per-user JWT — replaces old normflow MCP)
-from .normflow_tools import (
-    NORMFLOW_TOOLS,
-    NormflowAdvanceWorkflowTool,
-    NormflowCaseDetailTool,
-    NormflowCaseDocumentsTool,
-    NormflowCaseTasksTool,
-    NormflowCaseTimesheetTool,
-    NormflowClientCasesTool,
-    NormflowClientDetailTool,
-    NormflowCreateFollowUpTool,
-    NormflowPaymentStatusTool,
-    NormflowSearchCasesTool,
-    NormflowSearchClientsTool,
-    NormflowWorkflowTemplatesTool,
-)
-
 # Custom tools
 from .read_tools import ListFilesTool, ReadFileTool
 
-# Research Flow business tools (multi-tenant, per-user JWT — gelu-research-team, group "research")
-from .research_tools import (
-    RESEARCH_TOOLS,
-    ResearchJournalLookupTool,
-    ResearchJournalRubricTool,
-    ResearchJournalSuggestTool,
-    ResearchPaperGetTool,
-    ResearchPaperImportTool,
-    ResearchPaperSearchTool,
-    ResearchReviewRunCreateTool,
-    ResearchReviewSubmitTool,
-    ResearchSubmissionCheckTool,
-)
-
-# Sanctions tools (multi-tenant, per-user JWT — replaces old sanctions MCP)
-from .sanctions_tools import (
-    SanctionsDashboardTool,
-    SanctionsFiltersTool,
-    SanctionsGetEntityTool,
-    SanctionsGraphTool,
-    SanctionsMonitoringTool,
-    SanctionsScreenTool,
-    SanctionsSearchTool,
-    SanctionsWatchlistTool,
-)
 from .search_tools import SearchToolsTool
 from .smart_file_edit import SmartFileEditTool
 
@@ -181,72 +102,13 @@ __all__ = [
     "WaitTasksTool",
     # Timer/Scheduler Tools
     "TimerTool",
-    # Knowledge Base Tools
+    # Knowledge Base Tools（通用）
     "KnowledgeSearchTool",
     "KnowledgeRAGTool",
-    # Legal Search Tools (nn-kb-searcher)
-    "LegalSearchTool",
-    "LegalAskTool",
-    "LegalDocumentTool",
+    # Memory Tools
+    "SaveMemoryTool",
     # Docx Tools
     "DocxReadStructuredTool",
     "DocxDiffTool",
     "DocxEditTool",
-    # Market Flow business tools (market-team only, group "market")
-    "MARKET_TOOLS",
-    "MarketDashboardTool",
-    "MarketListProductsTool",
-    "MarketListSignalsTool",
-    "MarketGetSignalTool",
-    "MarketListEventsTool",
-    "MarketGetEventTool",
-    "MarketListBriefsTool",
-    "MarketListInsightsTool",
-    "MarketListCompetitorsTool",
-    "MarketCompetitorProfileTool",
-    "MarketCompetitorContentsTool",
-    "MarketTrendsTool",
-    "MarketGeoSummaryTool",
-    "MarketGeoChecksTool",
-    "MarketSeoChecksTool",
-    "MarketListKeywordSetsTool",
-    "MarketListActionsTool",
-    "MarketListOpportunitiesTool",
-    "MarketCalibrationTool",
-    "MarketRunPipelineTool",
-    "MarketRunSourceTool",
-    "MarketRunGeoTool",
-    "MarketRunSnapshotTool",
-    "MarketGenerateProfileTool",
-    "MarketGenerateReportTool",
-    "MarketDraftActionTool",
-    "MarketEvaluateDemandTool",
-    "MarketInsightFeedbackTool",
-    # Memory Tools
-    "SaveMemoryTool",
-    # NormFlow business tools (firm-team only, group "normflow")
-    "NORMFLOW_TOOLS",
-    "NormflowSearchCasesTool",
-    "NormflowCaseDetailTool",
-    "NormflowCaseTasksTool",
-    "NormflowCaseTimesheetTool",
-    "NormflowCaseDocumentsTool",
-    "NormflowAdvanceWorkflowTool",
-    "NormflowWorkflowTemplatesTool",
-    "NormflowSearchClientsTool",
-    "NormflowClientDetailTool",
-    "NormflowClientCasesTool",
-    "NormflowCreateFollowUpTool",
-    "NormflowPaymentStatusTool",
-    # Research Flow business tools (gelu-research-team only, group "research")
-    "RESEARCH_TOOLS",
-    "ResearchJournalLookupTool",
-    "ResearchJournalRubricTool",
-    "ResearchPaperSearchTool",
-    "ResearchPaperGetTool",
-    "ResearchPaperImportTool",
-    "ResearchReviewRunCreateTool",
-    "ResearchReviewSubmitTool",
-    "ResearchJournalSuggestTool",
-    "ResearchSubmissionCheckTool",
 ]

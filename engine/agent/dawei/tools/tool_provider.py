@@ -97,7 +97,6 @@ class CustomToolProvider(ToolProvider):
                 knowledge_tool,
                 mcp_tools,
                 read_tools,
-                social_draft_tools,
                 timer_tools,
             )
 
@@ -112,11 +111,22 @@ class CustomToolProvider(ToolProvider):
                 a2ui_tools,
                 knowledge_tool,
                 cost_tools,
-                social_draft_tools,
             ]
 
             # Also check the top-level custom_tools __init__ for any directly defined/imported tools
             tool_modules.append(custom_tools)
+
+            # 阶段六 6b（拆库方案 §18.3-S1）：业务工具经 entry point group
+            # "dawei.tools" 装载（值 = 模块名，import 即注册；缺席 = 零注册 ——
+            # 业务不在场=不存在）。ImportError → WARNING 语义不变（可选依赖），
+            # 核心清单回归纯核心。
+            from importlib.metadata import entry_points
+
+            for _ep in entry_points(group="dawei.tools"):
+                try:
+                    tool_modules.append(_ep.load())
+                except Exception as e:  # noqa: BLE001 —— 业务工具缺席不阻断核心装载
+                    logger.warning(f"[S1] biz tools entry '{_ep.name}' failed to load: {e}", exc_info=True)
 
             unique_tools = {}
 

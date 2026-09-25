@@ -79,8 +79,8 @@ class OpenRouterClient(BaseClient):
             "Content-Type": "application/json",
             "Accept": "application/json",
             "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": "https://github.com/RooVetGit/Roo-Code",
-            "X-Title": "Roo Code",
+            "HTTP-Referer": "https://www.davybot.com",
+            "X-Title": "DavyBot",
         }
 
     async def _load_dynamic_models(self) -> None:
@@ -403,8 +403,8 @@ class OpenRouterClient(BaseClient):
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/RooVetGit/Roo-Code",
-                "X-Title": "Roo Code",
+                "HTTP-Referer": "https://www.davybot.com",
+                "X-Title": "DavyBot",
             }
 
             logger.info(f"Generating image with model: {model}")

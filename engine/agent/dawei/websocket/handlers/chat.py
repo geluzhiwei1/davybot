@@ -1550,35 +1550,16 @@ class ChatHandler(AsyncMessageHandler):
             logger.error(f"[CHAT_HANDLER] Error executing agent: {e}", exc_info=True)
             raise
         finally:
-            # MarketingAgent 编队可观测性(E1 徽标):任务结束(成功/失败)→ 活跃子智能体
-            # 归位 idle;非 market 工作区为 no-op(失败仅告警,不影响对话)。
+            # 编队 idle 可观测性(E1 徽标):任务结束(成功/失败)→ 各编队活跃子智能体
+            # 归位 idle。阶段六 6a(S5):核心不再感知 social/market/research 各编队——
+            # 经扩展钩子注册表分发,业务缺席=无行为(失败仅告警,不影响对话)。
             try:
-                from dawei.websocket.market_fleet import mark_workspace_idle
+                from dawei.core.ext_hooks import notify_task_idle_observers
 
                 ws = getattr(agent, "user_workspace", None)
-                await mark_workspace_idle(getattr(ws, "workspace_id", "") or "")
+                await notify_task_idle_observers(getattr(ws, "workspace_id", "") or "")
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"[CHAT_HANDLER] market fleet idle broadcast failed: {e}")
-
-            # SocialAgent 编队可观测性(E1 徽标,镜像 market):任务结束 → 活跃
-            # 子智能体归位 idle;非 social 工作区为 no-op(失败仅告警,不影响对话)。
-            try:
-                from dawei.websocket.social_fleet import mark_social_workspace_idle
-
-                ws = getattr(agent, "user_workspace", None)
-                await mark_social_workspace_idle(getattr(ws, "workspace_id", "") or "")
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"[CHAT_HANDLER] social fleet idle broadcast failed: {e}")
-
-            # GeluResearch 编队可观测性(E1 徽标,镜像 social):任务结束 → 活跃
-            # 子智能体归位 idle;非 research 工作区为 no-op(失败仅告警,不影响对话)。
-            try:
-                from dawei.websocket.research_fleet import mark_research_workspace_idle
-
-                ws = getattr(agent, "user_workspace", None)
-                await mark_research_workspace_idle(getattr(ws, "workspace_id", "") or "")
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"[CHAT_HANDLER] research fleet idle broadcast failed: {e}")
+                logger.debug(f"[CHAT_HANDLER] fleet idle broadcast failed: {e}")
 
     async def _handle_agent_error(
         self,
@@ -2175,26 +2156,16 @@ class ChatHandler(AsyncMessageHandler):
             # 多租户业务工具（kb-searcher / sanctions）按当前用户 JWT 调内部服务。
             # 写入 local_context，工具运行时以 Bearer 透明注入，永不进 LLM 上下文。
             local_context.set_auth_token(auth_token)
-            # 社媒编辑会话上下文(A-M1,设计 A.3):前端 data.social_context{content_id, tenant_id}
-            # 与 auth_token 同通路 —— 工具经 ContextVar 读取,不进 LLM 上下文、不落盘。
-            from dawei.social import session_context as _social_session_ctx
+            # 业务会话上下文抽取(阶段六 6a,S5):各业务域把前端 WS 消息 metadata
+            # 中的域上下文(如社媒编辑会话的 social_context {content_id, tenant_id})
+            # 写入自己的 ContextVar —— 与 auth_token 同通路,不进 LLM 上下文、不落盘。
+            # 核心不感知具体业务,经扩展钩子注册表分发(业务缺席=无行为)。
+            from dawei.core.ext_hooks import apply_session_context_extractors
 
-            _social_ctx_raw = None
-            if isinstance(user_message.metadata, dict):
-                _fd = user_message.metadata.get("frontend_data")
-                if isinstance(_fd, dict):
-                    _social_ctx_raw = _fd.get("social_context")
-                _social_ctx_raw = _social_ctx_raw or user_message.metadata.get("social_context")
-            _social_session_ctx.set_social_context(_social_ctx_raw)
-            # SocialAgent(social-team)兜底:模块级会话不携带 social_context,但需调
-            # 模块级工具(social_lookup_trending / social_rule_check / social_generate_images)
-            # → 绑定租户级上下文(content_id 留空:稿件级工具 read_draft / propose_edit /
-            # validate_artifact 仍要求创作工坊编辑会话内绑定,诚实报"未关联稿件")。
-            if _social_session_ctx.get_social_context() is None:
-                from dawei.websocket.social_fleet import SOCIAL_TEAM_MODES as _SOCIAL_TEAM_MODES
-
-                if getattr(agent, "current_mode", None) in _SOCIAL_TEAM_MODES:
-                    _social_session_ctx.set_social_context({"tenant_id": "default"})
+            apply_session_context_extractors(
+                user_message.metadata if isinstance(user_message.metadata, dict) else None,
+                agent,
+            )
             await self._configure_llm_provider(session_id, task_id, agent, user_workspace, auth_token=auth_token)
 
             # 8. 存储 Agent 实例

@@ -8,7 +8,7 @@
 使用场景(重要):
   - SessionPool/CaptchaGate 为"同事件循环内多任务共享会话"的 asyncio 形态,
     适用于单进程内并发复用 Chrome 会话的高级场景(当前主要为测试所引用)。
-  - 生产社媒浏览器轨(dawei.social.browser_track)采用"每任务独立短会话 +
+  - 生产社媒浏览器轨(dawei_biz.bridges.social.browser_track)采用"每任务独立短会话 +
     线程卸载执行"模型:每个 claim 在工作线程里开全新事件循环跑
     RealBrowserSession,asyncio 原生锁跨不了循环,因此生产路径使用本模块的
     线程安全变体 ExecutionLimiter(threading 语义,同平台互斥 + 全局并发上限),
@@ -107,7 +107,7 @@ class CaptchaGate:
         self._human_gate = None  # 可选:社媒人工关卡(social 层注入,tools 层不依赖)
 
     def attach_human_gate(self, gate) -> None:
-        """接入人工关卡(dawei.social.browser_track.HumanGate)。"""
+        """接入人工关卡(dawei_biz.bridges.social.browser_track.HumanGate)。"""
         self._human_gate = gate
 
     def notify(self, platform: str) -> None:

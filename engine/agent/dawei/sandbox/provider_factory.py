@@ -348,18 +348,20 @@ def _create_docker_provider(config: dict[str, Any]) -> SandboxProvider:
 def _create_e2b_provider(config: dict[str, Any]) -> SandboxProvider:
     """创建 CubeSandboxProvider (旧名 E2BProvider)
 
-    e2b SDK 未安装时显式报错 (fail-fast), 不再降级到 docker/subprocess。
+    e2b SDK / davybot-biz 未安装时显式报错 (fail-fast), 不再降级到 docker/subprocess。
     """
     try:
-        from dawei.sandbox.cubesandbox_provider import CubeSandboxProvider
+        from dawei.sandbox.saas_loader import load_saas_module
+
+        CubeSandboxProvider = load_saas_module("cubesandbox").CubeSandboxProvider
 
         return CubeSandboxProvider(config)
     except ImportError as e:
         from dawei.core.exceptions import SandboxError
 
         raise SandboxError(
-            f"CubeSandbox/E2B SDK 不可用 ({e}) — 请安装沙箱依赖: "
-            'uv pip install -e ".[sandbox]"。拒绝降级到 docker/subprocess。',
+            f"CubeSandbox/E2B SDK 不可用 ({e}) — 云沙箱需安装 davybot-biz 与沙箱依赖: "
+            'uv pip install davybot-biz && uv pip install -e ".[sandbox]"。拒绝降级到 docker/subprocess。',
         )
 
 
@@ -371,28 +373,31 @@ def _create_cubesandbox_provider(config: dict[str, Any]) -> SandboxProvider:
 def _create_agentenv_provider(config: dict[str, Any]) -> SandboxProvider:
     """创建 AgentENVProvider (与 E2B SDK 共享依赖, 缺失即报错)"""
     try:
-        from dawei.sandbox.agentenv_provider import AgentENVProvider
+        from dawei.sandbox.saas_loader import load_saas_module
+
+        AgentENVProvider = load_saas_module("agentenv").AgentENVProvider
 
         return AgentENVProvider(config)
     except ImportError as e:
         from dawei.core.exceptions import SandboxError
 
         raise SandboxError(
-            f"AgentENV SDK 不可用 ({e}) — 请安装沙箱依赖: "
-            'uv pip install -e ".[sandbox]"。拒绝降级到 docker/subprocess。',
+            f"AgentENV SDK 不可用 ({e}) — 云沙箱需安装 davybot-biz 与沙箱依赖: "
+            'uv pip install davybot-biz && uv pip install -e ".[sandbox]"。拒绝降级到 docker/subprocess。',
         )
 
 
 def _create_saas_gateway(config: dict[str, Any]) -> SandboxProvider:
     """创建 SaaSGateway — 按 workspace 路由到 CubeSandbox / AgentENV"""
     try:
-        from dawei.sandbox.saas_gateway import SaaSGateway
+        from dawei.sandbox.saas_loader import load_saas_module
+
+        SaaSGateway = load_saas_module("saas_gateway").SaaSGateway
 
         return SaaSGateway(config)
     except ImportError as e:
         from dawei.core.exceptions import SandboxError
 
         raise SandboxError(
-            f"SaaSGateway 创建失败 ({e}) — 请安装沙箱依赖: "
-            'uv pip install -e ".[sandbox]"。拒绝降级。',
+            f"SaaSGateway 创建失败 ({e}) — 云沙箱需安装 davybot-biz。拒绝降级。",
         )

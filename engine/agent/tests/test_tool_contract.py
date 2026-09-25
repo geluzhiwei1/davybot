@@ -154,7 +154,10 @@ class TestEnforcementPoints:
 
 
 def _discover_all_tools() -> list:
-    """按 CustomToolProvider.get_tools 的同一批模块扫描全部工具类并实例化。"""
+    """按 CustomToolProvider.get_tools 的同一通路扫描全部工具类并实例化。
+
+    biz 工具经 entry point group "dawei.tools" 装载（S1，与 provider 完全同源）。
+    """
     from dawei.tools import a2ui_tools, custom_tools
     from dawei.tools.custom_tools import (
         acp_tools,
@@ -164,9 +167,9 @@ def _discover_all_tools() -> list:
         knowledge_tool,
         mcp_tools,
         read_tools,
-        social_draft_tools,
         timer_tools,
     )
+    from importlib.metadata import entry_points
 
     modules = [
         edit_tools,
@@ -178,9 +181,11 @@ def _discover_all_tools() -> list:
         a2ui_tools,
         knowledge_tool,
         cost_tools,
-        social_draft_tools,
         custom_tools,
     ]
+    # biz 模块（阶段六 6b S1：与 provider 同一 entry point 通路装载）
+    for _ep in entry_points(group="dawei.tools"):
+        modules.append(_ep.load())
 
     seen_classes: set[type] = set()
     instances = []

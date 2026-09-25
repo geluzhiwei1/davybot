@@ -84,7 +84,12 @@ import importlib.util as _ilu
 # botocore 的 endpoints JSON 按区域动态加载, 必须 collect-all 而非 hiddenimports。
 # 同样走 find_spec 守卫: build-server-binary.sh 传 --with boto3 --with cryptography,
 # desktop 构建环境没有 boto3 就自然跳过。
-OPTIONAL_COLLECT = ["e2b", "opentelemetry", "boto3", "botocore", "cryptography"]
+#
+# dawei_biz — 业务扩展后端 (拆库方案 §18.3 双项目, dist davybot-biz)。S8 缝:
+# saas/enterprise 构建经 DAWEI_BIZ_PKG 以 uv --with 注入 (wheel 化, 非 editable),
+# 此处 find_spec 检测到即 --collect-all; desktop/server 核心构建无之 → 跳过
+# (「业务不在场 = 不存在」在二进制形态同样成立)。onefile 冻结可见性 = G5 (6d 实测)。
+OPTIONAL_COLLECT = ["e2b", "opentelemetry", "boto3", "botocore", "cryptography", "dawei_biz"]
 
 # No ADD_DATA: --collect-all dawei already bundles every submodule + data file
 # under the package (templates, locales, configs). Re-adding the raw `dawei`
@@ -183,6 +188,13 @@ def build(clean: bool = False, use_upx: bool = True, name: str = "dawei",
         else:
             print(f"[build-binary] NOTE: optional '{pkg}' not in build env — skipped "
                   f"(saas/CubeSandbox binaries need it: add '--with {pkg}' to uv run)")
+
+    # dawei_biz 的注册缝 (S1/S3/S4 entry points) 经 importlib.metadata 发现;
+    # --collect-all 只收模块不收 dist-info → 须 --copy-metadata 让冻结态
+    # entry_points() 可见 (S8, 拆库方案 §18; onefile 实证 = G5/6d)。
+    if _ilu.find_spec("dawei_biz"):
+        cmd.extend(["--copy-metadata", "davybot-biz"])
+        print("[build-binary] Copying dist metadata: davybot-biz (entry points 冻结可见性)")
 
     # Force UTF-8 file I/O in the frozen app (zh-CN Windows defaults to GBK).
     if RUNTIME_HOOK.exists():

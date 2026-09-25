@@ -1,9 +1,11 @@
 name: CI
 
-# 拆库方案 §6 开源仓 CI 矩阵（engine × app × tui × server 零外呼冒烟）。
-# 门禁策略（沿 backend-ci.yml 惯例 + E5 收口）:
-#   BLOCKING: 云默认守卫(E5) / 工具系统门禁 / app lint+typecheck+vitest+核心构建 / server 冒烟断言
-#   NON-BLOCKING: 全量 unit（存量环境型失败未清零前只出报告）、ruff format / mypy
+# 拆库方案 §6 开源仓 CI 矩阵（engine × app × tui × server 零外呼冒烟）
+# + §18.6 6c-4 双项目形态：engine-biz job（双装 G3 恒等门禁）。
+# 门禁策略（沿 backend-ci.yml 惯例 + E5 收口 + §18.5 验收门）:
+#   BLOCKING: 云默认守卫(E5/G4) / 工具系统门禁 / 拆库守卫 G1·G2·G6 / G3 双装恒等 /
+#             app lint+typecheck+vitest+核心构建 / server 冒烟断言
+#   NON-BLOCKING: 全量 unit（存量环境型失败未清零前只出报告）、biz 全量、ruff format / mypy
 on:
   push:
     branches: [main]
@@ -54,6 +56,12 @@ jobs:
 
       - name: Tool system gate (BLOCKING)
         run: pytest tests/test_tool_contract.py tests/test_tool_system_health.py tests/test_smart_file_edit.py -v --tb=short
+
+      # 拆库方案 §18.5 验收门（核心侧；只装核心即须全绿 —— 「业务不在场 = 不存在」）:
+      #   G1 核心树 AST 零 dawei_biz import / G6 核心测试套件零 biz 残留
+      #   G2 核心纯净冷启动：caps==["relay"]、catalog==核心 18 项、双装环境亦不得加载 biz
+      - name: Split guards G1/G2/G6 (BLOCKING)
+        run: pytest tests/test_biz_isolation.py tests/test_core_purity.py -v --tb=short
 
       - name: Unit tests (non-blocking until legacy env-dependent failures triaged)
         run: pytest -m unit -q --tb=short || true
@@ -212,3 +220,36 @@ jobs:
           EOF
           UI_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8932/app-ui/)
           [ "$UI_CODE" = "200" ] || { echo "app-ui HTTP $UI_CODE"; tail -50 /tmp/dawei-desktop-smoke.log; exit 1; }
+
+  # 拆库方案 §18.6 6c-4：双项目形态 biz 包 CI（§18.4 双装矩阵：engine/agent + engine/biz）。
+  #   BLOCKING : G3 全量恒等 —— 双装后 catalog / API 路由与拆分前快照 diff = ∅
+  #              （快照: engine/biz/tests/snapshots/，provenance 见 test_split_identity.py）
+  #   NON-BLOCKING: biz 全量套件（存量环境型依赖未清零前只出报告，沿 §6 惯例）
+  engine-biz:
+    name: Biz package & split identity (G3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # 双装（§18.4 安装矩阵）：核心与 biz 同装，注册缝（S1/S3/S4/S5）方可见
+      - name: Install engine + biz (dual)
+        env:
+          UV_SYSTEM_PYTHON: 1
+        run: uv pip install --system -e "engine/agent[dev]" -e "engine/biz[dev]"
+
+      - name: G3 dual-install identity (BLOCKING)
+        working-directory: engine/biz
+        run: pytest tests/test_split_identity.py -v --tb=short
+
+      - name: Biz test suite (non-blocking until legacy env-dependent failures triaged)
+        working-directory: engine/biz
+        run: pytest tests -q --tb=short || true

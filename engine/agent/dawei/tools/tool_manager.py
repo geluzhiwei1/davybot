@@ -76,101 +76,13 @@ TOOL_GROUPS = {
             "save_memory",
         ],
     },
+    # 注：legal_* 8 工具属 biz（dawei_biz legal_knowledge_tools），经
+    # register_tool_group("knowledge", ...) 合并入本组 —— biz 缺席时本组仅含
+    # 核心 2 个用户知识库工具（业务不在场 = 不存在）。
     "knowledge": {
         "custom_tools": [
             "search_user_knowledge_base",
             "query_user_knowledge_base",
-            "search_legal_knowledge",
-            "ask_legal_question",
-            "get_legal_document",
-            "list_legal_knowledge_bases",
-            "legal_search_facets",
-            "legal_graph_search",
-            "legal_analytics",
-            "legal_document_timeline",
-        ],
-    },
-    "social": {
-        "custom_tools": [
-            "social_read_draft",
-            "social_rule_check",
-            "social_lookup_trending",
-            "social_propose_edit",
-            "social_validate_artifact",
-            "social_generate_images",
-        ],
-    },
-    "sanctions": {
-        "custom_tools": [
-            "sanctions_search_entities",
-            "sanctions_get_entity",
-            "sanctions_graph_search",
-            "sanctions_screen_entity",
-            "sanctions_create_watchlist",
-            "sanctions_run_monitoring_check",
-            "sanctions_dashboard",
-            "sanctions_filters",
-        ],
-    },
-    "normflow": {
-        "custom_tools": [
-            "normflow_search_cases",
-            "normflow_get_case_detail",
-            "normflow_get_case_tasks",
-            "normflow_get_case_timesheet",
-            "normflow_get_case_documents",
-            "normflow_advance_workflow",
-            "normflow_get_workflow_templates",
-            "normflow_search_clients",
-            "normflow_get_client_detail",
-            "normflow_get_client_cases",
-            "normflow_create_follow_up",
-            "normflow_get_payment_status",
-        ],
-    },
-    "market": {
-        "custom_tools": [
-            "market_dashboard",
-            "market_list_products",
-            "market_list_signals",
-            "market_get_signal",
-            "market_list_events",
-            "market_get_event",
-            "market_list_briefs",
-            "market_list_insights",
-            "market_list_competitors",
-            "market_competitor_profile",
-            "market_competitor_contents",
-            "market_trends",
-            "market_geo_summary",
-            "market_geo_checks",
-            "market_seo_checks",
-            "market_list_keyword_sets",
-            "market_list_actions",
-            "market_list_opportunities",
-            "market_calibration",
-            "market_run_pipeline",
-            "market_run_source",
-            "market_run_geo",
-            "market_run_snapshot",
-            "market_generate_profile",
-            "market_generate_report",
-            "market_draft_action",
-            "market_evaluate_demand",
-            "market_insight_feedback",
-        ],
-    },
-    "research": {
-        "custom_tools": [
-            "research_journal_lookup",
-            "research_journal_rubric",
-            "research_journal_suggest",
-            "research_paper_search",
-            "research_paper_get",
-            "research_paper_import",
-            "research_review_run_create",
-            "research_review_submit",
-            "research_submission_check",
         ],
     },
     "docx": {
@@ -194,7 +106,7 @@ TOOL_GROUPS = {
         # 浏览器能力分两条线,均不经此组加载:
         #   1. 互联网检索:三档 internet-search-* MCP 家族(http 直连/无头/真机
         #      Chrome,market: common-team/mcps),经 MCPToolManager 动态注册;
-        #   2. 社媒发布/采集:dawei.social 浏览器轨,仅本机执行端(桌面 sidecar/
+        #   2. 社媒发布/采集:dawei_biz.bridges.social 浏览器轨,仅本机执行端(桌面 sidecar/
         #      light-app 壳)claim 执行,SaaS 云引擎不跑(见 social/router.py 守卫)。
         "tools": [],
     },
@@ -202,6 +114,65 @@ TOOL_GROUPS = {
         "tools": [],  # TaskGraph tools are injected by workspace, not static
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# S2 工具组注册缝（拆库方案 §18.3）：核心静态组 + 扩展动态注册，单向 biz→core。
+#
+# biz 包（davybot-biz）在自身 __init__ 中调用 register_tool_group() 注册
+# sanctions/normflow/market/research/social 组，并向同名组（knowledge）合并
+# legal_* 工具 —— 组名与既有 workspace modes.yaml 的 groups 声明保持稳定。
+# biz 缺席 = 组不存在（get_group_tools 对未知组仅告警并返回空集，
+# "业务不在场 = 不存在"）。
+# ---------------------------------------------------------------------------
+
+_EXTRA_TOOL_GROUPS: Dict[str, Dict[str, List[str]]] = {}
+
+
+def register_tool_group(
+    name: str,
+    tools: List[str] | None = None,
+    custom_tools: List[str] | None = None,
+) -> None:
+    """注册扩展工具组（biz 包 import 时调用；同名组 = 合并语义）。
+
+    - 新名字 → 新增组；
+    - 与核心 TOOL_GROUPS 或先前注册同名 → 追加 tools/custom_tools 并去重
+      （保序：既有在前），用于 biz 向核心 knowledge 组合并 legal_* 工具。
+
+    幂等：重复注册同一名字/清单无副作用（去重保证）。
+
+    Raises:
+        ValueError: name 为空或非 str（FAST FAIL，配置错误立即暴露）。
+    """
+    if not name or not isinstance(name, str):
+        raise ValueError(f"invalid tool group name: {name!r}")
+    entry = _EXTRA_TOOL_GROUPS.setdefault(name, {"tools": [], "custom_tools": []})
+    for key, values in (("tools", tools or []), ("custom_tools", custom_tools or [])):
+        merged = entry[key]
+        for v in values:
+            if v not in merged:
+                merged.append(v)
+
+
+def get_all_tool_groups() -> Dict[str, Dict[str, Any]]:
+    """全量工具组 = 核心 TOOL_GROUPS + 注册的扩展组（同名合并，核心在前）。
+
+    Returns:
+        形如 {name: {"tools": [...], "custom_tools": [...]}} 的字典（副本，
+        修改不影响注册表）。
+    """
+    merged: Dict[str, Dict[str, Any]] = {
+        name: {"tools": list(g.get("tools", [])), "custom_tools": list(g.get("custom_tools", []))}
+        for name, g in TOOL_GROUPS.items()
+    }
+    for name, extra in _EXTRA_TOOL_GROUPS.items():
+        entry = merged.setdefault(name, {"tools": [], "custom_tools": []})
+        for key in ("tools", "custom_tools"):
+            for v in extra[key]:
+                if v not in entry[key]:
+                    entry[key].append(v)
+    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -870,11 +841,12 @@ class ToolManager:
             List[ToolConfig]: 该组中的工具配置列表
 
         """
-        if group_name not in TOOL_GROUPS:
+        all_groups = get_all_tool_groups()
+        if group_name not in all_groups:
             logger.warning(f"Unknown tool group: {group_name}")
             return []
 
-        group_config = ToolGroupConfig.from_dict(TOOL_GROUPS[group_name])
+        group_config = ToolGroupConfig.from_dict(all_groups[group_name])
         tools = []
 
         # 获取主要工具
@@ -899,7 +871,7 @@ class ToolManager:
             Dict[str, ToolGroupConfig]: 所有工具组的配置字典
 
         """
-        return {group_name: ToolGroupConfig.from_dict(group_data) for group_name, group_data in TOOL_GROUPS.items()}
+        return {group_name: ToolGroupConfig.from_dict(group_data) for group_name, group_data in get_all_tool_groups().items()}
 
     def get_group_tools(self, group_names: List[Any]) -> set[str]:
         """获取指定工具组中的所有工具名称
@@ -912,6 +884,7 @@ class ToolManager:
 
         """
         tool_names = set()
+        all_groups = get_all_tool_groups()
 
         for item in group_names:
             # 处理字典类型的group配置
@@ -923,11 +896,11 @@ class ToolManager:
             else:
                 group_name = str(item)
 
-            if group_name not in TOOL_GROUPS:
+            if group_name not in all_groups:
                 logger.warning(f"Unknown tool group: {group_name}")
                 continue
 
-            group_config = ToolGroupConfig.from_dict(TOOL_GROUPS[group_name])
+            group_config = ToolGroupConfig.from_dict(all_groups[group_name])
 
             # 添加主要工具
             tool_names.update(group_config.tools)
