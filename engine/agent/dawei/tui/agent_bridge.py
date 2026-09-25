@@ -28,6 +28,11 @@ from dawei.workspace.user_workspace import UserWorkspace
 
 logger = logging.getLogger(__name__)
 
+# 与 server 自包含模式身份统一（= dawei/api/auth.py LOCAL_USER_ID，勿改名）。
+# TUI 无认证态：未显式指定 --user 且注册表查不到 owner 时回落到该身份，
+# 使 LLM/MCP 等用户级配置与 server 加载同一份（configs/local-user/）。
+_SERVER_LOCAL_USER_ID = "local-user"
+
 
 class AgentBridge:
     """Bridge between TUI and Agent.
@@ -42,6 +47,7 @@ class AgentBridge:
         llm_model: str,
         mode: str,
         ui_update_queue: asyncio.Queue,
+        user_id: str = "",
     ):
         """Initialize AgentBridge
 
@@ -50,12 +56,14 @@ class AgentBridge:
             llm_model: LLM model identifier
             mode: Agent mode
             ui_update_queue: Queue for forwarding events to UI
+            user_id: 运行时用户身份（空=自动解析：--user > 注册表 owner_user_id > local-user）
 
         """
         self.workspace_path = Path(workspace_path).resolve()
         self.llm_model = llm_model
         self.mode = mode
         self.ui_queue = ui_update_queue
+        self.user_id = user_id or ""
 
         # Agent and workspace (initialized later)
         self.agent: Agent | None = None
@@ -94,6 +102,35 @@ class AgentBridge:
         self._is_initialized = True
         logger.info("AgentBridge initialization complete")
 
+    def _resolve_user_id(self) -> str:
+        """解析 TUI 运行时用户身份（与 server 版统一）
+
+        优先级：
+            1. --user 显式指定
+            2. 工作区注册表（workspaces.json）的 owner_user_id（server 端同源）
+            3. local-user（server 自包含模式固定身份，见 api/auth.py LOCAL_USER_ID）
+
+        Returns:
+            用户 ID（总返回非空值）
+        """
+        if self.user_id:
+            logger.info(f"[AGENT_BRIDGE] User identity from --user: {self.user_id}")
+            return self.user_id
+
+        try:
+            from dawei.workspace.workspace_manager import workspace_manager
+
+            info = workspace_manager.get_workspace_by_path(str(self.workspace_path))
+            owner = (info or {}).get("owner_user_id") or ""
+            if owner:
+                logger.info(f"[AGENT_BRIDGE] User identity from registry owner: {owner}")
+                return owner
+        except Exception as e:
+            logger.warning(f"[AGENT_BRIDGE] Registry owner lookup failed, fallback to '{_SERVER_LOCAL_USER_ID}': {e}")
+
+        logger.info(f"[AGENT_BRIDGE] User identity fallback to server local identity: {_SERVER_LOCAL_USER_ID}")
+        return _SERVER_LOCAL_USER_ID
+
     async def _initialize_workspace(self) -> None:
         """Initialize UserWorkspace
 
@@ -103,6 +140,13 @@ class AgentBridge:
         """
         try:
             self.user_workspace = UserWorkspace(workspace_path=str(self.workspace_path))
+            # 身份注入须在 initialize() 之前（context 按 (path, user_id) 分键，
+            # 与 server 端 websocket/handlers/chat.py 同一模式）：
+            #   --user 显式指定 > 注册表 owner_user_id > local-user（server 自包含身份）
+            resolved_user = self._resolve_user_id()
+            if resolved_user:
+                self.user_workspace.user_id = resolved_user
+                logger.info(f"[AGENT_BRIDGE] Workspace user identity: {resolved_user} (path={self.workspace_path})")
             await self.user_workspace.initialize()
         except FileNotFoundError:
             raise WorkspaceError(f"Workspace path not found: {self.workspace_path}")

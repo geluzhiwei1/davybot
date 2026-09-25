@@ -31,6 +31,13 @@ import click
     help="[OPTIONAL] Agent mode: plan or build (if not specified, loaded from workspace config)",
 )
 @click.option(
+    "--user",
+    "-u",
+    default=None,  # None means auto-resolve (registry owner_user_id > local-user)
+    show_default=False,
+    help="[OPTIONAL] Runtime user identity, aligned with server (default: registry owner > local-user)",
+)
+@click.option(
     "--refresh-rate",
     type=float,
     default=0.1,
@@ -46,7 +53,7 @@ import click
 )
 @click.option("--super", is_flag=True, help="⚠️  Enable super mode (bypass all security)")
 @click.pass_context
-def tui_cmd(ctx, workspace, llm, mode, refresh_rate, theme, super):
+def tui_cmd(ctx, workspace, llm, mode, user, refresh_rate, theme, super):
     """Start the Dawei Terminal User Interface (TUI).
 
     The TUI provides a full-featured terminal-based interface with:
@@ -76,6 +83,10 @@ def tui_cmd(ctx, workspace, llm, mode, refresh_rate, theme, super):
         click.echo(f"   Mode: {mode}")
     else:
         click.echo("   Mode: <from config>")
+    if user:
+        click.echo(f"   User: {user}")
+    else:
+        click.echo("   User: <auto: registry owner > local-user>")
     click.echo(f"   Theme: {theme}")
 
     if super_mode:
@@ -114,6 +125,10 @@ def tui_cmd(ctx, workspace, llm, mode, refresh_rate, theme, super):
         # Only add --mode if specified (not None)
         if mode is not None:
             sys.argv.extend(["--mode", mode])
+
+        # Only add --user if specified (not None)
+        if user is not None:
+            sys.argv.extend(["--user", user])
 
         # Add refresh rate
         sys.argv.extend(["--refresh-rate", str(refresh_rate)])

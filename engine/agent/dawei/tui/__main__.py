@@ -232,6 +232,13 @@ Notes:
         help="Agent mode (optional, default: load from workspace config)",
     )
 
+    parser.add_argument(
+        "--user",
+        "-u",
+        default="",
+        help="Runtime user identity (optional, default: registry owner_user_id > local-user, aligned with server)",
+    )
+
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     parser.add_argument(
@@ -280,6 +287,7 @@ Notes:
         workspace=args.workspace,
         llm=args.llm,
         mode=args.mode,
+        user=args.user,
         verbose=args.verbose,
         refresh_rate=args.refresh_rate,
     )

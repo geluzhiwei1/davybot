@@ -318,6 +318,7 @@ class GeweiTUIApp(App):
                 llm_model=self.config.llm,
                 mode=self.config.mode,
                 ui_update_queue=self.event_queue,
+                user_id=getattr(self.config, "user", ""),
             )
 
             # Initialize Agent and workspace

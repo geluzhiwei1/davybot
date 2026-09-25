@@ -93,6 +93,26 @@ class WorkspaceManager:
             result = [w for w in result if w.get("tenant_id", "personal") == tenant_id]
         return result
 
+    def get_workspace_by_path(self, workspace_path: str) -> Dict[str, Any] | None:
+        """根据路径获取工作区信息（resolved path 精确匹配；找不到返回 None）
+
+        TUI 等按路径打开工作区的入口用它解析归属用户（owner_user_id）。
+        """
+        try:
+            resolved = str(Path(workspace_path).resolve())
+        except OSError:
+            return None
+        for workspace in self.get_all_workspaces():
+            p = workspace.get("path")
+            if not p:
+                continue
+            try:
+                if str(Path(p).resolve()) == resolved:
+                    return workspace
+            except OSError:
+                continue
+        return None
+
     def get_workspace_name_by_id(self, workspace_id: str) -> str | None:
         """根据UUID获取工作区名称"""
         workspace = self.get_workspace_by_id(workspace_id)

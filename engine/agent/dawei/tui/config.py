@@ -28,6 +28,7 @@ class TUIConfig:
     # Agent settings
     llm: str = ""  # Will be loaded from workspace config
     mode: str = ""  # Will be loaded from workspace config (empty = load from config)
+    user: str = ""  # 运行时用户身份（空=AgentBridge 自动解析：注册表 owner > local-user）
     verbose: bool = False
 
     # TUI-specific settings
@@ -254,6 +255,7 @@ def create_tui_config(
     llm: str = "",  # Empty means load from workspace config
     mode: str = "pdca",
     verbose: bool = False,
+    user: str = "",  # Empty means auto-resolve (registry owner > local-user)
     **kwargs,
 ) -> TUIConfig:
     """Create TUI configuration
@@ -263,6 +265,7 @@ def create_tui_config(
         llm: LLM model to use (empty string to load from workspace config)
         mode: Agent mode
         verbose: Enable verbose logging
+        user: 运行时用户身份（空=自动解析，与 server 版统一）
         **kwargs: Additional TUI settings
 
     Returns:
@@ -294,4 +297,4 @@ def create_tui_config(
     merged_kwargs.update(saved_settings)
     merged_kwargs.update(kwargs)
 
-    return TUIConfig(workspace=workspace, llm=llm, mode=mode, verbose=verbose, **merged_kwargs)
+    return TUIConfig(workspace=workspace, llm=llm, mode=mode, user=user, verbose=verbose, **merged_kwargs)
