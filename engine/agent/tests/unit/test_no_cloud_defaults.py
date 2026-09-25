@@ -13,14 +13,17 @@ engine/biz sibling）时该部分跳过（业务不在场 = 不存在）。
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 
 import pytest
 
 AGENT_ROOT = Path(__file__).resolve().parents[2]
 DAWEI_ROOT = AGENT_ROOT / "dawei"
-# 拆库双项目布局：engine/agent + engine/biz（sibling）
-BIZ_ROOT = AGENT_ROOT.parent / "biz" / "dawei_biz"
+# 布局：默认 engine/agent + engine/biz sibling（开源仓双装形态）；
+# 非 sibling 布局（§18.11 davy-cloud/biz-backend）经 DAWEI_BIZ_DIR 指向 dawei_biz 包目录。
+_env_biz = os.environ.get("DAWEI_BIZ_DIR")
+BIZ_ROOT = Path(_env_biz) if _env_biz else AGENT_ROOT.parent / "biz" / "dawei_biz"
 
 
 def _docstring_nodes(tree: ast.AST) -> set[int]:
