@@ -1932,11 +1932,13 @@ class TaskNodeExecutionEngine:
         new_messages = [messages[i] for i in sorted(kept_indices)]
         conversation.messages = new_messages
 
-        # 注入压缩摘要作为系统消息，让 LLM 知道历史被压缩了
-        from dawei.entity.lm_messages import SystemMessage
+        # 注入压缩摘要（Claude Code compact 语义）：以 user 角色注入恢复指令。
+        # 不能用 SystemMessage——build_messages 会在其前方再前置 system prompt，
+        # 造成 mid-conversation system，GLM 等端点直接 400 code=1214。
+        from dawei.entity.lm_messages import UserMessage
 
-        summary_msg = SystemMessage(
-            content=(f"[Context Overflow Recovery] Conversation was compressed from {original_count} to {len(new_messages)} messages due to context window limit. Summary of removed messages:\n{summary_text}"),
+        summary_msg = UserMessage(
+            content=(f"[Context Overflow Recovery] Conversation was compressed from {original_count} to {len(new_messages)} messages due to context window limit. Summary of removed messages:\n{summary_text}\n\nPlease continue the current task."),
         )
         conversation.messages.insert(0, summary_msg)
 

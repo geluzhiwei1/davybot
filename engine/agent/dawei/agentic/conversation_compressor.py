@@ -19,6 +19,76 @@ from .context_manager import TokenEstimator
 
 logger = logging.getLogger(__name__)
 
+# 摘要消息的继续指令（Claude Code compact 语义：摘要后明确指示继续任务）
+_SUMMARY_CONTINUATION = "The conversation above has been compacted. Continue with the current task based on the summary and the recent messages that follow."
+
+# 单条被压缩 user 消息在摘要中的最大保留长度（字符）
+_SUMMARY_USER_EXCERPT_LIMIT = 600
+
+# 摘要中 user 原文摘录的条数上限（超出时保留首尾各半，防长对话摘要无界膨胀）
+_SUMMARY_USER_EXCERPT_MAX = 10
+
+
+def _convert_system_to_user(msg: Dict[str, Any]) -> Dict[str, Any]:
+    """将 mid-conversation system 消息转换为 user 角色（保留其余字段）。
+
+    content 为 None -> 空串；content 为多模态 list -> 前置 [system-note] 文本块，
+    其余块原样保留（避免把 list 渲染成 Python repr 破坏格式）。
+    """
+    converted = dict(msg)
+    converted["role"] = "user"
+    content = msg.get("content")
+    if isinstance(content, list):
+        converted["content"] = [{"type": "text", "text": "[system-note]"}, *content]
+    else:
+        converted["content"] = f"[system-note] {content or ''}"
+    return converted
+
+
+def enforce_chat_message_invariants(
+    messages: List[Dict[str, Any]],
+    *,
+    repair: bool = True,
+    allow_leading_system: bool = False,
+) -> List[Dict[str, Any]] | None:
+    """校验并修复 OpenAI/GLM 聊天消息结构不变量（Claude Code compact 语义）。
+
+    不变量：
+    1. system 角色仅允许出现在整个 messages 首位——若调用方传入的是
+       "对话段"（system prompt 由其前方单独前置，allow_leading_system=False，
+       默认），则段内不允许出现 system；若传入全量 messages
+       （allow_leading_system=True），则仅 messages[0] 可为 system
+    2. 至少存在一条 user 消息（GLM 要求 messages 含 user 轮）
+    3. 压缩段首条消息为 user（由摘要构造保证）
+
+    Args:
+        messages: 待校验的消息列表（对话段或全量 messages）
+        repair: True 时尽力修复（mid-system -> user）；False 仅校验
+        allow_leading_system: True 表示输入含 system prompt（首位允许 system）。
+            防御误用：全量调用方若漏传此参数，首位的 system prompt 会被转成
+            user——因此默认 False 只适用于对话段调用方
+
+    Returns:
+        修复后的消息列表；结构无法满足不变量（如无任何 user 消息）时返回 None，
+        调用方必须回退到原始消息（fail fast，绝不发送已知非法 payload）
+    """
+    if not any(msg.get("role") == "user" for msg in messages):
+        return None
+
+    if not repair:
+        start = 1 if (allow_leading_system and messages and messages[0].get("role") == "system") else 0
+        has_mid_system = any(m.get("role") == "system" for m in messages[start:])
+        return None if has_mid_system else messages
+
+    fixed: List[Dict[str, Any]] = []
+    for idx, msg in enumerate(messages):
+        if msg.get("role") == "system" and not (idx == 0 and allow_leading_system):
+            logger.warning(f"Converting mid-conversation system message to user: {str(msg.get('content', ''))[:80]!r}")
+            fixed.append(_convert_system_to_user(msg))
+        else:
+            fixed.append(msg)
+    return fixed
+
 
 @dataclass
 class CompressionStats:
@@ -256,12 +326,24 @@ class ConversationCompressor:
             # Level 2: 智能压缩 (50% - 90%)
             compressed, stats = self._intelligent_compression(messages, target, estimated_tokens)
             stats.strategy_used = "intelligent"
-            return compressed, stats
+        else:
+            # Level 3: 激进压缩 (> 90%)
+            compressed, stats = self._aggressive_compression(messages, target, estimated_tokens)
+            stats.strategy_used = "aggressive"
 
-        # Level 3: 激进压缩 (> 90%)
-        compressed, stats = self._aggressive_compression(messages, target, estimated_tokens)
-        stats.strategy_used = "aggressive"
-        return compressed, stats
+        # 出口统一校验结构不变量（fail fast：宁可放弃压缩也不能产出非法 messages）
+        validated = enforce_chat_message_invariants(compressed)
+        if validated is None:
+            self.logger.error(
+                "Compression result violates chat message invariants (no user message / irreparable system placement); falling back to original messages",
+            )
+            stats.strategy_used = "none"
+            stats.compressed_count = len(messages)
+            stats.compressed_tokens = estimated_tokens
+            stats.compression_ratio = 0.0
+            return messages, stats
+
+        return validated, stats
 
     def _intelligent_compression(
         self,
@@ -303,13 +385,14 @@ class ConversationCompressor:
             if middle_messages:
                 summary = self._generate_summary(middle_messages, metadata_list)
                 if summary:
-                    # 在最近消息前插入摘要
-                    insert_pos = max(0, len(compressed) - len(recent_messages))
+                    # Claude Code compact 语义：摘要以 user 角色置于对话段最前部
+                    # （紧跟 system prompt），绝不在会话中间注入 system 消息——
+                    # GLM 等端点只允许 system 位于整个 messages 首位（1214 错误）
                     compressed.insert(
-                        insert_pos,
+                        0,
                         {
-                            "role": "system",
-                            "content": f"[Conversation Summary]\n{summary}",
+                            "role": "user",
+                            "content": f"[Conversation Summary]\n{summary}\n\n{_SUMMARY_CONTINUATION}",
                             "metadata": {"is_summary": True},
                         },
                     )
@@ -354,8 +437,10 @@ class ConversationCompressor:
         recent_messages = messages[-preserve_count:] if len(messages) > preserve_count else messages
 
         # 只保留最关键的消息（错误、工具调用结果）
+        # sorted：key_indices 是 set，乱序迭代会把 tool 响应排到其 assistant
+        # tool_calls 之前，sanitize 阶段被当孤儿丢弃造成信息损失
         most_critical = []
-        for idx in key_indices:
+        for idx in sorted(key_indices):
             if idx < len(messages) - preserve_count:
                 meta = metadata_list[idx]
                 # 只保留错误和工具调用
@@ -370,34 +455,26 @@ class ConversationCompressor:
 
         middle_messages = [msg for idx, msg in enumerate(messages) if idx not in all_kept_indices]
 
-        compressed = []
+        compressed = most_critical + recent_messages
 
-        # 添加系统说明
-        compressed.append(
-            {
-                "role": "system",
-                "content": (f"The conversation history has been compressed to fit within token limits. Original conversation had {len(messages)} messages. Showing only the most recent and critical messages."),
-                "metadata": {"is_compression_notice": True},
-            },
-        )
-
-        # 添加最关键的消息
-        compressed.extend(most_critical)
-
-        # 添加摘要
-        if middle_messages:
-            summary = self._generate_summary(middle_messages, metadata_list, detailed=True)
-            if summary:
-                compressed.append(
-                    {
-                        "role": "system",
-                        "content": f"[Detailed Conversation Summary]\n{summary}",
-                        "metadata": {"is_summary": True},
-                    },
-                )
-
-        # 添加最近的消息
-        compressed.extend(recent_messages)
+        # 未删掉任何消息时不注入摘要（避免反向膨胀对话段）
+        if len(compressed) < len(messages):
+            # Claude Code compact 语义：压缩说明 + 摘要合并为一条 user 消息置于对话段
+            # 最前部。绝不注入 system 到会话中间（GLM 1214）。
+            notice = f"The conversation history has been compacted to fit within token limits. Original conversation had {len(messages)} messages. Showing only the most recent and critical messages."
+            if middle_messages:
+                summary = self._generate_summary(middle_messages, metadata_list, detailed=True)
+            else:
+                summary = ""
+            summary_content = f"{notice}\n[Detailed Conversation Summary]\n{summary}".strip() if summary else notice
+            compressed.insert(
+                0,
+                {
+                    "role": "user",
+                    "content": f"{summary_content}\n\n{_SUMMARY_CONTINUATION}",
+                    "metadata": {"is_summary": True},
+                },
+            )
 
         # 重新估算token
         compressed_tokens = self.estimate_messages_tokens(compressed)
@@ -450,6 +527,29 @@ class ConversationCompressor:
         summary_parts.append(f"Compressed {len(messages)} messages:")
         for role, count in role_counts.items():
             summary_parts.append(f"  - {count} {role} messages")
+
+        # 保留任务意图（Claude Code compact 的 "Primary Request and Intent"）：
+        # 被压缩的 user 消息原文必须进入摘要，否则唯一 user 轮被压掉后任务意图丢失
+        user_excerpts = []
+        for msg in messages:
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content", "")
+            text = " ".join([item.get("text", "") for item in content if isinstance(item, dict) and item.get("type") == "text"]) if isinstance(content, list) else str(content)
+            text = text.strip()
+            if not text:
+                continue
+            user_excerpts.append(text[:_SUMMARY_USER_EXCERPT_LIMIT])
+
+        if user_excerpts:
+            if len(user_excerpts) > _SUMMARY_USER_EXCERPT_MAX:
+                # 保留首尾各半，中间省略（首条=初始任务意图，尾条=最新指令）
+                half = _SUMMARY_USER_EXCERPT_MAX // 2
+                omitted = len(user_excerpts) - _SUMMARY_USER_EXCERPT_MAX
+                user_excerpts = user_excerpts[:half] + [f"... ({omitted} earlier user messages omitted) ..."] + user_excerpts[-half:]
+            summary_parts.append("\nUser's requests so far (verbatim excerpts):")
+            for i, excerpt in enumerate(user_excerpts, 1):
+                summary_parts.append(f"  {i}. {excerpt}")
 
         # 关键内容提取
         if detailed:

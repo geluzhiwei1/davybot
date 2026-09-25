@@ -360,9 +360,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
         from datetime import datetime
 
         _now = datetime.now(UTC)
-        dynamic_content["generation_timestamp"] = _now.replace(
-            minute=0, second=0, microsecond=0
-        ).isoformat()
+        dynamic_content["generation_timestamp"] = _now.replace(minute=0, second=0, microsecond=0).isoformat()
 
         return dynamic_content
 
@@ -841,6 +839,10 @@ class EnhancedSystemBuilder(IMessageProcessor):
         messages.append({"role": "system", "content": system_prompt})
 
         # 添加历史消息
+        # 【1214 修复】结构不变量校验函数：对话段与最终 payload 两处使用，
+        # 在 conv block 外也要可用（lazy import，遵循本文件惯例）
+        from dawei.agentic.conversation_compressor import enforce_chat_message_invariants
+
         if conv and hasattr(conv, "messages"):
             conversation_messages = []
             for msg in conv.messages:
@@ -882,7 +884,39 @@ class EnhancedSystemBuilder(IMessageProcessor):
 
             # 【400 修复】压缩/中断可能破坏 tool_calls 与 tool 消息配对，
             # 发送前强制修复，避免 "insufficient tool messages following tool_calls" 400
-            messages.extend(sanitize_tool_call_pairs(compressed_messages))
+            sanitized = sanitize_tool_call_pairs(compressed_messages)
+
+            # 【1214 修复】最后防线：对话段结构不变量（无 mid-system、至少一条 user）。
+            # GLM 等端点对 messages 结构强校验，违反即 400 code=1214。
+            enforced = enforce_chat_message_invariants(sanitized)
+            if enforced is None:
+                logger.critical(
+                    "Conversation segment has no user message after compression/sanitization; injecting continuation prompt to satisfy chat structure invariants",
+                )
+                # 注入后必须重跑 enforce：None 分支是无-user 早退，
+                # sanitized 里可能仍残留 mid-system 消息需要转换
+                enforced = enforce_chat_message_invariants(
+                    [
+                        {
+                            "role": "user",
+                            "content": ("[Continuation] The earlier conversation was compacted. Please continue the current task."),
+                        },
+                        *sanitized,
+                    ],
+                )
+                if enforced is None:  # 理论不可达（已含 user），防御性兜底
+                    logger.error("enforce still returned None after continuation injection; dropping conversation segment")
+                    enforced = []
+            messages.extend(enforced)
+
+        # 【1214 防御】最终 payload 终检（全量 messages，首位允许 system）。
+        # 段级 enforce 已保证对话段合法，此处防御其他路径遗漏；
+        # None 只告警不清空（无对话段时 messages=[system] 是既有形态）。
+        final_validated = enforce_chat_message_invariants(messages, allow_leading_system=True)
+        if final_validated is not None:
+            messages = final_validated
+        else:
+            logger.warning("Final messages list failed invariant check (no user message); sending as-is")
 
         # 获取工具（含 SessionToolPool 过滤 + SchemaCompressor 压缩）
         openai_tools = await self._get_tools_for_llm(user_workspace)
@@ -1011,16 +1045,11 @@ class EnhancedSystemBuilder(IMessageProcessor):
         if context_manager:
             ctx_stats = context_manager.get_stats()
             overhead = (
-                ctx_stats.breakdown.system_prompt
-                + ctx_stats.breakdown.tool_definitions
-                + ctx_stats.breakdown.skills
-                + ctx_stats.breakdown.workspace_files
-                + 8000  # 安全余量，留给模型输出
+                ctx_stats.breakdown.system_prompt + ctx_stats.breakdown.tool_definitions + ctx_stats.breakdown.skills + ctx_stats.breakdown.workspace_files + 8000  # 安全余量，留给模型输出
             )
             effective_target = max(ctx_stats.total - overhead, 8000)
             logger.info(
-                f"Effective compression budget: {effective_target} tokens "
-                f"(total={ctx_stats.total}, overhead={overhead})",
+                f"Effective compression budget: {effective_target} tokens (total={ctx_stats.total}, overhead={overhead})",
             )
 
         # 应用压缩
@@ -1334,12 +1363,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
             before = len(openai_tools)
             # mcp__ 前缀 = 一级 MCP 工具，视同 Tier-0 常驻（与 list_files
             # 同级默认可见，不依赖 search_tools 激活）
-            openai_tools = [
-                t
-                for t in openai_tools
-                if t.get("function", {}).get("name", "") in active
-                or t.get("function", {}).get("name", "").startswith("mcp__")
-            ]
+            openai_tools = [t for t in openai_tools if t.get("function", {}).get("name", "") in active or t.get("function", {}).get("name", "").startswith("mcp__")]
             after = len(openai_tools)
             logger.info(f"[PROGRESSIVE_DISCLOSURE] Pool filter: {before} → {after} tools (active: {len(active)})")
 
@@ -1430,10 +1454,7 @@ class EnhancedSystemBuilder(IMessageProcessor):
             new_core = get_core_tools_for_mode(current_mode)
             existing._core = new_core  # 更新 core，保留 _activated
             user_workspace._session_tool_pool_mode = current_mode
-            logger.info(
-                f"[PROGRESSIVE_DISCLOSURE] SessionToolPool mode changed: '{existing_mode}' → '{current_mode}', "
-                f"core={len(new_core)} tools, activated={len(existing._activated)} preserved"
-            )
+            logger.info(f"[PROGRESSIVE_DISCLOSURE] SessionToolPool mode changed: '{existing_mode}' → '{current_mode}', core={len(new_core)} tools, activated={len(existing._activated)} preserved")
             return existing
 
         # 检查是否启用渐进式披露
