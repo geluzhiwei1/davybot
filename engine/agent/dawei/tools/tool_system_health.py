@@ -25,9 +25,12 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 import re
 from collections import Counter
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _EMPTY_OBJECT_SCHEMA = {"type": "object", "properties": {}, "required": []}
 
@@ -140,6 +143,8 @@ def audit() -> dict[str, Any]:
         providers = [SubprocessProvider, DockerProvider]
 
         # 云 provider 随 davybot-biz（S4 entry points）—— 缺席如实标注, 不算不健康
+        # (拆库 §18 核心纯净形态: 仅本地 docker/subprocess 沙箱为合法完整状态;
+        #  若计入 issues, 核心形态 CI 工具门禁必红 — 见 test_tool_system_health)
         try:
             from dawei.sandbox.saas_loader import load_saas_module
 
@@ -147,8 +152,8 @@ def audit() -> dict[str, Any]:
             providers.append(load_saas_module("cubesandbox").CubeSandboxProvider)
             providers.append(load_saas_module("cubesandbox").E2BProvider)
             providers.append(load_saas_module("saas_gateway").SaaSGateway)
-        except ImportError as e:
-            provider_issues.append(f"cloud providers skipped: {str(e)[:120]}")
+        except ImportError:
+            logger.info("cloud sandbox providers absent (davybot-biz 未安装) — 开源核心形态, 跳过云 provider 契约检查")
 
         for cls in providers:
             for meth in ("execute_command", "execute_command_async"):

@@ -53,7 +53,17 @@ class TestRegistryFloor:
     """
 
     def test_registry_size_sane(self, report: dict) -> None:
-        assert report["total"] >= 50, f"注册工具仅 {report['total']} 个 (<50), 大概率发生了批量加载失败 — 检查 CustomToolProvider.get_tools() 的 WARNING/ERROR 日志"
+        # 形敏下限（拆库 §18）：双装 109 基线 ≥50；核心纯净形态（无 davybot-biz）
+        # 实测 40 基线 ≥30 —— 下限防的是公共依赖损坏导致的批量静默萎缩,
+        # 而非业务工具缺席（缺席 = 设计内合法形态, G2 另有 catalog==18 恒等守卫）。
+        import importlib.util
+
+        dual = importlib.util.find_spec("dawei_biz") is not None
+        floor = 50 if dual else 30
+        assert report["total"] >= floor, (
+            f"注册工具仅 {report['total']} 个 (<{floor}, 形态={'双装' if dual else '核心纯净'}), "
+            f"大概率发生了批量加载失败 — 检查 CustomToolProvider.get_tools() 的 WARNING/ERROR 日志"
+        )
 
 
 @pytest.mark.unit
