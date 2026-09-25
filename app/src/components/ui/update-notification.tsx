@@ -74,7 +74,9 @@ export function UpdateNotification() {
               <Download className="h-5 w-5 animate-pulse" />
               {t("update.downloadingTitle")}
             </DialogTitle>
-            <DialogDescription>{BRAND_NAME} v{updateVersion}</DialogDescription>
+            <DialogDescription>
+              {BRAND_NAME} v{updateVersion}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4">
             <Progress value={downloadProgress} className="h-3" />
