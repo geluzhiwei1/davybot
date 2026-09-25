@@ -79,8 +79,11 @@ if [[ -n "${DAWEI_BIZ_PKG:-}" ]]; then
     echo "ERROR: DAWEI_BIZ_PKG set but not a dir: $DAWEI_BIZ_PKG" >&2
     exit 1
   fi
-  BIZ_WITH_ARGS=(--with "$DAWEI_BIZ_PKG")
-  echo "==> Biz backend: $DAWEI_BIZ_PKG (davybot-biz, frozen into bundle)"
+  # --refresh-package: uv 对本地目录的 wheel 缓存按元数据(mtime)键控, 只改 .py
+  # 不触发重建 → 曾把修复前的 biz 代码静默嵌入 saas 二进制 (§18.10 G5 重放实证)。
+  # saas 构建必须强制刷新 biz 包, 代价 ~10s 重打 wheel。
+  BIZ_WITH_ARGS=(--with "$DAWEI_BIZ_PKG" --refresh-package davybot-biz)
+  echo "==> Biz backend: $DAWEI_BIZ_PKG (davybot-biz, frozen into bundle, wheel cache refreshed)"
 fi
 
 echo "==> Building dawei server binary via build-binary.py"
