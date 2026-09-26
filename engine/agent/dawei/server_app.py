@@ -578,6 +578,11 @@ def _mount_frontend_static(app: FastAPI) -> None:
     # Legacy redirects: /legalbot-ui/* -> /app-ui/*
     from starlette.responses import RedirectResponse
 
+    # Root → Web UI: 浏览器直接访问 / 时默认进入前端界面
+    @app.get("/", include_in_schema=False)
+    async def root_to_ui():  # type: ignore[misc]
+        return RedirectResponse(url="/app-ui/")
+
     @app.get("/legalbot-ui/{path:path}")
     async def legacy_spa_fallback(path: str):  # type: ignore[misc]
         return RedirectResponse(url=f"/app-ui/{path}", status_code=301)
