@@ -56,12 +56,9 @@ const zhCN = {
     "# Memories\n\n用户级记忆（跨工作区共享）...\n\n## 用户偏好\n- ...\n\n## 工作习惯\n- ...",
   "browser.placeholder.workspace":
     "# Memories\n\n工作区级记忆（当前项目相关）...\n\n## 项目信息\n- ...\n\n## 技术栈\n- ...",
-  "browser.tab.user": "用户级",
-  "browser.tab.workspace": "工作区",
   "browser.mode.manual": "手写",
   "browser.mode.auto": "自动",
-  "browser.workspace.placeholder": "选择工作区",
-  "browser.workspace.none": "暂无工作区",
+  "browser.unsaved": "有未保存的修改",
   "browser.workspace.createFirst": "请先创建一个工作区",
   "browser.workspace.selectFirst": "请从上方下拉菜单选择一个工作区",
   "browser.lines": "{{count}}/{{limit}} 行",

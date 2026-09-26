@@ -56,12 +56,9 @@ const enUS = {
     "# Memories\n\nUser-level memories (shared across workspaces)...\n\n## Preferences\n- ...\n\n## Working habits\n- ...",
   "browser.placeholder.workspace":
     "# Memories\n\nWorkspace-level memories (current project)...\n\n## Project info\n- ...\n\n## Tech stack\n- ...",
-  "browser.tab.user": "User",
-  "browser.tab.workspace": "Workspace",
   "browser.mode.manual": "Manual",
   "browser.mode.auto": "Auto",
-  "browser.workspace.placeholder": "Select a workspace",
-  "browser.workspace.none": "No workspaces",
+  "browser.unsaved": "Unsaved changes",
   "browser.workspace.createFirst": "Please create a workspace first",
   "browser.workspace.selectFirst": "Please select a workspace from the dropdown above",
   "browser.lines": "{{count}}/{{limit}} lines",

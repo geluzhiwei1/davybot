@@ -22,21 +22,12 @@ import { memoryApi } from "@/lib/memory-service";
 import type { AutoMemoryResponse } from "@/lib/memory-service";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   RefreshCw,
   Save,
   Loader2,
   FileText,
   AlertCircle,
-  FolderOpen,
   Bot,
   Trash2,
 } from "lucide-react";
@@ -225,23 +216,6 @@ export function MemoryBrowser() {
     }
   };
 
-  // ---- Tab switching ----
-  const handleTabChange = (value: string) => {
-    draftRef.current[activeTab] = content;
-    const newTab = value as TabScope;
-    setScope(newTab);
-
-    if (newTab === "workspace" && !currentWorkspaceId && workspaces.length > 0) {
-      const firstWsId = workspaces[0].id;
-      setWorkspace(firstWsId);
-      if (mode === "manual") loadContent("workspace", firstWsId);
-      else loadAutoMemory("workspace", firstWsId);
-    } else {
-      if (mode === "manual") loadContent(newTab);
-      else loadAutoMemory(newTab);
-    }
-  };
-
   // ---- Mode switching (manual/auto) ----
   const handleModeChange = (newMode: TabMode) => {
     if (newMode === mode) return;
@@ -249,14 +223,6 @@ export function MemoryBrowser() {
     setMode(newMode);
     if (newMode === "manual") loadContent(activeTab);
     else loadAutoMemory(activeTab);
-  };
-
-  // ---- Workspace selection ----
-  const handleWorkspaceChange = (wsId: string) => {
-    if (mode === "manual") draftRef.current.workspace = content;
-    setWorkspace(wsId);
-    if (mode === "manual") loadContent("workspace", wsId);
-    else loadAutoMemory("workspace", wsId);
   };
 
   // ---- Initial load ----
@@ -281,14 +247,23 @@ export function MemoryBrowser() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaces.length]);
 
-  // Reload when workspace changes externally
+  // Reload when scope/workspace changes from the page-header dropdown
+  // (range selection is owned by routes/memory.tsx header Select — the only selector)
+  const firstRenderRef = useRef(true);
   useEffect(() => {
-    if (activeTab === "workspace" && currentWorkspaceId) {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false;
+      return;
+    }
+    if (activeTab === "user") {
+      if (mode === "manual") loadContent("user");
+      else loadAutoMemory("user");
+    } else if (currentWorkspaceId) {
       if (mode === "manual") loadContent("workspace");
       else loadAutoMemory("workspace");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentWorkspaceId]);
+  }, [activeTab, currentWorkspaceId]);
 
   const placeholder =
     activeTab === "user" ? t("browser.placeholder.user") : t("browser.placeholder.workspace");
@@ -297,26 +272,8 @@ export function MemoryBrowser() {
 
   return (
     <div className="flex flex-col h-full gap-3">
-      {/* Scope Tabs + Mode Toggle + Workspace selector */}
+      {/* Mode Toggle (scope/workspace selection is owned by the page-header dropdown) */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList>
-            <TabsTrigger value="user" className="gap-1">
-              {t("browser.tab.user")}
-              {draftRef.current.user !== (savedContent.user ?? "") && (
-                <span className="ml-1 text-amber-500">*</span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="workspace" className="gap-1">
-              {t("browser.tab.workspace")}
-              {draftRef.current.workspace !== (savedContent.workspace ?? "") && (
-                <span className="ml-1 text-amber-500">*</span>
-              )}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {/* Mode toggle: manual edit vs auto memory */}
         <div className="flex items-center gap-0.5 rounded-md border bg-muted/40 p-0.5">
           <button
             className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded transition-colors ${
@@ -342,29 +299,11 @@ export function MemoryBrowser() {
           </button>
         </div>
 
-        {/* Workspace selector */}
-        {activeTab === "workspace" && (
-          <Select value={currentWorkspaceId ?? ""} onValueChange={handleWorkspaceChange}>
-            <SelectTrigger className="h-8 text-xs w-48">
-              <SelectValue placeholder={t("browser.workspace.placeholder")} />
-            </SelectTrigger>
-            <SelectContent>
-              {workspaces.length === 0 ? (
-                <SelectItem value="__none__" disabled>
-                  {t("browser.workspace.none")}
-                </SelectItem>
-              ) : (
-                workspaces.map((ws) => (
-                  <SelectItem key={ws.id} value={ws.id} className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <FolderOpen className="w-3 h-3" />
-                      {ws.name}
-                    </span>
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+        {/* Unsaved-changes marker (manual mode) */}
+        {mode === "manual" && isDirty && (
+          <span className="text-amber-500 text-xs" title={t("browser.unsaved")}>
+            *
+          </span>
         )}
       </div>
 
