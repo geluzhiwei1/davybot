@@ -122,8 +122,11 @@ class WorkspaceInfo:
     id: str
     name: str
     display_name: str
-    description: str
-    created_at: datetime
+    # 默认空串：注册表历史记录（temp-*、agent 工作区等写入通道）普遍无 description，
+    # v2 列表响应模型按本 dataclass 校验，必填会让一条缺字段记录打挂整个列表（500）。
+    description: str = ""
+    # 需跟随默认值（dataclass 字段序）；缺省取当前时间。
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     owner_user_id: str = "default_user"  # 多租户：工作区归属用户 ID
     is_active: bool = True
     files_list: List[str] = field(default_factory=list)
