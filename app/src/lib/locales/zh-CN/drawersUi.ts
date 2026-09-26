@@ -560,10 +560,10 @@ const zhCN = {
   "user.prefs.compactHint": "减少界面间距",
 
   // user About tab
-  "user.about.tagline": "AI-Native 全球合规引擎",
+  "user.about.tagline": "AI-Native 通用智能体",
   "user.about.version": "版本",
   "user.about.product": "产品",
-  "user.about.productValue": "NormNomos 合规平台",
+  "user.about.productValue": "NormNomos 智能体平台",
   "user.about.architecture": "架构",
 };
 

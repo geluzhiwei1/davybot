@@ -162,7 +162,7 @@ const enUS = {
   "sidebar.nav.social.governance": "Brand Governance",
   "sidebar.nav.social.accounts": "Account Matrix",
   "sidebar.nav.social.integrations": "Integrations & API",
-  "sidebar.tagline": "AI-Native Global Compliance Engine",
+  "sidebar.tagline": "AI-Native General-Purpose Agent",
   "sidebar.user.default": "User",
   "sidebar.user.personal": "Personal",
   "sidebar.user.switch": "Switch identity",

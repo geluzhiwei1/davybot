@@ -152,7 +152,7 @@ const zhCN = {
 
   // 导航分组/条目标题走 sidebar-config.ts 的 navTitle 渲染期解析:
   // zh 缺键回退配置原文(即中文),英文翻译集中在 en-US/commonUi.ts 的 sidebar.nav.* 段
-  "sidebar.tagline": "AI-Native全球合规引擎",
+  "sidebar.tagline": "AI-Native 通用智能体",
   "sidebar.user.default": "用户",
   "sidebar.user.personal": "个人身份",
   "sidebar.user.switch": "切换身份",

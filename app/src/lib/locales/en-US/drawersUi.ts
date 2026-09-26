@@ -577,10 +577,10 @@ const enUS = {
   "user.prefs.compactHint": "Reduce interface spacing",
 
   // user About tab
-  "user.about.tagline": "AI-Native Global Compliance Engine",
+  "user.about.tagline": "AI-Native General-Purpose Agent",
   "user.about.version": "Version",
   "user.about.product": "Product",
-  "user.about.productValue": "NormNomos Compliance Platform",
+  "user.about.productValue": "NormNomos Agent Platform",
   "user.about.architecture": "Architecture",
 };
 
