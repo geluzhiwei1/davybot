@@ -94,7 +94,7 @@ export default {
   "index.tasksCount": "{{count}} 个任务",
   "index.quickStartTitle": "快速开启智能体",
   "index.quickStartHint": "输入问题，立刻开启一个新聊天",
-  "index.quickStartPlaceholder": "例如：华为有哪些制裁信息…",
+  "index.quickStartPlaceholder": "例如：帮我制定一份读书计划并推荐书目…",
   "index.startNow": "立即开始",
   "index.pinnedSection": "快捷入口",
   "index.unpin": "取消固定",

@@ -109,7 +109,7 @@ export default {
   "index.tasksCount": "{{count}} tasks",
   "index.quickStartTitle": "Quick Start an Agent",
   "index.quickStartHint": "Type a question to start a new chat instantly",
-  "index.quickStartPlaceholder": "e.g. What sanctions information exists for Huawei…",
+  "index.quickStartPlaceholder": "e.g. Make me a reading plan with book recommendations…",
   "index.startNow": "Start Now",
   "index.pinnedSection": "Pinned Shortcuts",
   "index.unpin": "Unpin",
