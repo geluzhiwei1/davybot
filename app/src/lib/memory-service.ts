@@ -189,12 +189,13 @@ class MemoryApiService {
 
   /** Get workspace-level auto-memory. */
   async getWorkspaceAutoMemory(workspaceId: string): Promise<AutoMemoryResponse> {
-    return httpClient.get<AutoMemoryResponse>(`${this.base(workspaceId)}/memory/auto`);
+    // base 已含 /memory 段; 重复拼接 /memory/auto 会 404 (工作区 Auto 标签加载失败)
+    return httpClient.get<AutoMemoryResponse>(`${this.base(workspaceId)}/auto`);
   }
 
   /** Clear workspace-level auto-memory. */
   async clearWorkspaceAutoMemory(workspaceId: string): Promise<void> {
-    return httpClient.delete<void>(`${this.base(workspaceId)}/memory/auto`);
+    return httpClient.delete<void>(`${this.base(workspaceId)}/auto`);
   }
 
   /** Get workspace-level memory.md content. */
