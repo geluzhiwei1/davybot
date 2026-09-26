@@ -684,14 +684,13 @@ async def update_workspace_memory_md(workspace_id: str, request: MemoryMdRequest
 
 @router.get("/{workspace_id}/memory/auto")
 async def get_workspace_auto_memory(workspace_id: str):
-    """获取工作区级 auto-memory (索引 + 各主题文件内容)."""
+    """获取工作区级 auto-memory (索引 + 各主题文件内容, 主题自由命名目录扫描)."""
     from dawei.memory.auto_memory import (
-        workspace_auto_memory_dir,
+        get_stats,
+        list_topics,
         read_auto_memory_index,
         read_topic_file,
-        list_topics,
-        get_stats,
-        _TOPIC_FILES,
+        workspace_auto_memory_dir,
     )
 
     workspace_path = _get_workspace_path(workspace_id)
@@ -701,10 +700,10 @@ async def get_workspace_auto_memory(workspace_id: str):
     base_dir = workspace_auto_memory_dir(workspace_path)
     index = read_auto_memory_index(base_dir)
     topics_content = {}
-    for cat in _TOPIC_FILES:
-        content = read_topic_file(base_dir, cat)
+    for topic in list_topics(base_dir):
+        content = read_topic_file(base_dir, topic)
         if content.strip():
-            topics_content[cat] = content
+            topics_content[topic] = content
 
     return {
         "index": index,
@@ -718,7 +717,7 @@ async def get_workspace_auto_memory(workspace_id: str):
 @router.delete("/{workspace_id}/memory/auto")
 async def clear_workspace_auto_memory(workspace_id: str):
     """清空工作区级 auto-memory."""
-    from dawei.memory.auto_memory import workspace_auto_memory_dir, clear_all
+    from dawei.memory.auto_memory import clear_all, workspace_auto_memory_dir
 
     workspace_path = _get_workspace_path(workspace_id)
     if not workspace_path:
@@ -729,10 +728,32 @@ async def clear_workspace_auto_memory(workspace_id: str):
     return {"message": "Auto memory cleared"}
 
 
+@router.delete("/{workspace_id}/memory/auto/entry")
+async def delete_workspace_auto_memory_entry(
+    workspace_id: str,
+    topic: str,
+    line: int,
+):
+    """删除工作区级 auto-memory 单条条目 (更新 = 删旧 + 存新).
+
+    line 为该主题文件中第 n 个条目 (与索引 {topic}.md#L{n} 引用同语义).
+    """
+    from dawei.memory.auto_memory import delete_entry, workspace_auto_memory_dir
+
+    workspace_path = _get_workspace_path(workspace_id)
+    if not workspace_path:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    base_dir = workspace_auto_memory_dir(workspace_path)
+    if not delete_entry(base_dir, topic, line):
+        raise HTTPException(status_code=404, detail=f"Entry not found: {topic}#L{line}")
+    return {"message": "Entry deleted", "topic": topic, "line": line}
+
+
 @router.get("/{workspace_id}/memory/auto/stats")
 async def get_workspace_auto_memory_stats(workspace_id: str):
     """获取工作区级 auto-memory 统计."""
-    from dawei.memory.auto_memory import workspace_auto_memory_dir, get_stats
+    from dawei.memory.auto_memory import get_stats, workspace_auto_memory_dir
 
     workspace_path = _get_workspace_path(workspace_id)
     if not workspace_path:

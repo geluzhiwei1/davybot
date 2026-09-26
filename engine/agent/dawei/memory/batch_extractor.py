@@ -10,10 +10,10 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from dawei.core.datetime_compat import UTC
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
+from dawei.core.datetime_compat import UTC
 from dawei.memory.memory_graph import MemoryEntry, MemoryGraph, MemoryType
 
 
@@ -489,7 +489,7 @@ class BatchMemoryExtractor:
         return False
 
     def _memory_type_to_auto_category(self, memory: MemoryEntry) -> str:
-        """将 MemoryType 映射到 auto-memory 类别.
+        """将 MemoryType 映射到 auto-memory 主题 (legacy slug, 仍是合法自由 topic).
 
         Mapping:
             PREFERENCE → preferences
@@ -515,9 +515,9 @@ class BatchMemoryExtractor:
         Returns: 写入的条目数
         """
         from dawei.memory.auto_memory import (
+            append_memory,
             user_auto_memory_dir,
             workspace_auto_memory_dir,
-            append_memory,
         )
 
         user_dir = user_auto_memory_dir(self.user_id)
@@ -527,14 +527,14 @@ class BatchMemoryExtractor:
         for mem in memories:
             try:
                 is_user_level = self._should_go_to_user_level(mem)
-                category = self._memory_type_to_auto_category(mem)
+                topic = self._memory_type_to_auto_category(mem)
                 summary = f"{mem.subject} {mem.predicate} {mem.object[:100]}"
                 detail = f"{mem.subject} {mem.predicate} {mem.object}"
 
                 target_dir = user_dir if is_user_level else ws_dir
                 append_memory(
                     base_dir=target_dir,
-                    category=category,  # type: ignore
+                    topic=topic,
                     summary=summary,
                     detail=detail,
                 )

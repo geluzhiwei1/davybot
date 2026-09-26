@@ -10,15 +10,16 @@
 from pydantic import BaseModel, Field
 
 from dawei.core.decorators import safe_tool_operation
+from dawei.memory.auto_memory import topic_slug
 from dawei.tools.custom_base_tool import CustomBaseTool
 
 
 class SaveMemoryInput(BaseModel):
     """Input for SaveMemoryTool."""
 
-    category: str = Field(
+    topic: str = Field(
         ...,
-        description="Memory category: 'facts' (事实), 'preferences' (偏好), 'procedures' (操作经验), 'debugging' (调试记录)",
+        description=("Short topic label grouping related memories, free-form (no fixed list). Pick concise, reusable names, e.g. '用户偏好', '项目规范', '客户A要求', '产品知识', '工作流程', 'facts'. Existing topics are preferred over near-duplicates."),
     )
     summary: str = Field(
         ...,
@@ -35,12 +36,11 @@ class SaveMemoryInput(BaseModel):
 
 
 class SaveMemoryTool(CustomBaseTool):
-    """Save a memory to auto-memory files.
+    """Save a memory for future conversations.
 
     Use when:
     - User says "记住", "remember", "记下来"
-    - You discover a user preference worth remembering
-    - You learn a project-specific fact or debugging insight
+    - You discover any durable fact, preference, decision, or insight worth remembering
 
     The memory will be injected into future conversations automatically.
     """
@@ -49,8 +49,9 @@ class SaveMemoryTool(CustomBaseTool):
     description: str = (
         "Save a memory for future conversations. "
         "Use when the user says '记住' or you discover something worth remembering. "
-        "Categories: facts, preferences, procedures, debugging. "
-        "Scope: 'user' (about the user, cross-workspace) or 'workspace' (project-specific)."
+        "topic: free-form short label (e.g. '用户偏好', '项目规范', '客户要求', '操作经验'). "
+        "Scope: 'user' (about the user, cross-workspace) or 'workspace' (project-specific). "
+        "Append-only: if a fact changed, save the corrected entry (user can delete stale ones)."
     )
     args_schema: type[BaseModel] = SaveMemoryInput
 
@@ -67,7 +68,7 @@ class SaveMemoryTool(CustomBaseTool):
     )
     def _run(
         self,
-        category: str = "facts",
+        topic: str = "",
         summary: str = "",
         detail: str | None = None,
         scope: str = "workspace",
@@ -75,7 +76,7 @@ class SaveMemoryTool(CustomBaseTool):
         """Save memory to auto-memory file.
 
         Args:
-            category: facts / preferences / procedures / debugging
+            topic: 自由主题短标签 (决定主题文件名)
             summary: One-line summary
             detail: Optional detailed content
             scope: user (cross-workspace) or workspace (project-specific)
@@ -85,13 +86,12 @@ class SaveMemoryTool(CustomBaseTool):
         """
         import json
 
-        # Validate category
-        valid_categories = {"facts", "preferences", "procedures", "debugging"}
-        if category not in valid_categories:
+        # Validate topic (free-form, slug must be non-empty)
+        if not topic_slug(topic or ""):
             return json.dumps(
                 {
                     "status": "error",
-                    "message": f"Invalid category '{category}'. Must be one of: {valid_categories}",
+                    "message": "Invalid topic: provide a short non-empty label (letters/CJK/digits)",
                 }
             )
 
@@ -121,15 +121,13 @@ class SaveMemoryTool(CustomBaseTool):
                 workspace_path = getattr(uw, "absolute_path", None)
 
         if scope == "workspace" and not workspace_path:
-            return json.dumps(
-                {"status": "error", "message": "No workspace available for workspace-scoped memory"}
-            )
+            return json.dumps({"status": "error", "message": "No workspace available for workspace-scoped memory"})
 
         # Write to auto-memory
         from dawei.memory.auto_memory import (
+            append_memory,
             user_auto_memory_dir,
             workspace_auto_memory_dir,
-            append_memory,
         )
 
         try:
@@ -140,7 +138,7 @@ class SaveMemoryTool(CustomBaseTool):
 
             append_memory(
                 base_dir=base_dir,
-                category=category,  # type: ignore
+                topic=topic.strip(),
                 summary=summary,
                 detail=detail,
             )
@@ -148,9 +146,9 @@ class SaveMemoryTool(CustomBaseTool):
             return json.dumps(
                 {
                     "status": "success",
-                    "message": f"Memory saved: [{category}] {summary[:60]}",
+                    "message": f"Memory saved: [{topic.strip()[:24]}] {summary[:60]}",
                     "scope": scope,
-                    "category": category,
+                    "topic": topic.strip()[:24],
                 }
             )
         except Exception as e:

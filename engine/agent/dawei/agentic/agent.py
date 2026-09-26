@@ -1348,14 +1348,16 @@ Only extract clear, concrete facts worth remembering for future conversations.
 Skip vague or obvious things.
 
 For each memory, output ONE line in this format:
-CATEGORY|summary
-Where CATEGORY is one of: facts, preferences, procedures, debugging
+scope|topic|summary
+- scope: 'user' (about the user personally, cross-workspace) or 'workspace' (project-specific)
+- topic: a short free-form label grouping related memories (no fixed list),
+  e.g. '用户偏好', '项目规范', '客户要求', '操作经验'
 
 Examples:
-facts|Project uses PostgreSQL 15 with pgvector
-preferences|User prefers Chinese responses
-procedures|Deploy with: npm build && scp && pm2 reload
-debugging|API 500 error was caused by DB connection pool exhaustion
+user|用户偏好|User prefers Chinese responses
+workspace|项目规范|Project uses PostgreSQL 15 with pgvector
+workspace|操作经验|Deploy with: npm build && scp && pm2 reload
+user|饮食偏好|User is vegetarian
 
 If nothing noteworthy, output exactly: NONE
 
@@ -1379,8 +1381,9 @@ Memories:"""
             if raw.upper() == "NONE" or not raw:
                 return
 
-            # 解析每行: CATEGORY|summary
+            # 解析每行: scope|topic|summary
             from dawei.memory.auto_memory import (
+                topic_slug,
                 user_auto_memory_dir,
                 workspace_auto_memory_dir,
                 append_memory,
@@ -1392,34 +1395,31 @@ Memories:"""
             )
             ws_dir = workspace_auto_memory_dir(self.user_workspace.absolute_path)
 
-            # 用户级类别 (关于用户本人的)
-            user_categories = {"preferences"}
             count = 0
 
             for line in raw.split("\n"):
                 line = line.strip()
-                if not line or "|" not in line:
+                if not line or line.count("|") < 2:
                     continue
 
-                parts = line.split("|", 1)
-                if len(parts) != 2:
+                scope, topic, summary = (p.strip() for p in line.split("|", 2))
+
+                # scope 非法默认工作区级; topic slug 非空才收
+                if scope not in ("user", "workspace"):
+                    scope = "workspace"
+                if not topic_slug(topic):
                     continue
 
-                category = parts[0].strip().lower()
-                summary = redact_secrets(parts[1].strip())
-
-                if category not in ("facts", "preferences", "procedures", "debugging"):
-                    continue
+                summary = redact_secrets(summary)
                 if len(summary) < 3:
                     continue
 
-                # 路由: preferences → 用户级, 其余 → 工作区级
-                target_dir = user_dir if category in user_categories else ws_dir
+                target_dir = user_dir if scope == "user" else ws_dir
 
                 try:
                     append_memory(
                         base_dir=target_dir,
-                        category=category,  # type: ignore
+                        topic=topic,
                         summary=summary,
                     )
                     count += 1

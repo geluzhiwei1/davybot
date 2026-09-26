@@ -198,6 +198,20 @@ class MemoryApiService {
     return httpClient.delete<void>(`${this.base(workspaceId)}/auto`);
   }
 
+  /** Delete one user-level auto-memory entry (更新 = 删旧 + 存新). */
+  async deleteUserAutoMemoryEntry(topic: string, line: number): Promise<void> {
+    return httpClient.delete<void>("/api/users/me/memory/auto/entry", { topic, line });
+  }
+
+  /** Delete one workspace-level auto-memory entry. */
+  async deleteWorkspaceAutoMemoryEntry(
+    workspaceId: string,
+    topic: string,
+    line: number,
+  ): Promise<void> {
+    return httpClient.delete<void>(`${this.base(workspaceId)}/auto/entry`, { topic, line });
+  }
+
   /** Get workspace-level memory.md content. */
   async getWorkspaceMemoryMd(workspaceId: string): Promise<{ content: string; path: string }> {
     return httpClient.get<{ content: string; path: string }>(`${this.base(workspaceId)}/md`);

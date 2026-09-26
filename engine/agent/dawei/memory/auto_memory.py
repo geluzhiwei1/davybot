@@ -7,39 +7,44 @@
   - 用户级: {DAWEI_HOME}/configs/{uid}/auto-memory/
   - 工作区级: {workspace}/.dawei/auto-memory/
 
-每级目录结构:
+每级目录结构 (topic 为自由主题, 由 LLM/用户自定, 无固定枚举):
   MEMORY.md          — 索引文件 (每条记忆一行摘要, 注入前 MAX_INDEX_LINES 行)
-  facts.md           — 事实 (技术栈、架构等)
-  preferences.md     — 偏好 (回复风格、语言)
-  procedures.md      — 操作经验 (部署流程、步骤)
-  debugging.md       — 踩坑记录
+  {topic}.md         — 主题文件 (每个主题一个, 文件名 = topic 的安全 slug)
+
+历史兼容: 旧固定四类 facts/preferences/procedures/debugging 自然降级为
+普通 topic (目录扫描读取, 无需迁移)。
 
 注入策略: 仅 MEMORY.md 前 MAX_INDEX_LINES 行注入系统提示词,
 主题文件不注入, Agent 可用工具按需读取。
+
+更新语义: 追加式 —— save_memory 只追加; 索引按摘要去重 (同摘要不重复);
+单条删除走 delete_entry (API/UI 暴露), 偏好变化 = 删旧 + 存新。
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+import re
+import unicodedata
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
 
 from dawei import get_dawei_home
 from dawei.memory.memory_file import _safe_uid
 
 logger = logging.getLogger(__name__)
 
-MemoryCategory = Literal["facts", "preferences", "procedures", "debugging"]
+# topic 为自由字符串 (不再枚举); 保留类型别名便于调用方注解
+MemoryCategory = str
 
 MAX_INDEX_LINES = 100
 MAX_INDEX_BYTES = 4096
 
-_TOPIC_FILES: dict[str, str] = {
-    "facts": "事实",
-    "preferences": "偏好",
-    "procedures": "操作经验",
-    "debugging": "调试记录",
-}
+# topic slug 上限 (字符数)
+MAX_TOPIC_LEN = 24
+
+# slug 安全字符: 字母/数字/CJK/连字符/下划线; 其余 (含空白、路径分隔符、标点) → '-'
+_TOPIC_UNSAFE = re.compile(r"[^\w\u4e00-\u9fff\u3400-\u4dbf-]+", re.UNICODE)
 
 _INDEX_TEMPLATE = """\
 # Auto Memory Index
@@ -49,8 +54,28 @@ _INDEX_TEMPLATE = """\
 
 
 # ------------------------------------------------------------------
+# Topic slug
+# ------------------------------------------------------------------
+
+
+def topic_slug(topic: str) -> str:
+    """把自由 topic 转成安全文件名 (保留中文/字母/数字/-/_).
+
+    - NFC 归一 + 空白折叠
+    - 不安全字符替换为 '-'
+    - 截断到 MAX_TOPIC_LEN
+    - 返回空串表示非法 topic (调用方 FAST FAIL)
+    """
+    normalized = unicodedata.normalize("NFC", str(topic)).strip()
+    slug = _TOPIC_UNSAFE.sub("-", normalized)
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")
+    return slug[:MAX_TOPIC_LEN]
+
+
+# ------------------------------------------------------------------
 # Path resolution
 # ------------------------------------------------------------------
+
 
 def user_auto_memory_dir(user_id: str = "default_user") -> Path:
     """用户级 auto-memory 目录 (跨工作区共享)."""
@@ -66,13 +91,21 @@ def _index_path(base_dir: Path) -> Path:
     return base_dir / "MEMORY.md"
 
 
-def _topic_path(base_dir: Path, category: MemoryCategory) -> Path:
-    return base_dir / f"{category}.md"
+def _topic_path(base_dir: Path, topic: str) -> Path:
+    return base_dir / f"{topic_slug(topic)}.md"
+
+
+def _iter_topic_files(base_dir: Path) -> list[Path]:
+    """列出目录下全部主题文件 (按名排序, 排除索引)."""
+    if not base_dir.exists():
+        return []
+    return sorted(p for p in base_dir.glob("*.md") if p.name != "MEMORY.md")
 
 
 # ------------------------------------------------------------------
 # Read
 # ------------------------------------------------------------------
+
 
 def read_auto_memory_index(base_dir: Path) -> str:
     """读取 MEMORY.md 索引, 保留 header + 最近 MAX_INDEX_LINES 条目 / MAX_INDEX_BYTES 字节.
@@ -124,9 +157,9 @@ def read_auto_memory_index(base_dir: Path) -> str:
     return result
 
 
-def read_topic_file(base_dir: Path, category: MemoryCategory) -> str:
+def read_topic_file(base_dir: Path, topic: str) -> str:
     """读取主题文件全文."""
-    path = _topic_path(base_dir, category)
+    path = _topic_path(base_dir, topic)
     if not path.exists():
         return ""
     try:
@@ -137,20 +170,23 @@ def read_topic_file(base_dir: Path, category: MemoryCategory) -> str:
 
 
 def list_topics(base_dir: Path) -> dict[str, int]:
-    """返回 {category: line_count} 仅包含有内容的主题."""
+    """返回 {topic_slug: line_count} 仅包含有内容的主题 (目录扫描)."""
     result = {}
-    for cat in _TOPIC_FILES:
-        content = read_topic_file(base_dir, cat)
+    for path in _iter_topic_files(base_dir):
+        try:
+            content = path.read_text(encoding="utf-8")
+        except Exception:
+            continue
         if content.strip():
-            # Count non-empty, non-header lines
-            lines = [l for l in content.strip().split("\n") if l.strip() and not l.startswith("#")]
-            result[cat] = len(lines)
+            lines = [ln for ln in content.strip().split("\n") if ln.strip() and not ln.startswith("#")]
+            result[path.stem] = len(lines)
     return result
 
 
 # ------------------------------------------------------------------
 # Write — append a memory entry
 # ------------------------------------------------------------------
+
 
 def _ensure_dir(base_dir: Path) -> None:
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -164,18 +200,22 @@ def _ensure_index(base_dir: Path) -> None:
         path.write_text(_INDEX_TEMPLATE, encoding="utf-8")
 
 
-def _ensure_topic(base_dir: Path, category: MemoryCategory) -> None:
-    """创建主题文件如果不存在."""
-    path = _topic_path(base_dir, category)
+def _ensure_topic(base_dir: Path, topic: str) -> Path:
+    """创建主题文件如果不存在; 返回文件路径. topic 非法时抛 ValueError."""
+    slug = topic_slug(topic)
+    if not slug:
+        raise ValueError(f"invalid memory topic: {topic!r}")
+    path = base_dir / f"{slug}.md"
     if not path.exists():
         _ensure_dir(base_dir)
-        label = _TOPIC_FILES.get(category, category)
-        path.write_text(f"# {label}\n\n", encoding="utf-8")
+        # 标题用原始 topic 文本 (slug 可能被截断/替换)
+        path.write_text(f"# {str(topic).strip()}\n\n", encoding="utf-8")
+    return path
 
 
 def append_memory(
     base_dir: Path,
-    category: MemoryCategory,
+    topic: str,
     summary: str,
     detail: str | None = None,
 ) -> None:
@@ -183,16 +223,19 @@ def append_memory(
 
     Args:
         base_dir: auto-memory 目录 (user 或 workspace)
-        category: 记忆类别
+        topic: 自由主题 (如 '用户偏好'/'项目规范'/'facts'), 决定主题文件名
         summary: 一行摘要 (写入 MEMORY.md 索引)
         detail: 详细内容 (写入主题文件), None 则只用 summary
     """
+    slug = topic_slug(topic)
+    if not slug:
+        raise ValueError(f"invalid memory topic: {topic!r}")
+
     _ensure_index(base_dir)
-    _ensure_topic(base_dir, category)
+    topic_path = _ensure_topic(base_dir, topic)
 
     # 1) 写主题文件
-    topic_path = _topic_path(base_dir, category)
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ts = datetime.now(UTC).strftime("%Y-%m-%d")
     entry = detail or summary
     block = f"- [{ts}] {entry.strip()}\n"
     try:
@@ -204,7 +247,7 @@ def append_memory(
     # 2) 写索引 (一行摘要 + 引用)
     line_num = _count_topic_entries(topic_path)
     index_path = _index_path(base_dir)
-    index_line = f"- [{category}] {summary.strip()} → {category}.md#L{line_num}\n"
+    index_line = f"- [{slug}] {summary.strip()} → {slug}.md#L{line_num}\n"
     try:
         with index_path.open("a", encoding="utf-8") as f:
             f.write(index_line)
@@ -217,14 +260,14 @@ def append_memory(
     except Exception:
         pass
 
-    logger.info(f"Auto memory saved: [{category}] {summary[:60]}")
+    logger.info(f"Auto memory saved: [{slug}] {summary[:60]}")
 
 
 def _count_topic_entries(topic_path: Path) -> int:
     """统计主题文件中的条目数 (非空非注释行)."""
     try:
         content = topic_path.read_text(encoding="utf-8")
-        return sum(1 for l in content.split("\n") if l.strip().startswith("- "))
+        return sum(1 for ln in content.split("\n") if ln.strip().startswith("- "))
     except Exception:
         return 0
 
@@ -262,7 +305,7 @@ def _compact_index(base_dir: Path) -> int:
         seen: set[str] = set()
         deduped: list[str] = []
         for entry in entries:
-            # Extract summary key: "- [category] summary → ..."
+            # Extract summary key: "- [topic] summary → ..."
             parts = entry.split("]", 2)
             summary_key = parts[1].strip().split("→")[0].strip().lower() if len(parts) >= 2 else entry.lower()
             if summary_key not in seen:
@@ -281,14 +324,9 @@ def _compact_index(base_dir: Path) -> int:
             return original_count
 
         if trimmed:
-            logger.warning(
-                f"Auto memory index compacted: {original_count} → {len(deduped)} "
-                f"(deduped + trimmed to 80%)"
-            )
+            logger.warning(f"Auto memory index compacted: {original_count} → {len(deduped)} (deduped + trimmed to 80%)")
         else:
-            logger.info(
-                f"Auto memory index deduplicated: {original_count} → {len(deduped)}"
-            )
+            logger.info(f"Auto memory index deduplicated: {original_count} → {len(deduped)}")
 
         # Rewrite index
         new_content = _INDEX_TEMPLATE
@@ -306,38 +344,46 @@ def _compact_index(base_dir: Path) -> int:
 # Delete
 # ------------------------------------------------------------------
 
+
 def clear_all(base_dir: Path) -> None:
     """清空 auto-memory 目录中的所有内容, 重置为初始模板."""
     _ensure_dir(base_dir)
     # Reset index
     _index_path(base_dir).write_text(_INDEX_TEMPLATE, encoding="utf-8")
-    # Remove topic files
-    for cat in _TOPIC_FILES:
-        path = _topic_path(base_dir, cat)
-        if path.exists():
+    # Remove all topic files
+    for path in _iter_topic_files(base_dir):
+        try:
             path.unlink()
+        except Exception as e:
+            logger.warning(f"Failed to remove topic file {path}: {e}")
     logger.info(f"Cleared auto memory: {base_dir}")
 
 
-def delete_entry(base_dir: Path, category: MemoryCategory, line_num: int) -> bool:
-    """删除主题文件中指定行 + 对应索引行."""
-    topic_path = _topic_path(base_dir, category)
+def delete_entry(base_dir: Path, topic: str, line_num: int) -> bool:
+    """删除主题文件中第 line_num 个条目 (与索引引用 {slug}.md#L{n} 同语义) + 重建索引."""
+    topic_path = _topic_path(base_dir, topic)
     if not topic_path.exists():
         return False
 
     try:
         lines = topic_path.read_text(encoding="utf-8").split("\n")
-        if line_num < 1 or line_num > len(lines):
+        # line_num 指第 n 个条目行 ("- " 开头), 而非文件物理行号 —— 与索引 #L 引用一致
+        entry_idxs = [i for i, ln in enumerate(lines) if ln.strip().startswith("- ")]
+        if line_num < 1 or line_num > len(entry_idxs):
             return False
 
-        # Remove the entry line
-        idx = line_num - 1
+        idx = entry_idxs[line_num - 1]
         removed = lines.pop(idx)
-        topic_path.write_text("\n".join(lines), encoding="utf-8")
+        # 条目删空后删除整个主题文件 (不留空壳)
+        remaining = [ln for ln in lines if ln.strip() and not ln.startswith("#")]
+        if remaining:
+            topic_path.write_text("\n".join(lines), encoding="utf-8")
+        else:
+            topic_path.unlink()
 
-        # Rebuild index for this category
+        # Rebuild index
         _rebuild_index(base_dir)
-        logger.info(f"Deleted auto memory entry [{category}] line {line_num}")
+        logger.info(f"Deleted auto memory entry [{topic}] line {line_num}: {removed[:60]}")
         return True
     except Exception as e:
         logger.warning(f"Failed to delete entry: {e}")
@@ -347,31 +393,29 @@ def delete_entry(base_dir: Path, category: MemoryCategory, line_num: int) -> boo
 def _rebuild_index(base_dir: Path) -> None:
     """从主题文件重建 MEMORY.md 索引."""
     _ensure_dir(base_dir)
-    lines = [_INDEX_TEMPLATE]
+    parts = [_INDEX_TEMPLATE]
 
-    for cat, label in _TOPIC_FILES.items():
-        topic_path = _topic_path(base_dir, cat)
-        if not topic_path.exists():
-            continue
+    for topic_path in _iter_topic_files(base_dir):
         try:
             content = topic_path.read_text(encoding="utf-8")
-            entries = [l for l in content.split("\n") if l.strip().startswith("- ")]
+            entries = [ln for ln in content.split("\n") if ln.strip().startswith("- ")]
             for i, entry in enumerate(entries, 1):
                 # Extract summary from entry (strip timestamp prefix)
                 summary = entry.strip()
                 # Format: "- [2025-01-15] content"
                 if "]" in summary:
                     summary = summary.split("]", 1)[1].strip()
-                lines.append(f"- [{cat}] {summary[:120]} → {cat}.md#L{i}\n")
+                parts.append(f"- [{topic_path.stem}] {summary[:120]} → {topic_path.stem}.md#L{i}\n")
         except Exception:
             pass
 
-    _index_path(base_dir).write_text("".join(lines), encoding="utf-8")
+    _index_path(base_dir).write_text("".join(parts), encoding="utf-8")
 
 
 # ------------------------------------------------------------------
 # Stats
 # ------------------------------------------------------------------
+
 
 def get_stats(base_dir: Path) -> dict:
     """返回 auto-memory 统计信息.
@@ -385,7 +429,7 @@ def get_stats(base_dir: Path) -> dict:
     if index_path.exists():
         try:
             raw = index_path.read_text(encoding="utf-8")
-            actual_index_lines = sum(1 for l in raw.split("\n") if l.strip().startswith("- ["))
+            actual_index_lines = sum(1 for ln in raw.split("\n") if ln.strip().startswith("- ["))
         except Exception:
             pass
 

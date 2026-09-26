@@ -311,23 +311,22 @@ async def update_user_memory_md(
 
 @router.get("/auto")
 async def get_user_auto_memory(current_user: str = Depends(get_authenticated_user_id)):
-    """获取用户级 auto-memory (索引 + 各主题文件内容)."""
+    """获取用户级 auto-memory (索引 + 各主题文件内容, 主题自由命名目录扫描)."""
     from dawei.memory.auto_memory import (
-        user_auto_memory_dir,
+        get_stats,
+        list_topics,
         read_auto_memory_index,
         read_topic_file,
-        list_topics,
-        get_stats,
-        _TOPIC_FILES,
+        user_auto_memory_dir,
     )
 
     base_dir = user_auto_memory_dir(current_user)
     index = read_auto_memory_index(base_dir)
     topics_content = {}
-    for cat in _TOPIC_FILES:
-        content = read_topic_file(base_dir, cat)
+    for topic in list_topics(base_dir):
+        content = read_topic_file(base_dir, topic)
         if content.strip():
-            topics_content[cat] = content
+            topics_content[topic] = content
 
     return {
         "index": index,
@@ -341,17 +340,35 @@ async def get_user_auto_memory(current_user: str = Depends(get_authenticated_use
 @router.delete("/auto")
 async def clear_user_auto_memory(current_user: str = Depends(get_authenticated_user_id)):
     """清空用户级 auto-memory."""
-    from dawei.memory.auto_memory import user_auto_memory_dir, clear_all
+    from dawei.memory.auto_memory import clear_all, user_auto_memory_dir
 
     base_dir = user_auto_memory_dir(current_user)
     clear_all(base_dir)
     return {"message": "User auto memory cleared"}
 
 
+@router.delete("/auto/entry")
+async def delete_user_auto_memory_entry(
+    topic: str,
+    line: int,
+    current_user: str = Depends(get_authenticated_user_id),
+):
+    """删除用户级 auto-memory 单条条目 (更新 = 删旧 + 存新).
+
+    line 为该主题文件中第 n 个条目 (与索引 {topic}.md#L{n} 引用同语义).
+    """
+    from dawei.memory.auto_memory import delete_entry, user_auto_memory_dir
+
+    base_dir = user_auto_memory_dir(current_user)
+    if not delete_entry(base_dir, topic, line):
+        raise HTTPException(status_code=404, detail=f"Entry not found: {topic}#L{line}")
+    return {"message": "Entry deleted", "topic": topic, "line": line}
+
+
 @router.get("/auto/stats")
 async def get_user_auto_memory_stats(current_user: str = Depends(get_authenticated_user_id)):
     """获取用户级 auto-memory 统计."""
-    from dawei.memory.auto_memory import user_auto_memory_dir, get_stats
+    from dawei.memory.auto_memory import get_stats, user_auto_memory_dir
 
     base_dir = user_auto_memory_dir(current_user)
     return get_stats(base_dir)

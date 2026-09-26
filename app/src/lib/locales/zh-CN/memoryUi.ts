@@ -51,6 +51,7 @@ const zhCN = {
   "browser.error.loadAuto": "加载自动记忆失败",
   "browser.error.save": "保存失败",
   "browser.error.clear": "清空失败",
+  "browser.deleteEntry": "删除此条",
   "browser.placeholder.user":
     "# Memories\n\n用户级记忆（跨工作区共享）...\n\n## 用户偏好\n- ...\n\n## 工作习惯\n- ...",
   "browser.placeholder.workspace":

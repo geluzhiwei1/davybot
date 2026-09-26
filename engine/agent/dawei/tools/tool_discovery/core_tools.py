@@ -35,6 +35,9 @@ CORE_TOOLS: set[str] = {
     "call_acp_agent",
     # 工作流辅助
     "new_task",
+    # 记忆：save_memory 常驻（通用智能体的基础能力——LLM 自主决定何时记忆，
+    # 不依赖 search_tools 激活；留在 Tier-2 时模型不知道存在就永远不会调用）
+    "save_memory",
     # 委派/编排原语（与 new_task 同级——协议口诀单件 run_task、N≥2 同构
     # new_task_batch、阻塞收口 wait_tasks 都是 orchestrator 的"大脑"操作；
     # 若留在 Tier-2，模型不知道存在就不会 search_tools 激活，modes.yaml 的

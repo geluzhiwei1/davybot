@@ -186,6 +186,27 @@ export function MemoryBrowser() {
     }
   };
 
+  // ---- Delete one auto memory entry (更新 = 删旧 + 存新) ----
+  const [deletingEntry, setDeletingEntry] = useState<string | null>(null);
+
+  const handleDeleteAutoEntry = async (topic: string, line: number) => {
+    const key = `${topic}#${line}`;
+    setDeletingEntry(key);
+    setError(null);
+    try {
+      if (activeTab === "user") {
+        await memoryApi.deleteUserAutoMemoryEntry(topic, line);
+      } else if (currentWorkspaceId) {
+        await memoryApi.deleteWorkspaceAutoMemoryEntry(currentWorkspaceId, topic, line);
+      }
+      await loadAutoMemory(activeTab);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("browser.error.clear"));
+    } finally {
+      setDeletingEntry(null);
+    }
+  };
+
   // ---- Clear auto memory ----
   const handleClearAuto = async () => {
     setClearing(true);
@@ -476,11 +497,25 @@ export function MemoryBrowser() {
                         </span>
                       </div>
                       <div className="px-3 py-2 text-xs leading-relaxed space-y-1">
-                        {entries.map((entry, i) => (
-                          <div key={i} className="text-foreground/80">
-                            {entry.replace(/^- /, "• ")}
-                          </div>
-                        ))}
+                        {entries.map((entry, i) => {
+                          const entryKey = `${cat}#${i + 1}`;
+                          return (
+                            <div key={entryKey} className="group flex items-start gap-1">
+                              <span className="flex-1 text-foreground/80">
+                                {entry.replace(/^- /, "• ")}
+                              </span>
+                              <button
+                                type="button"
+                                title={t("browser.deleteEntry")}
+                                onClick={() => handleDeleteAutoEntry(cat, i + 1)}
+                                disabled={deletingEntry === entryKey}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive disabled:opacity-50 shrink-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );

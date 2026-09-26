@@ -51,6 +51,7 @@ const enUS = {
   "browser.error.loadAuto": "Failed to load automatic memories",
   "browser.error.save": "Failed to save",
   "browser.error.clear": "Failed to clear",
+  "browser.deleteEntry": "Delete this entry",
   "browser.placeholder.user":
     "# Memories\n\nUser-level memories (shared across workspaces)...\n\n## Preferences\n- ...\n\n## Working habits\n- ...",
   "browser.placeholder.workspace":
